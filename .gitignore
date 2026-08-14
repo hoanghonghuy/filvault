@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+
+bin/
+dist/
+tmp/
+coverage.out
+*.exe
+
+node_modules/
+apps/web/dist/
+
+.idea/
+.vscode/
+*.swp
