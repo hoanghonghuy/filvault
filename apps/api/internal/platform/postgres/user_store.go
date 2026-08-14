@@ -1,0 +1,126 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"filnest/internal/apperr"
+	"filnest/internal/auth"
+	"filnest/internal/user"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Store struct {
+	pool *pgxpool.Pool
+}
+
+func NewStore(pool *pgxpool.Pool) *Store {
+	return &Store{pool: pool}
+}
+
+func (s *Store) CreateUser(ctx context.Context, u user.User) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO users (
+			id, email, display_name, password_hash,
+			email_verified_at, verification_code_hash, verification_expires_at,
+			storage_used, storage_quota,
+			trash_auto_delete_enabled, trash_retention_days,
+			created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4,
+			$5, NULL, NULL,
+			$6, $7,
+			$8, $9,
+			$10, $11
+		)
+	`, u.ID, u.Email, u.DisplayName, u.PasswordHash,
+		u.EmailVerifiedAt, u.StorageUsed, u.StorageQuota,
+		u.TrashAutoDeleteEnabled, u.TrashRetentionDays,
+		u.CreatedAt, u.UpdatedAt)
+	if isUniqueViolation(err) {
+		return apperr.Conflict
+	}
+	return err
+}
+
+func (s *Store) GetUserByEmail(ctx context.Context, email string) (*user.User, error) {
+	return s.scanUser(s.pool.QueryRow(ctx, userSelect+` WHERE email = $1`, email))
+}
+
+func (s *Store) GetUserByID(ctx context.Context, id string) (*user.User, error) {
+	return s.scanUser(s.pool.QueryRow(ctx, userSelect+` WHERE id = $1`, id))
+}
+
+func (s *Store) InsertRefreshToken(ctx context.Context, tok auth.RefreshToken) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, tok.ID, tok.UserID, tok.TokenHash, tok.ExpiresAt, tok.RevokedAt, tok.CreatedAt)
+	return err
+}
+
+func (s *Store) GetRefreshTokenByHash(ctx context.Context, hash string) (*auth.RefreshToken, error) {
+	row := s.pool.QueryRow(ctx, `
+		SELECT id, user_id, token_hash, expires_at, revoked_at, created_at
+		FROM refresh_tokens
+		WHERE token_hash = $1
+	`, hash)
+	var tok auth.RefreshToken
+	err := row.Scan(&tok.ID, &tok.UserID, &tok.TokenHash, &tok.ExpiresAt, &tok.RevokedAt, &tok.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &tok, nil
+}
+
+func (s *Store) RevokeRefreshToken(ctx context.Context, hash string, at time.Time) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE refresh_tokens
+		SET revoked_at = $2
+		WHERE token_hash = $1 AND revoked_at IS NULL
+	`, hash, at)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.Unauthorized
+	}
+	return nil
+}
+
+const userSelect = `
+	SELECT id, email, display_name, password_hash,
+		email_verified_at, storage_used, storage_quota,
+		trash_auto_delete_enabled, trash_retention_days,
+		created_at, updated_at
+	FROM users
+`
+
+func (s *Store) scanUser(row pgx.Row) (*user.User, error) {
+	var u user.User
+	err := row.Scan(
+		&u.ID, &u.Email, &u.DisplayName, &u.PasswordHash,
+		&u.EmailVerifiedAt, &u.StorageUsed, &u.StorageQuota,
+		&u.TrashAutoDeleteEnabled, &u.TrashRetentionDays,
+		&u.CreatedAt, &u.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
