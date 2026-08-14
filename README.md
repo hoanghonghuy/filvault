@@ -1,6 +1,7 @@
 # Filnest
 
-Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).
+Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).  
+Checklist bàn giao Phase 1: [`docs/spec/08-phase-1-status.md`](docs/spec/08-phase-1-status.md).
 
 ## Slice 0 (hiện tại)
 
