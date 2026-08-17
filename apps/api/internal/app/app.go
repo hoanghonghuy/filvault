@@ -4,6 +4,7 @@ import (
 	"filnest/internal/auth"
 	"filnest/internal/file"
 	"filnest/internal/folder"
+	"filnest/internal/photo"
 	"filnest/internal/platform/config"
 	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/objectstore"
@@ -45,6 +46,10 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	trashSvc := trash.NewService(trashRepo, quota, obj)
 	trashHandlers := trash.NewHandler(trashSvc)
 
+	photoRepo := postgres.NewPhotoRepository(store)
+	photoSvc := photo.NewService(photoRepo)
+	photoHandlers := photo.NewHandler(photoSvc)
+
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	v1 := engine.Group("/api/v1")
@@ -57,6 +62,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	folderHandlers.RegisterRoutes(v1, storage...)
 	fileHandlers.RegisterRoutes(v1, storage...)
 	trashHandlers.RegisterRoutes(v1, storage...)
+	photoHandlers.RegisterRoutes(v1, storage...)
 
 	return engine
 }

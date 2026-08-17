@@ -96,6 +96,14 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] Ticker auto-cleanup in-process (`RunAutoCleanup`, interval 1h)
 - [x] Package `internal/trash` + test
 
+### Slice 6 — Photos
+
+- [x] `GET /photos/timeline` — ảnh/video READY, chưa trash, nhóm theo ngày UTC
+- [x] Album CRUD — tên unique/user; xóa album không xóa file
+- [x] `POST/DELETE .../albums/{id}/items` — chỉ media; trùng idempotent; PDF → `VALIDATION_ERROR`
+- [x] File trash → ẩn khỏi timeline/album view
+- [x] Package `internal/photo` + postgres adapter + test
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -109,7 +117,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 | [x] | **3** | Vertical slice file | allowlist + 100 MiB; presign → complete (`Head`) → browser → download |
 | [x] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
 | [x] | **5** | Trash + setting | delete/restore/permanent; PATCH setting; ticker |
-| [ ] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
+| [x] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
 | [ ] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
 | [ ] | **8** | Quota + search + storage | chặn vượt quota; search tên; thanh dung lượng |
 | [ ] | **9** | Siết DoD | ownership A/B, bucket private, migrate idempotent đã có một phần |
@@ -120,7 +128,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 - [x] Mailer port (console / SMTP); SES chỉ dành chỗ
 - [x] `ObjectStore` + adapter S3 (MinIO/AWS; test dùng memory)
 - [ ] MinIO trong compose — chạy `make run-api` với `FILNEST_S3_ENDPOINT` (upload thật qua presign)
-- [x] Package `file` (`folder` đã có); còn `photo` / `search`
+- [x] Package `file` (`folder` đã có); còn `search` (`photo` đã có)
 - [ ] CORS API; slog request đầy đủ
 - [x] `403 EMAIL_NOT_VERIFIED` trên folder/file/browser
 - [ ] Chứng minh một lần với AWS S3 thật (không chặn DoD local)
@@ -133,7 +141,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 - [x] Complete: size từ `Head` (test 128 bytes)
 - [x] Unique name sibling → 409 (file patch)
 - [x] Folder không rỗng: DELETE → 409
-- [ ] Album: không thêm PDF; xóa album không xóa file
+- [x] Album: không thêm PDF; xóa album không xóa file
 
 ---
 
@@ -153,5 +161,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **6 — Photos**.
+3. Bắt đầu slice **7 — Profile**.
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
