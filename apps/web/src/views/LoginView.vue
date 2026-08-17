@@ -46,7 +46,7 @@ async function submit() {
           <input v-model="password" type="password" required autocomplete="current-password" />
         </label>
         <p v-if="error" class="error">{{ error }}</p>
-        <button class="btn primary" type="submit" :disabled="loading">
+        <button class="btn ink block" type="submit" :disabled="loading">
           {{ loading ? 'Signing in…' : 'Sign in' }}
         </button>
       </form>

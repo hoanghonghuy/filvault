@@ -55,7 +55,7 @@ async function submit() {
           <input v-model="inviteCode" required />
         </label>
         <p v-if="error" class="error">{{ error }}</p>
-        <button class="btn primary" type="submit" :disabled="loading">
+        <button class="btn ink block" type="submit" :disabled="loading">
           {{ loading ? 'Creating…' : 'Create account' }}
         </button>
       </form>

@@ -1,35 +1,82 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { computed, provide, ref } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import StorageBar from '@/components/StorageBar.vue'
+import ToastHost from '@/components/ToastHost.vue'
+import GlobalConfirm from '@/components/GlobalConfirm.vue'
+import GlobalPrompt from '@/components/GlobalPrompt.vue'
+import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
 
 const auth = useAuthStore()
+const route = useRoute()
+const storageBarRef = ref<InstanceType<typeof StorageBar> | null>(null)
 
-async function logout() {
-  await auth.logout()
-  window.location.href = '/login'
-}
+provide('reloadStorage', async () => {
+  await storageBarRef.value?.reload()
+})
+
+const navItems = [
+  { to: '/files', label: 'Files', shortLabel: 'Files' },
+  { to: '/photos', label: 'Photos', shortLabel: 'Photos' },
+  { to: '/trash', label: 'Trash', shortLabel: 'Trash' },
+  { to: '/settings', label: 'Settings', shortLabel: 'Settings' },
+]
+
+const pageTitle = computed(() => {
+  if (route.name === 'album') return 'Album'
+  const match = navItems.find((item) => item.to === route.path)
+  return match?.label ?? 'Filnest'
+})
+
+const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 </script>
 
 <template>
-  <div v-if="auth.isAuthenticated && auth.isVerified" class="shell">
-    <header class="topbar">
+  <ToastHost />
+  <GlobalConfirm />
+  <GlobalPrompt />
+  <GlobalActionSheet />
+
+  <div v-if="showShell" class="shell">
+    <aside class="side-nav" aria-label="Main navigation">
       <div class="brand">Filnest</div>
-      <nav>
-        <RouterLink to="/files">My Files</RouterLink>
-        <RouterLink to="/photos">Photos</RouterLink>
-        <RouterLink to="/trash">Trash</RouterLink>
-        <RouterLink to="/settings">Settings</RouterLink>
+      <nav class="side-links">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="side-link"
+        >
+          {{ item.label }}
+        </RouterLink>
       </nav>
-      <div class="user">
-        <span>{{ auth.user?.displayName }}</span>
-        <button type="button" class="linkish" @click="logout">Logout</button>
+      <div class="side-user">
+        <span class="user-name">{{ auth.user?.displayName }}</span>
       </div>
-    </header>
-    <StorageBar />
-    <main>
-      <RouterView />
-    </main>
+    </aside>
+
+    <div class="shell-main">
+      <header class="header">
+        <div class="header-brand mobile-only">Filnest</div>
+        <h1 class="header-title">{{ pageTitle }}</h1>
+      </header>
+      <StorageBar ref="storageBarRef" />
+      <main class="main">
+        <RouterView />
+      </main>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <RouterLink
+        v-for="item in navItems"
+        :key="item.to"
+        :to="item.to"
+        class="bottom-link"
+      >
+        <span class="bottom-label">{{ item.shortLabel }}</span>
+      </RouterLink>
+    </nav>
   </div>
   <RouterView v-else />
 </template>
@@ -37,61 +84,165 @@ async function logout() {
 <style scoped>
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  background: var(--surface-soft);
 }
 
-.topbar {
+.side-nav {
+  display: none;
+}
+
+.shell-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+}
+
+.header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  gap: var(--space-sm);
+  min-height: var(--header-h);
+  padding: 0 var(--space-md);
+  background: var(--canvas);
+  border-bottom: 1px solid var(--hairline);
 }
 
-.brand {
+.header-brand {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  color: var(--ink);
 }
 
-nav {
-  display: flex;
-  gap: 0.75rem;
+.header-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.mobile-only {
+  display: block;
+}
+
+.main {
   flex: 1;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-md);
 }
 
-nav a {
-  color: var(--muted);
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  min-height: var(--bottom-nav-h);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--canvas);
+  border-top: 1px solid var(--hairline);
 }
 
-nav a.router-link-active {
-  color: var(--text);
-  background: var(--surface-2);
-}
-
-.user {
+.bottom-link {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9rem;
+  justify-content: center;
+  min-height: var(--touch-min);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.linkish {
-  background: none;
-  border: none;
+.bottom-link.router-link-active {
   color: var(--accent);
-  cursor: pointer;
-  padding: 0;
 }
 
-main {
-  flex: 1;
-  padding: 1.25rem;
-  max-width: 1100px;
-  width: 100%;
-  margin: 0 auto;
+.bottom-label {
+  padding: var(--space-xs) 0;
+}
+
+@media (min-width: 768px) {
+  .shell {
+    flex-direction: row;
+  }
+
+  .side-nav {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    flex-shrink: 0;
+    padding: var(--space-lg) var(--space-md);
+    background: var(--canvas);
+    border-right: 1px solid var(--hairline);
+  }
+
+  .brand {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--ink);
+    margin-bottom: var(--space-lg);
+  }
+
+  .side-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    flex: 1;
+  }
+
+  .side-link {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    padding: 0 var(--space-sm);
+    border-radius: var(--radius-md);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .side-link.router-link-active {
+    color: var(--ink);
+    background: var(--surface-soft);
+  }
+
+  .side-user {
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--hairline-soft);
+  }
+
+  .user-name {
+    font-size: 0.875rem;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .shell-main {
+    padding-bottom: 0;
+  }
+
+  .header {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-lg);
+  }
 }
 </style>
