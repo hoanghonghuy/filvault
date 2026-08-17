@@ -57,6 +57,10 @@ services:
       FILNEST_S3_ACCESS_KEY: filnest
       FILNEST_S3_SECRET_KEY: filnestsecret
       FILNEST_INVITE_CODE: dev-invite
+      FILNEST_SEED_DEV_USER: "true"
+      FILNEST_SEED_EMAIL: dev@filnest.com
+      FILNEST_SEED_PASSWORD: Dev1234@
+      FILNEST_SEED_DISPLAY_NAME: Filnest Dev
       FILNEST_JWT_SECRET: dev-jwt-secret
       FILNEST_HTTP_ADDR: ":8080"
       FILNEST_MAILER: console
