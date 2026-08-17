@@ -118,30 +118,27 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] Test quota: upload session bị `QUOTA_EXCEEDED` khi `storage_used` đầy
 - [x] Package `internal/search`, `internal/storage` + postgres adapter
 
+### Slice 9 — Siết DoD
+
+- [x] Ownership A/B: file (get/download/patch/delete/complete), album photo → `404` cho user khác
+- [x] ULID trên URL: sai format → `400 VALIDATION_ERROR` (folder, file, trash, photo)
+- [x] `httpx.ParamULID` / `QueryULID` dùng chung
+- [x] Test argon2id hash (`auth/password_test.go`)
+- [x] Migrate idempotent (chạy `Migrate` hai lần — đã có trong `schema_test.go`)
+- [x] MinIO private trong compose; `.env.example` credential khớp compose
+- [x] `make compose-up` khởi động Postgres + MinIO
+
 ---
 
-## Chưa làm — còn trong Phase 1
+## Chưa làm — ngoài Phase 1 API core
 
-Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
+Các slice 0–9 API **đã xong**. Còn lại là hạ tầng/UI tùy chọn:
 
-| | Slice | Việc | Xong khi |
-|---|---|---|---|
-| [x] | **1b** | Verify email | SMTP/console + mã 6 số (gate kho file khi có API folder/file) |
-| [x] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
-| [x] | **3** | Vertical slice file | allowlist + 100 MiB; presign → complete (`Head`) → browser → download |
-| [x] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
-| [x] | **5** | Trash + setting | delete/restore/permanent; PATCH setting; ticker |
-| [x] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
-| [x] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
-| [x] | **8** | Quota + search + storage | chặn vượt quota; search tên; thanh dung lượng |
-| [ ] | **9** | Siết DoD | ownership A/B, bucket private, migrate idempotent đã có một phần |
-
-### Còn thiếu dù đã khai trong spec / compose
 
 - [ ] Vue web — `apps/web` chưa có
 - [x] Mailer port (console / SMTP); SES chỉ dành chỗ
 - [x] `ObjectStore` + adapter S3 (MinIO/AWS; test dùng memory)
-- [ ] MinIO trong compose — chạy `make run-api` với `FILNEST_S3_ENDPOINT` (upload thật qua presign)
+- [x] MinIO trong compose — `make compose-up` dựng Postgres + MinIO (bucket private, `mc anonymous set none`)
 - [x] Package `file` (`folder`, `photo`, `search`, `storage` đã có)
 - [ ] CORS API; slog request đầy đủ
 - [x] `403 EMAIL_NOT_VERIFIED` trên folder/file/browser
@@ -175,5 +172,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **9 — Siết DoD**.
+3. Phase 1 API core xong — tiếp theo: Vue web (`apps/web`), CORS, slog request, AWS S3 thật (tùy chọn).
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.

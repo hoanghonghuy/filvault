@@ -74,7 +74,11 @@ func (h *Handler) complete(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	f, err := h.svc.Complete(c.Request.Context(), userID, c.Param("id"))
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	f, err := h.svc.Complete(c.Request.Context(), userID, id)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -88,7 +92,11 @@ func (h *Handler) get(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	f, err := h.svc.Get(c.Request.Context(), userID, c.Param("id"))
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	f, err := h.svc.Get(c.Request.Context(), userID, id)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -102,7 +110,11 @@ func (h *Handler) download(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	out, err := h.svc.DownloadURL(c.Request.Context(), userID, c.Param("id"))
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	out, err := h.svc.DownloadURL(c.Request.Context(), userID, id)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -119,7 +131,11 @@ func (h *Handler) delete(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	if err := h.svc.Delete(c.Request.Context(), userID, c.Param("id")); err != nil {
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.Delete(c.Request.Context(), userID, id); err != nil {
 		httpx.Error(c, err)
 		return
 	}
@@ -165,7 +181,11 @@ func (h *Handler) patch(c *gin.Context) {
 		httpx.Validation(c)
 		return
 	}
-	f, err := h.svc.Patch(c.Request.Context(), userID, c.Param("id"), name, moveFolder, newFolder)
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	f, err := h.svc.Patch(c.Request.Context(), userID, id, name, moveFolder, newFolder)
 	if err != nil {
 		httpx.Error(c, err)
 		return

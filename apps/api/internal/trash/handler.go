@@ -55,7 +55,11 @@ func (h *Handler) restoreFile(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	if err := h.svc.RestoreFile(c.Request.Context(), userID, c.Param("id")); err != nil {
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.RestoreFile(c.Request.Context(), userID, id); err != nil {
 		httpx.Error(c, err)
 		return
 	}
@@ -68,7 +72,11 @@ func (h *Handler) restoreFolder(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	if err := h.svc.RestoreFolder(c.Request.Context(), userID, c.Param("id")); err != nil {
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.RestoreFolder(c.Request.Context(), userID, id); err != nil {
 		httpx.Error(c, err)
 		return
 	}
@@ -82,7 +90,10 @@ func (h *Handler) permanentDelete(c *gin.Context) {
 		return
 	}
 	typ := strings.ToLower(c.Param("type"))
-	id := c.Param("id")
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
 	var err error
 	switch typ {
 	case "files":

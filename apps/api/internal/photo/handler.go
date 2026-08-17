@@ -42,12 +42,7 @@ func userIDFrom(c *gin.Context) (string, bool) {
 }
 
 func parseULIDParam(c *gin.Context, name string) (string, bool) {
-	id := c.Param(name)
-	if _, err := ulid.ParseStrict(id); err != nil {
-		httpx.Validation(c)
-		return "", false
-	}
-	return id, true
+	return httpx.ParamULID(c, name)
 }
 
 func (h *Handler) timeline(c *gin.Context) {

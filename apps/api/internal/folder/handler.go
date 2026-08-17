@@ -3,7 +3,6 @@ package folder
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"filnest/internal/apperr"
@@ -70,7 +69,11 @@ func (h *Handler) get(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	f, err := h.svc.Get(c.Request.Context(), userID, c.Param("id"))
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	f, err := h.svc.Get(c.Request.Context(), userID, id)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -117,7 +120,11 @@ func (h *Handler) patch(c *gin.Context) {
 		httpx.Validation(c)
 		return
 	}
-	f, err := h.svc.Patch(c.Request.Context(), userID, c.Param("id"), name, moveParent, newParent)
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	f, err := h.svc.Patch(c.Request.Context(), userID, id, name, moveParent, newParent)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -131,7 +138,11 @@ func (h *Handler) delete(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	if err := h.svc.Delete(c.Request.Context(), userID, c.Param("id")); err != nil {
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.Delete(c.Request.Context(), userID, id); err != nil {
 		httpx.Error(c, err)
 		return
 	}
@@ -144,9 +155,9 @@ func (h *Handler) browser(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	var folderID *string
-	if q := strings.TrimSpace(c.Query("folderId")); q != "" {
-		folderID = &q
+	folderID, ok := httpx.QueryULID(c, "folderId")
+	if !ok {
+		return
 	}
 	result, err := h.svc.Browser(c.Request.Context(), userID, folderID)
 	if err != nil {

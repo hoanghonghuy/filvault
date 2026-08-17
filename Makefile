@@ -6,7 +6,7 @@ export PATH := $(HOME)/.local/go/bin:$(PATH)
 .PHONY: compose-up compose-down migrate migrate-down test run-api
 
 compose-up:
-	$(COMPOSE) up -d postgres
+	$(COMPOSE) up -d postgres minio minio-init
 	@echo "waiting for postgres..."
 	@i=0; \
 	until $(COMPOSE) exec -T postgres pg_isready -U filnest -d filnest >/dev/null 2>&1; do \
@@ -15,6 +15,7 @@ compose-up:
 		sleep 1; \
 	done
 	@echo "postgres ready"
+	@echo "minio ready (bucket filnest, private)"
 
 compose-down:
 	$(COMPOSE) down

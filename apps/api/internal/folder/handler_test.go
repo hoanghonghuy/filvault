@@ -147,6 +147,14 @@ func TestFolders_CreateBrowserRenameMoveDelete(t *testing.T) {
 	}
 }
 
+func TestFolders_InvalidULID(t *testing.T) {
+	engine, mem := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	code, body := getAuth(t, engine, "/api/v1/folders/not-a-ulid", token)
+	assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+}
+
 func TestFolders_GetNotFoundForOtherUser(t *testing.T) {
 	engine, mem := newEngine(t)
 	tokenA := registerVerified(t, engine, mem, uniqueEmail())
