@@ -6,6 +6,7 @@ import (
 	"filnest/internal/folder"
 	"filnest/internal/photo"
 	"filnest/internal/platform/config"
+	"filnest/internal/platform/httpx"
 	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/objectstore"
 	"filnest/internal/platform/postgres"
@@ -60,6 +61,10 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 
 	engine := gin.New()
 	engine.Use(gin.Recovery())
+	engine.Use(httpx.RequestLog())
+	if len(cfg.CORSAllowedOrigins) > 0 {
+		engine.Use(httpx.CORS(cfg.CORSAllowedOrigins))
+	}
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
 

@@ -128,6 +128,14 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] MinIO private trong compose; `.env.example` credential khớp compose
 - [x] `make compose-up` khởi động Postgres + MinIO
 
+### Web + CORS + logging
+
+- [x] `apps/web` — Vue 3 + Pinia + API client; auth, files, photos, trash, settings
+- [x] Upload qua presigned URL (XHR progress); Photos grid placeholder (không `<img>` original)
+- [x] CORS middleware + `FILNEST_CORS_ALLOWED_ORIGINS`
+- [x] slog request log (`httpx.RequestLog`) với method, path, status, duration, userId
+- [x] Docker Compose: `api` + `web` services (`make up`)
+
 ---
 
 ## Chưa làm — ngoài Phase 1 API core
@@ -135,12 +143,8 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 Các slice 0–9 API **đã xong**. Còn lại là hạ tầng/UI tùy chọn:
 
 
-- [ ] Vue web — `apps/web` chưa có
-- [x] Mailer port (console / SMTP); SES chỉ dành chỗ
-- [x] `ObjectStore` + adapter S3 (MinIO/AWS; test dùng memory)
-- [x] MinIO trong compose — `make compose-up` dựng Postgres + MinIO (bucket private, `mc anonymous set none`)
-- [x] Package `file` (`folder`, `photo`, `search`, `storage` đã có)
-- [ ] CORS API; slog request đầy đủ
+- [x] Vue web — `apps/web` (login, files, photos, trash, settings)
+- [x] CORS API (`FILNEST_CORS_ALLOWED_ORIGINS`); slog request (`httpx.RequestLog`)
 - [x] `403 EMAIL_NOT_VERIFIED` trên folder/file/browser
 - [ ] Chứng minh một lần với AWS S3 thật (không chặn DoD local)
 
@@ -172,5 +176,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Phase 1 API core xong — tiếp theo: Vue web (`apps/web`), CORS, slog request, AWS S3 thật (tùy chọn).
+3. Chạy full stack: `make dev-api` + `make dev-web` (Node ^22 cho web).
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.

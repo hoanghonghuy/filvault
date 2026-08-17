@@ -10,7 +10,35 @@ coverage.out
 
 node_modules/
 apps/web/dist/
+apps/web/dist-ssr/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+.DS_Store
+coverage/
+*.local
+*.tsbuildinfo
+.eslintcache
+
+# Vitest / Cypress artifacts
+**/__screenshots__/
+apps/web/cypress/videos/
+apps/web/cypress/screenshots/
+
+# Vite
+*.timestamp-*-*.mjs
 
 .idea/
 .vscode/
 *.swp
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

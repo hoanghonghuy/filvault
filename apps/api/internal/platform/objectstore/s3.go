@@ -21,8 +21,9 @@ func NewFromConfig(cfg config.Config) (ObjectStore, error) {
 }
 
 type s3Store struct {
-	client *s3.Client
-	bucket string
+	client         *s3.Client
+	bucket         string
+	publicEndpoint string
 }
 
 func newS3(cfg config.Config) (*s3Store, error) {
@@ -48,5 +49,5 @@ func newS3(cfg config.Config) (*s3Store, error) {
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = true
 	})
-	return &s3Store{client: client, bucket: cfg.S3Bucket}, nil
+	return &s3Store{client: client, bucket: cfg.S3Bucket, publicEndpoint: cfg.S3PublicEndpoint}, nil
 }

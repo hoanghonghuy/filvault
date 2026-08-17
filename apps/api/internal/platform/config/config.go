@@ -32,6 +32,8 @@ type Config struct {
 	S3Region                  string
 	S3AccessKey               string
 	S3SecretKey               string
+	S3PublicEndpoint          string
 	DefaultTrashAutoDelete    bool
 	DefaultTrashRetentionDays int
+	CORSAllowedOrigins        []string
 }

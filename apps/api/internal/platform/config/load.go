@@ -26,8 +26,10 @@ func Load() (Config, error) {
 		S3Region:                  getenv("FILNEST_S3_REGION", "us-east-1"),
 		S3AccessKey:               os.Getenv("FILNEST_S3_ACCESS_KEY"),
 		S3SecretKey:               os.Getenv("FILNEST_S3_SECRET_KEY"),
+		S3PublicEndpoint:          os.Getenv("FILNEST_S3_PUBLIC_ENDPOINT"),
 		DefaultTrashAutoDelete:    getenv("FILNEST_DEFAULT_TRASH_AUTO_DELETE", "false") == "true",
 		DefaultTrashRetentionDays: DefaultTrashRetentionDays,
+		CORSAllowedOrigins:        parseCSV(getenv("FILNEST_CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),
 	}
 	if days := os.Getenv("FILNEST_DEFAULT_TRASH_RETENTION_DAYS"); days != "" {
 		n, err := strconv.Atoi(days)
@@ -56,4 +58,16 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func parseCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

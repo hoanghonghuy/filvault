@@ -38,8 +38,52 @@ services:
         mc alias set local http://minio:9000 filnest filnestsecret
         mc mb --ignore-existing local/filnest
         mc anonymous set none local/filnest
+        mc cors set local/filnest /cors.json
     volumes:
       - filnest_minio:/data
+      - ./docker/minio-cors.json:/cors.json:ro
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      FILNEST_METADATA_STORE: postgres
+      FILNEST_OBJECT_STORE: s3
+      FILNEST_DATABASE_URL: postgres://filnest:filnest@postgres:5432/filnest?sslmode=disable
+      FILNEST_S3_ENDPOINT: http://minio:9000
+      FILNEST_S3_PUBLIC_ENDPOINT: http://localhost:9000
+      FILNEST_S3_BUCKET: filnest
+      FILNEST_S3_REGION: us-east-1
+      FILNEST_S3_ACCESS_KEY: filnest
+      FILNEST_S3_SECRET_KEY: filnestsecret
+      FILNEST_INVITE_CODE: dev-invite
+      FILNEST_JWT_SECRET: dev-jwt-secret
+      FILNEST_HTTP_ADDR: ":8080"
+      FILNEST_MAILER: console
+      FILNEST_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      FILNEST_DEFAULT_TRASH_AUTO_DELETE: "false"
+      FILNEST_DEFAULT_TRASH_RETENTION_DAYS: "30"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080/api/v1
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   filnest_pg:
