@@ -9,6 +9,8 @@ import (
 	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/objectstore"
 	"filnest/internal/platform/postgres"
+	"filnest/internal/search"
+	"filnest/internal/storage"
 	"filnest/internal/trash"
 
 	"github.com/gin-gonic/gin"
@@ -50,6 +52,12 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	photoSvc := photo.NewService(photoRepo)
 	photoHandlers := photo.NewHandler(photoSvc)
 
+	searchRepo := postgres.NewSearchRepository(store)
+	searchSvc := search.NewService(searchRepo)
+	searchHandlers := search.NewHandler(searchSvc)
+
+	storageHandlers := storage.NewHandler(quota)
+
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	v1 := engine.Group("/api/v1")
@@ -63,6 +71,8 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	fileHandlers.RegisterRoutes(v1, storage...)
 	trashHandlers.RegisterRoutes(v1, storage...)
 	photoHandlers.RegisterRoutes(v1, storage...)
+	searchHandlers.RegisterRoutes(v1, storage...)
+	storageHandlers.RegisterRoutes(v1, storage...)
 
 	return engine
 }

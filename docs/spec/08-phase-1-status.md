@@ -111,6 +111,13 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] Trả `{ accessToken, refreshToken }` sau đổi mật khẩu; sai mật khẩu hiện tại → `401`
 - [x] Test: đổi tên, đổi password, revoke refresh, validation
 
+### Slice 8 — Quota + search + storage
+
+- [x] `GET /api/v1/search?q=` — ILIKE tên folder/file READY, không trash; `q` rỗng → validation
+- [x] `GET /api/v1/storage` — `{ usedBytes, quotaBytes }`
+- [x] Test quota: upload session bị `QUOTA_EXCEEDED` khi `storage_used` đầy
+- [x] Package `internal/search`, `internal/storage` + postgres adapter
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -126,7 +133,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 | [x] | **5** | Trash + setting | delete/restore/permanent; PATCH setting; ticker |
 | [x] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
 | [x] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
-| [ ] | **8** | Quota + search + storage | chặn vượt quota; search tên; thanh dung lượng |
+| [x] | **8** | Quota + search + storage | chặn vượt quota; search tên; thanh dung lượng |
 | [ ] | **9** | Siết DoD | ownership A/B, bucket private, migrate idempotent đã có một phần |
 
 ### Còn thiếu dù đã khai trong spec / compose
@@ -135,7 +142,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 - [x] Mailer port (console / SMTP); SES chỉ dành chỗ
 - [x] `ObjectStore` + adapter S3 (MinIO/AWS; test dùng memory)
 - [ ] MinIO trong compose — chạy `make run-api` với `FILNEST_S3_ENDPOINT` (upload thật qua presign)
-- [x] Package `file` (`folder` đã có); còn `search` (`photo` đã có)
+- [x] Package `file` (`folder`, `photo`, `search`, `storage` đã có)
 - [ ] CORS API; slog request đầy đủ
 - [x] `403 EMAIL_NOT_VERIFIED` trên folder/file/browser
 - [ ] Chứng minh một lần với AWS S3 thật (không chặn DoD local)
@@ -144,7 +151,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 
 - [x] Verify: chưa verify → 403 folder/browser
 - [x] Ownership: user B 404 trên folder user A
-- [x] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối (một phần — chưa test quota DB)
+- [x] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối (kể cả quota DB đầy)
 - [x] Complete: size từ `Head` (test 128 bytes)
 - [x] Unique name sibling → 409 (file patch)
 - [x] Folder không rỗng: DELETE → 409
@@ -168,5 +175,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **8 — Quota + search + storage**.
+3. Bắt đầu slice **9 — Siết DoD**.
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
