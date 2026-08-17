@@ -16,7 +16,7 @@ make dev-web       # Vue trên host :5173 (cần Node ^22)
 make seed          # tạo tài khoản dev (khi chạy API trên host, không qua Docker)
 ```
 
-Sau `make up`: web `http://localhost:5173`, API `http://localhost:8080`, MinIO `http://localhost:9000`.
+Sau `make up`: web `http://localhost:5173`, API `http://localhost:8080`, MinIO `http://localhost:9002`.
 
 ## Tài khoản dev (test xuyên suốt)
 

@@ -14,7 +14,7 @@ jobs:
     name: API — lint, typecheck, test
     runs-on: ubuntu-latest
     env:
-      DSN: postgres://filvault:filvault@127.0.0.1:5432/filvault?sslmode=disable
+      DSN: postgres://filvault:filvault@127.0.0.1:5435/filvault?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 

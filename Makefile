@@ -1,6 +1,6 @@
 GO ?= $(HOME)/.local/go/bin/go
 COMPOSE ?= docker compose
-DSN ?= postgres://filvault:filvault@127.0.0.1:5432/filvault?sslmode=disable
+DSN ?= postgres://filvault:filvault@127.0.0.1:5435/filvault?sslmode=disable
 export PATH := $(HOME)/.local/go/bin:$(PATH)
 
 .PHONY: compose-up compose-down up down migrate migrate-down seed test run-api dev-api dev-web \
@@ -40,10 +40,10 @@ test: compose-up
 	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" $(GO) test ./... -count=1 -p 1
 
 run-api: seed
-	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" FILVAULT_JWT_SECRET="dev-jwt-secret" FILVAULT_S3_ENDPOINT="http://127.0.0.1:9000" FILVAULT_S3_ACCESS_KEY="filvault" FILVAULT_S3_SECRET_KEY="filvaultsecret" $(GO) run ./cmd/api
+	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" FILVAULT_JWT_SECRET="dev-jwt-secret" FILVAULT_S3_ENDPOINT="http://127.0.0.1:9002" FILVAULT_S3_ACCESS_KEY="filvault" FILVAULT_S3_SECRET_KEY="filvaultsecret" $(GO) run ./cmd/api
 
 dev-api: seed
-	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" FILVAULT_JWT_SECRET="dev-jwt-secret" FILVAULT_S3_ENDPOINT="http://127.0.0.1:9000" FILVAULT_S3_ACCESS_KEY="filvault" FILVAULT_S3_SECRET_KEY="filvaultsecret" $(GO) run ./cmd/api
+	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" FILVAULT_JWT_SECRET="dev-jwt-secret" FILVAULT_S3_ENDPOINT="http://127.0.0.1:9002" FILVAULT_S3_ACCESS_KEY="filvault" FILVAULT_S3_SECRET_KEY="filvaultsecret" $(GO) run ./cmd/api
 
 dev-web:
 	cd apps/web && npm run dev

@@ -47,7 +47,7 @@ make dev-api       # API trên host :8080 (cũng seed)
 make dev-web       # Vue :5173 (Node ^22)
 ```
 
-Web `http://localhost:5173` · API `http://localhost:8080` · MinIO `http://localhost:9000`.
+Web `http://localhost:5173` · API `http://localhost:8080` · MinIO `http://localhost:9002`.
 
 ### Tài khoản dev (đã verify)
 
