@@ -30,6 +30,7 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao: đã làm / chưa làm Phase 1 |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
+| [`../../DESIGN.md`](../../DESIGN.md) | Design system web Phase 1 (Cal.com-like + teal, mobile-first) |
 
 Phase 1 **đủ spec để bắt đầu code**. Spec phase sau (sharing, worker, CLI, Terraform) viết khi vào phase đó.
 
