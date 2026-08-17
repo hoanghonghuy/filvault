@@ -3,7 +3,8 @@ COMPOSE ?= docker compose
 DSN ?= postgres://filnest:filnest@127.0.0.1:5432/filnest?sslmode=disable
 export PATH := $(HOME)/.local/go/bin:$(PATH)
 
-.PHONY: compose-up compose-down up down migrate migrate-down test run-api dev-api dev-web
+.PHONY: compose-up compose-down up down migrate migrate-down test run-api dev-api dev-web \
+	lint-api typecheck-api lint-web typecheck-web ci-api ci-web
 
 compose-up:
 	$(COMPOSE) up -d postgres minio minio-init
@@ -43,3 +44,19 @@ dev-api: migrate
 
 dev-web:
 	cd apps/web && npm run dev
+
+lint-api:
+	cd apps/api && $(GO) vet ./...
+
+typecheck-api:
+	cd apps/api && $(GO) build -o /dev/null ./...
+
+lint-web:
+	cd apps/web && npm run lint
+
+typecheck-web:
+	cd apps/web && npm run type-check
+
+ci-api: lint-api typecheck-api test
+
+ci-web: lint-web typecheck-web

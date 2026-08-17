@@ -18,7 +18,7 @@ async function saveProfile() {
   error.value = ''
   message.value = ''
   try {
-    const user = await api<User>('/users/me', {
+    await api<User>('/users/me', {
       method: 'PATCH',
       body: JSON.stringify({
         displayName: displayName.value,

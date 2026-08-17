@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — lint, typecheck, test
+    runs-on: ubuntu-latest
+    env:
+      DSN: postgres://filnest:filnest@127.0.0.1:5432/filnest?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+
+      - name: Start Postgres and MinIO
+        run: docker compose up -d postgres minio minio-init
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U filnest -d filnest >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "postgres did not become ready"
+          exit 1
+
+      - name: Migrate
+        working-directory: apps/api
+        run: go run ./cmd/migrate
+        env:
+          FILNEST_DATABASE_URL: ${{ env.DSN }}
+
+      - name: Lint
+        working-directory: apps/api
+        run: go vet ./...
+
+      - name: Typecheck
+        working-directory: apps/api
+        run: go build -o /dev/null ./...
+
+      - name: Test
+        working-directory: apps/api
+        run: go test ./... -count=1 -p 1
+        env:
+          FILNEST_DATABASE_URL: ${{ env.DSN }}
+
+  web:
+    name: Web — lint, typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run type-check
