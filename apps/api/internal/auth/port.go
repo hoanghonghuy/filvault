@@ -25,5 +25,8 @@ type Repository interface {
 	InsertRefreshToken(ctx context.Context, tok RefreshToken) error
 	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, hash string, at time.Time) error
+	RevokeAllRefreshTokensForUser(ctx context.Context, userID string, at time.Time) error
 	UpdateTrashSettings(ctx context.Context, userID string, enabled bool, retentionDays int) error
+	UpdateDisplayName(ctx context.Context, userID, displayName string) error
+	UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error
 }

@@ -146,26 +146,63 @@ func (s *Service) Me(ctx context.Context, userID string) (user.User, error) {
 	return *u, nil
 }
 
-func (s *Service) PatchMe(ctx context.Context, userID string, autoDelete *bool, retentionDays *int) (user.User, error) {
+func (s *Service) PatchMe(ctx context.Context, userID string, displayName *string, autoDelete *bool, retentionDays *int) (user.User, error) {
 	u, err := s.Me(ctx, userID)
 	if err != nil {
 		return user.User{}, err
 	}
-	enabled := u.TrashAutoDeleteEnabled
-	days := u.TrashRetentionDays
-	if autoDelete != nil {
-		enabled = *autoDelete
-	}
-	if retentionDays != nil {
-		if *retentionDays < 1 {
+	if displayName != nil {
+		name := strings.TrimSpace(*displayName)
+		if name == "" {
 			return user.User{}, apperr.Validation
 		}
-		days = *retentionDays
+		if err := s.repo.UpdateDisplayName(ctx, userID, name); err != nil {
+			return user.User{}, err
+		}
 	}
-	if err := s.repo.UpdateTrashSettings(ctx, userID, enabled, days); err != nil {
-		return user.User{}, err
+	if autoDelete != nil || retentionDays != nil {
+		enabled := u.TrashAutoDeleteEnabled
+		days := u.TrashRetentionDays
+		if autoDelete != nil {
+			enabled = *autoDelete
+		}
+		if retentionDays != nil {
+			if *retentionDays < 1 {
+				return user.User{}, apperr.Validation
+			}
+			days = *retentionDays
+		}
+		if err := s.repo.UpdateTrashSettings(ctx, userID, enabled, days); err != nil {
+			return user.User{}, err
+		}
 	}
 	return s.Me(ctx, userID)
+}
+
+func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) (Session, error) {
+	if currentPassword == "" || len(newPassword) < config.MinPasswordLength {
+		return Session{}, apperr.Validation
+	}
+	u, err := s.Me(ctx, userID)
+	if err != nil {
+		return Session{}, err
+	}
+	if !verifyPassword(u.PasswordHash, currentPassword) {
+		return Session{}, apperr.Unauthorized
+	}
+	hash, err := hashPassword(newPassword)
+	if err != nil {
+		return Session{}, err
+	}
+	now := s.now().UTC()
+	if err := s.repo.UpdatePasswordHash(ctx, userID, hash); err != nil {
+		return Session{}, err
+	}
+	if err := s.repo.RevokeAllRefreshTokensForUser(ctx, userID, now); err != nil {
+		return Session{}, err
+	}
+	u.PasswordHash = hash
+	return s.issueSession(ctx, u, now)
 }
 
 func (s *Service) ParseAccess(raw string) (string, error) {

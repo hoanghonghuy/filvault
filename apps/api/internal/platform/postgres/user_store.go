@@ -88,6 +88,34 @@ func (s *Store) UpdateTrashSettings(ctx context.Context, userID string, enabled 
 	return nil
 }
 
+func (s *Store) UpdateDisplayName(ctx context.Context, userID, displayName string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users SET display_name = $2, updated_at = now()
+		WHERE id = $1
+	`, userID, displayName)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users SET password_hash = $2, updated_at = now()
+		WHERE id = $1
+	`, userID, passwordHash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
+}
+
 func (s *Store) InsertRefreshToken(ctx context.Context, tok auth.RefreshToken) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)
@@ -126,6 +154,15 @@ func (s *Store) RevokeRefreshToken(ctx context.Context, hash string, at time.Tim
 		return apperr.Unauthorized
 	}
 	return nil
+}
+
+func (s *Store) RevokeAllRefreshTokensForUser(ctx context.Context, userID string, at time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE refresh_tokens
+		SET revoked_at = $2
+		WHERE user_id = $1 AND revoked_at IS NULL
+	`, userID, at)
+	return err
 }
 
 const userSelect = `

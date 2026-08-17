@@ -104,6 +104,13 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] File trash → ẩn khỏi timeline/album view
 - [x] Package `internal/photo` + postgres adapter + test
 
+### Slice 7 — Profile
+
+- [x] `PATCH /users/me` — thêm `displayName` (cùng endpoint trash settings)
+- [x] `POST /users/me/password` — `{ currentPassword, newPassword }` → revoke mọi refresh token
+- [x] Trả `{ accessToken, refreshToken }` sau đổi mật khẩu; sai mật khẩu hiện tại → `401`
+- [x] Test: đổi tên, đổi password, revoke refresh, validation
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -118,7 +125,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 | [x] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
 | [x] | **5** | Trash + setting | delete/restore/permanent; PATCH setting; ticker |
 | [x] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
-| [ ] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
+| [x] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
 | [ ] | **8** | Quota + search + storage | chặn vượt quota; search tên; thanh dung lượng |
 | [ ] | **9** | Siết DoD | ownership A/B, bucket private, migrate idempotent đã có một phần |
 
@@ -161,5 +168,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **7 — Profile**.
+3. Bắt đầu slice **8 — Quota + search + storage**.
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.

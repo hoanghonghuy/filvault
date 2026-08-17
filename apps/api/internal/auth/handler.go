@@ -27,6 +27,7 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/auth/resend-verification", h.resendVerification)
 	g.GET("/users/me", h.AuthRequired(), h.me)
 	g.PATCH("/users/me", h.AuthRequired(), h.EmailVerifiedRequired(), h.patchMe)
+	g.POST("/users/me/password", h.AuthRequired(), h.changePassword)
 }
 
 func (h *Handler) AuthRequired() gin.HandlerFunc {
@@ -212,16 +213,52 @@ func (h *Handler) patchMe(c *gin.Context) {
 		}
 		retentionDays = &n
 	}
-	if autoDelete == nil && retentionDays == nil {
+	var displayName *string
+	if v, ok := raw["displayName"]; ok {
+		var n string
+		if err := json.Unmarshal(v, &n); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		displayName = &n
+	}
+	if autoDelete == nil && retentionDays == nil && displayName == nil {
 		httpx.Validation(c)
 		return
 	}
-	u, err := h.svc.PatchMe(c.Request.Context(), userID, autoDelete, retentionDays)
+	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays)
 	if err != nil {
 		httpx.Error(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, user.PublicFrom(u))
+}
+
+type changePasswordReq struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+func (h *Handler) changePassword(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	var req changePasswordReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	session, err := h.svc.ChangePassword(c.Request.Context(), userID, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken":  session.AccessToken,
+		"refreshToken": session.RefreshToken,
+	})
 }
 
 func (h *Handler) verifyEmail(c *gin.Context) {
