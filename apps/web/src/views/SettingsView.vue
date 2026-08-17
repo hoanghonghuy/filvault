@@ -86,12 +86,11 @@ async function logout() {
 
     <section class="card section">
       <h2 class="section-title">Trash</h2>
-      <label class="field checkbox-field">
-        <span>
-          <input v-model="trashAutoDeleteEnabled" type="checkbox" />
-          Auto-delete trash
-        </span>
+      <label class="toggle-row">
+        <input v-model="trashAutoDeleteEnabled" type="checkbox" />
+        <span class="toggle-label">Auto-delete trash</span>
       </label>
+      <p class="field-hint">Permanently delete items older than the retention period.</p>
       <label class="field">
         <span>Retention days</span>
         <input v-model.number="trashRetentionDays" type="number" min="1" />
@@ -127,11 +126,25 @@ async function logout() {
   margin-bottom: var(--space-md);
 }
 
-.checkbox-field span {
+.toggle-row {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   min-height: var(--touch-min);
+  cursor: pointer;
+}
+
+.toggle-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .desktop-only {

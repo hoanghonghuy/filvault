@@ -6,7 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
-import { mimeIcon } from '@/lib/mimeIcon'
+import { mimeIcon, mimeLabel } from '@/lib/mimeIcon'
 import type { TrashList } from '@/api/types'
 
 const ui = useUiStore()
@@ -116,7 +116,7 @@ onMounted(load)
         <h2 class="section-title">Files</h2>
         <div v-for="file in trash.files" :key="file.id" class="row">
           <span class="name"><Icon :name="mimeIcon(file.mimeType ?? '')" :size="18" class="row-icon" />{{ file.name }}</span>
-          <span class="meta desktop-only">{{ file.mimeType }} · {{ formatBytes(file.sizeBytes ?? 0) }}</span>
+          <span class="meta desktop-only">{{ mimeLabel(file.mimeType ?? '') }} · {{ formatBytes(file.sizeBytes ?? 0) }}</span>
           <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
             ⋯
           </button>

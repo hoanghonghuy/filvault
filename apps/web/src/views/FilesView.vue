@@ -10,7 +10,7 @@ import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
-import { mimeIcon } from '@/lib/mimeIcon'
+import { mimeIcon, mimeLabel } from '@/lib/mimeIcon'
 import type { Browser, DownloadURL, SearchResult, UploadSession } from '@/api/types'
 
 const route = useRoute()
@@ -78,6 +78,12 @@ async function runSearch() {
     searchLoading.value = false
   }
 }
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+watch(searchQuery, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(runSearch, 300)
+})
 
 async function openFolder(id: string | null) {
   await router.push(id ? { path: '/files', query: { folderId: id } } : { path: '/files' })
@@ -314,14 +320,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         type="search"
         placeholder="Search by name"
         enterkeyhint="search"
-        @keyup.enter="runSearch"
       />
       <button class="btn accent desktop-only" type="button" @click="triggerUpload">Upload</button>
       <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">New folder</button>
       <button class="btn mobile-only" type="button" aria-label="New folder" @click="folderSheetOpen = true">
         + Folder
       </button>
-      <button class="btn" type="button" @click="runSearch">Search</button>
       <button
         v-if="searchResults"
         class="btn ghost"
@@ -381,7 +385,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </div>
       <div v-for="file in browser?.files ?? []" :key="file.id" class="row">
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
-        <span class="meta desktop-only">{{ file.mimeType }} · {{ formatBytes(file.sizeBytes) }}</span>
+        <span class="meta desktop-only">{{ mimeLabel(file.mimeType) }} · {{ formatBytes(file.sizeBytes) }}</span>
         <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
           ⋯
         </button>

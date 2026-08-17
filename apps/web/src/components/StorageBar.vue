@@ -62,7 +62,7 @@ defineExpose({ reload })
 
 .track {
   flex: 1;
-  height: 6px;
+  height: 8px;
   background: var(--hairline);
   border-radius: var(--radius-pill);
   overflow: hidden;
