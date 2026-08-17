@@ -3,36 +3,18 @@ package objectstore
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func (s *s3Store) mapPublicURL(raw string) string {
-	if s.publicEndpoint == "" {
-		return raw
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return raw
-	}
-	pub, err := url.Parse(s.publicEndpoint)
-	if err != nil {
-		return raw
-	}
-	parsed.Scheme = pub.Scheme
-	parsed.Host = pub.Host
-	return parsed.String()
-}
-
 func (s *s3Store) CreateUploadURL(ctx context.Context, key string, opts UploadOptions) (PresignedURL, error) {
 	exp := opts.Expires
 	if exp <= 0 {
 		exp = 15 * time.Minute
 	}
-	presign := s3.NewPresignClient(s.client)
+	presign := s3.NewPresignClient(s.presignClient)
 	out, err := presign.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
@@ -41,7 +23,7 @@ func (s *s3Store) CreateUploadURL(ctx context.Context, key string, opts UploadOp
 	if err != nil {
 		return PresignedURL{}, fmt.Errorf("presign upload: %w", err)
 	}
-	return PresignedURL{URL: s.mapPublicURL(out.URL), ExpiresAt: time.Now().UTC().Add(exp)}, nil
+	return PresignedURL{URL: out.URL, ExpiresAt: time.Now().UTC().Add(exp)}, nil
 }
 
 func (s *s3Store) CreateDownloadURL(ctx context.Context, key string, opts DownloadOptions) (PresignedURL, error) {
@@ -49,7 +31,7 @@ func (s *s3Store) CreateDownloadURL(ctx context.Context, key string, opts Downlo
 	if exp <= 0 {
 		exp = 5 * time.Minute
 	}
-	presign := s3.NewPresignClient(s.client)
+	presign := s3.NewPresignClient(s.presignClient)
 	out, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -57,7 +39,7 @@ func (s *s3Store) CreateDownloadURL(ctx context.Context, key string, opts Downlo
 	if err != nil {
 		return PresignedURL{}, fmt.Errorf("presign download: %w", err)
 	}
-	return PresignedURL{URL: s.mapPublicURL(out.URL), ExpiresAt: time.Now().UTC().Add(exp)}, nil
+	return PresignedURL{URL: out.URL, ExpiresAt: time.Now().UTC().Add(exp)}, nil
 }
 
 func (s *s3Store) Head(ctx context.Context, key string) (ObjectStat, error) {

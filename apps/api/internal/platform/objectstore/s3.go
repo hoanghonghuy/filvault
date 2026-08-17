@@ -21,9 +21,9 @@ func NewFromConfig(cfg config.Config) (ObjectStore, error) {
 }
 
 type s3Store struct {
-	client         *s3.Client
-	bucket         string
-	publicEndpoint string
+	client        *s3.Client
+	presignClient *s3.Client
+	bucket        string
 }
 
 func newS3(cfg config.Config) (*s3Store, error) {
@@ -35,19 +35,43 @@ func newS3(cfg config.Config) (*s3Store, error) {
 	if secretKey == "" {
 		secretKey = "minioadmin"
 	}
+
+	client, err := buildS3Client(cfg.S3Endpoint, cfg.S3Region, accessKey, secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Presign against the public endpoint so the browser's Host header matches
+	// the signed value. Fall back to the internal endpoint when unset.
+	presignEndpoint := cfg.S3PublicEndpoint
+	if presignEndpoint == "" {
+		presignEndpoint = cfg.S3Endpoint
+	}
+	presignClient, err := buildS3Client(presignEndpoint, cfg.S3Region, accessKey, secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &s3Store{
+		client:        client,
+		presignClient: presignClient,
+		bucket:        cfg.S3Bucket,
+	}, nil
+}
+
+func buildS3Client(endpoint, region, accessKey, secretKey string) (*s3.Client, error) {
 	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, _ ...any) (aws.Endpoint, error) {
-		return aws.Endpoint{URL: cfg.S3Endpoint, SigningRegion: cfg.S3Region, HostnameImmutable: true}, nil
+		return aws.Endpoint{URL: endpoint, SigningRegion: region, HostnameImmutable: true}, nil
 	})
 	awsCfg, err := awscfg.LoadDefaultConfig(context.Background(),
-		awscfg.WithRegion(cfg.S3Region),
+		awscfg.WithRegion(region),
 		awscfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 		awscfg.WithEndpointResolverWithOptions(resolver),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("aws config: %w", err)
 	}
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+	return s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = true
-	})
-	return &s3Store{client: client, bucket: cfg.S3Bucket, publicEndpoint: cfg.S3PublicEndpoint}, nil
+	}), nil
 }
