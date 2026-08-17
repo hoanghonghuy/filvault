@@ -5,12 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
-)
-
-const (
-	AccessTokenTTL  = 15 * time.Minute
-	RefreshTokenTTL = 7 * 24 * time.Hour
 )
 
 func Load() (Config, error) {
@@ -26,6 +20,12 @@ func Load() (Config, error) {
 		SMTPUsername:              os.Getenv("FILNEST_SMTP_USERNAME"),
 		SMTPPassword:              os.Getenv("FILNEST_SMTP_PASSWORD"),
 		SMTPFrom:                  os.Getenv("FILNEST_SMTP_FROM"),
+		ObjectStore:               getenv("FILNEST_OBJECT_STORE", "s3"),
+		S3Endpoint:                os.Getenv("FILNEST_S3_ENDPOINT"),
+		S3Bucket:                  getenv("FILNEST_S3_BUCKET", "filnest"),
+		S3Region:                  getenv("FILNEST_S3_REGION", "us-east-1"),
+		S3AccessKey:               os.Getenv("FILNEST_S3_ACCESS_KEY"),
+		S3SecretKey:               os.Getenv("FILNEST_S3_SECRET_KEY"),
 		DefaultTrashAutoDelete:    getenv("FILNEST_DEFAULT_TRASH_AUTO_DELETE", "false") == "true",
 		DefaultTrashRetentionDays: DefaultTrashRetentionDays,
 	}

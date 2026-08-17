@@ -25,4 +25,7 @@ var (
 	NotFound         = New(404, "NOT_FOUND", "Not found")
 	Conflict         = New(409, "CONFLICT", "Conflict")
 	InvalidState     = New(409, "INVALID_STATE", "Invalid state")
+	QuotaExceeded    = New(409, "QUOTA_EXCEEDED", "Storage quota exceeded")
+	FileTooLarge     = New(413, "FILE_TOO_LARGE", "File too large")
+	UploadExpired    = New(409, "UPLOAD_EXPIRED", "Upload session expired")
 )

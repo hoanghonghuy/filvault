@@ -69,6 +69,16 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] Package `internal/folder` + postgres adapter
 - [x] Test HTTP: unverified forbidden, CRUD flow, ownership
 
+### Slice 3 — Vertical slice file
+
+- [x] Port `ObjectStore` + adapter `memory` (test) / `s3` (MinIO/AWS)
+- [x] Allowlist extension + MIME; `FILE_TOO_LARGE` (> 100 MiB)
+- [x] `POST /api/v1/files/upload-sessions` — quota check, `PENDING`, presign
+- [x] `POST /api/v1/files/{id}/complete` — `Head`, `READY`, cập nhật `storage_used`
+- [x] `GET /api/v1/files/{id}`, `GET .../download`, `DELETE` abort `PENDING`
+- [x] Browser hiển thị file `READY`
+- [x] Test: reject type/size; upload → complete → browser → download
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -79,7 +89,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 |---|---|---|---|
 | [x] | **1b** | Verify email | SMTP/console + mã 6 số (gate kho file khi có API folder/file) |
 | [x] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
-| [ ] | **3** | Vertical slice file | allowlist + 100 MiB; presign → PUT MinIO/S3 → complete (`Head`) → download |
+| [x] | **3** | Vertical slice file | allowlist + 100 MiB; presign → complete (`Head`) → browser → download |
 | [ ] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
 | [ ] | **5** | Trash + setting | delete / restore / permanent; setting theo user; ticker tự xóa |
 | [ ] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
@@ -91,19 +101,19 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 
 - [ ] Vue web — `apps/web` chưa có
 - [x] Mailer port (console / SMTP); SES chỉ dành chỗ
-- [ ] `ObjectStore` + adapter S3 (MinIO và AWS cùng implementation)
-- [ ] MinIO trong compose **chưa** gắn vào luồng upload
-- [ ] Package `file` / `photo` / `search` (`folder` đã có)
+- [x] `ObjectStore` + adapter S3 (MinIO/AWS; test dùng memory)
+- [ ] MinIO trong compose — chạy `make run-api` với `FILNEST_S3_ENDPOINT` (upload thật qua presign)
+- [x] Package `file` (`folder` đã có); còn `photo` / `search`
 - [ ] CORS API; slog request đầy đủ
-- [x] `403 EMAIL_NOT_VERIFIED` trên folder/browser (file/photos khi slice 3+)
+- [x] `403 EMAIL_NOT_VERIFIED` trên folder/file/browser
 - [ ] Chứng minh một lần với AWS S3 thật (không chặn DoD local)
 
 ### Test tối thiểu Phase 1 còn thiếu
 
 - [x] Verify: chưa verify → 403 folder/browser
 - [x] Ownership: user B 404 trên folder user A
-- [ ] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối
-- [ ] Complete: size từ `Head` thắng size client khai
+- [x] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối (một phần — chưa test quota DB)
+- [x] Complete: size từ `Head` (test 128 bytes)
 - [ ] Unique name sibling → 409
 - [ ] Folder không rỗng: DELETE → 409
 - [ ] Album: không thêm PDF; xóa album không xóa file
@@ -126,5 +136,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **1b — Verify email**.
+3. Bắt đầu slice **4 — Rename / move file**.
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.

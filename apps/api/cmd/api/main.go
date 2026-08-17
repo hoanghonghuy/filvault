@@ -37,7 +37,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	engine := app.New(cfg, pool)
+	engine, err := app.New(cfg, pool)
+	if err != nil {
+		slog.Error("object store", "err", err)
+		os.Exit(1)
+	}
 	slog.Info("api listening", "addr", cfg.HTTPAddr)
 	if err := engine.Run(cfg.HTTPAddr); err != nil {
 		slog.Error("http", "err", err)

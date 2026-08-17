@@ -14,6 +14,7 @@ import (
 
 	"filnest/internal/app"
 	"filnest/internal/platform/config"
+	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/postgres"
 
 	"github.com/gin-gonic/gin"
@@ -267,13 +268,13 @@ func newAuthEngine(t *testing.T, invite string) (*gin.Engine, *pgxpool.Pool) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	engine := app.New(config.Config{
+	engine := app.NewWithMailer(config.Config{
 		InviteCode:                invite,
 		JWTSecret:                 "test-jwt-secret-not-for-prod",
 		DefaultTrashAutoDelete:    false,
 		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
 		MetadataStore:             "postgres",
-	}, pool)
+	}, pool, mailer.NewMemory())
 	return engine, pool
 }
 
