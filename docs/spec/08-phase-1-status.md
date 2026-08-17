@@ -131,6 +131,7 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 ### Web + CORS + logging
 
 - [x] `apps/web` — Vue 3 + Pinia + API client; auth, files, photos, trash, settings
+- [x] Loading skeleton theo layout từng màn (Files/Photos/Trash/Album)
 - [x] Upload qua presigned URL (XHR progress); Photos grid placeholder (không `<img>` original)
 - [x] CORS middleware + `FILNEST_CORS_ALLOWED_ORIGINS`
 - [x] slog request log (`httpx.RequestLog`) với method, path, status, duration, userId

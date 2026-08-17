@@ -4,6 +4,7 @@ import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import EmptyState from '@/components/EmptyState.vue'
+import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
 import type { TrashList } from '@/api/types'
 
 const ui = useUiStore()
@@ -90,34 +91,35 @@ onMounted(load)
   <div>
     <h1 class="page-title desktop-only">Trash</h1>
     <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+    <LoadingSkeletonTrash v-if="loading" />
+    <div v-else>
+      <EmptyState
+        v-if="isEmpty"
+        title="Trash is empty"
+        description="Deleted files and folders will appear here."
+      />
 
-    <EmptyState
-      v-if="isEmpty && !loading"
-      title="Trash is empty"
-      description="Deleted files and folders will appear here."
-    />
+      <section v-if="trash?.folders.length" class="list">
+        <h2 class="section-title">Folders</h2>
+        <div v-for="folder in trash.folders" :key="folder.id" class="row">
+          <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
+          <button class="btn icon-only" type="button" aria-label="Folder actions" @click="openFolderActions(folder)">
+            ⋯
+          </button>
+        </div>
+      </section>
 
-    <section v-if="trash?.folders.length" class="list">
-      <h2 class="section-title">Folders</h2>
-      <div v-for="folder in trash.folders" :key="folder.id" class="row">
-        <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
-        <button class="btn icon-only" type="button" aria-label="Folder actions" @click="openFolderActions(folder)">
-          ⋯
-        </button>
-      </div>
-    </section>
-
-    <section v-if="trash?.files.length" class="list" style="margin-top: 1rem">
-      <h2 class="section-title">Files</h2>
-      <div v-for="file in trash.files" :key="file.id" class="row">
-        <span class="name">{{ file.name }}</span>
-        <span class="meta desktop-only">{{ file.mimeType }} · {{ formatBytes(file.sizeBytes ?? 0) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
-          ⋯
-        </button>
-      </div>
-    </section>
+      <section v-if="trash?.files.length" class="list" style="margin-top: 1rem">
+        <h2 class="section-title">Files</h2>
+        <div v-for="file in trash.files" :key="file.id" class="row">
+          <span class="name">{{ file.name }}</span>
+          <span class="meta desktop-only">{{ file.mimeType }} · {{ formatBytes(file.sizeBytes ?? 0) }}</span>
+          <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
+            ⋯
+          </button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 

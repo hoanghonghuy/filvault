@@ -7,6 +7,7 @@ import { useUiStore } from '@/stores/ui'
 import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 import type { Album, DownloadURL, Timeline, TimelineItem } from '@/api/types'
 
 const router = useRouter()
@@ -149,59 +150,61 @@ onMounted(load)
   <div>
     <h1 class="page-title desktop-only">Photos</h1>
     <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
-
-    <section class="card section">
-      <h2 class="section-title">Albums</h2>
-      <div class="toolbar">
-        <input v-model="newAlbumName" class="search-input" placeholder="New album name" />
-        <button class="btn ink" type="button" @click="createAlbum">Create</button>
-      </div>
-      <div v-if="albums.length" class="list">
-        <div v-for="album in albums" :key="album.id" class="row">
-          <button type="button" class="name link-btn" @click="router.push(`/photos/albums/${album.id}`)">
-            {{ album.name }}
-          </button>
-          <button class="btn icon-only" type="button" aria-label="Album actions" @click="openAlbumActions(album)">
-            ⋯
-          </button>
+    <LoadingSkeletonPhotos v-if="loading" variant="initial" />
+    <div v-else>
+      <section class="card section">
+        <h2 class="section-title">Albums</h2>
+        <div class="toolbar">
+          <input v-model="newAlbumName" class="search-input" placeholder="New album name" />
+          <button class="btn ink" type="button" @click="createAlbum">Create</button>
         </div>
+        <div v-if="albums.length" class="list">
+          <div v-for="album in albums" :key="album.id" class="row">
+            <button type="button" class="name link-btn" @click="router.push(`/photos/albums/${album.id}`)">
+              {{ album.name }}
+            </button>
+            <button class="btn icon-only" type="button" aria-label="Album actions" @click="openAlbumActions(album)">
+              ⋯
+            </button>
+          </div>
+        </div>
+        <EmptyState v-else title="No albums yet" description="Create an album to group photos and videos." />
+      </section>
+
+      <section v-for="group in groups" :key="group.date" class="card section">
+        <h2 class="section-title">{{ group.date }}</h2>
+        <div class="grid photos">
+          <PhotoPlaceholder
+            v-for="item in group.items"
+            :key="item.id"
+            :mime-type="item.mimeType"
+            :name="item.name"
+            @click="openMedia(item)"
+          />
+        </div>
+      </section>
+
+      <EmptyState
+        v-if="groups.length === 0"
+        title="No photos yet"
+        description="Upload images or videos in My Files — they will appear here automatically."
+      />
+
+      <div v-if="nextBefore" class="load-more">
+        <LoadingSkeletonPhotos v-if="loadingMore" variant="more" />
+        <button v-else type="button" class="btn block" :disabled="loadingMore" @click="loadMore">
+          {{ loadingMore ? 'Loading…' : 'Load more' }}
+        </button>
       </div>
-      <EmptyState v-else title="No albums yet" description="Create an album to group photos and videos." />
-    </section>
 
-    <section v-for="group in groups" :key="group.date" class="card section">
-      <h2 class="section-title">{{ group.date }}</h2>
-      <div class="grid photos">
-        <PhotoPlaceholder
-          v-for="item in group.items"
-          :key="item.id"
-          :mime-type="item.mimeType"
-          :name="item.name"
-          @click="openMedia(item)"
-        />
-      </div>
-    </section>
-
-    <EmptyState
-      v-if="!loading && groups.length === 0"
-      title="No photos yet"
-      description="Upload images or videos in My Files — they will appear here automatically."
-    />
-
-    <div v-if="nextBefore" class="load-more">
-      <button type="button" class="btn block" :disabled="loadingMore" @click="loadMore">
-        {{ loadingMore ? 'Loading…' : 'Load more' }}
-      </button>
+      <PhotoMediaSheet
+        :open="mediaOpen"
+        :name="mediaItem?.name ?? ''"
+        @view="viewMedia"
+        @download="downloadMedia"
+        @close="mediaOpen = false"
+      />
     </div>
-
-    <PhotoMediaSheet
-      :open="mediaOpen"
-      :name="mediaItem?.name ?? ''"
-      @view="viewMedia"
-      @download="downloadMedia"
-      @close="mediaOpen = false"
-    />
   </div>
 </template>
 

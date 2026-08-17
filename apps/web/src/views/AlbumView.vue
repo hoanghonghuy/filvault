@@ -8,6 +8,7 @@ import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import MediaPickerSheet from '@/components/MediaPickerSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import LoadingSkeletonAlbum from '@/components/LoadingSkeletonAlbum.vue'
 import type { AlbumDetail, DownloadURL, TimelineItem } from '@/api/types'
 
 const route = useRoute()
@@ -166,25 +167,26 @@ watch(() => route.params.id, load, { immediate: true })
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+    <LoadingSkeletonAlbum v-if="loading" />
+    <div v-else>
+      <div v-if="album?.items.length" class="grid photos">
+        <PhotoPlaceholder
+          v-for="item in album.items"
+          :key="item.id"
+          :mime-type="item.mimeType"
+          :name="item.name"
+          @click="openItemActions(item)"
+        />
+      </div>
 
-    <div v-if="album?.items.length" class="grid photos">
-      <PhotoPlaceholder
-        v-for="item in album.items"
-        :key="item.id"
-        :mime-type="item.mimeType"
-        :name="item.name"
-        @click="openItemActions(item)"
+      <EmptyState
+        v-else
+        title="Album is empty"
+        description="Add photos or videos from your library."
+        action-label="Add photos"
+        @action="pickerOpen = true"
       />
     </div>
-
-    <EmptyState
-      v-else-if="!loading"
-      title="Album is empty"
-      description="Add photos or videos from your library."
-      action-label="Add photos"
-      @action="pickerOpen = true"
-    />
 
     <PhotoMediaSheet
       :open="mediaOpen"

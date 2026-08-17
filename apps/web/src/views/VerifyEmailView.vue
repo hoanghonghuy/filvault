@@ -56,8 +56,12 @@ async function submit() {
         <p v-if="message" class="muted">{{ message }}</p>
         <p v-if="error" class="error">{{ error }}</p>
         <div class="toolbar">
-          <button class="btn ink" type="submit" :disabled="loading">Verify</button>
-          <button class="btn" type="button" :disabled="loading" @click="resend">Resend code</button>
+          <button class="btn ink" type="submit" :disabled="loading">
+            {{ loading ? 'Verifying…' : 'Verify' }}
+          </button>
+          <button class="btn" type="button" :disabled="loading" @click="resend">
+            {{ loading ? 'Sending…' : 'Resend code' }}
+          </button>
         </div>
       </form>
     </div>

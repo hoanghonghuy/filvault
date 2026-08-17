@@ -8,6 +8,7 @@ import UploadFab from '@/components/UploadFab.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
+import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
 import type { Browser, DownloadURL, SearchResult, UploadSession } from '@/api/types'
 
 const route = useRoute()
@@ -18,6 +19,7 @@ const reloadStorage = inject<() => Promise<void>>('reloadStorage')
 const browser = ref<Browser | null>(null)
 const searchResults = ref<SearchResult | null>(null)
 const loading = ref(false)
+const searchLoading = ref(false)
 const error = ref('')
 const uploadProgress = ref<number | null>(null)
 const searchQuery = ref('')
@@ -61,13 +63,17 @@ async function loadBrowser() {
 async function runSearch() {
   if (!searchQuery.value.trim()) {
     searchResults.value = null
+    searchLoading.value = false
     return
   }
   error.value = ''
+  searchLoading.value = true
   try {
     searchResults.value = await api<SearchResult>(`/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
   } catch (e) {
     error.value = formatApiError(e, 'Search failed')
+  } finally {
+    searchLoading.value = false
   }
 }
 
@@ -328,9 +334,10 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       Uploading… {{ Math.round(uploadProgress * 100) }}%
     </p>
     <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+    <LoadingSkeletonFiles v-if="loading && !searchResults" mode="browse" />
+    <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
 
-    <section v-if="searchResults" class="list">
+    <section v-if="!loading && searchResults" class="list">
       <h2 class="section-title">Search results</h2>
       <div v-for="folder in searchResults.folders" :key="folder.id" class="row">
         <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
@@ -352,7 +359,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       />
     </section>
 
-    <section v-else class="list">
+    <section v-else-if="!loading" class="list">
       <div
         v-for="folder in browser?.folders ?? []"
         :key="folder.id"
@@ -377,7 +384,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         </button>
       </div>
       <EmptyState
-        v-if="isEmpty && !loading"
+        v-if="isEmpty"
         title="No files here"
         description="Upload a file or create a folder to get started."
         action-label="Upload file"
