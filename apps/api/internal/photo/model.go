@@ -28,6 +28,7 @@ type Album struct {
 	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	ItemCount int
 }
 
 type AlbumDetail struct {

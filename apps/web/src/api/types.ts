@@ -88,6 +88,7 @@ export interface Timeline {
 export interface Album {
   id: string
   name: string
+  itemCount: number
   createdAt: string
   updatedAt: string
 }

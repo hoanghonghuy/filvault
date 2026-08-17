@@ -174,6 +174,44 @@ func TestPhotos_TrashHidden(t *testing.T) {
 	}
 }
 
+func TestPhotos_AlbumItemCount(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	photoID := uploadReady(t, engine, objs, token, "a.jpg")
+
+	code, body := postAuth(t, engine, "/api/v1/photos/albums", token, map[string]any{"name": "Count"})
+	if code != http.StatusCreated {
+		t.Fatalf("create album status=%d body=%s", code, body)
+	}
+	var album struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &album)
+
+	code, body = getAuth(t, engine, "/api/v1/photos/albums", token)
+	if code != http.StatusOK {
+		t.Fatalf("list albums status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, `"itemCount":0`) {
+		t.Fatalf("empty album must have itemCount 0: %s", body)
+	}
+
+	code, _ = postAuth(t, engine, "/api/v1/photos/albums/"+album.ID+"/items", token, map[string]any{
+		"fileIds": []string{photoID},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("add item status=%d", code)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/photos/albums", token)
+	if code != http.StatusOK {
+		t.Fatalf("list albums status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, `"itemCount":1`) {
+		t.Fatalf("album must have itemCount 1: %s", body)
+	}
+}
+
 func TestPhotos_DuplicateAlbumName(t *testing.T) {
 	engine, mem, _ := newEngine(t)
 	token := registerVerified(t, engine, mem, uniqueEmail())

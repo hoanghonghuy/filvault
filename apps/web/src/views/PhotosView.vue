@@ -163,6 +163,7 @@ onMounted(load)
             <button type="button" class="name link-btn" @click="router.push(`/photos/albums/${album.id}`)">
               {{ album.name }}
             </button>
+            <span class="meta album-count">{{ album.itemCount }}</span>
             <button class="btn icon-only" type="button" aria-label="Album actions" @click="openAlbumActions(album)">
               ⋯
             </button>
@@ -225,6 +226,18 @@ onMounted(load)
   font-weight: 500;
   color: var(--ink);
   cursor: pointer;
+}
+
+.album-count {
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .load-more {

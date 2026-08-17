@@ -62,9 +62,13 @@ func (s *Store) CreateAlbum(ctx context.Context, a photo.Album) error {
 func (s *Store) GetAlbum(ctx context.Context, ownerID, id string) (*photo.Album, error) {
 	var a photo.Album
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, owner_id, name, created_at, updated_at
-		FROM albums WHERE owner_id = $1 AND id = $2
-	`, ownerID, id).Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt)
+		SELECT a.id, a.owner_id, a.name, a.created_at, a.updated_at,
+			COUNT(ai.file_id) AS item_count
+		FROM albums a
+		LEFT JOIN album_items ai ON ai.album_id = a.id
+		WHERE a.owner_id = $1 AND a.id = $2
+		GROUP BY a.id
+	`, ownerID, id).Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt, &a.ItemCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -76,9 +80,13 @@ func (s *Store) GetAlbum(ctx context.Context, ownerID, id string) (*photo.Album,
 
 func (s *Store) ListAlbums(ctx context.Context, ownerID string) ([]photo.Album, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, owner_id, name, created_at, updated_at
-		FROM albums WHERE owner_id = $1
-		ORDER BY name ASC
+		SELECT a.id, a.owner_id, a.name, a.created_at, a.updated_at,
+			COUNT(ai.file_id) AS item_count
+		FROM albums a
+		LEFT JOIN album_items ai ON ai.album_id = a.id
+		WHERE a.owner_id = $1
+		GROUP BY a.id
+		ORDER BY a.name ASC
 	`, ownerID)
 	if err != nil {
 		return nil, err
@@ -87,7 +95,7 @@ func (s *Store) ListAlbums(ctx context.Context, ownerID string) ([]photo.Album, 
 	var out []photo.Album
 	for rows.Next() {
 		var a photo.Album
-		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt, &a.ItemCount); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

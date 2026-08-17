@@ -263,6 +263,7 @@ func publicAlbum(a Album) gin.H {
 	return gin.H{
 		"id":        a.ID,
 		"name":      a.Name,
+		"itemCount": a.ItemCount,
 		"createdAt": a.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updatedAt": a.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
