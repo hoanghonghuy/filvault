@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 20
     volumes:
-      - filvault_pg:/var/lib/postgresql/data
+      - filvault_postgres_data:/var/lib/postgresql/data
 
   minio:
     image: minio/minio:latest
@@ -26,7 +26,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - filvault_minio:/data
+      - filvault_minio_data:/data
 
   minio-init:
     image: minio/mc:latest
@@ -87,5 +87,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  filvault_pg:
-  filvault_minio:
+  filvault_postgres_data:
+  filvault_minio_data:
