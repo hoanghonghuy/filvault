@@ -10,6 +10,13 @@ const friendly: Record<string, string> = {
   UPLOAD_EXPIRED: 'Upload session expired. Try uploading again.',
 }
 
+const authFriendly: Record<string, string> = {
+  CONFLICT: 'An account with this email already exists.',
+  FORBIDDEN: 'Invalid invite code.',
+  REGISTER_DISABLED: 'Registration is currently disabled.',
+  UNAUTHORIZED: 'Incorrect email or password.',
+}
+
 export function formatApiError(e: unknown, fallback: string): string {
   if (!(e instanceof ApiError)) {
     return fallback
@@ -18,4 +25,11 @@ export function formatApiError(e: unknown, fallback: string): string {
     return e.message
   }
   return friendly[e.code] ?? e.message ?? fallback
+}
+
+export function formatAuthError(e: unknown, fallback: string): string {
+  if (!(e instanceof ApiError)) {
+    return fallback
+  }
+  return authFriendly[e.code] ?? fallback
 }

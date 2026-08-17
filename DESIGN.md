@@ -146,6 +146,44 @@ Letter-spacing display: nhẹ âm (`-0.02em`). Không ALL-CAPS trừ badge kỹ 
 
 ## 4. Component Stylings
 
+### Auth card (Login / Register / Verify)
+
+Full-screen centered card — **không** bottom nav. Cal.com-like: canvas trắng trên nền `surface-soft`, hierarchy rõ.
+
+**Anatomy**
+```text
+[Brand: mark + “Filnest”]     ← trên card, căn giữa
+┌─────────────────────────┐
+│ Title (h1)              │
+│ Subtitle (muted, 1 câu) │
+│ Form fields (label trên)│
+│ Error alert (nếu có)    │
+│ Primary ink CTA (full)  │
+│ ─────────────────────── │
+│ Footer switch link      │
+└─────────────────────────┘
+```
+
+| Token | Value | Ghi chú |
+|-------|-------|---------|
+| Shell max-width | 420px | §8 responsive |
+| Card padding | 24px (`space-lg`) | |
+| Card radius | 16px (`radius-xl`) | |
+| Field min height | 44px | touch target |
+| CTA | ink `#111827`, full width | §4 Buttons |
+| Error | `danger-soft` bg + border | `role="alert"` |
+| Link switch | accent + underline | hit area ≥44px |
+
+**States:** default, focus (accent ring 2px), disabled/loading (opacity + `aria-busy`), error alert, success notice (verify resend).
+
+**Accessibility:** `aria-labelledby` form ↔ h1; labels luôn visible; autocomplete đúng (`username`, `current-password`, `new-password`, `one-time-code`); không placeholder-only. Màn ngắn: page scroll từ trên, không cắt field đầu.
+
+**Anti-patterns:** không bottom nav; không nhiều CTA primary; không placeholder thay label; không lỗi API raw; không `autocapitalize` invite (mã phân biệt hoa/thường).
+
+Verify: tách state Verifying / Resend — không đổi nhãn cả hai nút cùng lúc.
+
+Component: `AuthCard.vue` + views `LoginView`, `RegisterView`, `VerifyEmailView`.
+
 ### Buttons
 - **Primary ink** (`primary-cta`): dùng cho auth submit, “Save”, confirm không phá hủy. Height ≥44px mobile; radius `{rounded.md}`; text `{on-ink}`.
 - **Primary accent**: hiếm — chỉ khi action mang brand (vd. “Verify”). Prefer FAB cho Upload.

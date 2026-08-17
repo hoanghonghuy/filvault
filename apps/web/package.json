@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
+    "test": "vitest run",
     "lint": "run-s lint:oxlint:ci lint:eslint:ci",
     "lint:fix": "run-s lint:oxlint lint:eslint",
     "lint:oxlint": "oxlint . --fix",
