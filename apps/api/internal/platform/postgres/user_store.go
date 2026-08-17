@@ -55,6 +55,24 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (*user.User, error) 
 	return s.scanUser(s.pool.QueryRow(ctx, userSelect+` WHERE id = $1`, id))
 }
 
+func (s *Store) SetVerificationCode(ctx context.Context, userID, codeHash string, expiresAt time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE users
+		SET verification_code_hash = $2, verification_expires_at = $3, updated_at = now()
+		WHERE id = $1
+	`, userID, codeHash, expiresAt)
+	return err
+}
+
+func (s *Store) MarkEmailVerified(ctx context.Context, userID string, at time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE users
+		SET email_verified_at = $2, verification_code_hash = NULL, verification_expires_at = NULL, updated_at = now()
+		WHERE id = $1
+	`, userID, at)
+	return err
+}
+
 func (s *Store) InsertRefreshToken(ctx context.Context, tok auth.RefreshToken) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)
@@ -97,7 +115,8 @@ func (s *Store) RevokeRefreshToken(ctx context.Context, hash string, at time.Tim
 
 const userSelect = `
 	SELECT id, email, display_name, password_hash,
-		email_verified_at, storage_used, storage_quota,
+		email_verified_at, verification_code_hash, verification_expires_at,
+		storage_used, storage_quota,
 		trash_auto_delete_enabled, trash_retention_days,
 		created_at, updated_at
 	FROM users
@@ -105,9 +124,11 @@ const userSelect = `
 
 func (s *Store) scanUser(row pgx.Row) (*user.User, error) {
 	var u user.User
+	var codeHash *string
 	err := row.Scan(
 		&u.ID, &u.Email, &u.DisplayName, &u.PasswordHash,
-		&u.EmailVerifiedAt, &u.StorageUsed, &u.StorageQuota,
+		&u.EmailVerifiedAt, &codeHash, &u.VerificationExpiresAt,
+		&u.StorageUsed, &u.StorageQuota,
 		&u.TrashAutoDeleteEnabled, &u.TrashRetentionDays,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
@@ -116,6 +137,9 @@ func (s *Store) scanUser(row pgx.Row) (*user.User, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if codeHash != nil {
+		u.VerificationCodeHash = *codeHash
 	}
 	return &u, nil
 }

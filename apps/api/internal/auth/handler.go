@@ -22,6 +22,8 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/auth/login", h.login)
 	g.POST("/auth/refresh", h.refresh)
 	g.POST("/auth/logout", h.AuthRequired(), h.logout)
+	g.POST("/auth/verify-email", h.verifyEmail)
+	g.POST("/auth/resend-verification", h.resendVerification)
 	g.GET("/users/me", h.AuthRequired(), h.me)
 }
 
@@ -69,6 +71,15 @@ type loginReq struct {
 
 type refreshReq struct {
 	RefreshToken string `json:"refreshToken"`
+}
+
+type verifyEmailReq struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+type resendVerificationReq struct {
+	Email string `json:"email"`
 }
 
 func (h *Handler) register(c *gin.Context) {
@@ -143,6 +154,32 @@ func (h *Handler) me(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, user.PublicFrom(u))
+}
+
+func (h *Handler) verifyEmail(c *gin.Context) {
+	var req verifyEmailReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	if err := h.svc.VerifyEmail(c.Request.Context(), req.Email, req.Code); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) resendVerification(c *gin.Context) {
+	var req resendVerificationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	if err := h.svc.ResendVerification(c.Request.Context(), req.Email); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func sessionJSON(s Session) gin.H {

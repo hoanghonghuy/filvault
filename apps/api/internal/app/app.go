@@ -3,6 +3,7 @@ package app
 import (
 	"filnest/internal/auth"
 	"filnest/internal/platform/config"
+	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/postgres"
 
 	"github.com/gin-gonic/gin"
@@ -10,9 +11,13 @@ import (
 )
 
 func New(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
+	return NewWithMailer(cfg, pool, mailer.New(cfg))
+}
+
+func NewWithMailer(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer) *gin.Engine {
 	store := postgres.NewStore(pool)
 	tokens := auth.NewTokens(cfg.JWTSecret)
-	svc := auth.NewService(cfg, store, tokens)
+	svc := auth.NewService(cfg, store, tokens, m)
 	handlers := auth.NewHandler(svc)
 
 	engine := gin.New()

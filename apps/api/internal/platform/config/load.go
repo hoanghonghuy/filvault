@@ -20,6 +20,12 @@ func Load() (Config, error) {
 		JWTSecret:                 os.Getenv("FILNEST_JWT_SECRET"),
 		HTTPAddr:                  getenv("FILNEST_HTTP_ADDR", ":8080"),
 		MetadataStore:             getenv("FILNEST_METADATA_STORE", "postgres"),
+		Mailer:                    getenv("FILNEST_MAILER", "auto"),
+		SMTPHost:                  os.Getenv("FILNEST_SMTP_HOST"),
+		SMTPPort:                  getenv("FILNEST_SMTP_PORT", "587"),
+		SMTPUsername:              os.Getenv("FILNEST_SMTP_USERNAME"),
+		SMTPPassword:              os.Getenv("FILNEST_SMTP_PASSWORD"),
+		SMTPFrom:                  os.Getenv("FILNEST_SMTP_FROM"),
 		DefaultTrashAutoDelete:    getenv("FILNEST_DEFAULT_TRASH_AUTO_DELETE", "false") == "true",
 		DefaultTrashRetentionDays: DefaultTrashRetentionDays,
 	}

@@ -12,6 +12,12 @@ type Config struct {
 	JWTSecret                 string
 	HTTPAddr                  string
 	MetadataStore             string
+	Mailer                    string
+	SMTPHost                  string
+	SMTPPort                  string
+	SMTPUsername              string
+	SMTPPassword              string
+	SMTPFrom                  string
 	DefaultTrashAutoDelete    bool
 	DefaultTrashRetentionDays int
 }

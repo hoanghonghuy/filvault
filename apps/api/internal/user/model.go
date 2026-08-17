@@ -8,6 +8,8 @@ type User struct {
 	DisplayName            string
 	PasswordHash           string
 	EmailVerifiedAt        *time.Time
+	VerificationCodeHash   string
+	VerificationExpiresAt  *time.Time
 	StorageUsed            int64
 	StorageQuota           int64
 	TrashAutoDeleteEnabled bool

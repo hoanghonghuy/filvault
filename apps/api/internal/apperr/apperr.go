@@ -21,6 +21,7 @@ var (
 	Unauthorized     = New(401, "UNAUTHORIZED", "Unauthorized")
 	Forbidden        = New(403, "FORBIDDEN", "Forbidden")
 	RegisterDisabled = New(403, "REGISTER_DISABLED", "Registration is disabled")
+	EmailNotVerified = New(403, "EMAIL_NOT_VERIFIED", "Email not verified")
 	NotFound         = New(404, "NOT_FOUND", "Not found")
 	Conflict         = New(409, "CONFLICT", "Conflict")
 )

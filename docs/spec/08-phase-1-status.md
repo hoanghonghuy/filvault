@@ -1,6 +1,6 @@
 # Phase 1 — Checklist bàn giao
 
-Cập nhật: 2026-08-14.
+Cập nhật: 2026-08-17.
 
 Nguồn sự thật cho thứ tự làm: [06-phase-1-plan.md](06-phase-1-plan.md).  
 Nhánh gần nhất khi ghi: `develop`.
@@ -50,6 +50,15 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] Test: thiếu/sai invite, trùng email, login sai, refresh, logout một máy
 - [x] `make run-api`
 
+### Slice 1b — Verify email
+
+- [x] Port `Mailer` + adapter `console` / `smtp` (`FILNEST_MAILER=auto` → SMTP nếu có host, không thì console)
+- [x] `POST /api/v1/auth/resend-verification` — luôn `204`; email lạ không lộ
+- [x] `POST /api/v1/auth/verify-email` — mã 6 số, TTL 15 phút, lưu hash; sai/hết hạn → `400 VALIDATION_ERROR`
+- [x] Register gửi mã qua Mailer; Memory mailer dùng trong test
+- [x] Test: resend → verify sai → verify đúng → `emailVerified: true`
+- [ ] `403 EMAIL_NOT_VERIFIED` trên Files/Photos — gắn khi có route folder/file (slice 2+)
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -58,7 +67,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 
 | | Slice | Việc | Xong khi |
 |---|---|---|---|
-| [ ] | **1b** | Verify email | SMTP hoặc console; mã 6 số; chưa verify thì không dùng kho file |
+| [x] | **1b** | Verify email | SMTP/console + mã 6 số (gate kho file khi có API folder/file) |
 | [ ] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
 | [ ] | **3** | Vertical slice file | allowlist + 100 MiB; presign → PUT MinIO/S3 → complete (`Head`) → download |
 | [ ] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
@@ -71,12 +80,12 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 ### Còn thiếu dù đã khai trong spec / compose
 
 - [ ] Vue web — `apps/web` chưa có
-- [ ] Mailer port (console / SMTP); SES chỉ dành chỗ
+- [x] Mailer port (console / SMTP); SES chỉ dành chỗ
 - [ ] `ObjectStore` + adapter S3 (MinIO và AWS cùng implementation)
 - [ ] MinIO trong compose **chưa** gắn vào luồng upload
 - [ ] Package `file` / `folder` / `photo` / `search`
 - [ ] CORS API; slog request đầy đủ
-- [ ] `403 EMAIL_NOT_VERIFIED` trên Files/Photos (phụ thuộc 1b + slice 2/3)
+- [ ] `403 EMAIL_NOT_VERIFIED` trên Files/Photos (gắn khi có slice 2/3)
 - [ ] Chứng minh một lần với AWS S3 thật (không chặn DoD local)
 
 ### Test tối thiểu Phase 1 còn thiếu

@@ -9,6 +9,7 @@ import (
 
 	"filnest/internal/apperr"
 	"filnest/internal/platform/config"
+	"filnest/internal/platform/mailer"
 	"filnest/internal/user"
 )
 
@@ -16,6 +17,7 @@ type Service struct {
 	cfg    config.Config
 	repo   Repository
 	tokens *Tokens
+	mailer mailer.Mailer
 	now    func() time.Time
 	dummy  string
 }
@@ -26,11 +28,12 @@ type Session struct {
 	RefreshToken string
 }
 
-func NewService(cfg config.Config, repo Repository, tokens *Tokens) *Service {
+func NewService(cfg config.Config, repo Repository, tokens *Tokens, mailer mailer.Mailer) *Service {
 	return &Service{
 		cfg:    cfg,
 		repo:   repo,
 		tokens: tokens,
+		mailer: mailer,
 		now:    time.Now,
 		dummy:  dummyPasswordHash(),
 	}
@@ -75,6 +78,9 @@ func (s *Service) Register(ctx context.Context, email, password, displayName, in
 		u.TrashRetentionDays = config.DefaultTrashRetentionDays
 	}
 	if err := s.repo.CreateUser(ctx, u); err != nil {
+		return Session{}, err
+	}
+	if err := s.ResendVerification(ctx, u.Email); err != nil {
 		return Session{}, err
 	}
 	return s.issueSession(ctx, u, now)
