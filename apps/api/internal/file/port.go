@@ -10,6 +10,7 @@ type Repository interface {
 	GetByID(ctx context.Context, ownerID, id string) (*File, error)
 	Update(ctx context.Context, f File) error
 	DeleteRow(ctx context.Context, ownerID, id string) error
+	SoftDelete(ctx context.Context, ownerID, id string, at time.Time) error
 	ExistsAliveByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error)
 }
 

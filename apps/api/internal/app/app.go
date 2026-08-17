@@ -8,6 +8,7 @@ import (
 	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/objectstore"
 	"filnest/internal/platform/postgres"
+	"filnest/internal/trash"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,8 +36,14 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	folderSvc := folder.NewService(folderRepo)
 	folderHandlers := folder.NewHandler(folderSvc)
 
-	fileSvc := file.NewService(postgres.NewFileRepository(store), folderRepo, postgres.NewQuotaStore(store), obj)
+	fileRepo := postgres.NewFileRepository(store)
+	quota := postgres.NewQuotaStore(store)
+	fileSvc := file.NewService(fileRepo, folderRepo, quota, obj)
 	fileHandlers := file.NewHandler(fileSvc)
+
+	trashRepo := postgres.NewTrashRepository(store)
+	trashSvc := trash.NewService(trashRepo, quota, obj)
+	trashHandlers := trash.NewHandler(trashSvc)
 
 	engine := gin.New()
 	engine.Use(gin.Recovery())
@@ -49,6 +56,12 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	}
 	folderHandlers.RegisterRoutes(v1, storage...)
 	fileHandlers.RegisterRoutes(v1, storage...)
+	trashHandlers.RegisterRoutes(v1, storage...)
 
 	return engine
+}
+
+func NewTrashService(pool *pgxpool.Pool, obj objectstore.ObjectStore) *trash.Service {
+	store := postgres.NewStore(pool)
+	return trash.NewService(postgres.NewTrashRepository(store), postgres.NewQuotaStore(store), obj)
 }

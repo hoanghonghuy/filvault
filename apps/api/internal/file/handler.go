@@ -119,7 +119,7 @@ func (h *Handler) delete(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	if err := h.svc.AbortPending(c.Request.Context(), userID, c.Param("id")); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), userID, c.Param("id")); err != nil {
 		httpx.Error(c, err)
 		return
 	}

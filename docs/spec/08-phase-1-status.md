@@ -86,6 +86,16 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] `object_key` không đổi (download vẫn hoạt động sau patch)
 - [x] Test: rename, move vào folder, browser, conflict, invalid state
 
+### Slice 5 — Trash + setting
+
+- [x] `DELETE /files/{id}` — soft delete `READY`; `PENDING` vẫn abort
+- [x] `GET /api/v1/trash` — list file/folder đã xóa
+- [x] `POST /files/{id}/restore`, `POST /folders/{id}/restore` — conflict nếu trùng tên
+- [x] `DELETE /trash/files/{id}`, `DELETE /trash/folders/{id}` — permanent (file: xóa object + giảm quota)
+- [x] `PATCH /users/me` — `trashAutoDeleteEnabled`, `trashRetentionDays`
+- [x] Ticker auto-cleanup in-process (`RunAutoCleanup`, interval 1h)
+- [x] Package `internal/trash` + test
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -98,7 +108,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 | [x] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
 | [x] | **3** | Vertical slice file | allowlist + 100 MiB; presign → complete (`Head`) → browser → download |
 | [x] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
-| [ ] | **5** | Trash + setting | delete / restore / permanent; setting theo user; ticker tự xóa |
+| [x] | **5** | Trash + setting | delete/restore/permanent; PATCH setting; ticker |
 | [ ] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
 | [ ] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
 | [ ] | **8** | Quota + search + storage | chặn vượt quota; search tên; thanh dung lượng |
@@ -122,7 +132,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 - [x] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối (một phần — chưa test quota DB)
 - [x] Complete: size từ `Head` (test 128 bytes)
 - [x] Unique name sibling → 409 (file patch)
-- [ ] Folder không rỗng: DELETE → 409
+- [x] Folder không rỗng: DELETE → 409
 - [ ] Album: không thêm PDF; xóa album không xóa file
 
 ---
@@ -143,5 +153,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **5 — Trash + setting**.
+3. Bắt đầu slice **6 — Photos**.
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.

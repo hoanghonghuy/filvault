@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"filnest/internal/apperr"
 	"filnest/internal/file"
@@ -135,6 +136,10 @@ func (r fileRepo) Update(ctx context.Context, f file.File) error {
 
 func (r fileRepo) DeleteRow(ctx context.Context, ownerID, id string) error {
 	return r.store.DeleteFileRow(ctx, ownerID, id)
+}
+
+func (r fileRepo) SoftDelete(ctx context.Context, ownerID, id string, at time.Time) error {
+	return r.store.SoftDeleteFile(ctx, ownerID, id, at)
 }
 
 func (r fileRepo) ExistsAliveByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error) {

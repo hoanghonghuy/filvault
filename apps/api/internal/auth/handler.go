@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"filnest/internal/apperr"
 	"filnest/internal/platform/httpx"
 	"filnest/internal/user"
@@ -25,6 +26,7 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup) {
 	g.POST("/auth/verify-email", h.verifyEmail)
 	g.POST("/auth/resend-verification", h.resendVerification)
 	g.GET("/users/me", h.AuthRequired(), h.me)
+	g.PATCH("/users/me", h.AuthRequired(), h.EmailVerifiedRequired(), h.patchMe)
 }
 
 func (h *Handler) AuthRequired() gin.HandlerFunc {
@@ -174,6 +176,47 @@ func (h *Handler) me(c *gin.Context) {
 		return
 	}
 	u, err := h.svc.Me(c.Request.Context(), userID)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, user.PublicFrom(u))
+}
+
+func (h *Handler) patchMe(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	var raw map[string]json.RawMessage
+	if err := c.ShouldBindJSON(&raw); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	var autoDelete *bool
+	if v, ok := raw["trashAutoDeleteEnabled"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		autoDelete = &b
+	}
+	var retentionDays *int
+	if v, ok := raw["trashRetentionDays"]; ok {
+		var n int
+		if err := json.Unmarshal(v, &n); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		retentionDays = &n
+	}
+	if autoDelete == nil && retentionDays == nil {
+		httpx.Validation(c)
+		return
+	}
+	u, err := h.svc.PatchMe(c.Request.Context(), userID, autoDelete, retentionDays)
 	if err != nil {
 		httpx.Error(c, err)
 		return

@@ -146,6 +146,28 @@ func (s *Service) Me(ctx context.Context, userID string) (user.User, error) {
 	return *u, nil
 }
 
+func (s *Service) PatchMe(ctx context.Context, userID string, autoDelete *bool, retentionDays *int) (user.User, error) {
+	u, err := s.Me(ctx, userID)
+	if err != nil {
+		return user.User{}, err
+	}
+	enabled := u.TrashAutoDeleteEnabled
+	days := u.TrashRetentionDays
+	if autoDelete != nil {
+		enabled = *autoDelete
+	}
+	if retentionDays != nil {
+		if *retentionDays < 1 {
+			return user.User{}, apperr.Validation
+		}
+		days = *retentionDays
+	}
+	if err := s.repo.UpdateTrashSettings(ctx, userID, enabled, days); err != nil {
+		return user.User{}, err
+	}
+	return s.Me(ctx, userID)
+}
+
 func (s *Service) ParseAccess(raw string) (string, error) {
 	return s.tokens.ParseAccess(raw)
 }

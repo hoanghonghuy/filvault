@@ -73,6 +73,21 @@ func (s *Store) MarkEmailVerified(ctx context.Context, userID string, at time.Ti
 	return err
 }
 
+func (s *Store) UpdateTrashSettings(ctx context.Context, userID string, enabled bool, retentionDays int) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users
+		SET trash_auto_delete_enabled = $2, trash_retention_days = $3, updated_at = now()
+		WHERE id = $1
+	`, userID, enabled, retentionDays)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
+}
+
 func (s *Store) InsertRefreshToken(ctx context.Context, tok auth.RefreshToken) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)

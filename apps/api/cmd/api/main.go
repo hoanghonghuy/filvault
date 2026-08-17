@@ -8,7 +8,9 @@ import (
 
 	"filnest/internal/app"
 	"filnest/internal/platform/config"
+	"filnest/internal/platform/objectstore"
 	"filnest/internal/platform/postgres"
+	"filnest/internal/trash"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -42,9 +44,24 @@ func main() {
 		slog.Error("object store", "err", err)
 		os.Exit(1)
 	}
+
+	tickerCtx, tickerCancel := context.WithCancel(context.Background())
+	defer tickerCancel()
+	trashSvc := app.NewTrashService(pool, mustObjectStore(cfg))
+	trash.StartTicker(tickerCtx, trashSvc, trash.DefaultTickerInterval)
+
 	slog.Info("api listening", "addr", cfg.HTTPAddr)
 	if err := engine.Run(cfg.HTTPAddr); err != nil {
 		slog.Error("http", "err", err)
 		os.Exit(1)
 	}
+}
+
+func mustObjectStore(cfg config.Config) objectstore.ObjectStore {
+	obj, err := objectstore.NewFromConfig(cfg)
+	if err != nil {
+		slog.Error("object store", "err", err)
+		os.Exit(1)
+	}
+	return obj
 }
