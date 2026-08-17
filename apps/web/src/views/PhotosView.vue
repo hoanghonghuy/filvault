@@ -168,7 +168,7 @@ onMounted(load)
             </button>
           </div>
         </div>
-        <EmptyState v-else title="No albums yet" description="Create an album to group photos and videos." />
+        <EmptyState v-else title="No albums yet" description="Create an album to group photos and videos." icon="photos" />
       </section>
 
       <section v-for="group in groups" :key="group.date" class="card section">
@@ -188,6 +188,7 @@ onMounted(load)
         v-if="groups.length === 0"
         title="No photos yet"
         description="Upload images or videos in My Files — they will appear here automatically."
+        icon="photos"
       />
 
       <div v-if="nextBefore" class="load-more">

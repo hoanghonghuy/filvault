@@ -184,6 +184,7 @@ watch(() => route.params.id, load, { immediate: true })
         title="Album is empty"
         description="Add photos or videos from your library."
         action-label="Add photos"
+        icon="photos"
         @action="pickerOpen = true"
       />
     </div>

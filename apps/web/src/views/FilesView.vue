@@ -6,9 +6,11 @@ import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import UploadFab from '@/components/UploadFab.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
+import { mimeIcon } from '@/lib/mimeIcon'
 import type { Browser, DownloadURL, SearchResult, UploadSession } from '@/api/types'
 
 const route = useRoute()
@@ -340,13 +342,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <section v-if="!loading && searchResults" class="list">
       <h2 class="section-title">Search results</h2>
       <div v-for="folder in searchResults.folders" :key="folder.id" class="row">
-        <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
+        <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
         <button class="btn icon-only" type="button" aria-label="Open folder" @click="openFolder(folder.id)">
           →
         </button>
       </div>
       <div v-for="file in searchResults.files" :key="file.id" class="row">
-        <span class="name">{{ file.name }}</span>
+        <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
         <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
           ⋯
@@ -356,6 +358,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-if="searchResults.folders.length === 0 && searchResults.files.length === 0"
         title="No results"
         description="Try a different search term."
+        icon="file"
       />
     </section>
 
@@ -366,7 +369,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         class="row tappable"
         @click="openFolder(folder.id)"
       >
-        <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
+        <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
         <button
           class="btn icon-only"
           type="button"
@@ -377,7 +380,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         </button>
       </div>
       <div v-for="file in browser?.files ?? []" :key="file.id" class="row">
-        <span class="name">{{ file.name }}</span>
+        <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta desktop-only">{{ file.mimeType }} · {{ formatBytes(file.sizeBytes) }}</span>
         <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
           ⋯
@@ -388,6 +391,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         title="No files here"
         description="Upload a file or create a folder to get started."
         action-label="Upload file"
+        icon="folder"
         @action="triggerUpload"
       />
     </section>
@@ -418,6 +422,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 <style scoped>
 .files-page {
   position: relative;
+}
+
+.row-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+  vertical-align: -0.2em;
+  margin-right: var(--space-xs);
 }
 
 .upload-status {

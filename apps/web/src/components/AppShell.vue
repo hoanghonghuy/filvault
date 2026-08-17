@@ -3,6 +3,7 @@ import { computed, provide, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import StorageBar from '@/components/StorageBar.vue'
+import Icon from '@/components/AppIcon.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
@@ -17,10 +18,10 @@ provide('reloadStorage', async () => {
 })
 
 const navItems = [
-  { to: '/files', label: 'Files', shortLabel: 'Files' },
-  { to: '/photos', label: 'Photos', shortLabel: 'Photos' },
-  { to: '/trash', label: 'Trash', shortLabel: 'Trash' },
-  { to: '/settings', label: 'Settings', shortLabel: 'Settings' },
+  { to: '/files', label: 'Files', shortLabel: 'Files', icon: 'folder' },
+  { to: '/photos', label: 'Photos', shortLabel: 'Photos', icon: 'photos' },
+  { to: '/trash', label: 'Trash', shortLabel: 'Trash', icon: 'trash' },
+  { to: '/settings', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
 ]
 
 const pageTitle = computed(() => {
@@ -48,7 +49,8 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
           :to="item.to"
           class="side-link"
         >
-          {{ item.label }}
+          <Icon :name="item.icon" :size="20" />
+          <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
       <div class="side-user">
@@ -74,6 +76,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
         :to="item.to"
         class="bottom-link"
       >
+        <Icon :name="item.icon" :size="22" />
         <span class="bottom-label">{{ item.shortLabel }}</span>
       </RouterLink>
     </nav>
@@ -155,8 +158,10 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 .bottom-link {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   min-height: var(--touch-min);
   color: var(--muted);
   font-size: 12px;
@@ -177,6 +182,11 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   }
 
   .side-nav {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     width: 220px;
@@ -184,6 +194,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
     padding: var(--space-lg) var(--space-md);
     background: var(--canvas);
     border-right: 1px solid var(--hairline);
+    overflow-y: auto;
   }
 
   .brand {
@@ -203,17 +214,29 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   .side-link {
     display: flex;
     align-items: center;
+    gap: var(--space-sm);
     min-height: var(--touch-min);
     padding: 0 var(--space-sm);
     border-radius: var(--radius-md);
     color: var(--muted);
     font-size: 14px;
     font-weight: 600;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .side-link:hover {
+    color: var(--ink);
+    background: var(--surface-soft);
+  }
+
+  .side-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .side-link.router-link-active {
-    color: var(--ink);
-    background: var(--surface-soft);
+    color: var(--accent);
+    background: var(--accent-soft);
   }
 
   .side-user {
