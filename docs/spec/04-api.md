@@ -74,7 +74,7 @@ POST /api/v1/users/me/password
 **Register** `{ email, password, displayName, inviteCode }` → `201` `{ user, accessToken, refreshToken }`.
 
 - Sai/thiếu invite → `403 FORBIDDEN` (không nói mã đúng hay sai chi tiết)
-- `FILNEST_INVITE_CODE` trống → `403 REGISTER_DISABLED`
+- `FILVAULT_INVITE_CODE` trống → `403 REGISTER_DISABLED`
 - Email đã có → `409 CONFLICT`
 - User tạo ra **chưa** verify (`emailVerified: false`)
 

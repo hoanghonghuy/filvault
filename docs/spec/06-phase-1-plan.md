@@ -91,7 +91,7 @@ JWT access + nhiều refresh; logout một máy không đá máy khác
 Migration up/down chạy lại được
 docker-compose dựng Postgres + MinIO từ máy sạch
 Core không import AWS SDK
-FILNEST_METADATA_STORE=dynamodb fail fast
+FILVAULT_METADATA_STORE=dynamodb fail fast
 Không SMTP → mã verify in console
 Photos grid không load original 100MB
 ```

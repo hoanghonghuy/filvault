@@ -26,7 +26,7 @@ const navItems = [
 const pageTitle = computed(() => {
   if (route.name === 'album') return 'Album'
   const match = navItems.find((item) => item.to === route.path)
-  return match?.label ?? 'Filnest'
+  return match?.label ?? 'Filvault'
 })
 
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
@@ -40,7 +40,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 
   <div v-if="showShell" class="shell">
     <aside class="side-nav" aria-label="Main navigation">
-      <div class="brand">Filnest</div>
+      <div class="brand">Filvault</div>
       <nav class="side-links">
         <RouterLink
           v-for="item in navItems"
@@ -58,7 +58,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 
     <div class="shell-main">
       <header class="header">
-        <div class="header-brand mobile-only">Filnest</div>
+        <div class="header-brand mobile-only">Filvault</div>
         <h1 class="header-title">{{ pageTitle }}</h1>
       </header>
       <StorageBar ref="storageBarRef" />

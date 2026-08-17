@@ -3,7 +3,7 @@ package file
 import (
 	"context"
 
-	"filnest/internal/apperr"
+	"filvault/internal/apperr"
 )
 
 func (s *Service) Delete(ctx context.Context, ownerID, fileID string) error {

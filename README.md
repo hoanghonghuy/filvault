@@ -1,4 +1,4 @@
-# Filnest
+# Filvault
 
 Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).  
 Checklist bàn giao Phase 1: [`docs/spec/08-phase-1-status.md`](docs/spec/08-phase-1-status.md).
@@ -26,10 +26,10 @@ Thông tin đăng nhập mặc định:
 
 | Trường | Giá trị |
 |---|---|
-| Email | `dev@filnest.com` |
+| Email | `dev@filvault.com` |
 | Mật khẩu | `Dev1234@` |
 | Mã mời (register tay) | `dev-invite` |
 
 Tài khoản đã **verify email** — đăng nhập và dùng Files/Photos ngay. Seed idempotent: chạy lại không tạo trùng.
 
-Tuỳ chỉnh qua env: `FILNEST_SEED_DEV_USER` (Docker: bật mặc định), `FILNEST_SEED_EMAIL`, `FILNEST_SEED_PASSWORD`, `FILNEST_SEED_DISPLAY_NAME`. **Production:** không set `FILNEST_SEED_DEV_USER=true`.
+Tuỳ chỉnh qua env: `FILVAULT_SEED_DEV_USER` (Docker: bật mặc định), `FILVAULT_SEED_EMAIL`, `FILVAULT_SEED_PASSWORD`, `FILVAULT_SEED_DISPLAY_NAME`. **Production:** không set `FILVAULT_SEED_DEV_USER=true`.

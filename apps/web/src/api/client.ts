@@ -2,8 +2,8 @@ import type { ApiErrorBody, Session } from './types'
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
 
-const ACCESS_KEY = 'filnest.accessToken'
-const REFRESH_KEY = 'filnest.refreshToken'
+const ACCESS_KEY = 'filvault.accessToken'
+const REFRESH_KEY = 'filvault.refreshToken'
 
 let accessToken: string | null = localStorage.getItem(ACCESS_KEY)
 let refreshToken: string | null = localStorage.getItem(REFRESH_KEY)

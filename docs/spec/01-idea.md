@@ -2,17 +2,17 @@
 
 Trạng thái: **chốt cho hướng đi**. Chi tiết sản phẩm Phase 1 vẫn lấy từ concept v0.1.
 
-## 1. Filnest là gì
+## 1. Filvault là gì
 
-Filnest là nền tảng lưu trữ file cá nhân trên cloud (đám mây): upload, download, tổ chức folder, xóa/khôi phục, quản lý dung lượng.
+Filvault là nền tảng lưu trữ file cá nhân trên cloud (đám mây): upload, download, tổ chức folder, xóa/khôi phục, quản lý dung lượng.
 
 Khi hoàn thiện, cùng một API phục vụ:
 
 ```text
-Web (Vue)    CLI (filnest)    Desktop sync
+Web (Vue)    CLI (filvault)    Desktop sync
                  │
                  ▼
-            Filnest API
+            Filvault API
 ```
 
 Mobile là khả năng mở rộng, không phải mục tiêu hiện tại.
@@ -53,7 +53,7 @@ Xem [02-provider-strategy.md](02-provider-strategy.md).
 
 | Mục | Quyết định |
 |---|---|
-| Tên | Filnest; CLI `filnest` |
+| Tên | Filvault; CLI `filvault` |
 | Backend | Go + Gin; **modular monolith** (một ứng dụng, chia module theo domain); không microservices |
 | Metadata (siêu dữ liệu) | PostgreSQL là source of truth (nguồn sự thật) mặc định |
 | File binary | Object storage (kho object); **không** nhét vào PostgreSQL |
@@ -108,7 +108,7 @@ Không làm ngay (concept §23 vẫn đúng về **sản phẩm**, có siết th
 desktop/CLI sync, version history, public share, team workspace
 SQS, Lambda worker, thumbnail server, virus scan, OCR, FTS nặng
 CloudFront, multi-region, mobile, WebSocket, microservices
-tenant/app API cho dự án khác (mầm non, …) — sau khi Filnest xong
+tenant/app API cho dự án khác (mầm non, …) — sau khi Filvault xong
 ```
 
 Điều **được phép ngay từ Phase 1** (khác với “implement nhiều cloud”):

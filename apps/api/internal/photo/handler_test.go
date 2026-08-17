@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"filnest/internal/app"
-	"filnest/internal/file"
-	"filnest/internal/platform/config"
-	"filnest/internal/platform/mailer"
-	"filnest/internal/platform/objectstore"
-	"filnest/internal/platform/postgres"
+	"filvault/internal/app"
+	"filvault/internal/file"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/mailer"
+	"filvault/internal/platform/objectstore"
+	"filvault/internal/platform/postgres"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -239,9 +239,9 @@ func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) 
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	t.Cleanup(cancel)
-	url := os.Getenv("FILNEST_DATABASE_URL")
+	url := os.Getenv("FILVAULT_DATABASE_URL")
 	if url == "" {
-		t.Fatal("FILNEST_DATABASE_URL is required")
+		t.Fatal("FILVAULT_DATABASE_URL is required")
 	}
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {

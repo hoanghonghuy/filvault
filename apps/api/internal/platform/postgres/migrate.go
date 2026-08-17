@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"filnest/migrations"
+	"filvault/migrations"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

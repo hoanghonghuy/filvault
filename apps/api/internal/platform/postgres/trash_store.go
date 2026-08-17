@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/file"
-	"filnest/internal/folder"
-	"filnest/internal/trash"
-	"filnest/internal/user"
+	"filvault/internal/apperr"
+	"filvault/internal/file"
+	"filvault/internal/folder"
+	"filvault/internal/trash"
+	"filvault/internal/user"
 
 	"github.com/jackc/pgx/v5"
 )

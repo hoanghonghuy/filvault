@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/platform/config"
+	"filvault/internal/apperr"
+	"filvault/internal/platform/config"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/oklog/ulid/v2"
@@ -31,7 +31,7 @@ func NewID() string {
 func (t *Tokens) Access(userID string, now time.Time) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Subject:   userID,
-		Issuer:    "filnest",
+		Issuer:    "filvault",
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(now.Add(config.AccessTokenTTL)),
 	}

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"filnest/internal/platform/mailer"
+	"filvault/internal/platform/mailer"
 )
 
 func TestProfile_PatchDisplayName(t *testing.T) {

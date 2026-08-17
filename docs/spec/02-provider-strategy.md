@@ -66,7 +66,7 @@ Vì MinIO nói S3 API, Phase 1 **một implementation** `S3ObjectStore`, khác n
 
 Domain chỉ giữ `object_key` dạng chuỗi mờ (`users/{userId}/files/{fileId}`). Không nhét `s3://` hay region vào model nếu không cần.
 
-Kiểu trả về là DTO của Filnest (`URL`, `ExpiresAt`), không phải type AWS SDK.
+Kiểu trả về là DTO của Filvault (`URL`, `ExpiresAt`), không phải type AWS SDK.
 
 ### 3.2 MetadataStore — metadata
 
@@ -203,11 +203,11 @@ Vì những hệ quả đó: DynamoDB là **adapter tùy chọn / học tập**,
 Schema config **có khóa** cho metadata backend. Phase 1 chỉ nhận `postgres`. Giá trị `dynamodb` fail fast với lỗi rõ, chưa có implementation.
 
 ```text
-FILNEST_OBJECT_STORE=s3          # s3 (MinIO hoặc AWS, khác endpoint)
-FILNEST_METADATA_STORE=postgres  # postgres | dynamodb (dynamodb: chưa có)
-FILNEST_QUEUE=none               # none | memory | sqs
-FILNEST_INVITE_CODE=             # bắt buộc để register
-FILNEST_MAILER=auto              # auto: smtp nếu có env, không thì console
+FILVAULT_OBJECT_STORE=s3          # s3 (MinIO hoặc AWS, khác endpoint)
+FILVAULT_METADATA_STORE=postgres  # postgres | dynamodb (dynamodb: chưa có)
+FILVAULT_QUEUE=none               # none | memory | sqs
+FILVAULT_INVITE_CODE=             # bắt buộc để register
+FILVAULT_MAILER=auto              # auto: smtp nếu có env, không thì console
 ```
 
 Không tạo factory khổng lồ. Một hàm wiring trong `cmd/api`.

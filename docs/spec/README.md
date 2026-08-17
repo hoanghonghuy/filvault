@@ -1,4 +1,4 @@
-# Filnest — Spec
+# Filvault — Spec
 
 Thư mục này chứa **spec ý tưởng và quyết định thiết kế** đã được chốt để triển khai. Nó được tách từ [`../concept-product-scope_v0.1.md`](../concept-product-scope_v0.1.md) (concept — tài liệu khái niệm v0.1).
 
@@ -40,7 +40,7 @@ Phase 1 **đủ spec để bắt đầu code**. Spec phase sau (sharing, worker,
 - Terraform / RDS deploy spec
 - JobQueue + worker spec (Phase 3)
 - CLI / sync spec
-- Tích hợp app khác (full API + API key/tenant) — sau khi sản phẩm Filnest hoàn chỉnh
+- Tích hợp app khác (full API + API key/tenant) — sau khi sản phẩm Filvault hoàn chỉnh
 
 ## Quy ước
 

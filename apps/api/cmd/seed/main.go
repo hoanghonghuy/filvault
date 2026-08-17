@@ -6,22 +6,22 @@ import (
 	"os"
 	"time"
 
-	"filnest/internal/devseed"
+	"filvault/internal/devseed"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
-	url := os.Getenv("FILNEST_DATABASE_URL")
+	url := os.Getenv("FILVAULT_DATABASE_URL")
 	if url == "" {
-		fatal("FILNEST_DATABASE_URL is required")
+		fatal("FILVAULT_DATABASE_URL is required")
 	}
 
 	opts := devseed.Options{
-		Email:       os.Getenv("FILNEST_SEED_EMAIL"),
-		Password:    os.Getenv("FILNEST_SEED_PASSWORD"),
-		DisplayName: os.Getenv("FILNEST_SEED_DISPLAY_NAME"),
-		InviteCode:  getenv("FILNEST_INVITE_CODE", devseed.DefaultInviteCode),
+		Email:       os.Getenv("FILVAULT_SEED_EMAIL"),
+		Password:    os.Getenv("FILVAULT_SEED_PASSWORD"),
+		DisplayName: os.Getenv("FILVAULT_SEED_DISPLAY_NAME"),
+		InviteCode:  getenv("FILVAULT_INVITE_CODE", devseed.DefaultInviteCode),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

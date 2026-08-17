@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"filnest/internal/platform/config"
+	"filvault/internal/platform/config"
 )
 
 type Message struct {
@@ -22,7 +22,7 @@ type Mailer interface {
 }
 
 // New picks console when SMTP is not configured; otherwise SMTP.
-// FILNEST_MAILER=console forces console even if SMTP host is set.
+// FILVAULT_MAILER=console forces console even if SMTP host is set.
 func New(cfg config.Config) Mailer {
 	if strings.EqualFold(cfg.Mailer, "console") || cfg.SMTPHost == "" {
 		return Console{}

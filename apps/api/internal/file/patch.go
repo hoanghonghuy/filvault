@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"filnest/internal/apperr"
+	"filvault/internal/apperr"
 )
 
 func (s *Service) Patch(ctx context.Context, ownerID, fileID string, name *string, moveFolder bool, newFolderID *string) (File, error) {

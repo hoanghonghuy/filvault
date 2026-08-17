@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"filnest/internal/user"
+	"filvault/internal/user"
 )
 
 type RefreshToken struct {

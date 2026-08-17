@@ -6,7 +6,7 @@
 
 ## Bối cảnh
 
-Cần siết nghiệp vụ Phase 1 trước khi code. Filnest về sau có thể phục vụ app khác (ví dụ quản lý trường mầm non) — **toàn bộ** khả năng lưu trữ, không chỉ upload ảnh — nhưng việc đó **sau khi sản phẩm hiện tại hoàn chỉnh**. Web Phase 1 cần cả quản lý tệp và quản lý ảnh (Terabox / Google Photos).
+Cần siết nghiệp vụ Phase 1 trước khi code. Filvault về sau có thể phục vụ app khác (ví dụ quản lý trường mầm non) — **toàn bộ** khả năng lưu trữ, không chỉ upload ảnh — nhưng việc đó **sau khi sản phẩm hiện tại hoàn chỉnh**. Web Phase 1 cần cả quản lý tệp và quản lý ảnh (Terabox / Google Photos).
 
 ## Quyết định
 

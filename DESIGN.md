@@ -1,7 +1,7 @@
 ---
 version: alpha
-name: Filnest-design-system
-description: Light utility UI for personal cloud storage — Cal.com-like white canvas and confident hierarchy, Filnest teal as the single chromatic accent, mobile-first shell with Material 3 navigation and action patterns.
+name: Filvault-design-system
+description: Light utility UI for personal cloud storage — Cal.com-like white canvas and confident hierarchy, Filvault teal as the single chromatic accent, mobile-first shell with Material 3 navigation and action patterns.
 references:
   visual: Cal.com DESIGN.md (VoltAgent/awesome-design-md) — canvas, density, radius hierarchy, secondary surfaces
   interaction: Material Design 3 — bottom navigation, FAB, modal bottom sheets, touch targets
@@ -73,7 +73,7 @@ breakpoints:
   desktop: 1024px+
 ---
 
-# Filnest DESIGN.md
+# Filvault DESIGN.md
 
 Nguồn sự thật cho **giao diện web Phase 1** (`apps/web`). Agent và người làm UI đọc file này trước khi thêm màn / component.
 
@@ -85,7 +85,7 @@ Nghiệp vụ / ràng buộc sản phẩm: [`docs/spec/07-phase-1-business.md`](
 
 ## 1. Visual Theme & Atmosphere
 
-Filnest là **personal cloud** (My Files + Photos trên cùng một kho). UI phải đọc như phần mềm tiện ích đáng tin — sáng, gọn, một accent, không marketing hero.
+Filvault là **personal cloud** (My Files + Photos trên cùng một kho). UI phải đọc như phần mềm tiện ích đáng tin — sáng, gọn, một accent, không marketing hero.
 
 **Tone:** calm utility, confident hierarchy, mobile-first.  
 **Density:** list/file rows hơi dày (Cal.com product fragment feel); Photos grid thoáng hơn.  
@@ -93,7 +93,7 @@ Filnest là **personal cloud** (My Files + Photos trên cùng một kho). UI ph�
 
 **Key characteristics**
 - Canvas trắng (`{colors.canvas}`), surface phụ xám rất nhạt (`{colors.surface-soft}` / `{colors.surface-card}`).
-- Một accent chromatic: teal Filnest (`{colors.accent}` — `#0d9488`). Dùng cho FAB, tab active, link hành động, progress storage.
+- Một accent chromatic: teal Filvault (`{colors.accent}` — `#0d9488`). Dùng cho FAB, tab active, link hành động, progress storage.
 - Primary destructive / confirm mạnh dùng ink (`{colors.primary-cta}`) hoặc danger — không rainbow.
 - Font: **Plus Jakarta Sans** (display + body). Không Inter / Roboto / Arial / system-only stack.
 - Radius: controls `{rounded.md}` (8px), cards/sheets `{rounded.lg}`–`{rounded.xl}` (12–16px). Không pill CTA hàng loạt.
@@ -152,7 +152,7 @@ Full-screen centered card — **không** bottom nav. Cal.com-like: canvas trắn
 
 **Anatomy**
 ```text
-[Brand: mark + “Filnest”]     ← trên card, căn giữa
+[Brand: mark + “Filvault”]     ← trên card, căn giữa
 ┌─────────────────────────┐
 │ Title (h1)              │
 │ Subtitle (muted, 1 câu) │
@@ -330,7 +330,7 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 Khi generate / sửa UI:
 
 ```text
-Follow DESIGN.md (Filnest). Cal.com-like light utility UI, teal accent #0d9488,
+Follow DESIGN.md (Filvault). Cal.com-like light utility UI, teal accent #0d9488,
 Plus Jakarta Sans, mobile-first bottom nav (Files/Photos/Trash/Settings),
 FAB upload on Files, bottom sheets instead of prompt/confirm,
 no original <img> in Photos grid, touch targets ≥44px, no purple/dark-mode.

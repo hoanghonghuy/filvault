@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
-	"filnest/internal/app"
-	"filnest/internal/platform/config"
-	"filnest/internal/platform/objectstore"
-	"filnest/internal/platform/postgres"
-	"filnest/internal/trash"
+	"filvault/internal/app"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/objectstore"
+	"filvault/internal/platform/postgres"
+	"filvault/internal/trash"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

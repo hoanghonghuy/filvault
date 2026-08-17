@@ -44,7 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         await api('/auth/logout', {
           method: 'POST',
-          body: JSON.stringify({ refreshToken: localStorage.getItem('filnest.refreshToken') }),
+          body: JSON.stringify({ refreshToken: localStorage.getItem('filvault.refreshToken') }),
         })
       } catch {
         // ignore logout errors locally
@@ -75,7 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function bootstrap(): Promise<void> {
-    if (!localStorage.getItem('filnest.accessToken')) {
+    if (!localStorage.getItem('filvault.accessToken')) {
       return
     }
     loading.value = true

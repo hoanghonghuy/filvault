@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"filnest/internal/file"
-	"filnest/internal/folder"
-	"filnest/internal/user"
+	"filvault/internal/file"
+	"filvault/internal/folder"
+	"filvault/internal/user"
 )
 
 type Repository interface {

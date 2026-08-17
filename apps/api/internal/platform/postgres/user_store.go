@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/auth"
-	"filnest/internal/user"
+	"filvault/internal/apperr"
+	"filvault/internal/auth"
+	"filvault/internal/user"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

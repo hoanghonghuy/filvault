@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"filnest/internal/apperr"
+	"filvault/internal/apperr"
 
 	"github.com/gin-gonic/gin"
 )

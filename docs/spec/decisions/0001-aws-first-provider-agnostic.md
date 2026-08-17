@@ -6,7 +6,7 @@
 
 ## Bối cảnh
 
-Filnest có hai mục tiêu: làm sản phẩm cloud storage, và học AWS thật (S3, RDS, DynamoDB, SQS, Lambda, …).
+Filvault có hai mục tiêu: làm sản phẩm cloud storage, và học AWS thật (S3, RDS, DynamoDB, SQS, Lambda, …).
 
 Nếu domain gọi AWS SDK trực tiếp, project trở thành bài tập AWS: khó chạy local, khó đổi RDS → Postgres thường, khó thêm DynamoDB sau này mà không xé service.
 

@@ -28,7 +28,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!auth.user && localStorage.getItem('filnest.accessToken')) {
+  if (!auth.user && localStorage.getItem('filvault.accessToken')) {
     await auth.bootstrap()
   }
   if (to.meta.guest && auth.isAuthenticated) {

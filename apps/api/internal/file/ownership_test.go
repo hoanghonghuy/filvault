@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"filnest/internal/file"
-	"filnest/internal/platform/objectstore"
+	"filvault/internal/file"
+	"filvault/internal/platform/objectstore"
 )
 
 func TestFile_OtherUserCannotAccess(t *testing.T) {

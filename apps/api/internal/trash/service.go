@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/file"
-	"filnest/internal/folder"
+	"filvault/internal/apperr"
+	"filvault/internal/file"
+	"filvault/internal/folder"
 )
 
 type Service struct {

@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"time"
 
-	"filnest/internal/auth"
-	"filnest/internal/platform/config"
-	"filnest/internal/platform/mailer"
-	"filnest/internal/platform/postgres"
+	"filvault/internal/auth"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/mailer"
+	"filvault/internal/platform/postgres"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
-	DefaultEmail       = "dev@filnest.com"
+	DefaultEmail       = "dev@filvault.com"
 	DefaultPassword    = "Dev1234@"
-	DefaultDisplayName = "Filnest Dev"
+	DefaultDisplayName = "Filvault Dev"
 	DefaultInviteCode  = "dev-invite"
 )
 

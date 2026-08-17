@@ -3,8 +3,8 @@ package trash
 import (
 	"time"
 
-	"filnest/internal/file"
-	"filnest/internal/folder"
+	"filvault/internal/file"
+	"filvault/internal/folder"
 )
 
 type Item struct {

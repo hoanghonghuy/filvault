@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/auth"
+	"filvault/internal/apperr"
+	"filvault/internal/auth"
 )
 
 type Service struct {

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/auth"
-	"filnest/internal/folder"
-	"filnest/internal/platform/config"
-	"filnest/internal/platform/objectstore"
+	"filvault/internal/apperr"
+	"filvault/internal/auth"
+	"filvault/internal/folder"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/objectstore"
 )
 
 type Service struct {

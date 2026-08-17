@@ -2,9 +2,9 @@ package auth
 
 import (
 	"encoding/json"
-	"filnest/internal/apperr"
-	"filnest/internal/platform/httpx"
-	"filnest/internal/user"
+	"filvault/internal/apperr"
+	"filvault/internal/platform/httpx"
+	"filvault/internal/user"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

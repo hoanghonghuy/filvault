@@ -13,7 +13,7 @@ handler → service → port → adapter
 Concept §59 giữ, chỉnh `docs/` cho khớp thư mục spec hiện tại:
 
 ```text
-filnest/
+filvault/
 ├── apps/
 │   ├── web/                 Vue 3 + TS + Vite
 │   └── api/
@@ -74,21 +74,21 @@ Lỗi domain (code) → platform/http map JSON spec 04
 Config thêm (cùng spec 02 / 07):
 
 ```text
-FILNEST_METADATA_STORE=postgres
-FILNEST_OBJECT_STORE=s3
-FILNEST_S3_ENDPOINT=
-FILNEST_S3_BUCKET=
-FILNEST_S3_REGION=
-FILNEST_DATABASE_URL=
-FILNEST_QUEUE=none
-FILNEST_INVITE_CODE=
-FILNEST_MAILER=auto
-FILNEST_SMTP_HOST=            # trống → console mailer
-FILNEST_DEFAULT_TRASH_AUTO_DELETE=false
-FILNEST_DEFAULT_TRASH_RETENTION_DAYS=30
+FILVAULT_METADATA_STORE=postgres
+FILVAULT_OBJECT_STORE=s3
+FILVAULT_S3_ENDPOINT=
+FILVAULT_S3_BUCKET=
+FILVAULT_S3_REGION=
+FILVAULT_DATABASE_URL=
+FILVAULT_QUEUE=none
+FILVAULT_INVITE_CODE=
+FILVAULT_MAILER=auto
+FILVAULT_SMTP_HOST=            # trống → console mailer
+FILVAULT_DEFAULT_TRASH_AUTO_DELETE=false
+FILVAULT_DEFAULT_TRASH_RETENTION_DAYS=30
 ```
 
-`FILNEST_METADATA_STORE=dynamodb` → process **exit** với lỗi rõ.
+`FILVAULT_METADATA_STORE=dynamodb` → process **exit** với lỗi rõ.
 
 ## 3. ObjectStore port (Phase 1)
 

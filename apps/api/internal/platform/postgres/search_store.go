@@ -3,7 +3,7 @@ package postgres
 import (
 	"context"
 
-	"filnest/internal/search"
+	"filvault/internal/search"
 )
 
 func (s *Store) SearchFolders(ctx context.Context, ownerID, pattern string, limit int) ([]search.FolderHit, error) {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"filnest/internal/platform/postgres"
+	"filvault/internal/platform/postgres"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,9 +16,9 @@ func main() {
 	down := flag.Bool("down", false, "roll back the latest migration")
 	flag.Parse()
 
-	url := os.Getenv("FILNEST_DATABASE_URL")
+	url := os.Getenv("FILVAULT_DATABASE_URL")
 	if url == "" {
-		fatal("FILNEST_DATABASE_URL is required")
+		fatal("FILVAULT_DATABASE_URL is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

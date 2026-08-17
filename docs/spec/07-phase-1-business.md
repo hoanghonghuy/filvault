@@ -2,7 +2,7 @@
 
 Trạng thái: **chốt**. Schema/API phải khớp file này. ADR: [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md)
 
-Tích hợp app khác (ví dụ quản lý trường mầm non) **không** thuộc Phase 1. Làm sau khi sản phẩm Filnest hoàn chỉnh. App khác dùng **cả nền tảng** (file, folder, Photos, trash, quota, …), không phải chỉ API ảnh. Phase 1 chỉ **dành chỗ trong spec**, không thêm cột `tenant_id` / `app_id`, không API key.
+Tích hợp app khác (ví dụ quản lý trường mầm non) **không** thuộc Phase 1. Làm sau khi sản phẩm Filvault hoàn chỉnh. App khác dùng **cả nền tảng** (file, folder, Photos, trash, quota, …), không phải chỉ API ảnh. Phase 1 chỉ **dành chỗ trong spec**, không thêm cột `tenant_id` / `app_id`, không API key.
 
 ## 1. Hình dạng sản phẩm
 
@@ -21,7 +21,7 @@ Upload một file ảnh/video → vừa hiện ở folder (My Files) vừa hiệ
 
 | Mục | Chốt |
 |---|---|
-| Register | Bắt buộc `inviteCode` khớp `FILNEST_INVITE_CODE` (env). So sánh constant-time. Env trống → register tắt (`REGISTER_DISABLED`) |
+| Register | Bắt buộc `inviteCode` khớp `FILVAULT_INVITE_CODE` (env). So sánh constant-time. Env trống → register tắt (`REGISTER_DISABLED`) |
 | User đầu tiên | Không ngoại lệ: vẫn cần mã trong env |
 | Email | Phải verify mới dùng Files/Photos. Register xong **chưa** dùng kho |
 | Verify | Mã 6 số, TTL 15 phút, lưu hash, không plaintext |
@@ -100,7 +100,7 @@ Chạy bằng **ticker trong process API** (không SQS/Lambda). Interval gợi �
 
 ## 6. Dành chỗ tích hợp app khác (không code)
 
-Sau khi Filnest xong, hướng mặc định **dự kiến** (chưa chốt): app khác gọi **cùng HTTP API** của sản phẩm — không phải một “Photos API” tách.
+Sau khi Filvault xong, hướng mặc định **dự kiến** (chưa chốt): app khác gọi **cùng HTTP API** của sản phẩm — không phải một “Photos API” tách.
 
 Ví dụ trường mầm non có thể upload ảnh **và** lưu PDF, tổ chức folder, trash, quota, album… tùy app cần. Upload ảnh chỉ là một use case, không thu hẹp phạm vi tích hợp.
 

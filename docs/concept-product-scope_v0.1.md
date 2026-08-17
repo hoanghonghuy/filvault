@@ -2,11 +2,11 @@
 
 ---
 
-# Filnest — Product & Technical Concept Specification
+# Filvault — Product & Technical Concept Specification
 
 ## 1. Tổng quan ý tưởng
 
-**Filnest** là một nền tảng lưu trữ và đồng bộ file cá nhân trên cloud.
+**Filvault** là một nền tảng lưu trữ và đồng bộ file cá nhân trên cloud.
 
 Ở mức cơ bản, người dùng có thể:
 
@@ -19,7 +19,7 @@ Delete / restore files
 Manage storage
 ```
 
-Khi hoàn thiện, Filnest hướng tới:
+Khi hoàn thiện, Filvault hướng tới:
 
 ```text
                  ┌─────────────────┐
@@ -35,7 +35,7 @@ Khi hoàn thiện, Filnest hướng tới:
            └──────────────┼──────────────┘
                           │
                           ▼
-                     Filnest API
+                     Filvault API
                           │
                ┌──────────┴─────────┐
                │                    │
@@ -110,23 +110,23 @@ Mỗi service phải giải quyết một vấn đề thực tế.
 Working name:
 
 ```text
-Filnest
+Filvault
 ```
 
 CLI:
 
 ```bash
-filnest
+filvault
 ```
 
 Ví dụ:
 
 ```bash
-filnest login
-filnest ls
-filnest upload report.pdf
-filnest download report.pdf
-filnest sync ~/Documents
+filvault login
+filvault ls
+filvault upload report.pdf
+filvault download report.pdf
+filvault sync ~/Documents
 ```
 
 Tên vẫn có thể thay đổi trước khi public chính thức.
@@ -375,7 +375,7 @@ trong S3.
 
 # 7. Upload architecture
 
-Filnest sẽ dùng **S3 Presigned URL**.
+Filvault sẽ dùng **S3 Presigned URL**.
 
 Không upload file lớn xuyên qua Go API:
 
@@ -1125,7 +1125,7 @@ Share by link
 Ví dụ:
 
 ```text
-https://filnest.../s/Jk8xP2
+https://filvault.../s/Jk8xP2
 ```
 
 Có:
@@ -1199,7 +1199,7 @@ file_versions
 Đây là lúc binary:
 
 ```bash
-filnest
+filvault
 ```
 
 thực sự có giá trị.
@@ -1207,41 +1207,41 @@ thực sự có giá trị.
 Ví dụ:
 
 ```bash
-filnest login
+filvault login
 ```
 
 ```bash
-filnest whoami
+filvault whoami
 ```
 
 ```bash
-filnest ls
+filvault ls
 ```
 
 ```bash
-filnest cd Documents
+filvault cd Documents
 ```
 
 ```bash
-filnest upload report.pdf
+filvault upload report.pdf
 ```
 
 ```bash
-filnest download report.pdf
+filvault download report.pdf
 ```
 
 ```bash
-filnest rm old.pdf
+filvault rm old.pdf
 ```
 
 ```bash
-filnest mkdir projects
+filvault mkdir projects
 ```
 
 Có thể hỗ trợ:
 
 ```bash
-filnest upload *.pdf
+filvault upload *.pdf
 ```
 
 ---
@@ -1259,10 +1259,10 @@ Local folder
      │
      │ watcher
      ▼
-Filnest client
+Filvault client
      │
      ▼
-Filnest API
+Filvault API
      │
      ▼
 S3
@@ -1271,7 +1271,7 @@ S3
 Ví dụ:
 
 ```bash
-filnest sync ~/Documents
+filvault sync ~/Documents
 ```
 
 Sau đó:
@@ -1435,7 +1435,7 @@ worker
 
 # 34. Phase 9 — Audit & Activity
 
-Filnest hoàn thiện nên có:
+Filvault hoàn thiện nên có:
 
 ```text
 Uploaded file
@@ -1578,7 +1578,7 @@ DeleteObject
 HeadObject
 ```
 
-trên bucket Filnest.
+trên bucket Filvault.
 
 Không dùng:
 
@@ -1933,7 +1933,7 @@ Revoke device
 Cuối cùng:
 
 ```bash
-filnest sync ~/Documents
+filvault sync ~/Documents
 ```
 
 hoặc desktop app chạy background.
@@ -1955,31 +1955,31 @@ Offline queue
 
 # 54. CLI hoàn chỉnh
 
-CLI có thể trở thành một project nhỏ riêng trong hệ sinh thái Filnest.
+CLI có thể trở thành một project nhỏ riêng trong hệ sinh thái Filvault.
 
 Ví dụ:
 
 ```bash
-filnest auth login
-filnest auth logout
+filvault auth login
+filvault auth logout
 
-filnest ls
-filnest pwd
+filvault ls
+filvault pwd
 
-filnest mkdir photos
-filnest rm old.txt
-filnest mv a.txt documents/
+filvault mkdir photos
+filvault rm old.txt
+filvault mv a.txt documents/
 
-filnest upload photo.jpg
-filnest download report.pdf
+filvault upload photo.jpg
+filvault download report.pdf
 
-filnest share report.pdf
+filvault share report.pdf
 
-filnest sync ~/Documents
+filvault sync ~/Documents
 
-filnest status
+filvault status
 
-filnest storage
+filvault storage
 ```
 
 ---
@@ -2114,7 +2114,7 @@ SQS
 Mình đề xuất monorepo:
 
 ```text
-filnest/
+filvault/
 
 ├── apps/
 │   ├── web/
@@ -2351,7 +2351,7 @@ File versions
 ### Phase 5 — CLI
 
 ```text
-filnest
+filvault
 ```
 
 
@@ -2385,7 +2385,7 @@ Resumable upload
 
 # 64. Vision sản phẩm cuối cùng
 
-Filnest cuối cùng không chỉ là:
+Filvault cuối cùng không chỉ là:
 
 > một website upload file lên S3.
 
@@ -2396,7 +2396,7 @@ Mà là:
 User experience cuối cùng:
 
 ```text
-                     Filnest
+                     Filvault
                         │
       ┌─────────────────┼─────────────────┐
       │                 │                 │
@@ -2406,7 +2406,7 @@ User experience cuối cùng:
       └─────────────────┼─────────────────┘
                         │
                         ▼
-                    Filnest API
+                    Filvault API
                         │
           ┌─────────────┼──────────────┐
           │             │              │
@@ -2485,8 +2485,8 @@ File appears in My Files
 Download via Presigned URL
 ```
 
-**Đó nên là mục tiêu kỹ thuật đầu tiên của Filnest.**
+**Đó nên là mục tiêu kỹ thuật đầu tiên của Filvault.**
 
-Khi vertical slice này chạy ổn, những phần như Trash, Move/Rename, Search được xây xung quanh nó. Sau đó mới bước sang SQS/Lambda, sharing, versioning và cuối cùng là `filnest sync`.
+Khi vertical slice này chạy ổn, những phần như Trash, Move/Rename, Search được xây xung quanh nó. Sau đó mới bước sang SQS/Lambda, sharing, versioning và cuối cùng là `filvault sync`.
 
 Bản spec này mình sẽ coi là **v0.1 — Concept & Product Scope**. Nó đủ để từ đây tách tiếp thành **Database Spec, API Spec, Architecture Spec và Development Plan** mà không làm mất định hướng tổng thể.

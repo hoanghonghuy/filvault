@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/platform/config"
-	"filnest/internal/platform/mailer"
-	"filnest/internal/user"
+	"filvault/internal/apperr"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/mailer"
+	"filvault/internal/user"
 )
 
 type Service struct {

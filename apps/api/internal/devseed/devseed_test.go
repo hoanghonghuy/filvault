@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"filnest/internal/auth"
-	"filnest/internal/devseed"
-	"filnest/internal/platform/config"
-	"filnest/internal/platform/mailer"
-	"filnest/internal/platform/postgres"
+	"filvault/internal/auth"
+	"filvault/internal/devseed"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/mailer"
+	"filvault/internal/platform/postgres"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,8 +22,8 @@ func TestEnsureDevUser_CreatesVerifiedUser(t *testing.T) {
 
 	result, err := devseed.EnsureDevUser(ctx, pool, devseed.Options{
 		Email:       email,
-		Password:    "filnest-dev",
-		DisplayName: "Filnest Dev",
+		Password:    "filvault-dev",
+		DisplayName: "Filvault Dev",
 		InviteCode:  "dev-invite",
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func TestEnsureDevUser_CreatesVerifiedUser(t *testing.T) {
 		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
 	}, store, auth.NewTokens("test-jwt"), mailer.NewMemory())
 
-	session, err := svc.Login(ctx, email, "filnest-dev")
+	session, err := svc.Login(ctx, email, "filvault-dev")
 	if err != nil {
 		t.Fatalf("Login: %v", err)
 	}
@@ -66,8 +66,8 @@ func TestEnsureDevUser_Idempotent(t *testing.T) {
 	email := uniqueEmail()
 	opts := devseed.Options{
 		Email:       email,
-		Password:    "filnest-dev",
-		DisplayName: "Filnest Dev",
+		Password:    "filvault-dev",
+		DisplayName: "Filvault Dev",
 		InviteCode:  "dev-invite",
 	}
 
@@ -96,9 +96,9 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	t.Cleanup(cancel)
 
-	url := os.Getenv("FILNEST_DATABASE_URL")
+	url := os.Getenv("FILVAULT_DATABASE_URL")
 	if url == "" {
-		t.Fatal("FILNEST_DATABASE_URL is required")
+		t.Fatal("FILVAULT_DATABASE_URL is required")
 	}
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -115,5 +115,5 @@ func testPool(t *testing.T) *pgxpool.Pool {
 }
 
 func uniqueEmail() string {
-	return "devseed-" + time.Now().Format("20060102150405.000000") + "@filnest.local"
+	return "devseed-" + time.Now().Format("20060102150405.000000") + "@filvault.local"
 }

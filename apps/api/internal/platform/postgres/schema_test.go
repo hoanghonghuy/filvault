@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"filnest/internal/platform/postgres"
+	"filvault/internal/platform/postgres"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -84,9 +84,9 @@ func assertPhase1Tables(t *testing.T, ctx context.Context, pool *pgxpool.Pool, w
 func openTestPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
-	url := os.Getenv("FILNEST_DATABASE_URL")
+	url := os.Getenv("FILVAULT_DATABASE_URL")
 	if url == "" {
-		t.Fatal("FILNEST_DATABASE_URL is required")
+		t.Fatal("FILVAULT_DATABASE_URL is required")
 	}
 
 	pool, err := pgxpool.New(ctx, url)

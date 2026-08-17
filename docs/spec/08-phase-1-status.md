@@ -51,15 +51,15 @@ Web `http://localhost:5173` · API `http://localhost:8080` · MinIO `http://loca
 
 ### Tài khoản dev (đã verify)
 
-Tạo tự động khi `make up` / `make dev-api` nếu `FILNEST_SEED_DEV_USER=true` (chỉ bật trong `docker-compose.yml` local).
+Tạo tự động khi `make up` / `make dev-api` nếu `FILVAULT_SEED_DEV_USER=true` (chỉ bật trong `docker-compose.yml` local).
 
 | Trường | Giá trị |
 |---|---|
-| Email | `dev@filnest.com` |
+| Email | `dev@filvault.com` |
 | Mật khẩu | `Dev1234@` |
 | Mã mời (register tay) | `dev-invite` |
 
-**Production: không set `FILNEST_SEED_DEV_USER=true`.**
+**Production: không set `FILVAULT_SEED_DEV_USER=true`.**
 
 ---
 
@@ -81,7 +81,7 @@ Toàn bộ checklist kỹ thuật API (auth, verify, folder, file, trash, photos
 
 - [x] Docker Compose: postgres, minio, api, web (`make up`)
 - [x] CI GitHub Actions: lint / typecheck / test API + lint / typecheck web
-- [x] Seed user dev (idempotent); `apps/api/cmd/seed` + `FILNEST_SEED_DEV_USER`
+- [x] Seed user dev (idempotent); `apps/api/cmd/seed` + `FILVAULT_SEED_DEV_USER`
 
 ### Web — functional (đủ gọi API)
 
@@ -110,7 +110,7 @@ Auth đã sửa khi review: tách loading Verify/Resend, invite không `autocapi
 ## Còn lại trước khi sang Phase 2
 
 - [ ] UI/UX Files, Photos, Album, Trash, Settings — cùng bar với auth card
-- [ ] Smoke test tay xuyên suốt với `dev@filnest.com`
+- [ ] Smoke test tay xuyên suốt với `dev@filvault.com`
 - [ ] Chứng minh một lần với **AWS S3 thật** (không chặn DoD local; làm ở cửa Phase 2 cũng được)
 
 ### Test API tối thiểu — đã có
@@ -134,6 +134,6 @@ Không phải nợ. Không nhét vào công việc mai.
 ## Việc tiếp theo cho người nhận (mai)
 
 1. Đọc [`DESIGN.md`](../../DESIGN.md) §4 Auth card (mẫu đã xong) + §9 screen map.
-2. `make up` → login `dev@filnest.com` / `Dev1234@`.
+2. `make up` → login `dev@filvault.com` / `Dev1234@`.
 3. Làm Files trước (list row, toolbar, FAB, empty, lỗi).
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.

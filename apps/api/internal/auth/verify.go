@@ -10,8 +10,8 @@ import (
 	"math/big"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/platform/mailer"
+	"filvault/internal/apperr"
+	"filvault/internal/platform/mailer"
 )
 
 const verificationTTL = 15 * time.Minute
@@ -39,7 +39,7 @@ func (s *Service) ResendVerification(ctx context.Context, email string) error {
 	}
 	return s.mailer.Send(ctx, mailer.Message{
 		To:      u.Email,
-		Subject: "Filnest verification code",
+		Subject: "Filvault verification code",
 		Body:    code,
 	})
 }

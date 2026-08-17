@@ -14,7 +14,7 @@ jobs:
     name: API — lint, typecheck, test
     runs-on: ubuntu-latest
     env:
-      DSN: postgres://filnest:filnest@127.0.0.1:5432/filnest?sslmode=disable
+      DSN: postgres://filvault:filvault@127.0.0.1:5432/filvault?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +29,7 @@ jobs:
       - name: Wait for Postgres
         run: |
           for i in $(seq 1 30); do
-            if docker compose exec -T postgres pg_isready -U filnest -d filnest >/dev/null 2>&1; then
+            if docker compose exec -T postgres pg_isready -U filvault -d filvault >/dev/null 2>&1; then
               exit 0
             fi
             sleep 1
@@ -41,7 +41,7 @@ jobs:
         working-directory: apps/api
         run: go run ./cmd/migrate
         env:
-          FILNEST_DATABASE_URL: ${{ env.DSN }}
+          FILVAULT_DATABASE_URL: ${{ env.DSN }}
 
       - name: Lint
         working-directory: apps/api
@@ -55,7 +55,7 @@ jobs:
         working-directory: apps/api
         run: go test ./... -count=1 -p 1
         env:
-          FILNEST_DATABASE_URL: ${{ env.DSN }}
+          FILVAULT_DATABASE_URL: ${{ env.DSN }}
 
   web:
     name: Web — lint, typecheck

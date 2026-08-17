@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/folder"
+	"filvault/internal/apperr"
+	"filvault/internal/folder"
 
 	"github.com/jackc/pgx/v5"
 )

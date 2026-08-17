@@ -14,7 +14,7 @@ const titleId = useId()
     <div class="auth-shell">
       <p class="auth-brand">
         <span class="auth-brand-mark" aria-hidden="true">F</span>
-        <span class="auth-brand-name">Filnest</span>
+        <span class="auth-brand-name">Filvault</span>
       </p>
 
       <div class="card auth-card">

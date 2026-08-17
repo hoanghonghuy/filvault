@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"filnest/internal/apperr"
-	"filnest/internal/auth"
-	"filnest/internal/platform/httpx"
+	"filvault/internal/apperr"
+	"filvault/internal/auth"
+	"filvault/internal/platform/httpx"
 
 	"github.com/gin-gonic/gin"
 )

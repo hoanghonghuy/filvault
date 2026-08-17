@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"filnest/internal/apperr"
-	"filnest/internal/platform/config"
+	"filvault/internal/apperr"
+	"filvault/internal/platform/config"
 )
 
 var allowlist = map[string][]string{

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"filnest/internal/platform/config"
+	"filvault/internal/platform/config"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
