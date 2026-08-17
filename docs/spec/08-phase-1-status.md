@@ -57,7 +57,17 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] `POST /api/v1/auth/verify-email` — mã 6 số, TTL 15 phút, lưu hash; sai/hết hạn → `400 VALIDATION_ERROR`
 - [x] Register gửi mã qua Mailer; Memory mailer dùng trong test
 - [x] Test: resend → verify sai → verify đúng → `emailVerified: true`
-- [ ] `403 EMAIL_NOT_VERIFIED` trên Files/Photos — gắn khi có route folder/file (slice 2+)
+
+### Slice 2 — Folders
+
+- [x] `POST /api/v1/folders` — create root / nested; trùng tên sibling → `409`
+- [x] `GET /api/v1/folders/{id}` — ownership → `404` nếu không phải owner
+- [x] `PATCH /api/v1/folders/{id}` — rename, move; chu trình → `400 VALIDATION_ERROR`
+- [x] `DELETE /api/v1/folders/{id}` — soft delete; còn con → `409`
+- [x] `GET /api/v1/browser` — list root (folders + files READY)
+- [x] Middleware `403 EMAIL_NOT_VERIFIED` trên folder/browser
+- [x] Package `internal/folder` + postgres adapter
+- [x] Test HTTP: unverified forbidden, CRUD flow, ownership
 
 ---
 
@@ -68,7 +78,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 | | Slice | Việc | Xong khi |
 |---|---|---|---|
 | [x] | **1b** | Verify email | SMTP/console + mã 6 số (gate kho file khi có API folder/file) |
-| [ ] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
+| [x] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
 | [ ] | **3** | Vertical slice file | allowlist + 100 MiB; presign → PUT MinIO/S3 → complete (`Head`) → download |
 | [ ] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
 | [ ] | **5** | Trash + setting | delete / restore / permanent; setting theo user; ticker tự xóa |
@@ -83,15 +93,15 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 - [x] Mailer port (console / SMTP); SES chỉ dành chỗ
 - [ ] `ObjectStore` + adapter S3 (MinIO và AWS cùng implementation)
 - [ ] MinIO trong compose **chưa** gắn vào luồng upload
-- [ ] Package `file` / `folder` / `photo` / `search`
+- [ ] Package `file` / `photo` / `search` (`folder` đã có)
 - [ ] CORS API; slog request đầy đủ
-- [ ] `403 EMAIL_NOT_VERIFIED` trên Files/Photos (gắn khi có slice 2/3)
+- [x] `403 EMAIL_NOT_VERIFIED` trên folder/browser (file/photos khi slice 3+)
 - [ ] Chứng minh một lần với AWS S3 thật (không chặn DoD local)
 
 ### Test tối thiểu Phase 1 còn thiếu
 
-- [ ] Verify: chưa verify → 403 kho; console in mã; verify xong dùng được
-- [ ] Ownership: user B 404 trên id user A
+- [x] Verify: chưa verify → 403 folder/browser
+- [x] Ownership: user B 404 trên folder user A
 - [ ] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối
 - [ ] Complete: size từ `Head` thắng size client khai
 - [ ] Unique name sibling → 409

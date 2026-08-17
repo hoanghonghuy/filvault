@@ -24,4 +24,5 @@ var (
 	EmailNotVerified = New(403, "EMAIL_NOT_VERIFIED", "Email not verified")
 	NotFound         = New(404, "NOT_FOUND", "Not found")
 	Conflict         = New(409, "CONFLICT", "Conflict")
+	InvalidState     = New(409, "INVALID_STATE", "Invalid state")
 )

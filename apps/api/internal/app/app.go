@@ -2,6 +2,7 @@ package app
 
 import (
 	"filnest/internal/auth"
+	"filnest/internal/folder"
 	"filnest/internal/platform/config"
 	"filnest/internal/platform/mailer"
 	"filnest/internal/platform/postgres"
@@ -17,12 +18,22 @@ func New(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 func NewWithMailer(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer) *gin.Engine {
 	store := postgres.NewStore(pool)
 	tokens := auth.NewTokens(cfg.JWTSecret)
-	svc := auth.NewService(cfg, store, tokens, m)
-	handlers := auth.NewHandler(svc)
+	authSvc := auth.NewService(cfg, store, tokens, m)
+	authHandlers := auth.NewHandler(authSvc)
+
+	folderSvc := folder.NewService(postgres.NewFolderRepository(store))
+	folderHandlers := folder.NewHandler(folderSvc)
 
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	v1 := engine.Group("/api/v1")
-	handlers.RegisterRoutes(v1)
+	authHandlers.RegisterRoutes(v1)
+
+	storage := []gin.HandlerFunc{
+		authHandlers.AuthRequired(),
+		authHandlers.EmailVerifiedRequired(),
+	}
+	folderHandlers.RegisterRoutes(v1, storage...)
+
 	return engine
 }

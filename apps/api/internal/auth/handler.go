@@ -41,12 +41,37 @@ func (h *Handler) AuthRequired() gin.HandlerFunc {
 			httpx.Error(c, err)
 			return
 		}
-		c.Set(ctxUserID, userID)
+		c.Set(CtxUserID, userID)
 		c.Next()
 	}
 }
 
-const ctxUserID = "authUserID"
+func (h *Handler) EmailVerifiedRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := userIDFrom(c)
+		if !ok {
+			c.Abort()
+			httpx.Error(c, apperr.Unauthorized)
+			return
+		}
+		u, err := h.svc.Me(c.Request.Context(), userID)
+		if err != nil {
+			c.Abort()
+			httpx.Error(c, err)
+			return
+		}
+		if !u.EmailVerified() {
+			c.Abort()
+			httpx.Error(c, apperr.EmailNotVerified)
+			return
+		}
+		c.Next()
+	}
+}
+
+const CtxUserID = "authUserID"
+
+const ctxUserID = CtxUserID
 
 func userIDFrom(c *gin.Context) (string, bool) {
 	v, ok := c.Get(ctxUserID)
