@@ -1,6 +1,7 @@
 package file
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -24,6 +25,7 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.POST("/files/:id/complete", append(middleware, h.complete)...)
 	g.GET("/files/:id", append(middleware, h.get)...)
 	g.GET("/files/:id/download", append(middleware, h.download)...)
+	g.PATCH("/files/:id", append(middleware, h.patch)...)
 	g.DELETE("/files/:id", append(middleware, h.delete)...)
 }
 
@@ -122,6 +124,53 @@ func (h *Handler) delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) patch(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	var raw map[string]json.RawMessage
+	if err := c.ShouldBindJSON(&raw); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	var name *string
+	if v, ok := raw["name"]; ok {
+		var n string
+		if err := json.Unmarshal(v, &n); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		name = &n
+	}
+	moveFolder := false
+	var newFolder *string
+	if v, ok := raw["folderId"]; ok {
+		moveFolder = true
+		if string(v) == "null" {
+			newFolder = nil
+		} else {
+			var id string
+			if err := json.Unmarshal(v, &id); err != nil {
+				httpx.Validation(c)
+				return
+			}
+			newFolder = &id
+		}
+	}
+	if name == nil && !moveFolder {
+		httpx.Validation(c)
+		return
+	}
+	f, err := h.svc.Patch(c.Request.Context(), userID, c.Param("id"), name, moveFolder, newFolder)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, publicFrom(f))
 }
 
 type publicFile struct {

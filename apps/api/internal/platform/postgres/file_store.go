@@ -51,7 +51,7 @@ func (s *Store) DeleteFileRow(ctx context.Context, ownerID, id string) error {
 	return nil
 }
 
-func (s *Store) ExistsAliveFileByName(ctx context.Context, ownerID string, folderID *string, name string) (bool, error) {
+func (s *Store) ExistsAliveFileByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error) {
 	var exists bool
 	var err error
 	if folderID == nil {
@@ -60,16 +60,18 @@ func (s *Store) ExistsAliveFileByName(ctx context.Context, ownerID string, folde
 				SELECT 1 FROM files
 				WHERE owner_id = $1 AND folder_id IS NULL AND name = $2
 					AND deleted_at IS NULL AND status IN ('PENDING', 'READY')
+					AND ($3 = '' OR id <> $3)
 			)
-		`, ownerID, name).Scan(&exists)
+		`, ownerID, name, excludeFileID).Scan(&exists)
 	} else {
 		err = s.pool.QueryRow(ctx, `
 			SELECT EXISTS(
 				SELECT 1 FROM files
 				WHERE owner_id = $1 AND folder_id = $2 AND name = $3
 					AND deleted_at IS NULL AND status IN ('PENDING', 'READY')
+					AND ($4 = '' OR id <> $4)
 			)
-		`, ownerID, *folderID, name).Scan(&exists)
+		`, ownerID, *folderID, name, excludeFileID).Scan(&exists)
 	}
 	return exists, err
 }
@@ -135,8 +137,8 @@ func (r fileRepo) DeleteRow(ctx context.Context, ownerID, id string) error {
 	return r.store.DeleteFileRow(ctx, ownerID, id)
 }
 
-func (r fileRepo) ExistsAliveByName(ctx context.Context, ownerID string, folderID *string, name string) (bool, error) {
-	return r.store.ExistsAliveFileByName(ctx, ownerID, folderID, name)
+func (r fileRepo) ExistsAliveByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error) {
+	return r.store.ExistsAliveFileByName(ctx, ownerID, folderID, name, excludeFileID)
 }
 
 type quotaRepo struct {

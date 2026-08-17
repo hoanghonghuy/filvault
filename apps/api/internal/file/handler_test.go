@@ -54,43 +54,10 @@ func TestUploadSession_RejectsTooLarge(t *testing.T) {
 
 func TestUploadComplete_BrowserDownload(t *testing.T) {
 	engine, mem, objs := newEngine(t)
-	email := uniqueEmail()
-	token := registerVerified(t, engine, mem, email)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	fileID, _ := uploadReady(t, engine, objs, token, "photo.jpg", nil)
 
-	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
-		"name":        "photo.jpg",
-		"size":        128,
-		"contentType": "image/jpeg",
-	})
-	if code != http.StatusCreated {
-		t.Fatalf("session status=%d body=%s", code, body)
-	}
-	var session struct {
-		FileID    string `json:"fileId"`
-		UploadURL string `json:"uploadUrl"`
-	}
-	decodeJSON(t, body, &session)
-	if session.FileID == "" || session.UploadURL == "" {
-		t.Fatalf("session=%s", body)
-	}
-
-	key := file.ObjectKey(decodeUserID(t, engine, token), session.FileID)
-	objs.PutObject(key, objectstore.ObjectStat{Size: 128, ContentType: "image/jpeg"})
-
-	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
-	if code != http.StatusOK {
-		t.Fatalf("complete status=%d body=%s", code, body)
-	}
-	var meta struct {
-		Status    string `json:"status"`
-		SizeBytes int64  `json:"sizeBytes"`
-	}
-	decodeJSON(t, body, &meta)
-	if meta.Status != "READY" || meta.SizeBytes != 128 {
-		t.Fatalf("meta=%s", body)
-	}
-
-	code, body = getAuth(t, engine, "/api/v1/browser", token)
+	code, body := getAuth(t, engine, "/api/v1/browser", token)
 	if code != http.StatusOK {
 		t.Fatalf("browser status=%d body=%s", code, body)
 	}
@@ -98,7 +65,7 @@ func TestUploadComplete_BrowserDownload(t *testing.T) {
 		t.Fatalf("browser missing file: %s", body)
 	}
 
-	code, body = getAuth(t, engine, "/api/v1/files/"+session.FileID+"/download", token)
+	code, body = getAuth(t, engine, "/api/v1/files/"+fileID+"/download", token)
 	if code != http.StatusOK {
 		t.Fatalf("download status=%d body=%s", code, body)
 	}
@@ -109,6 +76,99 @@ func TestUploadComplete_BrowserDownload(t *testing.T) {
 	if dl.DownloadURL == "" {
 		t.Fatalf("download=%s", body)
 	}
+}
+
+func TestFilePatch_RenameMove(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	userID := decodeUserID(t, engine, token)
+	fileID, objectKey := uploadReady(t, engine, objs, token, "photo.jpg", nil)
+
+	code, body := patchAuth(t, engine, "/api/v1/files/"+fileID, token, map[string]any{
+		"name": "renamed.jpg",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("rename status=%d body=%s", code, body)
+	}
+	var renamed struct {
+		Name string `json:"name"`
+	}
+	decodeJSON(t, body, &renamed)
+	if renamed.Name != "renamed.jpg" {
+		t.Fatalf("rename=%s", body)
+	}
+
+	_, body = postAuth(t, engine, "/api/v1/folders", token, map[string]any{"name": "Docs"})
+	var folder struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &folder)
+
+	code, body = patchAuth(t, engine, "/api/v1/files/"+fileID, token, map[string]any{
+		"folderId": folder.ID,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("move status=%d body=%s", code, body)
+	}
+	var moved struct {
+		FolderID *string `json:"folderId"`
+	}
+	decodeJSON(t, body, &moved)
+	if moved.FolderID == nil || *moved.FolderID != folder.ID {
+		t.Fatalf("move=%s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/browser?folderId="+folder.ID, token)
+	if code != http.StatusOK {
+		t.Fatalf("browser folder status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "renamed.jpg") {
+		t.Fatalf("file not in folder browser: %s", body)
+	}
+
+	wantKey := file.ObjectKey(userID, fileID)
+	if objectKey != wantKey {
+		t.Fatalf("object key changed during test setup")
+	}
+	code, body = getAuth(t, engine, "/api/v1/files/"+fileID+"/download", token)
+	if code != http.StatusOK {
+		t.Fatalf("download after patch status=%d body=%s", code, body)
+	}
+}
+
+func TestFilePatch_DuplicateNameConflict(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	uploadReady(t, engine, objs, token, "a.jpg", nil)
+	fileB, _ := uploadReady(t, engine, objs, token, "b.jpg", nil)
+
+	code, body := patchAuth(t, engine, "/api/v1/files/"+fileB, token, map[string]any{
+		"name": "a.jpg",
+	})
+	assertAPIError(t, code, body, http.StatusConflict, "CONFLICT")
+}
+
+func TestFilePatch_PendingInvalidState(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":        "pending.jpg",
+		"size":        64,
+		"contentType": "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+
+	code, body = patchAuth(t, engine, "/api/v1/files/"+session.FileID, token, map[string]any{
+		"name": "nope.jpg",
+	})
+	assertAPIError(t, code, body, http.StatusConflict, "INVALID_STATE")
 }
 
 func TestComplete_WithoutUploadFails(t *testing.T) {
@@ -130,6 +190,38 @@ func TestComplete_WithoutUploadFails(t *testing.T) {
 
 	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
 	assertAPIError(t, code, body, http.StatusConflict, "UPLOAD_EXPIRED")
+}
+
+func uploadReady(t *testing.T, engine http.Handler, objs *objectstore.Memory, token, name string, folderID *string) (fileID, objectKey string) {
+	t.Helper()
+	payload := map[string]any{
+		"name":        name,
+		"size":        128,
+		"contentType": "image/jpeg",
+	}
+	if folderID != nil {
+		payload["folderId"] = *folderID
+	}
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, payload)
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objectKey = file.ObjectKey(userID, session.FileID)
+	objs.PutObject(objectKey, objectstore.ObjectStat{Size: 128, ContentType: "image/jpeg"})
+	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
+	if code != http.StatusOK {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+	return session.FileID, objectKey
+}
+
+func patchAuth(t *testing.T, engine http.Handler, path, token string, payload map[string]any) (int, string) {
+	return doJSON(t, engine, http.MethodPatch, path, token, payload)
 }
 
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {

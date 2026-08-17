@@ -55,7 +55,7 @@ func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, conten
 		return UploadSession{}, apperr.QuotaExceeded
 	}
 	displayName := strings.TrimSpace(name)
-	exists, err := s.repo.ExistsAliveByName(ctx, ownerID, folderID, displayName)
+	exists, err := s.repo.ExistsAliveByName(ctx, ownerID, folderID, displayName, "")
 	if err != nil {
 		return UploadSession{}, err
 	}

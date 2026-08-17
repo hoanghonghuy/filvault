@@ -79,6 +79,13 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 - [x] Browser hiển thị file `READY`
 - [x] Test: reject type/size; upload → complete → browser → download
 
+### Slice 4 — Rename / move file
+
+- [x] `PATCH /api/v1/files/{id}` — `{ name?, folderId? }`; chỉ `READY`
+- [x] Tên trùng sibling → `409`; `PENDING` patch → `INVALID_STATE`
+- [x] `object_key` không đổi (download vẫn hoạt động sau patch)
+- [x] Test: rename, move vào folder, browser, conflict, invalid state
+
 ---
 
 ## Chưa làm — còn trong Phase 1
@@ -90,7 +97,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 | [x] | **1b** | Verify email | SMTP/console + mã 6 số (gate kho file khi có API folder/file) |
 | [x] | **2** | Folders | create, browser root, rename, move, xóa folder trống |
 | [x] | **3** | Vertical slice file | allowlist + 100 MiB; presign → complete (`Head`) → browser → download |
-| [ ] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
+| [x] | **4** | Rename / move file | chỉ metadata; `object_key` không đổi |
 | [ ] | **5** | Trash + setting | delete / restore / permanent; setting theo user; ticker tự xóa |
 | [ ] | **6** | Photos | timeline + album; không thumbnail; grid không `<img>` original |
 | [ ] | **7** | Profile | đổi displayName + password (revoke mọi refresh) |
@@ -114,7 +121,7 @@ Làm tiếp **theo thứ tự slice**. TDD: test fail rồi mới code.
 - [x] Ownership: user B 404 trên folder user A
 - [x] Quota / 100 MiB / ngoài allowlist: tạo session bị từ chối (một phần — chưa test quota DB)
 - [x] Complete: size từ `Head` (test 128 bytes)
-- [ ] Unique name sibling → 409
+- [x] Unique name sibling → 409 (file patch)
 - [ ] Folder không rỗng: DELETE → 409
 - [ ] Album: không thêm PDF; xóa album không xóa file
 
@@ -136,5 +143,5 @@ Không phải nợ. Không làm lẫn vào slice hiện tại.
 
 1. Đọc [README.md](README.md) → [07-phase-1-business.md](07-phase-1-business.md) → file này.
 2. `make test` phải xanh.
-3. Bắt đầu slice **4 — Rename / move file**.
+3. Bắt đầu slice **5 — Trash + setting**.
 4. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
