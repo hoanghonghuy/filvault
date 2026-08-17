@@ -21,6 +21,7 @@ services:
     environment:
       MINIO_ROOT_USER: filnest
       MINIO_ROOT_PASSWORD: filnestsecret
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -38,10 +39,6 @@ services:
         mc alias set local http://minio:9000 filnest filnestsecret
         mc mb --ignore-existing local/filnest
         mc anonymous set none local/filnest
-        mc cors set local/filnest /cors.json
-    volumes:
-      - filnest_minio:/data
-      - ./docker/minio-cors.json:/cors.json:ro
 
   api:
     build:
