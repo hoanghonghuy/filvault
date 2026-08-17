@@ -97,19 +97,20 @@ Toàn bộ checklist kỹ thuật API (auth, verify, folder, file, trash, photos
 | Màn | Functional | Chuẩn UI/UX (review) |
 |---|---|---|
 | Login / Register / Verify (`AuthCard`) | xong | **xong** (2026-08-17) |
-| Files | xong | **chưa** — mai làm |
-| Photos | xong | **chưa** |
-| Album detail | xong | **chưa** |
-| Trash | xong | **chưa** |
-| Settings | xong | **chưa** |
+| Files | xong | **xong** (2026-08-17) |
+| Photos | xong | **xong** (2026-08-17) |
+| Album detail | xong | **xong** (2026-08-17) |
+| Trash | xong | **xong** (2026-08-17) |
+| Settings | xong | **xong** (2026-08-17) |
 
 Auth đã sửa khi review: tách loading Verify/Resend, invite không `autocapitalize`, lỗi OTP không bị nuốt bởi `VALIDATION_ERROR` generic, chặn open redirect `?redirect=`, scroll màn ngắn, hint CSS.
+
+Các màn còn lại đã siết UI/UX (2026-08-17): icon nav (side + bottom), icon loại file, icon empty state, tìm kiếm live (debounce), meta file rút gọn, checkbox trash settings, storage bar rõ hơn, badge `itemCount` cho album (kèm field mới trong API `GET /photos/albums`).
 
 ---
 
 ## Còn lại trước khi sang Phase 2
 
-- [ ] UI/UX Files, Photos, Album, Trash, Settings — cùng bar với auth card
 - [ ] Smoke test tay xuyên suốt với `dev@filvault.com`
 - [ ] Chứng minh một lần với **AWS S3 thật** (không chặn DoD local; làm ở cửa Phase 2 cũng được)
 

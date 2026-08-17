@@ -253,6 +253,18 @@ DELETE /api/v1/photos/albums/{id}/items/{fileId}
 
 **Albums:** `{ name }` tạo; patch `{ name }`; delete album không xóa file.
 
+`GET /photos/albums` trả danh sách album kèm `itemCount` (số item ảnh/video `READY`, chưa trash trong album):
+
+```json
+{
+  "albums": [
+    { "id": "...", "name": "Trip", "itemCount": 3, "createdAt": "...", "updatedAt": "..." }
+  ]
+}
+```
+
+`GET /photos/albums/{id}` trả cùng shape trên cộng `items` (danh sách item).
+
 **Items:** `{ fileIds: ["..."] }`. File không phải ảnh/video / không phải của user / trash → `404` hoặc `VALIDATION_ERROR`. Trùng trong album → bỏ qua hoặc `409` (chốt: **idempotent**, trùng = no-op).
 
 Nghiệp vụ đầy đủ: spec 07 §4.
