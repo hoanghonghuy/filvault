@@ -24,7 +24,7 @@ async function submit() {
       await router.push('/verify-email')
       return
     }
-    await router.push(safeInternalPath(route.query.redirect))
+    await router.push(safeInternalPath(route.query.redirect, '/'))
   } catch (e) {
     error.value = formatAuthError(e, 'Sign in failed. Try again.')
   } finally {
