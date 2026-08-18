@@ -27,6 +27,8 @@ func Load() (Config, error) {
 		S3AccessKey:               os.Getenv("FILVAULT_S3_ACCESS_KEY"),
 		S3SecretKey:               os.Getenv("FILVAULT_S3_SECRET_KEY"),
 		S3PublicEndpoint:          os.Getenv("FILVAULT_S3_PUBLIC_ENDPOINT"),
+		DefaultImageThumbnails:    getenv("FILVAULT_DEFAULT_IMAGE_THUMBNAILS", "true") == "true",
+		DefaultVideoThumbnails:    getenv("FILVAULT_DEFAULT_VIDEO_THUMBNAILS", "true") == "true",
 		DefaultTrashAutoDelete:    getenv("FILVAULT_DEFAULT_TRASH_AUTO_DELETE", "false") == "true",
 		DefaultTrashRetentionDays: DefaultTrashRetentionDays,
 		CORSAllowedOrigins:        parseCSV(getenv("FILVAULT_CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),

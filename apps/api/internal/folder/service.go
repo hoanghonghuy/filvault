@@ -44,6 +44,34 @@ func (s *Service) Create(ctx context.Context, ownerID, name string, parentID *st
 	return f, nil
 }
 
+// GetOrCreate returns an existing alive folder with the given name under
+// parentID, or creates it if it does not exist. It is idempotent and used by
+// folder upload to avoid CONFLICT when a directory already exists.
+func (s *Service) GetOrCreate(ctx context.Context, ownerID, name string, parentID *string) (Folder, bool, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Folder{}, false, apperr.Validation
+	}
+	if parentID != nil && *parentID == "" {
+		parentID = nil
+	}
+	if err := s.validateParent(ctx, ownerID, parentID); err != nil {
+		return Folder{}, false, err
+	}
+	existing, err := s.repo.GetAliveByName(ctx, ownerID, parentID, name)
+	if err != nil {
+		return Folder{}, false, err
+	}
+	if existing != nil {
+		return *existing, false, nil
+	}
+	created, err := s.Create(ctx, ownerID, name, parentID)
+	if err != nil {
+		return Folder{}, false, err
+	}
+	return created, true, nil
+}
+
 func (s *Service) Get(ctx context.Context, ownerID, id string) (Folder, error) {
 	f, err := s.repo.GetAliveByID(ctx, ownerID, id)
 	if err != nil {

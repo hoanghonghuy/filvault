@@ -12,6 +12,8 @@ export interface User {
   emailVerified: boolean
   storageUsed: number
   storageQuota: number
+  imageThumbnailsEnabled: boolean
+  videoThumbnailsEnabled: boolean
   trashAutoDeleteEnabled: boolean
   trashRetentionDays: number
   createdAt: string
@@ -73,6 +75,7 @@ export interface TimelineItem {
   mimeType: string
   sizeBytes: number
   createdAt: string
+  thumbnailUrl?: string
 }
 
 export interface TimelineGroup {

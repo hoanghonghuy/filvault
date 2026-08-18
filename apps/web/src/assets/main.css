@@ -522,6 +522,33 @@ textarea:focus-visible {
   border: 0;
 }
 
+/* Custom vertical scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-soft) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--muted-soft);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+}
+
 /* Loading skeletons (per-screen composition) */
 .skeleton {
   background: linear-gradient(90deg, rgba(229, 231, 235, 0.8) 25%, rgba(243, 244, 246, 1) 50%, rgba(229, 231, 235, 0.8) 75%);

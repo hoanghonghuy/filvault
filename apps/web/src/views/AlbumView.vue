@@ -4,7 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
-import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue'
+import PhotoThumb from '@/components/PhotoThumb.vue'
+import Icon from '@/components/AppIcon.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import MediaPickerSheet from '@/components/MediaPickerSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -163,18 +164,21 @@ watch(() => route.params.id, load, { immediate: true })
     <div class="album-header">
       <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">← Photos</button>
       <h1 class="page-title desktop-only">{{ album?.name ?? 'Album' }}</h1>
-      <button type="button" class="btn icon-only" aria-label="Album menu" @click="openAlbumMenu">⋯</button>
+      <button type="button" class="btn icon-only" aria-label="Album menu" @click="openAlbumMenu">
+        <Icon name="more" :size="18" />
+      </button>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>
     <LoadingSkeletonAlbum v-if="loading" />
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
-        <PhotoPlaceholder
+        <PhotoThumb
           v-for="item in album.items"
           :key="item.id"
           :mime-type="item.mimeType"
           :name="item.name"
+          :thumbnail-url="item.thumbnailUrl"
           @click="openItemActions(item)"
         />
       </div>

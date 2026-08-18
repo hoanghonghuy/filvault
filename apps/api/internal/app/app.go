@@ -50,7 +50,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	trashHandlers := trash.NewHandler(trashSvc)
 
 	photoRepo := postgres.NewPhotoRepository(store)
-	photoSvc := photo.NewService(photoRepo)
+	photoSvc := photo.NewService(photoRepo, obj)
 	photoHandlers := photo.NewHandler(photoSvc)
 
 	searchRepo := postgres.NewSearchRepository(store)

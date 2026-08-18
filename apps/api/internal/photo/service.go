@@ -7,15 +7,18 @@ import (
 
 	"filvault/internal/apperr"
 	"filvault/internal/auth"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/objectstore"
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo    Repository
+	objects objectstore.ObjectStore
+	now     func() time.Time
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo, now: time.Now}
+func NewService(repo Repository, objects objectstore.ObjectStore) *Service {
+	return &Service{repo: repo, objects: objects, now: time.Now}
 }
 
 func (s *Service) Timeline(ctx context.Context, ownerID string, before *time.Time, limit int) (Timeline, error) {
@@ -33,6 +36,9 @@ func (s *Service) Timeline(ctx context.Context, ownerID string, before *time.Tim
 	if len(items) > limit {
 		items = items[:limit]
 		nextBefore = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if err := s.attachThumbnails(ctx, ownerID, items); err != nil {
+		return Timeline{}, err
 	}
 	return Timeline{Groups: groupByUTCDate(items), NextBefore: nextBefore}, nil
 }
@@ -72,7 +78,35 @@ func (s *Service) GetAlbum(ctx context.Context, ownerID, albumID string) (AlbumD
 	if err != nil {
 		return AlbumDetail{}, err
 	}
+	if err := s.attachThumbnails(ctx, ownerID, items); err != nil {
+		return AlbumDetail{}, err
+	}
 	return AlbumDetail{Album: *a, Items: items}, nil
+}
+
+func (s *Service) attachThumbnails(ctx context.Context, ownerID string, items []TimelineItem) error {
+	if s.objects == nil || len(items) == 0 {
+		return nil
+	}
+	prefs, err := s.repo.GetThumbnailPrefs(ctx, ownerID)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		isImage := strings.HasPrefix(items[i].MimeType, "image/")
+		isVideo := strings.HasPrefix(items[i].MimeType, "video/")
+		if (isImage && !prefs.ImageEnabled) || (isVideo && !prefs.VideoEnabled) {
+			continue
+		}
+		url, err := s.objects.CreateDownloadURL(ctx, items[i].ObjectKey, objectstore.DownloadOptions{
+			Expires: config.ThumbnailPresignTTL,
+		})
+		if err != nil {
+			return err
+		}
+		items[i].ThumbnailURL = url.URL
+	}
+	return nil
 }
 
 func (s *Service) PatchAlbum(ctx context.Context, ownerID, albumID, name string) (Album, error) {

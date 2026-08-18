@@ -222,11 +222,29 @@ func (h *Handler) patchMe(c *gin.Context) {
 		}
 		displayName = &n
 	}
-	if autoDelete == nil && retentionDays == nil && displayName == nil {
+	var imageThumbnails *bool
+	if v, ok := raw["imageThumbnailsEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		imageThumbnails = &enabled
+	}
+	var videoThumbnails *bool
+	if v, ok := raw["videoThumbnailsEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		videoThumbnails = &enabled
+	}
+	if autoDelete == nil && retentionDays == nil && displayName == nil && imageThumbnails == nil && videoThumbnails == nil {
 		httpx.Validation(c)
 		return
 	}
-	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays)
+	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays, imageThumbnails, videoThumbnails)
 	if err != nil {
 		httpx.Error(c, err)
 		return

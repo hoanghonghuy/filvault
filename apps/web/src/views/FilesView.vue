@@ -10,7 +10,7 @@ import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
-import { mimeIcon, mimeLabel } from '@/lib/mimeIcon'
+import { mimeIcon, mimeLabel, resolveContentType } from '@/lib/mimeIcon'
 import type { Browser, DownloadURL, SearchResult, UploadSession } from '@/api/types'
 
 const route = useRoute()
@@ -28,6 +28,7 @@ const searchQuery = ref('')
 const newFolderName = ref('')
 const folderSheetOpen = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const folderInputRef = ref<HTMLInputElement | null>(null)
 
 const pickerOpen = ref(false)
 const pickerMode = ref<'file' | 'folder' | null>(null)
@@ -110,28 +111,44 @@ function triggerUpload() {
   fileInputRef.value?.click()
 }
 
+function triggerFolderUpload() {
+  folderInputRef.value?.click()
+}
+
+async function uploadOneFile(file: File, targetFolderId: string | null) {
+  const contentType = resolveContentType(file)
+  if (!contentType) {
+    ui.showToast(`Skipped "${file.name}" (unsupported type)`, 'info')
+    return
+  }
+  const session = await api<UploadSession>('/files/upload-sessions', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: file.name,
+      size: file.size,
+      contentType,
+      folderId: targetFolderId,
+    }),
+  })
+  await uploadToPresigned(session.uploadUrl, file, contentType)
+  await api(`/files/${session.fileId}/complete`, { method: 'POST', body: '{}' })
+}
+
 async function onUploadChange(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const files = Array.from(input.files ?? [])
   input.value = ''
-  if (!file) return
+  if (files.length === 0) return
   error.value = ''
   uploadProgress.value = 0
+  let done = 0
   try {
-    const session = await api<UploadSession>('/files/upload-sessions', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: file.name,
-        size: file.size,
-        contentType: file.type || 'application/octet-stream',
-        folderId: folderId.value,
-      }),
-    })
-    await uploadToPresigned(session.uploadUrl, file, file.type || 'application/octet-stream', (p) => {
-      uploadProgress.value = p
-    })
-    await api(`/files/${session.fileId}/complete`, { method: 'POST', body: '{}' })
-    ui.showToast('Upload complete')
+    for (const file of files) {
+      await uploadOneFile(file, folderId.value)
+      done += 1
+      uploadProgress.value = done / files.length
+    }
+    ui.showToast(files.length === 1 ? 'Upload complete' : `${files.length} files uploaded`)
     await loadBrowser()
     await reloadStorage?.()
   } catch (e) {
@@ -139,6 +156,62 @@ async function onUploadChange(event: Event) {
   } finally {
     uploadProgress.value = null
   }
+}
+
+async function onFolderUploadChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (files.length === 0) return
+  error.value = ''
+  uploadProgress.value = 0
+  let done = 0
+  try {
+    const folderCache = new Map<string, string>()
+    for (const file of files) {
+      const relPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? file.name
+      const parts = relPath.split('/')
+      parts.pop()
+      let parentId = folderId.value
+      if (parts.length > 0) {
+        parentId = await ensureFolderPath(parts, parentId, folderCache)
+      }
+      await uploadOneFile(file, parentId)
+      done += 1
+      uploadProgress.value = done / files.length
+    }
+    ui.showToast(files.length === 1 ? 'Upload complete' : `${files.length} files uploaded`)
+    await loadBrowser()
+    await reloadStorage?.()
+  } catch (e) {
+    error.value = formatApiError(e, 'Upload failed')
+  } finally {
+    uploadProgress.value = null
+  }
+}
+
+async function ensureFolderPath(
+  parts: string[],
+  rootParentId: string | null,
+  cache: Map<string, string>,
+): Promise<string | null> {
+  let parentId = rootParentId
+  let currentPath = ''
+  for (const part of parts) {
+    currentPath = currentPath ? `${currentPath}/${part}` : part
+    const cached = cache.get(currentPath)
+    if (cached) {
+      parentId = cached
+      continue
+    }
+    const created = await api<{ id: string }>('/folders/get-or-create', {
+      method: 'POST',
+      body: JSON.stringify({ name: part, parentId }),
+    })
+    parentId = created.id
+    cache.set(currentPath, parentId)
+  }
+  return parentId
 }
 
 async function downloadFile(id: string) {
@@ -322,6 +395,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         enterkeyhint="search"
       />
       <button class="btn accent desktop-only" type="button" @click="triggerUpload">Upload</button>
+      <button class="btn desktop-only" type="button" @click="triggerFolderUpload">Upload folder</button>
       <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">New folder</button>
       <button class="btn mobile-only" type="button" aria-label="New folder" @click="folderSheetOpen = true">
         + Folder
@@ -348,14 +422,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <div v-for="folder in searchResults.folders" :key="folder.id" class="row">
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
         <button class="btn icon-only" type="button" aria-label="Open folder" @click="openFolder(folder.id)">
-          →
+          <Icon name="arrow-right" :size="18" />
         </button>
       </div>
       <div v-for="file in searchResults.files" :key="file.id" class="row">
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
         <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
-          ⋯
+          <Icon name="more" :size="18" />
         </button>
       </div>
       <EmptyState
@@ -380,14 +454,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           aria-label="Folder actions"
           @click.stop="openFolderActions(folder)"
         >
-          ⋯
+          <Icon name="more" :size="18" />
         </button>
       </div>
       <div v-for="file in browser?.files ?? []" :key="file.id" class="row">
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta desktop-only">{{ mimeLabel(file.mimeType) }} · {{ formatBytes(file.sizeBytes) }}</span>
         <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
-          ⋯
+          <Icon name="more" :size="18" />
         </button>
       </div>
       <EmptyState
@@ -400,7 +474,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       />
     </section>
 
-    <input ref="fileInputRef" type="file" class="sr-only" @change="onUploadChange" />
+    <input ref="fileInputRef" type="file" class="sr-only" multiple @change="onUploadChange" />
+    <input ref="folderInputRef" type="file" class="sr-only" webkitdirectory @change="onFolderUploadChange" />
 
     <UploadFab label="Upload file" :disabled="uploadProgress !== null" @click="triggerUpload" />
 

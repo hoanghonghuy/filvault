@@ -69,6 +69,8 @@ func (s *Service) Register(ctx context.Context, email, password, displayName, in
 		PasswordHash:           hash,
 		StorageUsed:            0,
 		StorageQuota:           config.DefaultStorageQuotaBytes,
+		ImageThumbnailsEnabled: s.cfg.DefaultImageThumbnails,
+		VideoThumbnailsEnabled: s.cfg.DefaultVideoThumbnails,
 		TrashAutoDeleteEnabled: s.cfg.DefaultTrashAutoDelete,
 		TrashRetentionDays:     s.cfg.DefaultTrashRetentionDays,
 		CreatedAt:              now,
@@ -146,7 +148,15 @@ func (s *Service) Me(ctx context.Context, userID string) (user.User, error) {
 	return *u, nil
 }
 
-func (s *Service) PatchMe(ctx context.Context, userID string, displayName *string, autoDelete *bool, retentionDays *int) (user.User, error) {
+func (s *Service) PatchMe(
+	ctx context.Context,
+	userID string,
+	displayName *string,
+	autoDelete *bool,
+	retentionDays *int,
+	imageThumbnails *bool,
+	videoThumbnails *bool,
+) (user.User, error) {
 	u, err := s.Me(ctx, userID)
 	if err != nil {
 		return user.User{}, err
@@ -173,6 +183,19 @@ func (s *Service) PatchMe(ctx context.Context, userID string, displayName *strin
 			days = *retentionDays
 		}
 		if err := s.repo.UpdateTrashSettings(ctx, userID, enabled, days); err != nil {
+			return user.User{}, err
+		}
+	}
+	if imageThumbnails != nil || videoThumbnails != nil {
+		imageEnabled := u.ImageThumbnailsEnabled
+		videoEnabled := u.VideoThumbnailsEnabled
+		if imageThumbnails != nil {
+			imageEnabled = *imageThumbnails
+		}
+		if videoThumbnails != nil {
+			videoEnabled = *videoThumbnails
+		}
+		if err := s.repo.UpdateThumbnailSettings(ctx, userID, imageEnabled, videoEnabled); err != nil {
 			return user.User{}, err
 		}
 	}

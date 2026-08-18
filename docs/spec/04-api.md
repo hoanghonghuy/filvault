@@ -96,6 +96,7 @@ Password: **argon2id**, tối thiểu 8 ký tự.
 
 ```text
 POST   /api/v1/folders
+POST   /api/v1/folders/get-or-create
 GET    /api/v1/folders/{id}
 PATCH  /api/v1/folders/{id}
 DELETE /api/v1/folders/{id}
@@ -103,6 +104,8 @@ POST   /api/v1/folders/{id}/restore
 ```
 
 **Create** `{ name, parentId? }` → `201`. `parentId` omit/null = root. Cha không tồn tại / không thuộc user → `404`. Tên trùng sibling → `409`.
+
+**Get-or-create** `{ name, parentId? }` → `201` nếu tạo mới, `200` nếu folder cùng tên đã tồn tại (idempotent). Dùng cho upload folder để tránh `409` khi thư mục đã có. Body trả về giống `Create`.
 
 **Patch** `{ name?, parentId? }` — rename và/hoặc move. Move không được tạo chu trình (folder thành con cháu của chính nó). Move vào folder đang trong trash → `INVALID_STATE`.
 

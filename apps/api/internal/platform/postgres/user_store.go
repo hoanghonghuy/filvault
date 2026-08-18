@@ -28,6 +28,7 @@ func (s *Store) CreateUser(ctx context.Context, u user.User) error {
 			id, email, display_name, password_hash,
 			email_verified_at, verification_code_hash, verification_expires_at,
 			storage_used, storage_quota,
+			image_thumbnails_enabled, video_thumbnails_enabled,
 			trash_auto_delete_enabled, trash_retention_days,
 			created_at, updated_at
 		) VALUES (
@@ -35,10 +36,12 @@ func (s *Store) CreateUser(ctx context.Context, u user.User) error {
 			$5, NULL, NULL,
 			$6, $7,
 			$8, $9,
-			$10, $11
+			$10, $11,
+			$12, $13
 		)
 	`, u.ID, u.Email, u.DisplayName, u.PasswordHash,
 		u.EmailVerifiedAt, u.StorageUsed, u.StorageQuota,
+		u.ImageThumbnailsEnabled, u.VideoThumbnailsEnabled,
 		u.TrashAutoDeleteEnabled, u.TrashRetentionDays,
 		u.CreatedAt, u.UpdatedAt)
 	if isUniqueViolation(err) {
@@ -79,6 +82,21 @@ func (s *Store) UpdateTrashSettings(ctx context.Context, userID string, enabled 
 		SET trash_auto_delete_enabled = $2, trash_retention_days = $3, updated_at = now()
 		WHERE id = $1
 	`, userID, enabled, retentionDays)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
+}
+
+func (s *Store) UpdateThumbnailSettings(ctx context.Context, userID string, imageEnabled, videoEnabled bool) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users
+		SET image_thumbnails_enabled = $2, video_thumbnails_enabled = $3, updated_at = now()
+		WHERE id = $1
+	`, userID, imageEnabled, videoEnabled)
 	if err != nil {
 		return err
 	}
@@ -169,6 +187,7 @@ const userSelect = `
 	SELECT id, email, display_name, password_hash,
 		email_verified_at, verification_code_hash, verification_expires_at,
 		storage_used, storage_quota,
+		image_thumbnails_enabled, video_thumbnails_enabled,
 		trash_auto_delete_enabled, trash_retention_days,
 		created_at, updated_at
 	FROM users
@@ -181,6 +200,7 @@ func (s *Store) scanUser(row pgx.Row) (*user.User, error) {
 		&u.ID, &u.Email, &u.DisplayName, &u.PasswordHash,
 		&u.EmailVerifiedAt, &codeHash, &u.VerificationExpiresAt,
 		&u.StorageUsed, &u.StorageQuota,
+		&u.ImageThumbnailsEnabled, &u.VideoThumbnailsEnabled,
 		&u.TrashAutoDeleteEnabled, &u.TrashRetentionDays,
 		&u.CreatedAt, &u.UpdatedAt,
 	)

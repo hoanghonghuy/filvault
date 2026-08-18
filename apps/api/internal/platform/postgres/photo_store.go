@@ -14,7 +14,7 @@ import (
 func (s *Store) ListTimelineFiles(ctx context.Context, ownerID string, before *time.Time, limit int) ([]photo.TimelineItem, error) {
 	mimes := photo.PhotoMIMESlice()
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, mime_type, size_bytes, created_at
+		SELECT id, name, mime_type, size_bytes, created_at, object_key
 		FROM files
 		WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'READY'
 			AND mime_type = ANY($2::text[])
@@ -32,10 +32,10 @@ func (s *Store) ListTimelineFiles(ctx context.Context, ownerID string, before *t
 func (s *Store) GetPhotoFile(ctx context.Context, ownerID, fileID string) (*photo.TimelineItem, error) {
 	var item photo.TimelineItem
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, name, mime_type, size_bytes, created_at
+		SELECT id, name, mime_type, size_bytes, created_at, object_key
 		FROM files
 		WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL AND status = 'READY'
-	`, ownerID, fileID).Scan(&item.ID, &item.Name, &item.MimeType, &item.SizeBytes, &item.CreatedAt)
+	`, ownerID, fileID).Scan(&item.ID, &item.Name, &item.MimeType, &item.SizeBytes, &item.CreatedAt, &item.ObjectKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.NotFound
 	}
@@ -46,6 +46,19 @@ func (s *Store) GetPhotoFile(ctx context.Context, ownerID, fileID string) (*phot
 		return nil, apperr.Validation
 	}
 	return &item, nil
+}
+
+func (s *Store) GetThumbnailPrefs(ctx context.Context, ownerID string) (photo.ThumbnailPrefs, error) {
+	var prefs photo.ThumbnailPrefs
+	err := s.pool.QueryRow(ctx, `
+		SELECT image_thumbnails_enabled, video_thumbnails_enabled
+		FROM users
+		WHERE id = $1
+	`, ownerID).Scan(&prefs.ImageEnabled, &prefs.VideoEnabled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return photo.ThumbnailPrefs{}, apperr.NotFound
+	}
+	return prefs, err
 }
 
 func (s *Store) CreateAlbum(ctx context.Context, a photo.Album) error {
@@ -144,7 +157,7 @@ func (s *Store) RemoveAlbumItem(ctx context.Context, albumID, fileID string) err
 func (s *Store) ListAlbumItems(ctx context.Context, ownerID, albumID string) ([]photo.TimelineItem, error) {
 	mimes := photo.PhotoMIMESlice()
 	rows, err := s.pool.Query(ctx, `
-		SELECT f.id, f.name, f.mime_type, f.size_bytes, f.created_at
+		SELECT f.id, f.name, f.mime_type, f.size_bytes, f.created_at, f.object_key
 		FROM album_items ai
 		JOIN albums a ON a.id = ai.album_id
 		JOIN files f ON f.id = ai.file_id
@@ -164,7 +177,7 @@ func scanTimelineItems(rows pgx.Rows) ([]photo.TimelineItem, error) {
 	var out []photo.TimelineItem
 	for rows.Next() {
 		var item photo.TimelineItem
-		if err := rows.Scan(&item.ID, &item.Name, &item.MimeType, &item.SizeBytes, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.MimeType, &item.SizeBytes, &item.CreatedAt, &item.ObjectKey); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -186,6 +199,10 @@ func (r photoRepo) ListTimelineFiles(ctx context.Context, ownerID string, before
 
 func (r photoRepo) GetPhotoFile(ctx context.Context, ownerID, fileID string) (*photo.TimelineItem, error) {
 	return r.store.GetPhotoFile(ctx, ownerID, fileID)
+}
+
+func (r photoRepo) GetThumbnailPrefs(ctx context.Context, ownerID string) (photo.ThumbnailPrefs, error) {
+	return r.store.GetThumbnailPrefs(ctx, ownerID)
 }
 
 func (r photoRepo) CreateAlbum(ctx context.Context, a photo.Album) error {

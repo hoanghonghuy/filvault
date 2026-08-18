@@ -250,13 +250,17 @@ func publicGroups(groups []TimelineGroup) []gin.H {
 }
 
 func publicItem(it TimelineItem) gin.H {
-	return gin.H{
+	out := gin.H{
 		"id":        it.ID,
 		"name":      it.Name,
 		"mimeType":  it.MimeType,
 		"sizeBytes": it.SizeBytes,
 		"createdAt": it.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
+	if it.ThumbnailURL != "" {
+		out["thumbnailUrl"] = it.ThumbnailURL
+	}
+	return out
 }
 
 func publicAlbum(a Album) gin.H {

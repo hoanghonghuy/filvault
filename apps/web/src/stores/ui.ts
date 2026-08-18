@@ -33,6 +33,7 @@ type ActionSheetState = {
 
 export const useUiStore = defineStore('ui', () => {
   const toastMessage = ref<string | null>(null)
+  const toastType = ref<'success' | 'error' | 'info'>('info')
   let toastTimer: ReturnType<typeof setTimeout> | null = null
 
   const confirmState = ref<ConfirmState>({
@@ -59,8 +60,9 @@ export const useUiStore = defineStore('ui', () => {
   })
   let actionSheetResolve: ((id: string | null) => void) | null = null
 
-  function showToast(message: string, durationMs = 3000) {
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'info', durationMs = 3000) {
     toastMessage.value = message
+    toastType.value = type
     if (toastTimer) clearTimeout(toastTimer)
     toastTimer = setTimeout(() => {
       toastMessage.value = null
@@ -121,6 +123,7 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     toastMessage,
+    toastType,
     confirmState,
     promptState,
     actionSheetState,

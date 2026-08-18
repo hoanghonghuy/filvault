@@ -9,6 +9,8 @@ const auth = useAuthStore()
 const ui = useUiStore()
 
 const displayName = ref(auth.user?.displayName ?? '')
+const imageThumbnailsEnabled = ref(auth.user?.imageThumbnailsEnabled ?? true)
+const videoThumbnailsEnabled = ref(auth.user?.videoThumbnailsEnabled ?? true)
 const trashAutoDeleteEnabled = ref(auth.user?.trashAutoDeleteEnabled ?? false)
 const trashRetentionDays = ref(auth.user?.trashRetentionDays ?? 30)
 const currentPassword = ref('')
@@ -25,6 +27,8 @@ async function saveProfile() {
       method: 'PATCH',
       body: JSON.stringify({
         displayName: displayName.value,
+        imageThumbnailsEnabled: imageThumbnailsEnabled.value,
+        videoThumbnailsEnabled: videoThumbnailsEnabled.value,
         trashAutoDeleteEnabled: trashAutoDeleteEnabled.value,
         trashRetentionDays: Number(trashRetentionDays.value),
       }),
@@ -87,7 +91,8 @@ async function logout() {
     <section class="card section">
       <h2 class="section-title">Trash</h2>
       <label class="toggle-row">
-        <input v-model="trashAutoDeleteEnabled" type="checkbox" />
+        <input v-model="trashAutoDeleteEnabled" type="checkbox" class="switch-input" />
+        <span class="switch-track" aria-hidden="true"></span>
         <span class="toggle-label">Auto-delete trash</span>
       </label>
       <p class="field-hint">Permanently delete items older than the retention period.</p>
@@ -97,6 +102,26 @@ async function logout() {
       </label>
       <button class="btn" type="button" :disabled="savingProfile" @click="saveProfile">
         {{ savingProfile ? 'Saving…' : 'Save trash settings' }}
+      </button>
+    </section>
+
+    <section class="card section">
+      <h2 class="section-title">Media previews</h2>
+      <p class="field-hint section-hint">
+        Turn previews off to reduce object-storage bandwidth while browsing Photos.
+      </p>
+      <label class="toggle-row">
+        <input v-model="imageThumbnailsEnabled" type="checkbox" class="switch-input" />
+        <span class="switch-track" aria-hidden="true"></span>
+        <span class="toggle-label">Show image thumbnails</span>
+      </label>
+      <label class="toggle-row">
+        <input v-model="videoThumbnailsEnabled" type="checkbox" class="switch-input" />
+        <span class="switch-track" aria-hidden="true"></span>
+        <span class="toggle-label">Show video previews</span>
+      </label>
+      <button class="btn" type="button" :disabled="savingProfile" @click="saveProfile">
+        {{ savingProfile ? 'Saving…' : 'Save preview settings' }}
       </button>
     </section>
 
@@ -126,6 +151,10 @@ async function logout() {
   margin-bottom: var(--space-md);
 }
 
+.section-hint {
+  margin: calc(var(--space-xs) * -1) 0 var(--space-sm);
+}
+
 .toggle-row {
   display: flex;
   align-items: center;
@@ -134,11 +163,47 @@ async function logout() {
   cursor: pointer;
 }
 
-.toggle-row input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-  cursor: pointer;
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--hairline);
+  transition: background-color 150ms ease;
+}
+
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--canvas);
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.25);
+  transition: transform 150ms ease;
+}
+
+.switch-input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch-input:checked + .switch-track::after {
+  transform: translateX(20px);
+}
+
+.switch-input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .toggle-label {

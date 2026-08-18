@@ -46,6 +46,52 @@ func TestPhotos_Timeline_ExcludesPDF(t *testing.T) {
 	}
 }
 
+func TestPhotos_ThumbnailURLsFollowUserSettings(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	imageID := uploadReady(t, engine, objs, token, "photo.jpg")
+	videoID := uploadReadyVideo(t, engine, objs, token, "clip.mp4")
+
+	code, body := getAuth(t, engine, "/api/v1/photos/timeline", token)
+	if code != http.StatusOK {
+		t.Fatalf("timeline status=%d body=%s", code, body)
+	}
+	items := timelineItems(t, body)
+	if items[imageID].ThumbnailURL == "" || items[videoID].ThumbnailURL == "" {
+		t.Fatalf("expected image and video thumbnails enabled: %s", body)
+	}
+
+	code, body = patchAuth(t, engine, "/api/v1/users/me", token, map[string]any{
+		"imageThumbnailsEnabled": false,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("disable image thumbnails status=%d body=%s", code, body)
+	}
+	code, body = getAuth(t, engine, "/api/v1/photos/timeline", token)
+	if code != http.StatusOK {
+		t.Fatalf("timeline after image setting status=%d body=%s", code, body)
+	}
+	items = timelineItems(t, body)
+	if items[imageID].ThumbnailURL != "" || items[videoID].ThumbnailURL == "" {
+		t.Fatalf("image setting was not applied: %s", body)
+	}
+
+	code, body = patchAuth(t, engine, "/api/v1/users/me", token, map[string]any{
+		"videoThumbnailsEnabled": false,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("disable video thumbnails status=%d body=%s", code, body)
+	}
+	code, body = getAuth(t, engine, "/api/v1/photos/timeline", token)
+	if code != http.StatusOK {
+		t.Fatalf("timeline after video setting status=%d body=%s", code, body)
+	}
+	items = timelineItems(t, body)
+	if items[imageID].ThumbnailURL != "" || items[videoID].ThumbnailURL != "" {
+		t.Fatalf("video setting was not applied: %s", body)
+	}
+}
+
 func TestPhotos_AlbumCRUD(t *testing.T) {
 	engine, mem, _ := newEngine(t)
 	token := registerVerified(t, engine, mem, uniqueEmail())
@@ -273,6 +319,54 @@ func uploadReady(t *testing.T, engine http.Handler, objs *objectstore.Memory, to
 	return session.FileID
 }
 
+func uploadReadyVideo(t *testing.T, engine http.Handler, objs *objectstore.Memory, token, name string) string {
+	t.Helper()
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":        name,
+		"size":        128,
+		"contentType": "video/mp4",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("video session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objectKey := file.ObjectKey(userID, session.FileID)
+	objs.PutObject(objectKey, objectstore.ObjectStat{Size: 128, ContentType: "video/mp4"})
+	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
+	if code != http.StatusOK {
+		t.Fatalf("video complete status=%d body=%s", code, body)
+	}
+	return session.FileID
+}
+
+type timelineItemResponse struct {
+	ThumbnailURL string `json:"thumbnailUrl"`
+}
+
+func timelineItems(t *testing.T, body string) map[string]timelineItemResponse {
+	t.Helper()
+	var response struct {
+		Groups []struct {
+			Items []struct {
+				ID string `json:"id"`
+				timelineItemResponse
+			} `json:"items"`
+		} `json:"groups"`
+	}
+	decodeJSON(t, body, &response)
+	items := make(map[string]timelineItemResponse)
+	for _, group := range response.Groups {
+		for _, item := range group.Items {
+			items[item.ID] = item.timelineItemResponse
+		}
+	}
+	return items
+}
+
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -297,6 +391,8 @@ func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) 
 	engine := app.NewWithDeps(config.Config{
 		InviteCode:                "secret-invite",
 		JWTSecret:                 "test-jwt-secret-not-for-prod",
+		DefaultImageThumbnails:    true,
+		DefaultVideoThumbnails:    true,
 		DefaultTrashAutoDelete:    false,
 		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
 		MetadataStore:             "postgres",

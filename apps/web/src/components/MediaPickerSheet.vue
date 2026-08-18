@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue'
+import PhotoThumb from '@/components/PhotoThumb.vue'
 import type { Timeline, TimelineItem } from '@/api/types'
 
 const props = defineProps<{
@@ -94,11 +94,12 @@ watch(
     <p v-if="loading" class="muted">Loading…</p>
 
     <div v-else class="grid photos picker-grid">
-      <PhotoPlaceholder
+      <PhotoThumb
         v-for="item in flattenItems()"
         :key="item.id"
         :mime-type="item.mimeType"
         :name="item.name"
+        :thumbnail-url="item.thumbnailUrl"
         @click="pick(item)"
       />
     </div>

@@ -22,6 +22,7 @@ func NewHandler(svc *Service) *Handler {
 
 func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFunc) {
 	g.POST("/folders", append(middleware, h.create)...)
+	g.POST("/folders/get-or-create", append(middleware, h.getOrCreate)...)
 	g.GET("/folders/:id", append(middleware, h.get)...)
 	g.PATCH("/folders/:id", append(middleware, h.patch)...)
 	g.DELETE("/folders/:id", append(middleware, h.delete)...)
@@ -61,6 +62,29 @@ func (h *Handler) create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, publicFrom(f))
+}
+
+func (h *Handler) getOrCreate(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	var req createReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	f, created, err := h.svc.GetOrCreate(c.Request.Context(), userID, req.Name, req.ParentID)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	c.JSON(status, publicFrom(f))
 }
 
 func (h *Handler) get(c *gin.Context) {

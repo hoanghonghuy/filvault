@@ -4,9 +4,10 @@ import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
-import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue'
+import PhotoThumb from '@/components/PhotoThumb.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 import type { Album, DownloadURL, Timeline, TimelineItem } from '@/api/types'
 
@@ -165,7 +166,7 @@ onMounted(load)
             </button>
             <span class="meta album-count">{{ album.itemCount }}</span>
             <button class="btn icon-only" type="button" aria-label="Album actions" @click="openAlbumActions(album)">
-              ⋯
+              <Icon name="more" :size="18" />
             </button>
           </div>
         </div>
@@ -175,11 +176,12 @@ onMounted(load)
       <section v-for="group in groups" :key="group.date" class="card section">
         <h2 class="section-title">{{ group.date }}</h2>
         <div class="grid photos">
-          <PhotoPlaceholder
+          <PhotoThumb
             v-for="item in group.items"
             :key="item.id"
             :mime-type="item.mimeType"
             :name="item.name"
+            :thumbnail-url="item.thumbnailUrl"
             @click="openMedia(item)"
           />
         </div>
