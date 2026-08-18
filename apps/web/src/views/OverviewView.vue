@@ -106,7 +106,7 @@ onMounted(load)
           <h2 id="recent-files-heading" class="section-title">Recent files</h2>
           <RouterLink class="see-all" to="/files">See all</RouterLink>
         </div>
-        <p v-if="filesError" class="section-error">{{ filesError }}</p>
+        <p v-if="filesError" class="section-error" role="alert">{{ filesError }}</p>
         <div v-else-if="recentFiles.length" class="list">
           <RouterLink
             v-for="file in recentFiles"
@@ -132,7 +132,7 @@ onMounted(load)
           <h2 id="recent-photos-heading" class="section-title">Recent photos</h2>
           <RouterLink class="see-all" to="/photos">See all</RouterLink>
         </div>
-        <p v-if="photosError" class="section-error">{{ photosError }}</p>
+        <p v-if="photosError" class="section-error" role="alert">{{ photosError }}</p>
         <div v-else-if="recentPhotos.length" class="grid photos">
           <PhotoPlaceholder
             v-for="item in recentPhotos"

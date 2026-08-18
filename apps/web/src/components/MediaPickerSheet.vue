@@ -90,7 +90,7 @@ watch(
 <template>
   <BottomSheet :open="open" title="Add to album" @close="emit('close')">
     <p class="muted hint">Tap a photo or video to add it.</p>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="loading" class="muted">Loading…</p>
 
     <div v-else class="grid photos picker-grid">

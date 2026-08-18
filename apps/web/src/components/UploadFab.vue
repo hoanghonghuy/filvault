@@ -42,6 +42,11 @@ const emit = defineEmits<{
   box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
 }
 
+.fab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .fab:hover:not(:disabled) {
   background: var(--accent-hover);
 }

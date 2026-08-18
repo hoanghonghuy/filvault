@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ApiError, api, setTokens } from '@/api/client'
+import { api, setTokens } from '@/api/client'
+import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { User } from '@/api/types'
@@ -32,7 +33,7 @@ async function saveProfile() {
     await auth.loadMe()
     ui.showToast('Settings saved')
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : 'Save failed'
+    error.value = formatApiError(e, 'Save failed')
   } finally {
     savingProfile.value = false
   }
@@ -55,7 +56,7 @@ async function changePassword() {
     newPassword.value = ''
     ui.showToast('Password updated')
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : 'Password change failed'
+    error.value = formatApiError(e, 'Password change failed')
   } finally {
     changingPassword.value = false
   }
@@ -70,16 +71,16 @@ async function logout() {
 <template>
   <div>
     <h1 class="page-title desktop-only">Settings</h1>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
 
     <section class="card section">
       <h2 class="section-title">Profile</h2>
       <p class="muted">{{ auth.user?.email }}</p>
       <label class="field">
         <span>Display name</span>
-        <input v-model="displayName" />
+        <input v-model="displayName" autocomplete="nickname" />
       </label>
-      <button class="btn ink" type="button" :disabled="savingProfile" @click="saveProfile">
+      <button class="btn ink save-btn" type="button" :disabled="savingProfile" @click="saveProfile">
         {{ savingProfile ? 'Saving…' : 'Save profile' }}
       </button>
     </section>
@@ -93,9 +94,9 @@ async function logout() {
       <p class="field-hint">Permanently delete items older than the retention period.</p>
       <label class="field">
         <span>Retention days</span>
-        <input v-model.number="trashRetentionDays" type="number" min="1" />
+        <input v-model.number="trashRetentionDays" type="number" min="1" inputmode="numeric" />
       </label>
-      <button class="btn" type="button" :disabled="savingProfile" @click="saveProfile">
+      <button class="btn save-btn" type="button" :disabled="savingProfile" @click="saveProfile">
         {{ savingProfile ? 'Saving…' : 'Save trash settings' }}
       </button>
     </section>
@@ -110,7 +111,7 @@ async function logout() {
         <span>New password</span>
         <input v-model="newPassword" type="password" minlength="8" autocomplete="new-password" />
       </label>
-      <button class="btn ink" type="button" :disabled="changingPassword" @click="changePassword">
+      <button class="btn ink save-btn" type="button" :disabled="changingPassword" @click="changePassword">
         {{ changingPassword ? 'Changing…' : 'Change password' }}
       </button>
     </section>
@@ -147,11 +148,19 @@ async function logout() {
   color: var(--ink);
 }
 
+.save-btn {
+  width: 100%;
+}
+
 .desktop-only {
   display: none;
 }
 
 @media (min-width: 768px) {
+  .save-btn {
+    width: auto;
+  }
+
   .desktop-only {
     display: block;
   }

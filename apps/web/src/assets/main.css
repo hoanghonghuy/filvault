@@ -28,6 +28,7 @@
   --radius-xl: 16px;
   --radius-pill: 9999px;
 
+  --space-xxs: 4px;
   --space-xs: 8px;
   --space-sm: 12px;
   --space-md: 16px;
@@ -36,7 +37,7 @@
 
   --touch-min: 44px;
   --fab-size: 56px;
-  --bottom-nav-h: 64px;
+  --bottom-nav-h: 72px;
   --header-h: 56px;
   --content-max: 1100px;
 
@@ -203,7 +204,13 @@ textarea:focus-visible {
 
 .error {
   color: var(--danger);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--danger-soft);
+  background: var(--danger-soft);
 }
 
 .grid {
@@ -536,6 +543,13 @@ textarea:focus-visible {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--hairline);
   }
 }
 

@@ -5,6 +5,7 @@ import {
   pageTitleForRoute,
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
+  showStorageBar,
 } from './shellNav'
 import type { BrowserFile, TimelineGroup } from '@/api/types'
 
@@ -17,6 +18,21 @@ describe('HOME_PATH', () => {
 describe('OVERVIEW_DESTINATIONS', () => {
   it('exposes Files and Photos only', () => {
     expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos'])
+  })
+})
+
+describe('showStorageBar', () => {
+  it('hides on Overview where quota already appears in the hero', () => {
+    expect(showStorageBar('/')).toBe(false)
+    expect(showStorageBar('')).toBe(false)
+  })
+
+  it('shows on shell destinations that do not repeat quota', () => {
+    expect(showStorageBar('/files')).toBe(true)
+    expect(showStorageBar('/photos')).toBe(true)
+    expect(showStorageBar('/photos/albums/01ABC')).toBe(true)
+    expect(showStorageBar('/trash')).toBe(true)
+    expect(showStorageBar('/settings')).toBe(true)
   })
 })
 

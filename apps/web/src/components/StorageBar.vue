@@ -29,14 +29,21 @@ defineExpose({ reload })
 <template>
   <div v-if="usage" class="storage-bar">
     <span class="label desktop-only">Storage</span>
-    <div class="track">
+    <div
+      class="track"
+      role="progressbar"
+      :aria-valuenow="Math.round((usage.usedBytes / usage.quotaBytes) * 100)"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      :aria-label="`${formatBytes(usage.usedBytes)} of ${formatBytes(usage.quotaBytes)} used`"
+    >
       <div
         class="fill"
         :class="fillClass"
         :style="{ width: `${Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100)}%` }"
       />
     </div>
-    <div class="numbers">{{ formatBytes(usage.usedBytes) }} / {{ formatBytes(usage.quotaBytes) }}</div>
+    <div class="numbers" aria-hidden="true">{{ formatBytes(usage.usedBytes) }} / {{ formatBytes(usage.quotaBytes) }}</div>
   </div>
 </template>
 
@@ -73,6 +80,12 @@ defineExpose({ reload })
   background: var(--accent);
   border-radius: var(--radius-pill);
   transition: width 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
+  }
 }
 
 .fill.warning {

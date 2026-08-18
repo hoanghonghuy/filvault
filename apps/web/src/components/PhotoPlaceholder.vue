@@ -7,7 +7,7 @@ const isVideo = (mime: string) => mime.startsWith('video/')
 </script>
 
 <template>
-  <button type="button" class="placeholder" :title="name" @click="emit('click')">
+  <button type="button" class="placeholder" :aria-label="name" :title="name" @click="emit('click')">
     <span class="badge" :class="{ video: isVideo(mimeType) }">
       {{ isVideo(mimeType) ? 'Video' : 'Photo' }}
     </span>
@@ -32,9 +32,16 @@ const isVideo = (mime: string) => mime.startsWith('video/')
   cursor: pointer;
 }
 
-.placeholder:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+.placeholder:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .placeholder:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
 }
 
 .badge {

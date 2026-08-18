@@ -28,6 +28,11 @@ export function pageTitleForRoute(path: string, routeName?: string | symbol | nu
   return 'Filvault'
 }
 
+/** Overview already shows quota in the hero — skip the compact storage bar there. */
+export function showStorageBar(path: string): boolean {
+  return path !== HOME_PATH && path !== ''
+}
+
 export function recentFilesFromBrowser(
   files: BrowserFile[],
   limit = RECENT_FILE_LIMIT,

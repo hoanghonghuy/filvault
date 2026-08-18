@@ -8,7 +8,7 @@ import ToastHost from '@/components/ToastHost.vue'
 import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
-import { HOME_PATH, SHELL_NAV, pageTitleForRoute } from '@/lib/shellNav'
+import { HOME_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -20,6 +20,7 @@ provide('reloadStorage', async () => {
 
 const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
+const storageVisible = computed(() => showStorageBar(route.path))
 </script>
 
 <template>
@@ -60,7 +61,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
           <h1 class="header-title">{{ pageTitle }}</h1>
         </div>
       </header>
-      <StorageBar ref="storageBarRef" />
+      <StorageBar v-show="storageVisible" ref="storageBarRef" />
       <main class="main">
         <RouterView />
       </main>
@@ -109,7 +110,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   align-items: center;
   gap: var(--space-sm);
   min-height: var(--header-h);
-  padding: var(--space-xs) var(--space-md);
+  padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
   background: var(--canvas);
   border-bottom: 1px solid var(--hairline);
 }
@@ -197,7 +198,7 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   align-items: stretch;
   justify-content: space-between;
   min-height: var(--bottom-nav-h);
-  padding: 6px 0 env(safe-area-inset-bottom);
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
   background: var(--canvas);
   border-top: 1px solid var(--hairline);
 }
@@ -229,12 +230,17 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   color: var(--accent);
 }
 
+.bottom-link.router-link-active .bottom-icon {
+  background: var(--accent-soft);
+  border-radius: var(--radius-md);
+}
+
 .bottom-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 
