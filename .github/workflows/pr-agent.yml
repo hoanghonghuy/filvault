@@ -194,7 +194,7 @@ jobs:
           OPENAI__KEY: ${{ secrets.PR_AGENT_API_KEY }}
           OPENAI_KEY: ${{ secrets.PR_AGENT_API_KEY }}
           config.model: ${{ vars.PR_AGENT_MODEL }}
-          config.fallback_models: '[]'
+          config.fallback_models: ${{ vars.PR_AGENT_FALLBACK_MODELS }}
           config.custom_model_max_tokens: "128000"
           config.max_model_tokens: "32000"
 
