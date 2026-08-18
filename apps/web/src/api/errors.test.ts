@@ -3,7 +3,21 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ApiError } from './client'
-import { formatAuthError } from './errors'
+import { formatApiError, formatAuthError } from './errors'
+
+describe('formatApiError', () => {
+  it('maps fetch failures to a reachability message instead of the caller fallback', () => {
+    expect(formatApiError(new TypeError('Failed to fetch'), 'Failed to load photos')).toBe(
+      "Can't reach the server. Try again in a moment.",
+    )
+  })
+
+  it('keeps the caller fallback for unknown non-API errors', () => {
+    expect(formatApiError(new Error('unexpected json'), 'Failed to load photos')).toBe(
+      'Failed to load photos',
+    )
+  })
+})
 
 describe('formatAuthError', () => {
   it('maps known auth codes', () => {

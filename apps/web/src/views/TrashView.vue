@@ -92,7 +92,7 @@ onMounted(load)
 <template>
   <div>
     <h1 class="page-title desktop-only">Trash</h1>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonTrash v-if="loading" />
     <div v-else>
       <EmptyState
@@ -104,9 +104,14 @@ onMounted(load)
 
       <section v-if="trash?.folders.length" class="list">
         <h2 class="section-title">Folders</h2>
-        <div v-for="folder in trash.folders" :key="folder.id" class="row">
+        <div
+          v-for="folder in trash.folders"
+          :key="folder.id"
+          class="row tappable"
+          @click="openFolderActions(folder)"
+        >
           <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
-          <button class="btn icon-only" type="button" aria-label="Folder actions" @click="openFolderActions(folder)">
+          <button class="btn icon-only" type="button" aria-label="Folder actions" @click.stop="openFolderActions(folder)">
             <Icon name="more" :size="18" />
           </button>
         </div>
@@ -114,10 +119,15 @@ onMounted(load)
 
       <section v-if="trash?.files.length" class="list files-section">
         <h2 class="section-title">Files</h2>
-        <div v-for="file in trash.files" :key="file.id" class="row">
+        <div
+          v-for="file in trash.files"
+          :key="file.id"
+          class="row tappable"
+          @click="openFileActions(file)"
+        >
           <span class="name"><Icon :name="mimeIcon(file.mimeType ?? '')" :size="18" class="row-icon" />{{ file.name }}</span>
           <span class="meta desktop-only">{{ mimeLabel(file.mimeType ?? '') }} · {{ formatBytes(file.sizeBytes ?? 0) }}</span>
-          <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
+          <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
             <Icon name="more" :size="18" />
           </button>
         </div>

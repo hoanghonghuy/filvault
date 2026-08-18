@@ -6,6 +6,7 @@ defineProps<{
   description?: string
   actionLabel?: string
   icon?: string
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,7 +15,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="empty">
+  <div class="empty" :class="{ compact }">
     <Icon v-if="icon" :name="icon" :size="32" class="empty-icon" />
     <p class="empty-title">{{ title }}</p>
     <p v-if="description" class="empty-desc">{{ description }}</p>
@@ -52,5 +53,19 @@ const emit = defineEmits<{
   font-size: 0.9rem;
   color: var(--muted);
   max-width: 28rem;
+}
+
+.empty.compact {
+  align-items: flex-start;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) 0;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.empty.compact .empty-icon {
+  display: none;
 }
 </style>

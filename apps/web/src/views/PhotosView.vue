@@ -148,32 +148,46 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
+  <div class="photos-page">
     <h1 class="page-title desktop-only">Photos</h1>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
     <div v-else>
-      <section class="card section">
-        <h2 class="section-title">Albums</h2>
-        <div class="toolbar">
-          <input v-model="newAlbumName" class="search-input" placeholder="New album name" />
-          <button class="btn ink" type="button" @click="createAlbum">Create</button>
-        </div>
+      <section class="section" aria-labelledby="albums-heading">
+        <h2 id="albums-heading" class="section-title">Albums</h2>
+        <form class="album-form" @submit.prevent="createAlbum">
+          <label class="field album-field">
+            <span class="sr-only">New album name</span>
+            <input v-model="newAlbumName" type="text" placeholder="New album name" autocomplete="off" />
+          </label>
+          <button class="btn ink" type="submit" :disabled="!newAlbumName.trim()">Create</button>
+        </form>
         <div v-if="albums.length" class="list">
-          <div v-for="album in albums" :key="album.id" class="row">
-            <button type="button" class="name link-btn" @click="router.push(`/photos/albums/${album.id}`)">
+          <div
+            v-for="album in albums"
+            :key="album.id"
+            class="row tappable"
+            @click="router.push(`/photos/albums/${album.id}`)"
+          >
+            <button type="button" class="name link-btn" @click.stop="router.push(`/photos/albums/${album.id}`)">
               {{ album.name }}
             </button>
             <span class="meta album-count">{{ album.itemCount }}</span>
-            <button class="btn icon-only" type="button" aria-label="Album actions" @click="openAlbumActions(album)">
+            <button class="btn icon-only" type="button" aria-label="Album actions" @click.stop="openAlbumActions(album)">
               <Icon name="more" :size="18" />
             </button>
           </div>
         </div>
-        <EmptyState v-else title="No albums yet" description="Create an album to group photos and videos." icon="photos" />
+        <EmptyState
+          v-else
+          compact
+          title="No albums yet"
+          description="Create an album to group photos and videos."
+          icon="photos"
+        />
       </section>
 
-      <section v-for="group in groups" :key="group.date" class="card section">
+      <section v-for="group in groups" :key="group.date" class="section" :aria-label="group.date">
         <h2 class="section-title">{{ group.date }}</h2>
         <div class="grid photos">
           <PhotoThumb
@@ -214,7 +228,23 @@ onMounted(load)
 
 <style scoped>
 .section {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.album-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.album-field {
+  flex: 1 1 100%;
+  margin-bottom: 0;
+}
+
+.album-form .btn {
+  width: 100%;
 }
 
 .link-btn {
@@ -253,6 +283,14 @@ onMounted(load)
 @media (min-width: 768px) {
   .desktop-only {
     display: block;
+  }
+
+  .album-field {
+    flex: 1 1 auto;
+  }
+
+  .album-form .btn {
+    width: auto;
   }
 }
 </style>

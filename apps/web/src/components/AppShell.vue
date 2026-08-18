@@ -8,6 +8,7 @@ import ToastHost from '@/components/ToastHost.vue'
 import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
+import { HOME_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -17,20 +18,9 @@ provide('reloadStorage', async () => {
   await storageBarRef.value?.reload()
 })
 
-const navItems = [
-  { to: '/files', label: 'Files', shortLabel: 'Files', icon: 'folder' },
-  { to: '/photos', label: 'Photos', shortLabel: 'Photos', icon: 'photos' },
-  { to: '/trash', label: 'Trash', shortLabel: 'Trash', icon: 'trash' },
-  { to: '/settings', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
-]
-
-const pageTitle = computed(() => {
-  if (route.name === 'album') return 'Album'
-  const match = navItems.find((item) => item.to === route.path)
-  return match?.label ?? 'Filvault'
-})
-
+const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
+const storageVisible = computed(() => showStorageBar(route.path))
 </script>
 
 <template>
@@ -41,10 +31,13 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 
   <div v-if="showShell" class="shell">
     <aside class="side-nav" aria-label="Main navigation">
-      <div class="brand">Filvault</div>
-      <nav class="side-links">
+      <RouterLink :to="HOME_PATH" class="brand" aria-label="Go to overview">
+        <span class="header-brand-mark" aria-hidden="true">F</span>
+        <span>Filvault</span>
+      </RouterLink>
+      <nav class="side-links" aria-label="Destinations">
         <RouterLink
-          v-for="item in navItems"
+          v-for="item in SHELL_NAV"
           :key="item.to"
           :to="item.to"
           class="side-link"
@@ -60,23 +53,30 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 
     <div class="shell-main">
       <header class="header">
-        <div class="header-brand mobile-only">Filvault</div>
-        <h1 class="header-title">{{ pageTitle }}</h1>
+        <RouterLink :to="HOME_PATH" class="header-home" aria-label="Go to overview">
+          <span class="header-brand-mark" aria-hidden="true">F</span>
+        </RouterLink>
+        <div class="header-text">
+          <p class="header-brand-name">Filvault</p>
+          <h1 class="header-title">{{ pageTitle }}</h1>
+        </div>
       </header>
-      <StorageBar ref="storageBarRef" />
+      <StorageBar v-show="storageVisible" ref="storageBarRef" />
       <main class="main">
         <RouterView />
       </main>
     </div>
 
     <nav class="bottom-nav" aria-label="Main navigation">
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.to"
-        :to="item.to"
-        class="bottom-link"
-      >
-        <Icon :name="item.icon" :size="22" />
+        <RouterLink
+          v-for="item in SHELL_NAV"
+          :key="item.to"
+          :to="item.to"
+          class="bottom-link"
+        >
+        <span class="bottom-icon">
+          <Icon :name="item.icon" :size="24" />
+        </span>
         <span class="bottom-label">{{ item.shortLabel }}</span>
       </RouterLink>
     </nav>
@@ -110,27 +110,74 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   align-items: center;
   gap: var(--space-sm);
   min-height: var(--header-h);
-  padding: 0 var(--space-md);
+  padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
   background: var(--canvas);
   border-bottom: 1px solid var(--hairline);
 }
 
-.header-brand {
+.header-home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  margin-left: -6px;
+  border-radius: var(--radius-md);
+  color: inherit;
+}
+
+.header-home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-home.router-link-exact-active .header-brand-mark {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.header-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: 0.875rem;
   font-weight: 700;
-  font-size: 1rem;
-  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.header-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+
+.header-brand-name {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--muted);
 }
 
 .header-title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.02em;
+  line-height: 1.25;
   color: var(--ink);
-}
-
-.mobile-only {
-  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main {
@@ -149,31 +196,61 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   z-index: 40;
   display: flex;
   align-items: stretch;
+  justify-content: space-between;
   min-height: var(--bottom-nav-h);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
   background: var(--canvas);
   border-top: 1px solid var(--hairline);
 }
 
 .bottom-link {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
   min-height: var(--touch-min);
+  padding: 0 4px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
+}
+
+.bottom-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+  border-radius: var(--radius-md);
 }
 
 .bottom-link.router-link-active {
   color: var(--accent);
 }
 
+.bottom-link.router-link-active .bottom-icon {
+  background: var(--accent-soft);
+  border-radius: var(--radius-md);
+}
+
+.bottom-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
 .bottom-label {
-  padding: var(--space-xs) 0;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
 @media (min-width: 768px) {
@@ -198,10 +275,25 @@ const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
   }
 
   .brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
     font-weight: 700;
     font-size: 1.125rem;
     color: var(--ink);
     margin-bottom: var(--space-lg);
+    min-height: var(--touch-min);
+  }
+
+  .brand:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  .brand.router-link-exact-active .header-brand-mark {
+    background: var(--accent);
+    color: var(--on-accent);
   }
 
   .side-links {

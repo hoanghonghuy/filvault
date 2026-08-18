@@ -1,6 +1,6 @@
 # 06 — Phase 1 plan & Definition of Done
 
-Trạng thái: **chốt thứ tự làm**. Không bắt đầu Phase 2 trước khi DoD dưới đây xanh.
+Trạng thái: **chốt thứ tự làm**. Tiến độ thực tế: [08-phase-1-status.md](08-phase-1-status.md). Không bắt đầu Phase 2 trước khi DoD dưới đây xanh **và** smoke test tay trong file 08 đã tick.
 
 Mục tiêu phase (concept):
 

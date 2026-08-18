@@ -91,7 +91,7 @@ watch(browseFolderId, () => {
       </template>
     </nav>
 
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="loading" class="muted">Loading…</p>
 
     <div v-else class="picker-list">

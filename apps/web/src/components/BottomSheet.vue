@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{
+import { nextTick, onUnmounted, ref, useId, watch } from 'vue'
+
+const props = defineProps<{
   open: boolean
   title?: string
 }>()
@@ -8,18 +10,61 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const titleId = useId()
+const panelRef = ref<HTMLElement | null>(null)
+let previousFocus: HTMLElement | null = null
+
 function onBackdropClick() {
   emit('close')
 }
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+  }
+}
+
+watch(
+  () => props.open,
+  async (open) => {
+    if (open) {
+      previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      document.body.style.overflow = 'hidden'
+      document.addEventListener('keydown', onKeydown)
+      await nextTick()
+      panelRef.value?.focus()
+      return
+    }
+    document.body.style.overflow = ''
+    document.removeEventListener('keydown', onKeydown)
+    previousFocus?.focus()
+    previousFocus = null
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  document.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="open" class="sheet-root" role="presentation">
       <div class="sheet-backdrop" @click="onBackdropClick" />
-      <div class="sheet-panel" role="dialog" aria-modal="true" :aria-label="title">
+      <div
+        ref="panelRef"
+        class="sheet-panel"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        :aria-labelledby="title ? titleId : undefined"
+        :aria-label="title ? undefined : 'Dialog'"
+      >
         <div class="sheet-handle" aria-hidden="true" />
-        <h2 v-if="title" class="sheet-title">{{ title }}</h2>
+        <h2 v-if="title" :id="titleId" class="sheet-title">{{ title }}</h2>
         <slot />
       </div>
     </div>
@@ -52,6 +97,15 @@ function onBackdropClick() {
   background: var(--canvas);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   padding: var(--space-sm) var(--space-md) max(var(--space-md), env(safe-area-inset-bottom));
+}
+
+.sheet-panel:focus {
+  outline: none;
+}
+
+.sheet-panel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 @media (min-width: 768px) {

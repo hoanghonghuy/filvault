@@ -16,6 +16,7 @@ Mặc định gọi API tại `http://localhost:8080/api/v1`. Chạy API trướ
 
 ## Routes
 
+- `/` — overview (logo home)
 - `/login`, `/register`, `/verify-email`
 - `/files` — browser, upload (presigned PUT), search, download
 - `/photos` — timeline (placeholder, không load original), albums

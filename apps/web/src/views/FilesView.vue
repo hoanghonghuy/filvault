@@ -392,13 +392,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         class="search-input"
         type="search"
         placeholder="Search by name"
+        aria-label="Search files"
         enterkeyhint="search"
       />
       <button class="btn accent desktop-only" type="button" @click="triggerUpload">Upload</button>
       <button class="btn desktop-only" type="button" @click="triggerFolderUpload">Upload folder</button>
       <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">New folder</button>
       <button class="btn mobile-only" type="button" aria-label="New folder" @click="folderSheetOpen = true">
-        + Folder
+        New folder
       </button>
       <button
         v-if="searchResults"
@@ -413,22 +414,32 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <p v-if="uploadProgress !== null" class="muted upload-status">
       Uploading… {{ Math.round(uploadProgress * 100) }}%
     </p>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonFiles v-if="loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
 
     <section v-if="!loading && searchResults" class="list">
       <h2 class="section-title">Search results</h2>
-      <div v-for="folder in searchResults.folders" :key="folder.id" class="row">
+      <div
+        v-for="folder in searchResults.folders"
+        :key="folder.id"
+        class="row tappable"
+        @click="openFolder(folder.id)"
+      >
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
-        <button class="btn icon-only" type="button" aria-label="Open folder" @click="openFolder(folder.id)">
+        <button class="btn icon-only" type="button" aria-label="Open folder" @click.stop="openFolder(folder.id)">
           <Icon name="arrow-right" :size="18" />
         </button>
       </div>
-      <div v-for="file in searchResults.files" :key="file.id" class="row">
+      <div
+        v-for="file in searchResults.files"
+        :key="file.id"
+        class="row tappable"
+        @click="openFileActions(file)"
+      >
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
+        <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
           <Icon name="more" :size="18" />
         </button>
       </div>
@@ -457,10 +468,10 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <Icon name="more" :size="18" />
         </button>
       </div>
-      <div v-for="file in browser?.files ?? []" :key="file.id" class="row">
+      <div v-for="file in browser?.files ?? []" :key="file.id" class="row tappable" @click="openFileActions(file)">
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta desktop-only">{{ mimeLabel(file.mimeType) }} · {{ formatBytes(file.sizeBytes) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click="openFileActions(file)">
+        <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
           <Icon name="more" :size="18" />
         </button>
       </div>
@@ -501,6 +512,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 <style scoped>
 .files-page {
   position: relative;
+  padding-bottom: calc(var(--fab-size) + var(--space-md));
 }
 
 .row-icon {
@@ -523,19 +535,27 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: var(--surface-soft);
 }
 
+.toolbar-sticky .search-input {
+  flex: 1 1 100%;
+}
+
 .breadcrumb {
   align-items: center;
 }
 
 .mobile-back {
-  min-height: auto;
-  padding: 0.25rem 0.5rem;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-sm);
   margin-right: var(--space-xs);
 }
 
 .mobile-current {
   font-weight: 600;
   color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb-trail {
@@ -551,6 +571,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 }
 
 @media (min-width: 768px) {
+  .files-page {
+    padding-bottom: 0;
+  }
+
+  .toolbar-sticky .search-input {
+    flex: 1 1 auto;
+  }
+
   .mobile-back,
   .mobile-current,
   .mobile-only {

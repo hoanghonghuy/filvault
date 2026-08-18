@@ -60,7 +60,7 @@ Xem [02-provider-strategy.md](02-provider-strategy.md).
 | Object key | ID ổn định, không lấy đường dẫn/tên file làm S3 key |
 | Upload | Presigned URL (URL ký sẵn, hết hạn nhanh); client upload thẳng lên object storage |
 | Auth Phase 1 | Email + password, JWT, invite env, verify email (SMTP hoặc console); **chưa** Cognito |
-| Web Phase 1 | My Files + Photos (cùng kho; album/timeline; không thumbnail server) |
+| Web Phase 1 | Overview (logo home) + My Files + Photos (cùng kho; album/timeline; không thumbnail server) |
 | IaC | Terraform khi infrastructure ổn định |
 | CI | GitHub Actions + OIDC tới IAM Role; tránh access key dài hạn |
 
