@@ -161,12 +161,14 @@ watch(() => route.params.id, load, { immediate: true })
 <template>
   <div>
     <div class="album-header">
-      <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">← Photos</button>
-      <h1 class="page-title desktop-only">{{ album?.name ?? 'Album' }}</h1>
+      <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">
+        ← Photos
+      </button>
+      <h1 class="album-title">{{ album?.name ?? 'Album' }}</h1>
       <button type="button" class="btn icon-only" aria-label="Album menu" @click="openAlbumMenu">⋯</button>
     </div>
 
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonAlbum v-if="loading" />
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
@@ -214,18 +216,22 @@ watch(() => route.params.id, load, { immediate: true })
   margin-bottom: var(--space-md);
 }
 
-.album-header .page-title {
+.album-title {
   flex: 1;
+  min-width: 0;
   margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-back {
-  min-height: auto;
-  padding: 0.25rem 0.5rem;
-}
-
-.desktop-only {
-  display: none;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-sm);
 }
 
 @media (min-width: 768px) {
@@ -233,8 +239,9 @@ watch(() => route.params.id, load, { immediate: true })
     display: none;
   }
 
-  .desktop-only {
-    display: block;
+  .album-title {
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
   }
 }
 </style>

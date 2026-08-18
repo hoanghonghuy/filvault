@@ -170,6 +170,7 @@ Hash mật khẩu: argon2id, wrapper trong `internal/auth` (không phải AWS).
 
 ```text
 /login  /register  /verify-email
+/                         overview (logo home)
 /files                    browser + breadcrumb
 /photos                   timeline (placeholder, không <img> original)
 /photos/albums/:id

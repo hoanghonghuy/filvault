@@ -184,6 +184,36 @@ Verify: tách state Verifying / Resend — không đổi nhãn cả hai nút cù
 
 Component: `AuthCard.vue` + views `LoginView`, `RegisterView`, `VerifyEmailView`.
 
+### Overview (`/`)
+
+Hub sau login. **Không** lặp 4 tab nav (Files/Photos/Trash/Settings đã ở bottom/side). Trash và Settings không phải lối vào chính.
+
+**Anatomy**
+```text
+[Name]                          ← title-lg, ink
+[used of quota]                 ← caption muted (từ users/me)
+┌────────────┐ ┌────────────┐
+│ My Files   │ │ Photos     │   ← 2 destination cards
+│ Browse…    │ │ Timeline…  │
+└────────────┘ └────────────┘
+Recent files              See all
+  rows (hoặc 1 dòng empty + link)
+Recent photos             See all
+  placeholder grid (không <img> original)
+```
+
+| Token | Value | Ghi chú |
+|-------|-------|---------|
+| Hero title | 22px mobile / 28px desktop | `displayName` |
+| Cards | 2 cột, radius-lg, border hairline | chỉ Files + Photos |
+| Card min-height | 96px | chạm dễ |
+| Section gap | 32px (`space-xl`) | |
+| Empty | 1 dòng + link accent | không EmptyState lồng card |
+
+**Anti-patterns:** 4 ô trùng bottom nav; card lồng card; empty dashed lớn; FAB trên Overview.
+
+Component: `OverviewView.vue`. Logo F / wordmark → `/`.
+
 ### Buttons
 - **Primary ink** (`primary-cta`): dùng cho auth submit, “Save”, confirm không phá hủy. Height ≥44px mobile; radius `{rounded.md}`; text `{on-ink}`.
 - **Primary accent**: hiếm — chỉ khi action mang brand (vd. “Verify”). Prefer FAB cho Upload.
@@ -233,17 +263,21 @@ Component: `AuthCard.vue` + views `LoginView`, `RegisterView`, `VerifyEmailView`
 ```text
 Mobile (<768)                         Tablet/Desktop (≥768)
 ┌─────────────────────┐               ┌──────┬──────────────────┐
-│ Header (brand+title)│               │ Side │ Header           │
-│ Storage (compact)   │               │ nav  │ Storage          │
-│                     │               │ 4    │                  │
-│ Main (scroll)       │               │ tabs │ Main             │
-│                     │               │      │                  │
-│ [FAB]               │               └──────┴──────────────────┘
-│ Bottom nav (4)      │               FAB → toolbar button
-└─────────────────────┘
+│ [F] Filvault        │               │ Side │ (no top header)  │
+│     My Files        │               │ nav  │ Storage          │
+│ Storage (compact)   │               │ 4    │ Page title in    │
+│ Main (scroll)       │               │ tabs │ main             │
+│ [FAB]               │               │      │                  │
+│ Bottom nav (4)      │               └──────┴──────────────────┘
+└─────────────────────┘               FAB → toolbar button
 ```
 
+Mobile header: mark 32px (ô **F** là nút Home, chạm ≥44px) + tên app caption muted + page title ink. Bấm **F** (mobile) hoặc wordmark sidebar (desktop) → `/` Overview. Title Files = “My Files”. Header ẩn ≥768 — title nằm trong view. Overview **không** thêm tab thứ 5 vào bottom nav.
+
 ### Top-level destinations (đúng M3: 3–5, chỉ navigation)
+**Home / Overview** — vào bằng logo (ô F / wordmark), không phải tab.
+
+Bottom / side nav (4):
 1. **Files** — browser + search + upload  
 2. **Photos** — timeline + albums  
 3. **Trash**  
@@ -317,6 +351,7 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 |--------|--------------|-----|
 | Login / Register | Form ink CTA | auth |
 | Verify email | OTP 6 số + resend | verify / resend |
+| Overview (`/`) | Greeting + quota, 2 destination cards (Files/Photos), recent files/photos | me, browser, photos/timeline |
 | Files | Browser, search, create folder, upload, rename/move/delete file & folder | browser, folders, files, search |
 | Photos | Timeline (+ load more), albums CRUD, add/remove items, open/download | photos/* |
 | Album detail | Grid + manage | albums/:id, items |

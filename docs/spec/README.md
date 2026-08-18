@@ -27,12 +27,12 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [05-architecture.md](05-architecture.md) | Monorepo, module Go, flow upload, test |
 | [06-phase-1-plan.md](06-phase-1-plan.md) | Thứ tự slice + Definition of Done |
 | [07-phase-1-business.md](07-phase-1-business.md) | Nghiệp vụ đã chốt: invite, verify, Photos, allowlist, trash |
-| [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao: đã làm / chưa làm Phase 1 |
+| [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao Phase 1; việc tiếp theo: smoke test tay |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web Phase 1 (Cal.com-like + teal, mobile-first) |
 
-Phase 1 **đủ spec để bắt đầu code**. Spec phase sau (sharing, worker, CLI, Terraform) viết khi vào phase đó.
+Phase 1 **đã có spec và đã implement** (tiến độ bàn giao: [08-phase-1-status.md](08-phase-1-status.md)). Spec phase sau (sharing, worker, CLI, Terraform) viết khi vào phase đó.
 
 ## Chưa viết (đúng lúc)
 
