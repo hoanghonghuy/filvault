@@ -160,6 +160,61 @@ jobs:
             fs.writeFileSync(contextPath, output.join('\n'), 'utf8');
             core.info(`Loaded ${contextComments.length} trusted context comment(s)`);
 
+      - name: Validate PR-Agent provider config
+        id: provider
+        shell: bash
+        env:
+          API_BASE: ${{ vars.PR_AGENT_API_BASE }}
+          API_KEY: ${{ secrets.PR_AGENT_API_KEY }}
+          MODEL: ${{ vars.PR_AGENT_MODEL }}
+          FALLBACK_MODELS: ${{ vars.PR_AGENT_FALLBACK_MODELS }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$API_BASE" ]; then
+            echo "::error::Missing repository variable PR_AGENT_API_BASE"
+            exit 1
+          fi
+
+          if [ -z "$API_KEY" ]; then
+            echo "::error::Missing repository secret PR_AGENT_API_KEY"
+            exit 1
+          fi
+
+          if [ -z "$MODEL" ]; then
+            echo "::error::Missing repository variable PR_AGENT_MODEL"
+            exit 1
+          fi
+
+          python <<'PY'
+          import json
+          import os
+
+          raw = os.environ.get("FALLBACK_MODELS", "").strip()
+          if not raw:
+              value = []
+          else:
+              try:
+                  value = json.loads(raw)
+              except json.JSONDecodeError as exc:
+                  raise SystemExit(
+                      f"PR_AGENT_FALLBACK_MODELS must be valid JSON: {exc}"
+                  )
+
+              if not isinstance(value, list) or not all(
+                  isinstance(item, str) and item.strip()
+                  for item in value
+              ):
+                  raise SystemExit(
+                      "PR_AGENT_FALLBACK_MODELS must be a JSON array "
+                      "of non-empty model strings"
+                  )
+
+          compact = json.dumps(value, separators=(",", ":"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"fallback_models={compact}\n")
+          PY
+
       - name: Run PR Agent review
         id: pr_agent
         uses: The-PR-Agent/pr-agent@1eea001187afc7cbbdd055f6bc1347917e7b509a
@@ -179,7 +234,7 @@ jobs:
           OPENAI__KEY: ${{ secrets.PR_AGENT_API_KEY }}
           OPENAI_KEY: ${{ secrets.PR_AGENT_API_KEY }}
           config.model: ${{ vars.PR_AGENT_MODEL }}
-          config.fallback_models: ${{ vars.PR_AGENT_FALLBACK_MODELS }}
+          config.fallback_models: ${{ steps.provider.outputs.fallback_models }}
           config.custom_model_max_tokens: "128000"
           config.max_model_tokens: "32000"
 
