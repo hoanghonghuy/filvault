@@ -43,7 +43,7 @@ async function submit() {
   verifying.value = true
   try {
     await auth.verifyEmail(auth.user.email, code.value)
-    await router.push('/files')
+    await router.push('/')
   } catch (e) {
     error.value = formatAuthError(e, 'Invalid or expired code. Try again.')
   } finally {

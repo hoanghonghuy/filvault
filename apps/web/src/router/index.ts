@@ -12,6 +12,7 @@ const router = createRouter({
       component: () => import('@/views/VerifyEmailView.vue'),
       meta: { auth: true },
     },
+    { path: '/', name: 'home', component: () => import('@/views/OverviewView.vue'), meta: { auth: true, verified: true } },
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
     {
@@ -22,7 +23,7 @@ const router = createRouter({
     },
     { path: '/trash', name: 'trash', component: () => import('@/views/TrashView.vue'), meta: { auth: true, verified: true } },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true, verified: true } },
-    { path: '/:pathMatch(.*)*', redirect: '/files' },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
@@ -32,7 +33,7 @@ router.beforeEach(async (to) => {
     await auth.bootstrap()
   }
   if (to.meta.guest && auth.isAuthenticated) {
-    return auth.isVerified ? '/files' : '/verify-email'
+    return auth.isVerified ? '/' : '/verify-email'
   }
   if (to.meta.auth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }

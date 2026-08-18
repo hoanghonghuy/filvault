@@ -85,7 +85,7 @@ Field thêm sau slice: `itemCount` trên `GET /photos/albums`.
 ### Web — functional (đủ gọi API)
 
 - [x] Vue 3 + Pinia + Vue Router; CORS; slog request log
-- [x] Login, register, verify, files, photos, album, trash, settings
+- [x] Login, register, verify, overview, files, photos, album, trash, settings
 - [x] Shell mobile bottom nav + desktop side nav
 - [x] Bottom sheet / confirm / prompt / action sheet (không `window.prompt`)
 - [x] Upload presign + progress; Photos placeholder (không `<img>` original)
@@ -96,6 +96,7 @@ Field thêm sau slice: `itemCount` trên `GET /photos/albums`.
 | Màn | Functional | Chuẩn UI/UX (review) |
 |---|---|---|
 | Login / Register / Verify (`AuthCard`) | xong | **xong** (2026-08-17) |
+| Overview (`/`, logo home) | xong | **xong** (2026-08-18) |
 | Files | xong | **xong** (2026-08-17) |
 | Photos | xong | **xong** (2026-08-17) |
 | Album detail | xong | **xong** (2026-08-17) |
@@ -118,6 +119,7 @@ Các màn còn lại đã siết UI/UX (2026-08-17): icon nav (side + bottom), i
 Đăng nhập `dev@filvault.com` / `Dev1234@`, rồi tick từng dòng khi làm:
 
 - [ ] Login thành công; chưa verify không vào được kho (thử register + verify nếu cần)
+- [ ] Ô **F** trên header (mobile) / wordmark sidebar (desktop) về Overview `/`
 - [ ] Files: tạo folder, upload file allowlist (kèm progress), rename, move, download, search tên
 - [ ] Upload ngoài allowlist / quá 100 MiB bị từ chối
 - [ ] Ảnh/video vừa hiện Files vừa hiện Photos (timeline); PDF không vào Photos
