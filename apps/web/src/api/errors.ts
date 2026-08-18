@@ -17,7 +17,16 @@ const authFriendly: Record<string, string> = {
   UNAUTHORIZED: 'Incorrect email or password.',
 }
 
+const NETWORK_UNAVAILABLE = "Can't reach the server. Try again in a moment."
+
+function isNetworkError(e: unknown): boolean {
+  return e instanceof TypeError
+}
+
 export function formatApiError(e: unknown, fallback: string): string {
+  if (isNetworkError(e)) {
+    return NETWORK_UNAVAILABLE
+  }
   if (!(e instanceof ApiError)) {
     return fallback
   }
