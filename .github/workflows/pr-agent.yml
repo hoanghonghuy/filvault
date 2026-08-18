@@ -6,7 +6,6 @@ on:
       - opened
       - reopened
       - ready_for_review
-      - review_requested
       - synchronize
   issue_comment:
     types: [created, edited]
@@ -216,7 +215,7 @@ jobs:
           github_action_config.auto_describe: "false"
           github_action_config.auto_improve: "true"
           github_action_config.pr_actions: >-
-            ["opened","reopened","ready_for_review","review_requested"]
+            ["opened","reopened","ready_for_review"]
 
           # New commits: incremental review only.
           github_action_config.handle_push_trigger: "true"
