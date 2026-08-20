@@ -526,3 +526,124 @@ func (c *Commands) LsGlob(pattern string) error {
 	}
 	return nil
 }
+
+type shareOutgoing struct {
+	ID           string `json:"id"`
+	ResourceType string `json:"resourceType"`
+	ResourceID   string `json:"resourceId"`
+	ResourceName string `json:"resourceName"`
+	Recipient    struct {
+		Email string `json:"email"`
+	} `json:"recipient"`
+}
+
+type shareIncoming struct {
+	ID           string `json:"id"`
+	ResourceType string `json:"resourceType"`
+	ResourceID   string `json:"resourceId"`
+	ResourceName string `json:"resourceName"`
+	Owner        struct {
+		Email string `json:"email"`
+	} `json:"owner"`
+}
+
+// Share shares a file or folder (by name in the current folder) with an email.
+func (c *Commands) Share(name, email string) error {
+	typ, id, err := c.resolve(name)
+	if err != nil {
+		return err
+	}
+	if err := c.Client.Do(http.MethodPost, "/shares", map[string]string{
+		"resourceType": typ,
+		"resourceId":   id,
+		"email":        email,
+	}, nil); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "Shared %s with %s\n", name, email)
+	return nil
+}
+
+// Shares lists shares the current user created.
+func (c *Commands) Shares() error {
+	var out struct {
+		Shares []shareOutgoing `json:"shares"`
+	}
+	if err := c.Client.Do(http.MethodGet, "/shares", nil, &out); err != nil {
+		return err
+	}
+	if len(out.Shares) == 0 {
+		fmt.Fprintln(c.Out, "(empty)")
+		return nil
+	}
+	for _, s := range out.Shares {
+		fmt.Fprintf(c.Out, "%s  %s  -> %s\n", s.ID, s.ResourceName, s.Recipient.Email)
+	}
+	return nil
+}
+
+// SharedWithMe lists shares the current user received.
+func (c *Commands) SharedWithMe() error {
+	var out struct {
+		Shares []shareIncoming `json:"shares"`
+	}
+	if err := c.Client.Do(http.MethodGet, "/shares/with-me", nil, &out); err != nil {
+		return err
+	}
+	if len(out.Shares) == 0 {
+		fmt.Fprintln(c.Out, "(empty)")
+		return nil
+	}
+	for _, s := range out.Shares {
+		fmt.Fprintf(c.Out, "%s  %s  <- %s\n", s.ID, s.ResourceName, s.Owner.Email)
+	}
+	return nil
+}
+
+// Unshare revokes a share by id.
+func (c *Commands) Unshare(id string) error {
+	if err := c.Client.Do(http.MethodDelete, "/shares/"+id, nil, nil); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "Revoked share %s\n", id)
+	return nil
+}
+
+// SharedLs browses a folder shared with the current user.
+func (c *Commands) SharedLs(folderID string) error {
+	var b struct {
+		Folder  *folder  `json:"folder"`
+		Folders []folder `json:"folders"`
+		Files   []file   `json:"files"`
+	}
+	if err := c.Client.Do(http.MethodGet, "/shared/folders/"+folderID, nil, &b); err != nil {
+		return err
+	}
+	for _, f := range b.Folders {
+		fmt.Fprintf(c.Out, "/%s\n", f.Name)
+	}
+	for _, f := range b.Files {
+		fmt.Fprintf(c.Out, "%s  %s\n", f.Name, formatBytes(f.SizeBytes))
+	}
+	return nil
+}
+
+// SharedDownload downloads a file shared with the current user.
+func (c *Commands) SharedDownload(fileID, name string) error {
+	var dl struct {
+		DownloadURL string `json:"downloadUrl"`
+		ExpiresAt   string `json:"expiresAt"`
+	}
+	if err := c.Client.Do(http.MethodGet, "/shared/files/"+fileID+"/download", nil, &dl); err != nil {
+		return err
+	}
+	data, err := getBytes(dl.DownloadURL)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(name, data, 0o600); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "Downloaded %s\n", name)
+	return nil
+}

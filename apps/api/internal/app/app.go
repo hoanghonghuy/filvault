@@ -11,6 +11,7 @@ import (
 	"filvault/internal/platform/objectstore"
 	"filvault/internal/platform/postgres"
 	"filvault/internal/search"
+	"filvault/internal/share"
 	"filvault/internal/storage"
 	"filvault/internal/trash"
 
@@ -57,6 +58,10 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	searchSvc := search.NewService(searchRepo)
 	searchHandlers := search.NewHandler(searchSvc)
 
+	shareRepo := postgres.NewShareRepository(store)
+	shareSvc := share.NewService(shareRepo, obj)
+	shareHandlers := share.NewHandler(shareSvc)
+
 	storageHandlers := storage.NewHandler(quota)
 
 	engine := gin.New()
@@ -77,6 +82,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	trashHandlers.RegisterRoutes(v1, storage...)
 	photoHandlers.RegisterRoutes(v1, storage...)
 	searchHandlers.RegisterRoutes(v1, storage...)
+	shareHandlers.RegisterRoutes(v1, storage...)
 	storageHandlers.RegisterRoutes(v1, storage...)
 
 	return engine

@@ -145,6 +145,30 @@ func run(args []string) error {
 		return cmds.Search(args[1])
 	case "storage":
 		return cmds.Storage()
+	case "share":
+		if len(args) < 3 {
+			return usageError()
+		}
+		return cmds.Share(args[1], args[2])
+	case "shares":
+		return cmds.Shares()
+	case "shared-with-me":
+		return cmds.SharedWithMe()
+	case "unshare":
+		if len(args) < 2 {
+			return usageError()
+		}
+		return cmds.Unshare(args[1])
+	case "shared-ls":
+		if len(args) < 2 {
+			return usageError()
+		}
+		return cmds.SharedLs(args[1])
+	case "shared-download":
+		if len(args) < 3 {
+			return usageError()
+		}
+		return cmds.SharedDownload(args[1], args[2])
 	default:
 		return usageError()
 	}
@@ -273,6 +297,12 @@ func usageText() string {
   filvault restore <name>
   filvault search <q>
   filvault storage
+  filvault share <name> <email>
+  filvault shares
+  filvault shared-with-me
+  filvault unshare <id>
+  filvault shared-ls <folderId>
+  filvault shared-download <fileId> <name>
   filvault --help
   filvault --version`
 }

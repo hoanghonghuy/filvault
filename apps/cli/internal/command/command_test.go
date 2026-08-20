@@ -515,3 +515,132 @@ func TestLsGlob(t *testing.T) {
 		t.Fatalf("ls glob should not include b.txt: %q", out)
 	}
 }
+
+func TestShare(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []map[string]any{{"id": "f1", "name": "Docs"}},
+				"files":   []any{},
+			})
+		case r.URL.Path == "/shares" && r.Method == http.MethodPost:
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if body["resourceType"] != "folder" || body["resourceId"] != "f1" || body["email"] != "b@example.com" {
+				t.Fatalf("unexpected body %+v", body)
+			}
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]any{"id": "s1", "resourceType": "folder", "resourceId": "f1"})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Share("Docs", "b@example.com") })
+	if !strings.Contains(out, "Docs") || !strings.Contains(out, "b@example.com") {
+		t.Fatalf("share output missing: %q", out)
+	}
+}
+
+func TestShares(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/shares" || r.Method != http.MethodGet {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"shares": []map[string]any{
+				{"id": "s1", "resourceType": "folder", "resourceId": "f1", "resourceName": "Docs", "recipient": map[string]any{"email": "b@example.com"}},
+			},
+		})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Shares() })
+	if !strings.Contains(out, "Docs") || !strings.Contains(out, "b@example.com") {
+		t.Fatalf("shares output missing: %q", out)
+	}
+}
+
+func TestSharedWithMe(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/shares/with-me" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"shares": []map[string]any{
+				{"id": "s1", "resourceType": "folder", "resourceId": "f1", "resourceName": "Docs", "owner": map[string]any{"email": "a@example.com"}},
+			},
+		})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.SharedWithMe() })
+	if !strings.Contains(out, "Docs") || !strings.Contains(out, "a@example.com") {
+		t.Fatalf("shared-with-me output missing: %q", out)
+	}
+}
+
+func TestUnshare(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/shares/s1" || r.Method != http.MethodDelete {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Unshare("s1") })
+	if !strings.Contains(out, "s1") {
+		t.Fatalf("unshare output missing id: %q", out)
+	}
+}
+
+func TestSharedLs(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/shared/folders/f1" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"folder":  map[string]any{"id": "f1", "name": "Docs"},
+			"folders": []map[string]any{{"id": "f2", "name": "Sub"}},
+			"files":   []map[string]any{{"id": "x1", "name": "a.pdf", "sizeBytes": 5}},
+		})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.SharedLs("f1") })
+	if !strings.Contains(out, "Sub") || !strings.Contains(out, "a.pdf") {
+		t.Fatalf("shared-ls output missing: %q", out)
+	}
+}
+
+func TestSharedDownload(t *testing.T) {
+	var srv *httptest.Server
+	srv = newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/shared/files/x1/download" {
+			json.NewEncoder(w).Encode(map[string]any{"downloadUrl": srv.URL + "/dl", "expiresAt": "2026-01-01T00:00:00Z"})
+			return
+		}
+		if r.URL.Path == "/dl" {
+			w.Write([]byte("hello"))
+			return
+		}
+		t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+	})
+
+	dir := t.TempDir()
+	old, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(old)
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.SharedDownload("x1", "out.txt") })
+	if !strings.Contains(out, "out.txt") {
+		t.Fatalf("shared-download output missing: %q", out)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "out.txt"))
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if string(data) != "hello" {
+		t.Fatalf("file content = %q, want hello", string(data))
+	}
+}
