@@ -140,6 +140,22 @@ func (c *Commands) Upload(localPath, folderID string) error {
 	return nil
 }
 
+// Logout revokes the current refresh token and clears saved tokens.
+func (c *Commands) Logout(refreshToken string, clear func() error) error {
+	if err := c.Client.Do(http.MethodPost, "/auth/logout", map[string]string{
+		"refreshToken": refreshToken,
+	}, nil); err != nil {
+		return err
+	}
+	if clear != nil {
+		if err := clear(); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintln(c.Out, "Logged out")
+	return nil
+}
+
 // Download downloads a file by name from the current folder (root).
 func (c *Commands) Download(name string) error {
 	var b browser

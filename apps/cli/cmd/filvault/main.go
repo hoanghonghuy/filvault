@@ -14,16 +14,38 @@ import (
 	"golang.org/x/term"
 )
 
+const version = "0.1.0"
+
+// exitCode distinguishes usage errors (2) from runtime errors (1).
+type exitError struct {
+	code int
+	err  error
+}
+
+func (e *exitError) Error() string { return e.err.Error() }
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		if ee, ok := err.(*exitError); ok {
+			os.Exit(ee.code)
+		}
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return usage()
+		return usageError()
+	}
+
+	switch args[0] {
+	case "-h", "--help", "help":
+		printUsage(os.Stdout)
+		return nil
+	case "-v", "--version", "version":
+		fmt.Fprintf(os.Stdout, "filvault %s\n", version)
+		return nil
 	}
 
 	cfg, err := config.Load()
@@ -57,6 +79,8 @@ func run(args []string) error {
 	switch args[0] {
 	case "login":
 		return login(cmds, cfg)
+	case "logout":
+		return logout(cmds, cfg)
 	case "whoami":
 		return cmds.Whoami()
 	case "ls":
@@ -69,11 +93,11 @@ func run(args []string) error {
 		return upload(cmds, args[1:])
 	case "download":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: filvault download <name>")
+			return usageError()
 		}
 		return cmds.Download(args[1])
 	default:
-		return usage()
+		return usageError()
 	}
 }
 
@@ -94,6 +118,14 @@ func login(cmds *command.Commands, cfg config.Config) error {
 		cfg.AccessToken = access
 		cfg.RefreshToken = refresh
 		cfg.APIBase = cmds.Client.Base
+		return config.Save(cfg)
+	})
+}
+
+func logout(cmds *command.Commands, cfg config.Config) error {
+	return cmds.Logout(cfg.RefreshToken, func() error {
+		cfg.AccessToken = ""
+		cfg.RefreshToken = ""
 		return config.Save(cfg)
 	})
 }
@@ -120,20 +152,30 @@ func upload(cmds *command.Commands, args []string) error {
 	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
 	folder := fs.String("folder", "", "target folder id")
 	if err := fs.Parse(args); err != nil {
-		return err
+		return usageError()
 	}
 	rest := fs.Args()
 	if len(rest) != 1 {
-		return fmt.Errorf("usage: filvault upload <file> [--folder <id>]")
+		return usageError()
 	}
 	return cmds.Upload(rest[0], *folder)
 }
 
-func usage() error {
-	return fmt.Errorf(`usage:
-  filvault login
+func usageError() error {
+	return &exitError{code: 2, err: fmt.Errorf("usage:\n%s", usageText())}
+}
+
+func printUsage(w *os.File) {
+	fmt.Fprintln(w, usageText())
+}
+
+func usageText() string {
+	return `  filvault login
+  filvault logout
   filvault whoami
   filvault ls [folderId]
   filvault upload <file> [--folder <id>]
-  filvault download <name>`)
+  filvault download <name>
+  filvault --help
+  filvault --version`
 }

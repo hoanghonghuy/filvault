@@ -58,6 +58,26 @@ func TestLogin(t *testing.T) {
 	}
 }
 
+func TestLogout(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/logout" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	cleared := false
+	out, _ := run(t, srv, func(c *Commands) error {
+		return c.Logout("refresh-1", func() error { cleared = true; return nil })
+	})
+	if !strings.Contains(out, "Logged out") {
+		t.Fatalf("logout output missing: %q", out)
+	}
+	if !cleared {
+		t.Fatal("clear callback not called")
+	}
+}
+
 func TestWhoami(t *testing.T) {
 	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/users/me" {

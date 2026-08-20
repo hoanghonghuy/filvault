@@ -8,10 +8,13 @@ CLI `filvault` nói chuyện với API **qua HTTP** (`/api/v1`), không import p
 
 ```text
 filvault login                 # email + password → lưu token
+filvault logout                # revoke refresh token + xóa token file
 filvault whoami                # GET /users/me
 filvault ls [folderId]         # GET /browser (root nếu bỏ trống)
 filvault upload <file> [--folder <id>]
 filvault download <name>       # tìm theo tên trong folder hiện tại
+filvault --help                # in usage ra stdout, exit 0
+filvault --version             # in version, exit 0
 ```
 
 Chưa làm ở slice này: `cd`, `mkdir`, `rm`, `sync`, glob `*.pdf`, sharing, versioning.
@@ -41,7 +44,7 @@ Token file JSON:
 }
 ```
 
-- `login` ghi đè file. `logout` (slice sau) xóa.
+- `login` ghi đè file. `logout` revoke refresh token rồi xóa token trong file.
 - Access hết hạn (401) → tự `POST /auth/refresh` một lần rồi retry, giống web client. Refresh fail → xóa token, báo phải `login` lại.
 
 ## 4. Lệnh chi tiết
@@ -60,11 +63,16 @@ filvault login
 - Sai mật khẩu → `401 UNAUTHORIZED` → in message, exit 1.
 - Chưa verify: login vẫn `200` (spec 04 §2) — CLI in cảnh báo `Email not verified` nhưng vẫn lưu token (để `whoami` chạy được).
 
-### 4.2 whoami
+### 4.2 logout
+
+- `POST /auth/logout` `{ refreshToken }` → `204`.
+- Xóa `accessToken`/`refreshToken` trong token file. In `Logged out`.
+
+### 4.3 whoami
 
 - `GET /users/me` → in `displayName <email>` + `storageUsed/storageQuota` (dùng `formatBytes`).
 
-### 4.3 ls
+### 4.4 ls
 
 ```text
 filvault ls [folderId]
@@ -73,7 +81,7 @@ filvault ls [folderId]
 - `GET /browser?folderId=` (omit nếu trống) → in folders trước (prefix `/`), rồi files (tên + size).
 - Không có folderId → root.
 
-### 4.4 upload
+### 4.5 upload
 
 ```text
 filvault upload <file> [--folder <id>]
@@ -87,7 +95,7 @@ filvault upload <file> [--folder <id>]
 
 Lỗi: ngoài allowlist / quá 100 MiB / vượt quota → in `code` + `message` từ body lỗi, exit 1.
 
-### 4.5 download
+### 4.6 download
 
 ```text
 filvault download <name>
@@ -102,7 +110,8 @@ filvault download <name>
 ## 5. Lỗi & exit code
 
 - Parse body lỗi `{ error: { code, message } }` → in `code: message` ra stderr.
-- Exit code: `0` thành công, `1` lỗi nghiệp vụ/HTTP, `2` sai usage (thiếu arg).
+- Exit code: `0` thành công, `1` lỗi nghiệp vụ/HTTP, `2` sai usage (thiếu arg / lệnh không rõ).
+- `--help` / `--version` in ra **stdout** và exit `0` (không phải lỗi).
 
 ## 6. Test
 
@@ -112,7 +121,7 @@ TDD theo slice. Ưu tiên:
 |---|---|
 | HTTP client | parse lỗi, refresh-on-401 retry (dùng `httptest.Server` fake) |
 | Token store | đọc/ghi file, path theo OS |
-| Command | `ls`/`whoami`/`upload`/`download` gọi đúng endpoint + parse response (fake server) |
+| Command | `login`/`logout`/`ls`/`whoami`/`upload`/`download` gọi đúng endpoint + parse response (fake server) |
 
 Không cần test thật MinIO/S3 — upload/download dùng fake server trả presigned URL.
 
