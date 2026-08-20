@@ -80,3 +80,26 @@ jobs:
 
       - name: Typecheck
         run: npm run type-check
+
+  cli:
+    name: CLI — lint, typecheck, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+          cache-dependency-path: apps/cli/go.sum
+
+      - name: Lint
+        run: go vet ./...
+
+      - name: Typecheck
+        run: go build -o /dev/null ./...
+
+      - name: Test
+        run: go test ./... -count=1

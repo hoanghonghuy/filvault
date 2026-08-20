@@ -185,3 +185,189 @@ func TestDownload(t *testing.T) {
 		t.Fatalf("downloaded content mismatch: %q err=%v", data, err)
 	}
 }
+
+func TestMkdir(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/folders" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		if body["name"] != "Docs" {
+			t.Fatalf("unexpected name %v", body["name"])
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{"id": "f1", "name": "Docs"})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Mkdir("Docs", "") })
+	if !strings.Contains(out, "Docs") {
+		t.Fatalf("mkdir output missing name: %q", out)
+	}
+}
+
+func TestRmFile(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []any{},
+				"files":   []map[string]any{{"id": "f1", "name": "a.pdf", "sizeBytes": 5}},
+			})
+		case r.URL.Path == "/files/f1" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Rm("a.pdf") })
+	if !strings.Contains(out, "a.pdf") {
+		t.Fatalf("rm output missing name: %q", out)
+	}
+}
+
+func TestRmFolder(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []map[string]any{{"id": "f1", "name": "Docs"}},
+				"files":   []any{},
+			})
+		case r.URL.Path == "/folders/f1" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Rm("Docs") })
+	if !strings.Contains(out, "Docs") {
+		t.Fatalf("rm output missing name: %q", out)
+	}
+}
+
+func TestMvRename(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []any{},
+				"files":   []map[string]any{{"id": "f1", "name": "a.pdf", "sizeBytes": 5}},
+			})
+		case r.URL.Path == "/files/f1" && r.Method == http.MethodPatch:
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["name"] != "b.pdf" {
+				t.Fatalf("unexpected name %v", body["name"])
+			}
+			json.NewEncoder(w).Encode(map[string]any{"id": "f1", "name": "b.pdf"})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Mv("a.pdf", "b.pdf", "") })
+	if !strings.Contains(out, "a.pdf") {
+		t.Fatalf("mv output missing name: %q", out)
+	}
+}
+
+func TestMvMove(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []any{},
+				"files":   []map[string]any{{"id": "f1", "name": "a.pdf", "sizeBytes": 5}},
+			})
+		case r.URL.Path == "/files/f1" && r.Method == http.MethodPatch:
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["folderId"] != "dest" {
+				t.Fatalf("unexpected folderId %v", body["folderId"])
+			}
+			json.NewEncoder(w).Encode(map[string]any{"id": "f1", "name": "a.pdf"})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Mv("a.pdf", "", "dest") })
+	if !strings.Contains(out, "a.pdf") {
+		t.Fatalf("mv output missing name: %q", out)
+	}
+}
+
+func TestTrash(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/trash" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"folders": []map[string]any{{"id": "f1", "name": "Docs", "type": "folder"}},
+			"files":   []map[string]any{{"id": "x1", "name": "a.pdf", "type": "file", "sizeBytes": 5}},
+		})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Trash() })
+	if !strings.Contains(out, "Docs") || !strings.Contains(out, "a.pdf") {
+		t.Fatalf("trash output missing entries: %q", out)
+	}
+}
+
+func TestRestore(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/trash":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []any{},
+				"files":   []map[string]any{{"id": "x1", "name": "a.pdf", "type": "file", "sizeBytes": 5}},
+			})
+		case r.URL.Path == "/files/x1/restore" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Restore("a.pdf") })
+	if !strings.Contains(out, "a.pdf") {
+		t.Fatalf("restore output missing name: %q", out)
+	}
+}
+
+func TestSearch(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("q") != "doc" {
+			t.Fatalf("unexpected q %q", r.URL.Query().Get("q"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"folders": []map[string]any{{"id": "f1", "name": "Docs"}},
+			"files":   []map[string]any{{"id": "x1", "name": "doc.pdf", "sizeBytes": 5}},
+		})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Search("doc") })
+	if !strings.Contains(out, "Docs") || !strings.Contains(out, "doc.pdf") {
+		t.Fatalf("search output missing entries: %q", out)
+	}
+}
+
+func TestStorage(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/storage" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"usedBytes": 1024, "quotaBytes": 1048576})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Storage() })
+	if !strings.Contains(out, "1.0 KiB") || !strings.Contains(out, "1.0 MiB") {
+		t.Fatalf("storage output missing sizes: %q", out)
+	}
+}

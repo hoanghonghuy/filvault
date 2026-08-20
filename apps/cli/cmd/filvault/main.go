@@ -96,6 +96,29 @@ func run(args []string) error {
 			return usageError()
 		}
 		return cmds.Download(args[1])
+	case "mkdir":
+		return mkdir(cmds, args[1:])
+	case "rm":
+		if len(args) < 2 {
+			return usageError()
+		}
+		return cmds.Rm(args[1])
+	case "mv":
+		return mv(cmds, args[1:])
+	case "trash":
+		return cmds.Trash()
+	case "restore":
+		if len(args) < 2 {
+			return usageError()
+		}
+		return cmds.Restore(args[1])
+	case "search":
+		if len(args) < 2 {
+			return usageError()
+		}
+		return cmds.Search(args[1])
+	case "storage":
+		return cmds.Storage()
 	default:
 		return usageError()
 	}
@@ -161,6 +184,38 @@ func upload(cmds *command.Commands, args []string) error {
 	return cmds.Upload(rest[0], *folder)
 }
 
+func mkdir(cmds *command.Commands, args []string) error {
+	fs := flag.NewFlagSet("mkdir", flag.ContinueOnError)
+	parent := fs.String("parent", "", "parent folder id")
+	if err := fs.Parse(args); err != nil {
+		return usageError()
+	}
+	rest := fs.Args()
+	if len(rest) != 1 {
+		return usageError()
+	}
+	return cmds.Mkdir(rest[0], *parent)
+}
+
+func mv(cmds *command.Commands, args []string) error {
+	fs := flag.NewFlagSet("mv", flag.ContinueOnError)
+	to := fs.String("to", "", "target folder id")
+	if err := fs.Parse(args); err != nil {
+		return usageError()
+	}
+	rest := fs.Args()
+	if *to != "" {
+		if len(rest) != 1 {
+			return usageError()
+		}
+		return cmds.Mv(rest[0], "", *to)
+	}
+	if len(rest) != 2 {
+		return usageError()
+	}
+	return cmds.Mv(rest[0], rest[1], "")
+}
+
 func usageError() error {
 	return &exitError{code: 2, err: fmt.Errorf("usage:\n%s", usageText())}
 }
@@ -176,6 +231,14 @@ func usageText() string {
   filvault ls [folderId]
   filvault upload <file> [--folder <id>]
   filvault download <name>
+  filvault mkdir <name> [--parent <id>]
+  filvault rm <name>
+  filvault mv <name> <newName>
+  filvault mv <name> --to <folderId>
+  filvault trash
+  filvault restore <name>
+  filvault search <q>
+  filvault storage
   filvault --help
   filvault --version`
 }
