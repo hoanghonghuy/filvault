@@ -481,3 +481,48 @@ func (c *Commands) Storage() error {
 	fmt.Fprintf(c.Out, "%s of %s\n", formatBytes(s.UsedBytes), formatBytes(s.QuotaBytes))
 	return nil
 }
+
+// Purge permanently deletes a trashed file or folder by name.
+func (c *Commands) Purge(name string) error {
+	var t trashList
+	if err := c.Client.Do(http.MethodGet, "/trash", nil, &t); err != nil {
+		return err
+	}
+	for _, f := range t.Folders {
+		if f.Name == name {
+			if err := c.Client.Do(http.MethodDelete, "/trash/folders/"+f.ID, nil, nil); err != nil {
+				return err
+			}
+			fmt.Fprintf(c.Out, "Purged %s\n", name)
+			return nil
+		}
+	}
+	for _, f := range t.Files {
+		if f.Name == name {
+			if err := c.Client.Do(http.MethodDelete, "/trash/files/"+f.ID, nil, nil); err != nil {
+				return err
+			}
+			fmt.Fprintf(c.Out, "Purged %s\n", name)
+			return nil
+		}
+	}
+	return &client.Error{Code: "NOT_FOUND", Message: "not found in trash: " + name, Status: 404}
+}
+
+// LsGlob lists files in the current folder matching a glob pattern.
+func (c *Commands) LsGlob(pattern string) error {
+	var b browser
+	if err := c.Client.Do(http.MethodGet, browserPath(c.CurrentFolderID), nil, &b); err != nil {
+		return err
+	}
+	for _, f := range b.Files {
+		ok, err := filepath.Match(pattern, f.Name)
+		if err != nil {
+			return err
+		}
+		if ok {
+			fmt.Fprintf(c.Out, "%s  %s\n", f.Name, formatBytes(f.SizeBytes))
+		}
+	}
+	return nil
+}

@@ -1,6 +1,6 @@
 # 09 — CLI spec (Phase 4)
 
-Trạng thái: **slice 1 + slice 2**. Nguồn API: [04-api.md](04-api.md). Kiến trúc: [05-architecture.md](05-architecture.md).
+Trạng thái: **slice 1 + 2 + 3 + 4**. Nguồn API: [04-api.md](04-api.md). Kiến trúc: [05-architecture.md](05-architecture.md).
 
 CLI `filvault` nói chuyện với API **qua HTTP** (`/api/v1`), không import package `internal/` của API. Đây là binary độc lập, cùng monorepo.
 
@@ -43,7 +43,17 @@ filvault pwd           # in folder hiện tại (path hoặc id)
 - `ls` (không arg), `upload`, `download`, `rm`, `mv`, `mkdir` hoạt động **trong folder hiện tại**.
 - `ls <folderId>` vẫn liệt kê folder cụ thể (không đổi `currentFolderId`).
 
-Chưa làm: `sync`, glob `*.pdf`, sharing, versioning, permanent delete (`rm -f`).
+## 1d. Phạm vi slice 4 (xóa vĩnh viễn + glob)
+
+```text
+filvault rm -f <name>   # xóa vĩnh viễn file/folder trong trash (DELETE /trash/{type}/{id})
+filvault ls <glob>      # liệt kê file khớp pattern (vd: ls *.pdf)
+```
+
+- `rm -f` tìm trong trash theo tên (khớp chính xác) rồi gọi `DELETE /trash/files/{id}` hoặc `/trash/folders/{id}`.
+- `ls <glob>` dùng `filepath.Match` để lọc file trong folder hiện tại.
+
+Chưa làm: `sync`, sharing, versioning, devices, multipart, resumable (API chưa có endpoint — spec 04 §7).
 
 ## 2. Ngôn ngữ & module
 
@@ -237,7 +247,7 @@ TDD theo slice. Ưu tiên:
 |---|---|
 | HTTP client | parse lỗi, refresh-on-401 retry (dùng `httptest.Server` fake) |
 | Token store | đọc/ghi file, path theo OS |
-| Command | `login`/`logout`/`ls`/`whoami`/`upload`/`download`/`mkdir`/`rm`/`mv`/`trash`/`restore`/`search`/`storage` gọi đúng endpoint + parse response (fake server) |
+| Command | `login`/`logout`/`ls`/`whoami`/`upload`/`download`/`mkdir`/`rm`/`mv`/`trash`/`restore`/`search`/`storage`/`cd`/`pwd`/`purge`/`lsGlob` gọi đúng endpoint + parse response (fake server) |
 
 Không cần test thật MinIO/S3 — upload/download dùng fake server trả presigned URL.
 
@@ -245,7 +255,8 @@ Không cần test thật MinIO/S3 — upload/download dùng fake server trả pr
 
 ```text
 sync, watcher, hash
-glob, resumable, multipart
+resumable, multipart
 sharing, versioning, devices
-permanent delete (rm -f)
 ```
+
+Các tính năng này bị chặn bởi API chưa có endpoint tương ứng (spec 04 §7).

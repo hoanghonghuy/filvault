@@ -93,6 +93,9 @@ func run(args []string) error {
 	case "whoami":
 		return cmds.Whoami()
 	case "ls":
+		if len(args) > 1 && hasGlob(args[1]) {
+			return cmds.LsGlob(args[1])
+		}
 		folderID := ""
 		if len(args) > 1 {
 			folderID = args[1]
@@ -116,6 +119,12 @@ func run(args []string) error {
 	case "mkdir":
 		return mkdir(cmds, args[1:])
 	case "rm":
+		if len(args) >= 2 && args[1] == "-f" {
+			if len(args) < 3 {
+				return usageError()
+			}
+			return cmds.Purge(args[2])
+		}
 		if len(args) < 2 {
 			return usageError()
 		}
@@ -237,6 +246,11 @@ func usageError() error {
 	return &exitError{code: 2, err: fmt.Errorf("usage:\n%s", usageText())}
 }
 
+// hasGlob reports whether s contains glob metacharacters.
+func hasGlob(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
 func printUsage(w *os.File) {
 	fmt.Fprintln(w, usageText())
 }
@@ -245,13 +259,14 @@ func usageText() string {
 	return `  filvault login
   filvault logout
   filvault whoami
-  filvault ls [folderId]
+  filvault ls [folderId|glob]
   filvault cd [name|..]
   filvault pwd
   filvault upload <file> [--folder <id>]
   filvault download <name>
   filvault mkdir <name> [--parent <id>]
   filvault rm <name>
+  filvault rm -f <name>
   filvault mv <name> <newName>
   filvault mv <name> --to <folderId>
   filvault trash

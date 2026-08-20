@@ -450,3 +450,68 @@ func TestPwd(t *testing.T) {
 		t.Fatalf("pwd output missing id: %q", out.String())
 	}
 }
+
+func TestPurgeFile(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/trash":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []any{},
+				"files":   []map[string]any{{"id": "x1", "name": "a.pdf", "type": "file", "sizeBytes": 5}},
+			})
+		case r.URL.Path == "/trash/files/x1" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Purge("a.pdf") })
+	if !strings.Contains(out, "a.pdf") {
+		t.Fatalf("purge output missing name: %q", out)
+	}
+}
+
+func TestPurgeFolder(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/trash":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []map[string]any{{"id": "f1", "name": "Docs", "type": "folder"}},
+				"files":   []any{},
+			})
+		case r.URL.Path == "/trash/folders/f1" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Purge("Docs") })
+	if !strings.Contains(out, "Docs") {
+		t.Fatalf("purge output missing name: %q", out)
+	}
+}
+
+func TestLsGlob(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/browser" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"folders": []map[string]any{{"id": "f1", "name": "Docs"}},
+			"files": []map[string]any{
+				{"id": "x1", "name": "a.pdf", "sizeBytes": 5},
+				{"id": "x2", "name": "b.txt", "sizeBytes": 6},
+			},
+		})
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.LsGlob("*.pdf") })
+	if !strings.Contains(out, "a.pdf") {
+		t.Fatalf("ls glob missing a.pdf: %q", out)
+	}
+	if strings.Contains(out, "b.txt") {
+		t.Fatalf("ls glob should not include b.txt: %q", out)
+	}
+}
