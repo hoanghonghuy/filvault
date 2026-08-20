@@ -22,6 +22,7 @@ Chưa làm ở slice này: `cd`, `mkdir`, `rm`, `sync`, glob `*.pdf`, sharing, v
 - Không import AWS SDK, không import `apps/api/internal/*`.
 - HTTP client dùng stdlib `net/http`. JSON stdlib `encoding/json`.
 - CLI framework: **stdlib `flag`** (KISS, không thêm dependency). Subcommand dispatch thủ công.
+- Dependency duy nhất: `golang.org/x/term` (ẩn password khi gõ).
 
 ## 3. Config & token
 
@@ -55,6 +56,7 @@ filvault login
 
 - `POST /auth/login` `{ email, password }` → `200` `{ user, accessToken, refreshToken }`.
 - Lưu token file. In `Logged in as <email>`.
+- Password đọc ẩn qua `golang.org/x/term` (không echo); fallback stdin thường khi không có TTY (piped input).
 - Sai mật khẩu → `401 UNAUTHORIZED` → in message, exit 1.
 - Chưa verify: login vẫn `200` (spec 04 §2) — CLI in cảnh báo `Email not verified` nhưng vẫn lưu token (để `whoami` chạy được).
 

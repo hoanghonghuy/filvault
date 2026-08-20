@@ -10,6 +10,8 @@ import (
 	"filvault/cli/internal/client"
 	"filvault/cli/internal/command"
 	"filvault/cli/internal/config"
+
+	"golang.org/x/term"
 )
 
 func main() {
@@ -82,8 +84,11 @@ func login(cmds *command.Commands, cfg config.Config) error {
 	email = strings.TrimSpace(email)
 
 	fmt.Fprint(os.Stderr, "password: ")
-	password, _ := reader.ReadString('\n')
-	password = strings.TrimSpace(password)
+	password, err := readPassword()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr)
 
 	return cmds.Login(email, password, func(access, refresh string) error {
 		cfg.AccessToken = access
@@ -91,6 +96,24 @@ func login(cmds *command.Commands, cfg config.Config) error {
 		cfg.APIBase = cmds.Client.Base
 		return config.Save(cfg)
 	})
+}
+
+// readPassword reads a password without echoing it to the terminal.
+// Falls back to plain stdin when not attached to a TTY (e.g. piped input).
+func readPassword() (string, error) {
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		data, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	reader := bufio.NewReader(os.Stdin)
+	line, err := reader.ReadString('\n')
+	if err != nil && line == "" {
+		return "", err
+	}
+	return strings.TrimSpace(line), nil
 }
 
 func upload(cmds *command.Commands, args []string) error {
