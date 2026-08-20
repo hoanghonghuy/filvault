@@ -91,5 +91,12 @@ defineProps<{ variant?: 'initial' }>()
     background-position: -200% 0;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--hairline);
+  }
+}
 </style>
 

@@ -10,6 +10,7 @@ import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
+import LinearProgress from '@/components/LinearProgress.vue'
 import { mimeIcon, mimeLabel, resolveContentType } from '@/lib/mimeIcon'
 import type { Browser, DownloadURL, SearchResult, UploadSession } from '@/api/types'
 
@@ -411,9 +412,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </button>
     </div>
 
-    <p v-if="uploadProgress !== null" class="muted upload-status">
-      Uploading… {{ Math.round(uploadProgress * 100) }}%
-    </p>
+    <LinearProgress v-if="uploadProgress !== null" :value="uploadProgress" label="Uploading…" />
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonFiles v-if="loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
@@ -520,10 +519,6 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   color: var(--muted);
   vertical-align: -0.2em;
   margin-right: var(--space-xs);
-}
-
-.upload-status {
-  margin-bottom: var(--space-sm);
 }
 
 .toolbar-sticky {

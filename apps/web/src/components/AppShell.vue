@@ -367,7 +367,9 @@ const profileLabel = computed(
     color: var(--muted);
     font-size: 14px;
     font-weight: 600;
-    transition: background-color 150ms ease, color 150ms ease;
+    transition:
+      background-color var(--motion-press) var(--ease-standard),
+      color var(--motion-press) var(--ease-standard);
   }
 
   .side-link:hover {
@@ -438,6 +440,12 @@ const profileLabel = computed(
 
   .main {
     padding: var(--space-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-link {
+    transition: none;
   }
 }
 </style>

@@ -210,7 +210,7 @@ Hub sau login. **Không** lặp 4 tab nav (Files/Photos/Trash/Settings đã ở 
 Recent files              See all
   rows (hoặc 1 dòng empty + link)
 Recent photos             See all
-  placeholder grid (không <img> original)
+  PhotoThumb grid (thumbnailUrl; fallback mime icon — không <img> original)
 ```
 
 | Token | Value | Ghi chú |
@@ -243,8 +243,12 @@ Component: `OverviewView.vue`. Logo F / wordmark → `/`.
 
 ### Photo grid
 - `auto-fill`, min cell ~108–120px mobile; gap `{spacing.xs}`–`{spacing.sm}`.
-- Cell = **placeholder** theo mime (không `<img>` original — spec Phase 1).
+- Cell = `PhotoThumb`: `thumbnailUrl` khi có (server thumb), không thì icon theo mime — **không** `<img>` original.
 - Tap → sheet: Xem / Tải / Thêm vào album / Xóa (nếu context cho phép).
+
+### Upload progress (Files)
+- Khi đang upload: `LinearProgress` (track hairline 4px, fill accent) + label + % — không chỉ text “Uploading… N%”.
+- `role="progressbar"` + `aria-valuenow` / min / max.
 
 ### Bottom sheet / Action sheet
 - Backdrop `{overlay}`; sheet bg canvas; top radius `{rounded.xl}`; drag handle 32×4px muted.
@@ -328,7 +332,7 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 - Mobile-first: thiết kế 375px trước, mở rộng lên.
 - Thay `window.prompt` / `confirm` bằng sheet.
 - Touch target ≥44px (ưu tiên 48px).
-- Photos: placeholder + presign on demand (spec 07).
+- Photos: `PhotoThumb` + thumbnail URL / mime fallback; xem original qua presign on demand (spec 07).
 - Một việc chính mỗi màn; overflow vào sheet.
 - Báo lỗi API bằng copy ngắn + code ẩn trong detail nếu cần (`QUOTA_EXCEEDED`, `409`).
 

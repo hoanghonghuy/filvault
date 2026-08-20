@@ -5,7 +5,7 @@ import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
-import PhotoPlaceholder from '@/components/PhotoPlaceholder.vue'
+import PhotoThumb from '@/components/PhotoThumb.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import {
   OVERVIEW_DESTINATIONS,
@@ -134,11 +134,12 @@ onMounted(load)
         </div>
         <p v-if="photosError" class="section-error" role="alert">{{ photosError }}</p>
         <div v-else-if="recentPhotos.length" class="grid photos">
-          <PhotoPlaceholder
+          <PhotoThumb
             v-for="item in recentPhotos"
             :key="item.id"
             :mime-type="item.mimeType"
             :name="item.name"
+            :thumbnail-url="item.thumbnailUrl"
             @click="router.push('/photos')"
           />
         </div>
