@@ -4,7 +4,7 @@ DSN ?= postgres://filvault:filvault@127.0.0.1:5435/filvault?sslmode=disable
 export PATH := $(HOME)/.local/go/bin:$(PATH)
 
 .PHONY: compose-up compose-down up down migrate migrate-down seed test run-api dev-api dev-web \
-	lint-api typecheck-api lint-web typecheck-web ci-api ci-web
+	lint-api typecheck-api lint-web typecheck-web ci-api ci-web cli-build cli-test
 
 compose-up:
 	$(COMPOSE) up -d postgres minio minio-init
@@ -63,3 +63,9 @@ typecheck-web:
 ci-api: lint-api typecheck-api test
 
 ci-web: lint-web typecheck-web
+
+cli-build:
+	cd apps/cli && $(GO) build -o ../../bin/filvault ./cmd/filvault
+
+cli-test:
+	cd apps/cli && $(GO) test ./... -count=1
