@@ -11,10 +11,12 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
 
 <template>
   <Teleport to="body">
-    <div v-if="toastMessage" class="toast" :class="toastType" role="status" aria-live="polite">
-      <Icon :name="iconName(toastType)" :size="18" class="toast-icon" />
-      <span>{{ toastMessage }}</span>
-    </div>
+    <Transition name="toast">
+      <div v-if="toastMessage" class="toast" :class="toastType" role="status" aria-live="polite">
+        <Icon :name="iconName(toastType)" :size="18" class="toast-icon" />
+        <span>{{ toastMessage }}</span>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -58,6 +60,36 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
     bottom: var(--space-lg);
     margin: 0;
     max-width: 360px;
+  }
+}
+
+.toast-enter-active {
+  transition:
+    opacity var(--motion-enter) var(--ease-enter),
+    transform var(--motion-enter) var(--ease-enter);
+}
+
+.toast-leave-active {
+  transition:
+    opacity var(--motion-exit) var(--ease-exit),
+    transform var(--motion-exit) var(--ease-exit);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-active,
+  .toast-leave-active {
+    transition: none;
+  }
+
+  .toast-enter-from,
+  .toast-leave-to {
+    transform: none;
   }
 }
 </style>

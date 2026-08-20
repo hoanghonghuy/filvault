@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   HOME_PATH,
   OVERVIEW_DESTINATIONS,
+  PROFILE_PATH,
   pageTitleForRoute,
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
@@ -12,6 +13,12 @@ import type { BrowserFile, TimelineGroup } from '@/api/types'
 describe('HOME_PATH', () => {
   it('is the app overview', () => {
     expect(HOME_PATH).toBe('/')
+  })
+})
+
+describe('PROFILE_PATH', () => {
+  it('is a dedicated account route outside bottom nav', () => {
+    expect(PROFILE_PATH).toBe('/profile')
   })
 })
 
@@ -54,6 +61,7 @@ describe('pageTitleForRoute', () => {
     expect(pageTitleForRoute('/photos')).toBe('Photos')
     expect(pageTitleForRoute('/trash')).toBe('Trash')
     expect(pageTitleForRoute('/settings')).toBe('Settings')
+    expect(pageTitleForRoute('/profile')).toBe('Profile')
   })
 })
 

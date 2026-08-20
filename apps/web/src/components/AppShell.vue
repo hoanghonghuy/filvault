@@ -8,7 +8,8 @@ import ToastHost from '@/components/ToastHost.vue'
 import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
-import { HOME_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
+import { HOME_PATH, PROFILE_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
+import { userInitials } from '@/lib/userInitials'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -21,7 +22,12 @@ provide('reloadStorage', async () => {
 const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 const storageVisible = computed(() => showStorageBar(route.path))
-</script>
+const avatarInitials = computed(() =>
+  userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
+)
+const profileLabel = computed(
+  () => `Open profile for ${auth.user?.displayName || auth.user?.email || 'account'}`,
+)</script>
 
 <template>
   <ToastHost />
@@ -47,7 +53,10 @@ const storageVisible = computed(() => showStorageBar(route.path))
         </RouterLink>
       </nav>
       <div class="side-user">
-        <span class="user-name">{{ auth.user?.displayName }}</span>
+        <RouterLink :to="PROFILE_PATH" class="side-profile" :aria-label="profileLabel">
+          <span class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
+          <span class="user-name">{{ auth.user?.displayName }}</span>
+        </RouterLink>
       </div>
     </aside>
 
@@ -60,6 +69,9 @@ const storageVisible = computed(() => showStorageBar(route.path))
           <p class="header-brand-name">Filvault</p>
           <h1 class="header-title">{{ pageTitle }}</h1>
         </div>
+        <RouterLink :to="PROFILE_PATH" class="header-profile" :aria-label="profileLabel">
+          <span class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
+        </RouterLink>
       </header>
       <StorageBar v-show="storageVisible" ref="storageBarRef" />
       <main class="main">
@@ -154,10 +166,46 @@ const storageVisible = computed(() => showStorageBar(route.path))
 
 .header-text {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 1px;
+}
+
+.header-profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  margin-right: -6px;
+  border-radius: var(--radius-md);
+}
+
+.header-profile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-profile.router-link-active .avatar {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .header-brand-name {
@@ -218,11 +266,17 @@ const storageVisible = computed(() => showStorageBar(route.path))
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
+  transition: color var(--motion-press) var(--ease-standard);
 }
 
 .bottom-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -4px;
+  border-radius: var(--radius-md);
+}
+
+.bottom-link:active .bottom-icon {
+  background: var(--surface-card);
   border-radius: var(--radius-md);
 }
 
@@ -336,8 +390,34 @@ const storageVisible = computed(() => showStorageBar(route.path))
     border-top: 1px solid var(--hairline-soft);
   }
 
+  .side-profile {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-height: var(--touch-min);
+    padding: 0 var(--space-sm);
+    margin: 0 calc(var(--space-sm) * -1);
+    border-radius: var(--radius-md);
+    color: inherit;
+  }
+
+  .side-profile:hover {
+    background: var(--surface-soft);
+  }
+
+  .side-profile:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .side-profile.router-link-active .avatar {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
   .user-name {
     font-size: 0.875rem;
+    font-weight: 600;
     color: var(--muted);
     overflow: hidden;
     text-overflow: ellipsis;

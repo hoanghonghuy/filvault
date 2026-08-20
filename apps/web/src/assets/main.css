@@ -41,6 +41,13 @@
   --header-h: 56px;
   --content-max: 1100px;
 
+  --motion-press: 150ms;
+  --motion-enter: 250ms;
+  --motion-exit: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+
   /* legacy aliases */
   --text: var(--ink);
   --border: var(--hairline);
@@ -100,11 +107,24 @@ textarea:focus-visible {
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  transition:
+    background-color var(--motion-press) var(--ease-standard),
+    border-color var(--motion-press) var(--ease-standard),
+    color var(--motion-press) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.btn:active:not(:disabled):not(.block) {
+  transform: scale(0.97);
+}
+
+.btn.block:active:not(:disabled) {
+  background: var(--surface-card);
 }
 
 .btn.ink {
@@ -118,6 +138,10 @@ textarea:focus-visible {
   border-color: var(--primary-cta-hover);
 }
 
+.btn.ink:active:not(:disabled) {
+  background: var(--primary-cta-hover);
+}
+
 .btn.accent {
   background: var(--accent);
   border-color: var(--accent);
@@ -127,6 +151,10 @@ textarea:focus-visible {
 .btn.accent:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+}
+
+.btn.accent:active:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 .btn.primary {
@@ -247,6 +275,19 @@ textarea:focus-visible {
 
 .row.tappable {
   cursor: pointer;
+  transition:
+    background-color var(--motion-press) var(--ease-standard),
+    border-color var(--motion-press) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .row.tappable:hover {
+    background: var(--surface-soft);
+  }
+}
+
+.row.tappable:active {
+  background: var(--surface-card);
 }
 
 .row .name {
@@ -577,6 +618,15 @@ textarea:focus-visible {
   .skeleton {
     animation: none;
     background: var(--hairline);
+  }
+
+  .btn,
+  .row.tappable {
+    transition: none;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: none;
   }
 }
 

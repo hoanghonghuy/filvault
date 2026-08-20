@@ -191,11 +191,19 @@ onMounted(load)
   border-radius: var(--radius-lg);
   background: var(--canvas);
   color: var(--ink);
+  transition:
+    background-color var(--motion-press) var(--ease-standard),
+    border-color var(--motion-press) var(--ease-standard);
 }
 
 .dest-card:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.dest-card:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 @media (hover: hover) {

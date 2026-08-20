@@ -23,6 +23,7 @@ const router = createRouter({
     },
     { path: '/trash', name: 'trash', component: () => import('@/views/TrashView.vue'), meta: { auth: true, verified: true } },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true, verified: true } },
+    { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { auth: true, verified: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

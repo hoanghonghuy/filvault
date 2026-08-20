@@ -25,6 +25,13 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+function unlockPage() {
+  document.body.style.overflow = ''
+  document.removeEventListener('keydown', onKeydown)
+  previousFocus?.focus()
+  previousFocus = null
+}
+
 watch(
   () => props.open,
   async (open) => {
@@ -34,40 +41,34 @@ watch(
       document.addEventListener('keydown', onKeydown)
       await nextTick()
       panelRef.value?.focus()
-      return
     }
-    document.body.style.overflow = ''
-    document.removeEventListener('keydown', onKeydown)
-    previousFocus?.focus()
-    previousFocus = null
   },
   { immediate: true },
 )
 
-onUnmounted(() => {
-  document.body.style.overflow = ''
-  document.removeEventListener('keydown', onKeydown)
-})
+onUnmounted(unlockPage)
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="sheet-root" role="presentation">
-      <div class="sheet-backdrop" @click="onBackdropClick" />
-      <div
-        ref="panelRef"
-        class="sheet-panel"
-        role="dialog"
-        aria-modal="true"
-        tabindex="-1"
-        :aria-labelledby="title ? titleId : undefined"
-        :aria-label="title ? undefined : 'Dialog'"
-      >
-        <div class="sheet-handle" aria-hidden="true" />
-        <h2 v-if="title" :id="titleId" class="sheet-title">{{ title }}</h2>
-        <slot />
+    <Transition name="sheet" @after-leave="unlockPage">
+      <div v-if="open" class="sheet-root" role="presentation">
+        <div class="sheet-backdrop" @click="onBackdropClick" />
+        <div
+          ref="panelRef"
+          class="sheet-panel"
+          role="dialog"
+          aria-modal="true"
+          tabindex="-1"
+          :aria-labelledby="title ? titleId : undefined"
+          :aria-label="title ? undefined : 'Dialog'"
+        >
+          <div class="sheet-handle" aria-hidden="true" />
+          <h2 v-if="title" :id="titleId" class="sheet-title">{{ title }}</h2>
+          <slot />
+        </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -133,5 +134,66 @@ onUnmounted(() => {
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--ink);
+}
+
+.sheet-enter-active .sheet-backdrop {
+  transition: opacity var(--motion-enter) var(--ease-enter);
+}
+
+.sheet-leave-active .sheet-backdrop {
+  transition: opacity var(--motion-exit) var(--ease-exit);
+}
+
+.sheet-enter-from .sheet-backdrop,
+.sheet-leave-to .sheet-backdrop {
+  opacity: 0;
+}
+
+.sheet-enter-active .sheet-panel {
+  transition: transform var(--motion-enter) var(--ease-enter);
+}
+
+.sheet-leave-active .sheet-panel {
+  transition: transform var(--motion-exit) var(--ease-exit);
+}
+
+.sheet-enter-from .sheet-panel,
+.sheet-leave-to .sheet-panel {
+  transform: translateY(100%);
+}
+
+@media (min-width: 768px) {
+  .sheet-enter-active .sheet-panel,
+  .sheet-leave-active .sheet-panel {
+    transition:
+      transform var(--motion-enter) var(--ease-enter),
+      opacity var(--motion-enter) var(--ease-enter);
+  }
+
+  .sheet-leave-active .sheet-panel {
+    transition:
+      transform var(--motion-exit) var(--ease-exit),
+      opacity var(--motion-exit) var(--ease-exit);
+  }
+
+  .sheet-enter-from .sheet-panel,
+  .sheet-leave-to .sheet-panel {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-active .sheet-backdrop,
+  .sheet-leave-active .sheet-backdrop,
+  .sheet-enter-active .sheet-panel,
+  .sheet-leave-active .sheet-panel {
+    transition: none;
+  }
+
+  .sheet-enter-from .sheet-panel,
+  .sheet-leave-to .sheet-panel {
+    transform: none;
+  }
 }
 </style>

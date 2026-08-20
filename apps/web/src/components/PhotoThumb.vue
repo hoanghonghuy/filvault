@@ -62,10 +62,17 @@ function handleError() {
   border-radius: var(--radius-md);
   background: var(--surface-soft);
   cursor: pointer;
+  transition:
+    border-color var(--motion-press) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 
 .photo-thumb:hover {
   border-color: var(--accent);
+}
+
+.photo-thumb:active {
+  transform: scale(0.97);
 }
 
 .photo-thumb:focus-visible {
@@ -121,5 +128,15 @@ video {
   word-break: break-all;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-thumb {
+    transition: none;
+  }
+
+  .photo-thumb:active {
+    transform: none;
+  }
 }
 </style>

@@ -40,6 +40,10 @@ const emit = defineEmits<{
   color: var(--on-accent);
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  transition:
+    background-color var(--motion-press) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard),
+    box-shadow var(--motion-press) var(--ease-standard);
 }
 
 .fab:focus-visible {
@@ -51,9 +55,25 @@ const emit = defineEmits<{
   background: var(--accent-hover);
 }
 
+.fab:active:not(:disabled) {
+  transform: scale(0.94);
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
+}
+
 .fab:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab {
+    transition: none;
+  }
+
+  .fab:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 @media (min-width: 768px) {

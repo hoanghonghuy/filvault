@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { api, setTokens } from '@/api/client'
+import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -9,25 +9,20 @@ import type { User } from '@/api/types'
 const auth = useAuthStore()
 const ui = useUiStore()
 
-const displayName = ref(auth.user?.displayName ?? '')
 const imageThumbnailsEnabled = ref(auth.user?.imageThumbnailsEnabled ?? true)
 const videoThumbnailsEnabled = ref(auth.user?.videoThumbnailsEnabled ?? true)
 const trashAutoDeleteEnabled = ref(auth.user?.trashAutoDeleteEnabled ?? false)
 const trashRetentionDays = ref(auth.user?.trashRetentionDays ?? 30)
-const currentPassword = ref('')
-const newPassword = ref('')
 const error = ref('')
-const savingProfile = ref(false)
-const changingPassword = ref(false)
+const saving = ref(false)
 
-async function saveProfile() {
+async function savePrefs() {
   error.value = ''
-  savingProfile.value = true
+  saving.value = true
   try {
     await api<User>('/users/me', {
       method: 'PATCH',
       body: JSON.stringify({
-        displayName: displayName.value,
         imageThumbnailsEnabled: imageThumbnailsEnabled.value,
         videoThumbnailsEnabled: videoThumbnailsEnabled.value,
         trashAutoDeleteEnabled: trashAutoDeleteEnabled.value,
@@ -35,40 +30,12 @@ async function saveProfile() {
       }),
     })
     await auth.loadMe()
-    ui.showToast('Settings saved')
+    ui.showToast('Settings saved', 'success')
   } catch (e) {
     error.value = formatApiError(e, 'Save failed')
   } finally {
-    savingProfile.value = false
+    saving.value = false
   }
-}
-
-async function changePassword() {
-  error.value = ''
-  changingPassword.value = true
-  try {
-    const tokens = await api<{ accessToken: string; refreshToken: string }>('/users/me/password', {
-      method: 'POST',
-      body: JSON.stringify({
-        currentPassword: currentPassword.value,
-        newPassword: newPassword.value,
-      }),
-    })
-    setTokens(tokens.accessToken, tokens.refreshToken)
-    await auth.loadMe()
-    currentPassword.value = ''
-    newPassword.value = ''
-    ui.showToast('Password updated')
-  } catch (e) {
-    error.value = formatApiError(e, 'Password change failed')
-  } finally {
-    changingPassword.value = false
-  }
-}
-
-async function logout() {
-  await auth.logout()
-  window.location.href = '/login'
 }
 </script>
 
@@ -76,18 +43,6 @@ async function logout() {
   <div>
     <h1 class="page-title desktop-only">Settings</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-
-    <section class="card section">
-      <h2 class="section-title">Profile</h2>
-      <p class="muted">{{ auth.user?.email }}</p>
-      <label class="field">
-        <span>Display name</span>
-        <input v-model="displayName" autocomplete="nickname" />
-      </label>
-      <button class="btn ink save-btn" type="button" :disabled="savingProfile" @click="saveProfile">
-        {{ savingProfile ? 'Saving…' : 'Save profile' }}
-      </button>
-    </section>
 
     <section class="card section">
       <h2 class="section-title">Trash</h2>
@@ -101,8 +56,8 @@ async function logout() {
         <span>Retention days</span>
         <input v-model.number="trashRetentionDays" type="number" min="1" inputmode="numeric" />
       </label>
-      <button class="btn save-btn" type="button" :disabled="savingProfile" @click="saveProfile">
-        {{ savingProfile ? 'Saving…' : 'Save trash settings' }}
+      <button class="btn save-btn" type="button" :disabled="saving" @click="savePrefs">
+        {{ saving ? 'Saving…' : 'Save trash settings' }}
       </button>
     </section>
 
@@ -121,28 +76,9 @@ async function logout() {
         <span class="switch-track" aria-hidden="true"></span>
         <span class="toggle-label">Show video previews</span>
       </label>
-      <button class="btn" type="button" :disabled="savingProfile" @click="saveProfile">
-        {{ savingProfile ? 'Saving…' : 'Save preview settings' }}
+      <button class="btn" type="button" :disabled="saving" @click="savePrefs">
+        {{ saving ? 'Saving…' : 'Save preview settings' }}
       </button>
-    </section>
-
-    <section class="card section">
-      <h2 class="section-title">Password</h2>
-      <label class="field">
-        <span>Current password</span>
-        <input v-model="currentPassword" type="password" autocomplete="current-password" />
-      </label>
-      <label class="field">
-        <span>New password</span>
-        <input v-model="newPassword" type="password" minlength="8" autocomplete="new-password" />
-      </label>
-      <button class="btn ink save-btn" type="button" :disabled="changingPassword" @click="changePassword">
-        {{ changingPassword ? 'Changing…' : 'Change password' }}
-      </button>
-    </section>
-
-    <section class="card section">
-      <button class="btn danger block" type="button" @click="logout">Log out</button>
     </section>
   </div>
 </template>
@@ -178,7 +114,7 @@ async function logout() {
   height: 24px;
   border-radius: var(--radius-pill);
   background: var(--hairline);
-  transition: background-color 150ms ease;
+  transition: background-color var(--motion-press) var(--ease-standard);
 }
 
 .switch-track::after {
@@ -191,7 +127,7 @@ async function logout() {
   border-radius: 50%;
   background: var(--canvas);
   box-shadow: 0 1px 3px rgba(17, 24, 39, 0.25);
-  transition: transform 150ms ease;
+  transition: transform var(--motion-press) var(--ease-standard);
 }
 
 .switch-input:checked + .switch-track {
@@ -228,6 +164,13 @@ async function logout() {
 
   .desktop-only {
     display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-track,
+  .switch-track::after {
+    transition: none;
   }
 }
 </style>

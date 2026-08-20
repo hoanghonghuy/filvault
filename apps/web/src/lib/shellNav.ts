@@ -1,6 +1,7 @@
 import type { BrowserFile, TimelineGroup, TimelineItem } from '@/api/types'
 
 export const HOME_PATH = '/'
+export const PROFILE_PATH = '/profile'
 
 export const RECENT_FILE_LIMIT = 5
 export const RECENT_PHOTO_LIMIT = 6
@@ -25,6 +26,7 @@ export function pageTitleForRoute(path: string, routeName?: string | symbol | nu
   if (path === '/photos' || path.startsWith('/photos/')) return 'Photos'
   if (path === '/trash') return 'Trash'
   if (path === '/settings') return 'Settings'
+  if (path === '/profile') return 'Profile'
   return 'Filvault'
 }
 

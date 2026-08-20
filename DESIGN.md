@@ -89,7 +89,18 @@ Filvault là **personal cloud** (My Files + Photos trên cùng một kho). UI ph
 
 **Tone:** calm utility, confident hierarchy, mobile-first.  
 **Density:** list/file rows hơi dày (Cal.com product fragment feel); Photos grid thoáng hơn.  
-**Motion:** ngắn (150–250ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast — không decorative.
+**Motion:** ngắn (150–250ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast, và phản hồi nhấn trên row/ô ảnh — không decorative, không trượt cả trang khi đổi tab.
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--motion-press` | 150ms | Nút, FAB, row, ô ảnh |
+| `--motion-enter` | 250ms | Sheet / toast vào màn |
+| `--motion-exit` | 200ms | Sheet / toast ra (nhanh hơn vào) |
+| `--ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Đổi trạng thái trên màn |
+| `--ease-enter` | `cubic-bezier(0, 0, 0, 1)` | Vào màn (M3 Standard decelerate) |
+| `--ease-exit` | `cubic-bezier(0.3, 0, 1, 1)` | Ra màn (M3 Standard accelerate) |
+
+Tôn trọng `prefers-reduced-motion: reduce` (tắt transition). Component: Vue `<Transition>` trên `BottomSheet` và `ToastHost`.
 
 **Key characteristics**
 - Canvas trắng (`{colors.canvas}`), surface phụ xám rất nhạt (`{colors.surface-soft}` / `{colors.surface-card}`).
@@ -272,16 +283,17 @@ Mobile (<768)                         Tablet/Desktop (≥768)
 └─────────────────────┘               FAB → toolbar button
 ```
 
-Mobile header: mark 32px (ô **F** là nút Home, chạm ≥44px) + tên app caption muted + page title ink. Bấm **F** (mobile) hoặc wordmark sidebar (desktop) → `/` Overview. Title Files = “My Files”. Header ẩn ≥768 — title nằm trong view. Overview **không** thêm tab thứ 5 vào bottom nav.
+Mobile header: mark 32px (ô **F** là nút Home, chạm ≥44px) + tên app caption muted + page title ink + **avatar initials** (phải, chạm ≥44px → `/profile`). Bấm **F** (mobile) hoặc wordmark sidebar (desktop) → `/` Overview. Title Files = “My Files”. Header ẩn ≥768 — title nằm trong view; avatar nằm đáy side nav. Overview **không** thêm tab thứ 5 vào bottom nav.
 
 ### Top-level destinations (đúng M3: 3–5, chỉ navigation)
-**Home / Overview** — vào bằng logo (ô F / wordmark), không phải tab.
+**Home / Overview** — vào bằng logo (ô F / wordmark), không phải tab.  
+**Profile** — vào bằng avatar (header mobile / side-nav desktop), không phải tab.
 
 Bottom / side nav (4):
 1. **Files** — browser + search + upload  
 2. **Photos** — timeline + albums  
 3. **Trash**  
-4. **Settings**
+4. **Settings** — trash prefs, media preview prefs (không chứa account)
 
 Auth / verify: full-screen card giữa, không bottom nav.
 
@@ -356,7 +368,8 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 | Photos | Timeline (+ load more), albums CRUD, add/remove items, open/download | photos/* |
 | Album detail | Grid + manage | albums/:id, items |
 | Trash | Restore / delete forever | trash, restore |
-| Settings | displayName, trash prefs, password, logout | users/me, password |
+| Settings | trash prefs, thumbnail prefs | users/me |
+| Profile (`/profile`) | avatar initials, displayName, password, logout | users/me, password |
 
 ---
 
@@ -367,7 +380,7 @@ Khi generate / sửa UI:
 ```text
 Follow DESIGN.md (Filvault). Cal.com-like light utility UI, teal accent #0d9488,
 Plus Jakarta Sans, mobile-first bottom nav (Files/Photos/Trash/Settings),
-FAB upload on Files, bottom sheets instead of prompt/confirm,
+avatar → Profile (not a 5th tab), FAB upload on Files, bottom sheets instead of prompt/confirm,
 no original <img> in Photos grid, touch targets ≥44px, no purple/dark-mode.
 ```
 
