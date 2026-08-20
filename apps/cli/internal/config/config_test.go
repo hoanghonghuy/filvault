@@ -11,9 +11,10 @@ func TestSaveAndLoad(t *testing.T) {
 	t.Setenv("FILVAULT_CONFIG_PATH", filepath.Join(dir, "config.json"))
 
 	cfg := Config{
-		APIBase:      "http://example.com/api/v1",
-		AccessToken:  "access-123",
-		RefreshToken: "refresh-456",
+		APIBase:         "http://example.com/api/v1",
+		AccessToken:     "access-123",
+		RefreshToken:    "refresh-456",
+		CurrentFolderID: "folder-1",
 	}
 	if err := Save(cfg); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -23,7 +24,7 @@ func TestSaveAndLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got.APIBase != cfg.APIBase || got.AccessToken != cfg.AccessToken || got.RefreshToken != cfg.RefreshToken {
+	if got.APIBase != cfg.APIBase || got.AccessToken != cfg.AccessToken || got.RefreshToken != cfg.RefreshToken || got.CurrentFolderID != cfg.CurrentFolderID {
 		t.Fatalf("roundtrip mismatch: got %+v want %+v", got, cfg)
 	}
 }

@@ -74,7 +74,16 @@ func run(args []string) error {
 		_ = config.Save(cfg)
 	}
 
-	cmds := &command.Commands{Client: c, Out: os.Stdout, Err: os.Stderr}
+	cmds := &command.Commands{
+		Client:          c,
+		Out:             os.Stdout,
+		Err:             os.Stderr,
+		CurrentFolderID: cfg.CurrentFolderID,
+		SaveFolder: func(id string) error {
+			cfg.CurrentFolderID = id
+			return config.Save(cfg)
+		},
+	}
 
 	switch args[0] {
 	case "login":
@@ -89,6 +98,14 @@ func run(args []string) error {
 			folderID = args[1]
 		}
 		return cmds.Ls(folderID)
+	case "cd":
+		name := ""
+		if len(args) > 1 {
+			name = args[1]
+		}
+		return cmds.Cd(name)
+	case "pwd":
+		return cmds.Pwd()
 	case "upload":
 		return upload(cmds, args[1:])
 	case "download":
@@ -229,6 +246,8 @@ func usageText() string {
   filvault logout
   filvault whoami
   filvault ls [folderId]
+  filvault cd [name|..]
+  filvault pwd
   filvault upload <file> [--folder <id>]
   filvault download <name>
   filvault mkdir <name> [--parent <id>]

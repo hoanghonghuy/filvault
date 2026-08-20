@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 )
 
-// Config is the persisted CLI state (tokens + API base).
+// Config is the persisted CLI state (tokens + API base + current folder).
 type Config struct {
-	APIBase      string `json:"apiBase"`
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
+	APIBase         string `json:"apiBase"`
+	AccessToken     string `json:"accessToken"`
+	RefreshToken    string `json:"refreshToken"`
+	CurrentFolderID string `json:"currentFolderId,omitempty"`
 }
 
 // DefaultAPIBase is used when FILVAULT_API_BASE is unset.

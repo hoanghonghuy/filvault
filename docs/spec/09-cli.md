@@ -30,7 +30,20 @@ filvault search <q>                     # GET /search?q=
 filvault storage                        # GET /storage
 ```
 
-Chưa làm: `cd`, `sync`, glob `*.pdf`, sharing, versioning, permanent delete (`rm -f`).
+## 1c. Phạm vi slice 3 (điều hướng thư mục)
+
+```text
+filvault cd <name>     # vào folder theo tên (trong folder hiện tại)
+filvault cd ..         # lên folder cha
+filvault cd            # về root (cùng với cd /)
+filvault pwd           # in folder hiện tại (path hoặc id)
+```
+
+- Config lưu thêm `currentFolderId` (rỗng = root).
+- `ls` (không arg), `upload`, `download`, `rm`, `mv`, `mkdir` hoạt động **trong folder hiện tại**.
+- `ls <folderId>` vẫn liệt kê folder cụ thể (không đổi `currentFolderId`).
+
+Chưa làm: `sync`, glob `*.pdf`, sharing, versioning, permanent delete (`rm -f`).
 
 ## 2. Ngôn ngữ & module
 
@@ -193,6 +206,29 @@ filvault storage
 
 - `GET /storage` → in `usedBytes of quotaBytes` (dùng `formatBytes`).
 
+## 5c. Lệnh slice 3 chi tiết
+
+### 5c.1 cd
+
+```text
+filvault cd <name>     # vào folder con theo tên
+filvault cd ..         # lên cha
+filvault cd            # về root
+```
+
+- `cd <name>`: `GET /browser?folderId=<current>` → tìm folder con theo `name` (khớp chính xác). Không thấy → `NOT_FOUND`, exit 1. Thấy → lưu `currentFolderId` = id folder đó.
+- `cd ..`: `GET /browser?folderId=<current>` → lấy `parentId` của folder hiện tại (từ field `folder.parentId`). Lưu `currentFolderId` = parentId (rỗng = root).
+- `cd` (không arg): xóa `currentFolderId` (về root).
+- In `Now in <name>` (hoặc `Now in /` khi về root).
+
+### 5c.2 pwd
+
+```text
+filvault pwd
+```
+
+- In `currentFolderId` nếu có, ngược lại in `/`.
+
 ## 6. Test
 
 TDD theo slice. Ưu tiên:
@@ -208,7 +244,6 @@ Không cần test thật MinIO/S3 — upload/download dùng fake server trả pr
 ## 7. Không làm ở slice này
 
 ```text
-cd
 sync, watcher, hash
 glob, resumable, multipart
 sharing, versioning, devices

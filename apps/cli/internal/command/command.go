@@ -14,9 +14,11 @@ import (
 
 // Commands holds shared dependencies for CLI subcommands.
 type Commands struct {
-	Client *client.Client
-	Out    io.Writer
-	Err    io.Writer
+	Client          *client.Client
+	Out             io.Writer
+	Err             io.Writer
+	CurrentFolderID string
+	SaveFolder      func(id string) error
 }
 
 // Login authenticates and persists tokens via the provided saver.
@@ -50,8 +52,9 @@ type user struct {
 }
 
 type folder struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	ParentID *string `json:"parentId"`
 }
 
 type file struct {
@@ -61,6 +64,7 @@ type file struct {
 }
 
 type browser struct {
+	Folder  *folder  `json:"folder"`
 	Folders []folder `json:"folders"`
 	Files   []file   `json:"files"`
 }
@@ -93,14 +97,13 @@ func (c *Commands) Whoami() error {
 	return nil
 }
 
-// Ls lists folders and files in a folder (root when folderID is empty).
+// Ls lists folders and files in a folder (current folder when folderID is empty).
 func (c *Commands) Ls(folderID string) error {
-	path := "/browser"
-	if folderID != "" {
-		path += "?folderId=" + folderID
+	if folderID == "" {
+		folderID = c.CurrentFolderID
 	}
 	var b browser
-	if err := c.Client.Do(http.MethodGet, path, nil, &b); err != nil {
+	if err := c.Client.Do(http.MethodGet, browserPath(folderID), nil, &b); err != nil {
 		return err
 	}
 	for _, f := range b.Folders {
@@ -112,8 +115,11 @@ func (c *Commands) Ls(folderID string) error {
 	return nil
 }
 
-// Upload uploads a local file, optionally into a folder.
+// Upload uploads a local file, optionally into a folder (default: current folder).
 func (c *Commands) Upload(localPath, folderID string) error {
+	if folderID == "" {
+		folderID = c.CurrentFolderID
+	}
 	info, err := os.Stat(localPath)
 	if err != nil {
 		return err
@@ -173,10 +179,10 @@ func (c *Commands) Logout(refreshToken string, clear func() error) error {
 	return nil
 }
 
-// Download downloads a file by name from the current folder (root).
+// Download downloads a file by name from the current folder.
 func (c *Commands) Download(name string) error {
 	var b browser
-	if err := c.Client.Do(http.MethodGet, "/browser", nil, &b); err != nil {
+	if err := c.Client.Do(http.MethodGet, browserPath(c.CurrentFolderID), nil, &b); err != nil {
 		return err
 	}
 	var target *file
@@ -251,11 +257,19 @@ func formatBytes(n int64) string {
 	}
 }
 
-// resolve finds a folder or file by exact name in the root browser listing.
+// browserPath builds the /browser path for a folder (root when empty).
+func browserPath(folderID string) string {
+	if folderID == "" {
+		return "/browser"
+	}
+	return "/browser?folderId=" + folderID
+}
+
+// resolve finds a folder or file by exact name in the current folder.
 // It returns the resource type ("folder" or "file") and its ID.
 func (c *Commands) resolve(name string) (string, string, error) {
 	var b browser
-	if err := c.Client.Do(http.MethodGet, "/browser", nil, &b); err != nil {
+	if err := c.Client.Do(http.MethodGet, browserPath(c.CurrentFolderID), nil, &b); err != nil {
 		return "", "", err
 	}
 	for _, f := range b.Folders {
@@ -271,8 +285,70 @@ func (c *Commands) resolve(name string) (string, string, error) {
 	return "", "", &client.Error{Code: "NOT_FOUND", Message: "not found: " + name, Status: 404}
 }
 
-// Mkdir creates a folder, optionally under a parent.
+// Cd changes the current folder. Empty name returns to root; ".." goes up.
+func (c *Commands) Cd(name string) error {
+	if name == "" {
+		if c.SaveFolder != nil {
+			if err := c.SaveFolder(""); err != nil {
+				return err
+			}
+		}
+		c.CurrentFolderID = ""
+		fmt.Fprintln(c.Out, "Now in /")
+		return nil
+	}
+	var b browser
+	if err := c.Client.Do(http.MethodGet, browserPath(c.CurrentFolderID), nil, &b); err != nil {
+		return err
+	}
+	if name == ".." {
+		parent := ""
+		if b.Folder != nil && b.Folder.ParentID != nil {
+			parent = *b.Folder.ParentID
+		}
+		if c.SaveFolder != nil {
+			if err := c.SaveFolder(parent); err != nil {
+				return err
+			}
+		}
+		c.CurrentFolderID = parent
+		if parent == "" {
+			fmt.Fprintln(c.Out, "Now in /")
+		} else {
+			fmt.Fprintf(c.Out, "Now in %s\n", parent)
+		}
+		return nil
+	}
+	for _, f := range b.Folders {
+		if f.Name == name {
+			if c.SaveFolder != nil {
+				if err := c.SaveFolder(f.ID); err != nil {
+					return err
+				}
+			}
+			c.CurrentFolderID = f.ID
+			fmt.Fprintf(c.Out, "Now in %s\n", name)
+			return nil
+		}
+	}
+	return &client.Error{Code: "NOT_FOUND", Message: "folder not found: " + name, Status: 404}
+}
+
+// Pwd prints the current folder id (or "/" for root).
+func (c *Commands) Pwd() error {
+	if c.CurrentFolderID == "" {
+		fmt.Fprintln(c.Out, "/")
+	} else {
+		fmt.Fprintln(c.Out, c.CurrentFolderID)
+	}
+	return nil
+}
+
+// Mkdir creates a folder, optionally under a parent (default: current folder).
 func (c *Commands) Mkdir(name, parentID string) error {
+	if parentID == "" {
+		parentID = c.CurrentFolderID
+	}
 	req := map[string]any{"name": name}
 	if parentID != "" {
 		req["parentId"] = parentID

@@ -371,3 +371,82 @@ func TestStorage(t *testing.T) {
 		t.Fatalf("storage output missing sizes: %q", out)
 	}
 }
+
+func TestCd(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/browser" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"folder":     nil,
+			"breadcrumb": []any{},
+			"folders":    []map[string]any{{"id": "f1", "name": "Docs"}},
+			"files":      []any{},
+		})
+	})
+
+	var saved string
+	var out bytes.Buffer
+	c := client.New(srv.URL)
+	cmds := &Commands{Client: c, Out: &out, Err: &out, SaveFolder: func(id string) error { saved = id; return nil }}
+	if err := cmds.Cd("Docs"); err != nil {
+		t.Fatalf("cd error: %v", err)
+	}
+	if saved != "f1" {
+		t.Fatalf("saved folder = %q, want f1", saved)
+	}
+	if !strings.Contains(out.String(), "Docs") {
+		t.Fatalf("cd output missing name: %q", out.String())
+	}
+}
+
+func TestCdUp(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/browser" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("folderId") != "f1" {
+			t.Fatalf("unexpected folderId %q", r.URL.Query().Get("folderId"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"folder":     map[string]any{"id": "f1", "name": "Docs", "parentId": "root1"},
+			"breadcrumb": []any{},
+			"folders":    []any{},
+			"files":      []any{},
+		})
+	})
+
+	var saved string
+	var out bytes.Buffer
+	c := client.New(srv.URL)
+	cmds := &Commands{Client: c, Out: &out, Err: &out, CurrentFolderID: "f1", SaveFolder: func(id string) error { saved = id; return nil }}
+	if err := cmds.Cd(".."); err != nil {
+		t.Fatalf("cd .. error: %v", err)
+	}
+	if saved != "root1" {
+		t.Fatalf("saved folder = %q, want root1", saved)
+	}
+}
+
+func TestCdRoot(t *testing.T) {
+	var saved string
+	var out bytes.Buffer
+	cmds := &Commands{Out: &out, Err: &out, CurrentFolderID: "f1", SaveFolder: func(id string) error { saved = id; return nil }}
+	if err := cmds.Cd(""); err != nil {
+		t.Fatalf("cd root error: %v", err)
+	}
+	if saved != "" {
+		t.Fatalf("saved folder = %q, want empty", saved)
+	}
+}
+
+func TestPwd(t *testing.T) {
+	var out bytes.Buffer
+	cmds := &Commands{Out: &out, Err: &out, CurrentFolderID: "f1"}
+	if err := cmds.Pwd(); err != nil {
+		t.Fatalf("pwd error: %v", err)
+	}
+	if !strings.Contains(out.String(), "f1") {
+		t.Fatalf("pwd output missing id: %q", out.String())
+	}
+}
