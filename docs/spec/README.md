@@ -30,6 +30,7 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao Phase 1; việc tiếp theo: smoke test tay |
 | [09-cli.md](09-cli.md) | CLI `filvault` (Phase 4): login, whoami, ls, upload, download |
 | [10-sharing.md](10-sharing.md) | Sharing (Phase 5): chia sẻ file/folder cho user khác |
+| [11-versioning.md](11-versioning.md) | Versioning (Phase 6): lịch sử phiên bản file khi replace |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web Phase 1 (Cal.com-like + teal, mobile-first) |

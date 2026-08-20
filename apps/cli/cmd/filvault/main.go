@@ -111,6 +111,16 @@ func run(args []string) error {
 		return cmds.Pwd()
 	case "upload":
 		return upload(cmds, args[1:])
+	case "versions":
+		if len(args) < 2 {
+			return usageError()
+		}
+		return cmds.Versions(args[1])
+	case "version-download":
+		if len(args) < 3 {
+			return usageError()
+		}
+		return cmds.VersionDownload(args[1], args[2])
 	case "download":
 		if len(args) < 2 {
 			return usageError()
@@ -224,12 +234,16 @@ func readPassword() (string, error) {
 func upload(cmds *command.Commands, args []string) error {
 	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
 	folder := fs.String("folder", "", "target folder id")
+	replace := fs.String("replace", "", "replace existing file by name")
 	if err := fs.Parse(args); err != nil {
 		return usageError()
 	}
 	rest := fs.Args()
 	if len(rest) != 1 {
 		return usageError()
+	}
+	if *replace != "" {
+		return cmds.UploadReplace(rest[0], *replace)
 	}
 	return cmds.Upload(rest[0], *folder)
 }
@@ -287,7 +301,10 @@ func usageText() string {
   filvault cd [name|..]
   filvault pwd
   filvault upload <file> [--folder <id>]
+  filvault upload <file> --replace <name>
   filvault download <name>
+  filvault versions <name>
+  filvault version-download <name> <versionId>
   filvault mkdir <name> [--parent <id>]
   filvault rm <name>
   filvault rm -f <name>

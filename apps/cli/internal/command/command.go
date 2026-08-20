@@ -163,6 +163,104 @@ func (c *Commands) Upload(localPath, folderID string) error {
 	return nil
 }
 
+// UploadReplace uploads a local file, replacing an existing file by name.
+func (c *Commands) UploadReplace(localPath, name string) error {
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return err
+	}
+	_, fileID, err := c.resolve(name)
+	if err != nil {
+		return err
+	}
+	contentType := mime.TypeByExtension(filepath.Ext(localPath))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	var session struct {
+		FileID    string `json:"fileId"`
+		UploadURL string `json:"uploadUrl"`
+		ExpiresAt string `json:"expiresAt"`
+	}
+	req := map[string]any{
+		"name":          name,
+		"size":          info.Size(),
+		"contentType":   contentType,
+		"replaceFileId": fileID,
+	}
+	if err := c.Client.Do(http.MethodPost, "/files/upload-sessions", req, &session); err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return err
+	}
+	if err := putBytes(session.UploadURL, contentType, data); err != nil {
+		return err
+	}
+
+	var completed file
+	if err := c.Client.Do(http.MethodPost, "/files/"+session.FileID+"/complete", nil, &completed); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "Replaced %s\n", name)
+	return nil
+}
+
+// Versions lists archived versions of a file by name.
+func (c *Commands) Versions(name string) error {
+	_, fileID, err := c.resolve(name)
+	if err != nil {
+		return err
+	}
+	var out struct {
+		Versions []struct {
+			ID        string `json:"id"`
+			SizeBytes int64  `json:"sizeBytes"`
+			MimeType  string `json:"mimeType"`
+			CreatedAt string `json:"createdAt"`
+		} `json:"versions"`
+	}
+	if err := c.Client.Do(http.MethodGet, "/files/"+fileID+"/versions", nil, &out); err != nil {
+		return err
+	}
+	if len(out.Versions) == 0 {
+		fmt.Fprintln(c.Out, "No versions")
+		return nil
+	}
+	for _, v := range out.Versions {
+		fmt.Fprintf(c.Out, "%s  %s  %s\n", v.ID, formatBytes(v.SizeBytes), v.CreatedAt)
+	}
+	return nil
+}
+
+// VersionDownload downloads an archived version of a file by name.
+func (c *Commands) VersionDownload(name, versionID string) error {
+	_, fileID, err := c.resolve(name)
+	if err != nil {
+		return err
+	}
+	var dl struct {
+		DownloadURL string `json:"downloadUrl"`
+		ExpiresAt   string `json:"expiresAt"`
+	}
+	if err := c.Client.Do(http.MethodGet, "/files/"+fileID+"/versions/"+versionID+"/download", nil, &dl); err != nil {
+		return err
+	}
+	data, err := getBytes(dl.DownloadURL)
+	if err != nil {
+		return err
+	}
+	outName := name + "." + versionID
+	if err := os.WriteFile(outName, data, 0o600); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "Downloaded %s\n", outName)
+	return nil
+}
+
 // Logout revokes the current refresh token and clears saved tokens.
 func (c *Commands) Logout(refreshToken string, clear func() error) error {
 	if err := c.Client.Do(http.MethodPost, "/auth/logout", map[string]string{

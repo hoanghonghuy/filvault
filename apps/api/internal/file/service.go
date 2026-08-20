@@ -31,12 +31,15 @@ func NewService(repo Repository, folders folder.Repository, quota QuotaStore, ob
 	}
 }
 
-func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, contentType string, size int64, folderID *string) (UploadSession, error) {
+func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, contentType string, size int64, folderID *string, replaceFileID *string) (UploadSession, error) {
 	if err := ValidateUpload(name, contentType, size); err != nil {
 		return UploadSession{}, err
 	}
 	if folderID != nil && *folderID == "" {
 		folderID = nil
+	}
+	if replaceFileID != nil && *replaceFileID == "" {
+		replaceFileID = nil
 	}
 	if folderID != nil {
 		f, err := s.folders.GetAliveByID(ctx, ownerID, *folderID)
@@ -55,12 +58,26 @@ func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, conten
 		return UploadSession{}, apperr.QuotaExceeded
 	}
 	displayName := strings.TrimSpace(name)
-	exists, err := s.repo.ExistsAliveByName(ctx, ownerID, folderID, displayName, "")
-	if err != nil {
-		return UploadSession{}, err
-	}
-	if exists {
-		return UploadSession{}, apperr.Conflict
+
+	if replaceFileID != nil {
+		target, err := s.repo.GetByID(ctx, ownerID, *replaceFileID)
+		if err != nil {
+			return UploadSession{}, err
+		}
+		if target == nil || target.DeletedAt != nil || target.Status != StatusReady {
+			return UploadSession{}, apperr.NotFound
+		}
+		if target.Name != displayName {
+			return UploadSession{}, apperr.Validation
+		}
+	} else {
+		exists, err := s.repo.ExistsAliveByName(ctx, ownerID, folderID, displayName, "")
+		if err != nil {
+			return UploadSession{}, err
+		}
+		if exists {
+			return UploadSession{}, apperr.Conflict
+		}
 	}
 
 	now := s.now().UTC()
@@ -81,6 +98,7 @@ func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, conten
 		CreatedAt:       now,
 		UpdatedAt:       now,
 		UploadExpiresAt: &expires,
+		ReplacesFileID:  replaceFileID,
 	}
 	if err := s.repo.Create(ctx, f); err != nil {
 		return UploadSession{}, err
@@ -130,6 +148,45 @@ func (s *Service) Complete(ctx context.Context, ownerID, fileID string) (File, e
 		return File{}, apperr.QuotaExceeded
 	}
 
+	// Replace flow: archive the old file, update the target, drop the PENDING row.
+	if f.ReplacesFileID != nil {
+		target, err := s.repo.GetByID(ctx, ownerID, *f.ReplacesFileID)
+		if err != nil {
+			return File{}, err
+		}
+		if target == nil || target.DeletedAt != nil || target.Status != StatusReady {
+			return File{}, apperr.NotFound
+		}
+		version := FileVersion{
+			ID:        auth.NewID(),
+			FileID:    target.ID,
+			ObjectKey: target.ObjectKey,
+			SizeBytes: target.SizeBytes,
+			MimeType:  target.MimeType,
+			CreatedAt: now,
+		}
+		if err := s.repo.CreateVersion(ctx, version); err != nil {
+			return File{}, err
+		}
+		rec := *target
+		rec.ObjectKey = f.ObjectKey
+		rec.SizeBytes = stat.Size
+		if stat.ContentType != "" {
+			rec.MimeType = stat.ContentType
+		}
+		rec.UpdatedAt = now
+		if err := s.repo.Update(ctx, rec); err != nil {
+			return File{}, err
+		}
+		if err := s.repo.DeleteRow(ctx, ownerID, fileID); err != nil {
+			return File{}, err
+		}
+		if err := s.quota.AddStorageUsed(ctx, ownerID, stat.Size); err != nil {
+			return File{}, err
+		}
+		return rec, nil
+	}
+
 	rec := *f
 	rec.Status = StatusReady
 	rec.SizeBytes = stat.Size
@@ -167,6 +224,39 @@ func (s *Service) DownloadURL(ctx context.Context, ownerID, fileID string) (Down
 		return DownloadURL{}, apperr.NotFound
 	}
 	presigned, err := s.objects.CreateDownloadURL(ctx, f.ObjectKey, objectstore.DownloadOptions{
+		Expires: config.DownloadPresignTTL,
+	})
+	if err != nil {
+		return DownloadURL{}, err
+	}
+	return DownloadURL{URL: presigned.URL, ExpiresAt: presigned.ExpiresAt}, nil
+}
+
+// ListVersions returns archived versions of a file, newest first.
+func (s *Service) ListVersions(ctx context.Context, ownerID, fileID string) ([]FileVersion, error) {
+	f, err := s.Get(ctx, ownerID, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if f.Status != StatusReady {
+		return nil, apperr.NotFound
+	}
+	return s.repo.ListVersions(ctx, fileID)
+}
+
+// DownloadVersionURL returns a presigned URL for an archived version.
+func (s *Service) DownloadVersionURL(ctx context.Context, ownerID, fileID, versionID string) (DownloadURL, error) {
+	if _, err := s.Get(ctx, ownerID, fileID); err != nil {
+		return DownloadURL{}, err
+	}
+	v, err := s.repo.GetVersion(ctx, fileID, versionID)
+	if err != nil {
+		return DownloadURL{}, err
+	}
+	if v == nil {
+		return DownloadURL{}, apperr.NotFound
+	}
+	presigned, err := s.objects.CreateDownloadURL(ctx, v.ObjectKey, objectstore.DownloadOptions{
 		Expires: config.DownloadPresignTTL,
 	})
 	if err != nil {

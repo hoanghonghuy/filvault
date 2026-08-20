@@ -224,6 +224,84 @@ func patchAuth(t *testing.T, engine http.Handler, path, token string, payload ma
 	return doJSON(t, engine, http.MethodPatch, path, token, payload)
 }
 
+func TestVersioning_ReplaceListDownload(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	// Upload the original file.
+	fileID, _ := uploadReady(t, engine, objs, token, "photo.jpg", nil)
+
+	// Replace it with a new version.
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":          "photo.jpg",
+		"size":          256,
+		"contentType":   "image/jpeg",
+		"replaceFileId": fileID,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("replace session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	newKey := file.ObjectKey(userID, session.FileID)
+	objs.PutObject(newKey, objectstore.ObjectStat{Size: 256, ContentType: "image/jpeg"})
+	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
+	if code != http.StatusOK {
+		t.Fatalf("replace complete status=%d body=%s", code, body)
+	}
+
+	// List versions: should have exactly one archived version.
+	code, body = getAuth(t, engine, "/api/v1/files/"+fileID+"/versions", token)
+	if code != http.StatusOK {
+		t.Fatalf("versions status=%d body=%s", code, body)
+	}
+	var versions struct {
+		Versions []struct {
+			ID        string `json:"id"`
+			SizeBytes int64  `json:"sizeBytes"`
+		} `json:"versions"`
+	}
+	decodeJSON(t, body, &versions)
+	if len(versions.Versions) != 1 {
+		t.Fatalf("expected 1 version, got %d: %s", len(versions.Versions), body)
+	}
+	if versions.Versions[0].SizeBytes != 128 {
+		t.Fatalf("version size = %d, want 128", versions.Versions[0].SizeBytes)
+	}
+
+	// Download the archived version.
+	versionID := versions.Versions[0].ID
+	code, body = getAuth(t, engine, "/api/v1/files/"+fileID+"/versions/"+versionID+"/download", token)
+	if code != http.StatusOK {
+		t.Fatalf("version download status=%d body=%s", code, body)
+	}
+	var dl struct {
+		DownloadURL string `json:"downloadUrl"`
+	}
+	decodeJSON(t, body, &dl)
+	if dl.DownloadURL == "" {
+		t.Fatalf("version download url empty: %s", body)
+	}
+}
+
+func TestVersioning_ReplaceNameMismatch(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	fileID, _ := uploadReady(t, engine, objs, token, "photo.jpg", nil)
+
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":          "other.jpg",
+		"size":          256,
+		"contentType":   "image/jpeg",
+		"replaceFileId": fileID,
+	})
+	assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+}
+
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

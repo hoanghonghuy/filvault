@@ -12,6 +12,10 @@ type Repository interface {
 	DeleteRow(ctx context.Context, ownerID, id string) error
 	SoftDelete(ctx context.Context, ownerID, id string, at time.Time) error
 	ExistsAliveByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error)
+
+	CreateVersion(ctx context.Context, v FileVersion) error
+	ListVersions(ctx context.Context, fileID string) ([]FileVersion, error)
+	GetVersion(ctx context.Context, fileID, versionID string) (*FileVersion, error)
 }
 
 type QuotaStore interface {

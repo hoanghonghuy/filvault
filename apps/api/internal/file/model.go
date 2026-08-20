@@ -22,6 +22,17 @@ type File struct {
 	UpdatedAt       time.Time
 	DeletedAt       *time.Time
 	UploadExpiresAt *time.Time
+	ReplacesFileID  *string
+}
+
+// FileVersion is an archived previous version of a file.
+type FileVersion struct {
+	ID        string
+	FileID    string
+	ObjectKey string
+	SizeBytes int64
+	MimeType  string
+	CreatedAt time.Time
 }
 
 func ObjectKey(ownerID, fileID string) string {

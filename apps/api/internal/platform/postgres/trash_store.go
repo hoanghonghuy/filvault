@@ -15,7 +15,7 @@ import (
 
 const fileSelectAny = `
 	SELECT id, owner_id, folder_id, name, original_name, object_key,
-		mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at
+		mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id
 	FROM files
 	WHERE 1=1
 `
@@ -88,7 +88,7 @@ func scanFiles(rows pgx.Rows) ([]file.File, error) {
 		var f file.File
 		if err := rows.Scan(
 			&f.ID, &f.OwnerID, &f.FolderID, &f.Name, &f.OriginalName, &f.ObjectKey,
-			&f.MimeType, &f.SizeBytes, &f.Status, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt, &f.UploadExpiresAt,
+			&f.MimeType, &f.SizeBytes, &f.Status, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt, &f.UploadExpiresAt, &f.ReplacesFileID,
 		); err != nil {
 			return nil, err
 		}

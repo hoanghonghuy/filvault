@@ -25,6 +25,8 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.POST("/files/:id/complete", append(middleware, h.complete)...)
 	g.GET("/files/:id", append(middleware, h.get)...)
 	g.GET("/files/:id/download", append(middleware, h.download)...)
+	g.GET("/files/:id/versions", append(middleware, h.listVersions)...)
+	g.GET("/files/:id/versions/:versionId/download", append(middleware, h.downloadVersion)...)
 	g.PATCH("/files/:id", append(middleware, h.patch)...)
 	g.DELETE("/files/:id", append(middleware, h.delete)...)
 }
@@ -39,10 +41,11 @@ func userIDFrom(c *gin.Context) (string, bool) {
 }
 
 type sessionReq struct {
-	Name        string  `json:"name"`
-	Size        int64   `json:"size"`
-	ContentType string  `json:"contentType"`
-	FolderID    *string `json:"folderId"`
+	Name          string  `json:"name"`
+	Size          int64   `json:"size"`
+	ContentType   string  `json:"contentType"`
+	FolderID      *string `json:"folderId"`
+	ReplaceFileID *string `json:"replaceFileId"`
 }
 
 func (h *Handler) createSession(c *gin.Context) {
@@ -56,7 +59,7 @@ func (h *Handler) createSession(c *gin.Context) {
 		httpx.Validation(c)
 		return
 	}
-	session, err := h.svc.CreateUploadSession(c.Request.Context(), userID, req.Name, req.ContentType, req.Size, req.FolderID)
+	session, err := h.svc.CreateUploadSession(c.Request.Context(), userID, req.Name, req.ContentType, req.Size, req.FolderID, req.ReplaceFileID)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -115,6 +118,58 @@ func (h *Handler) download(c *gin.Context) {
 		return
 	}
 	out, err := h.svc.DownloadURL(c.Request.Context(), userID, id)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"downloadUrl": out.URL,
+		"expiresAt":   out.ExpiresAt.UTC().Format(time.RFC3339Nano),
+	})
+}
+
+func (h *Handler) listVersions(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	versions, err := h.svc.ListVersions(c.Request.Context(), userID, id)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	out := make([]gin.H, 0, len(versions))
+	for _, v := range versions {
+		out = append(out, gin.H{
+			"id":        v.ID,
+			"sizeBytes": v.SizeBytes,
+			"mimeType":  v.MimeType,
+			"createdAt": v.CreatedAt.UTC().Format(time.RFC3339Nano),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"versions": out})
+}
+
+func (h *Handler) downloadVersion(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	versionID, ok := httpx.ParamULID(c, "versionId")
+	if !ok {
+		return
+	}
+	out, err := h.svc.DownloadVersionURL(c.Request.Context(), userID, id, versionID)
 	if err != nil {
 		httpx.Error(c, err)
 		return

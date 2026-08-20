@@ -44,6 +44,12 @@ func TestMigrate_DownRemovesPhase1Tables(t *testing.T) {
 		t.Fatalf("MigrateDown: %v", err)
 	}
 	if err := postgres.MigrateDown(ctx, pool); err != nil {
+		t.Fatalf("MigrateDown phase 4: %v", err)
+	}
+	if err := postgres.MigrateDown(ctx, pool); err != nil {
+		t.Fatalf("MigrateDown phase 3: %v", err)
+	}
+	if err := postgres.MigrateDown(ctx, pool); err != nil {
 		t.Fatalf("MigrateDown phase 2: %v", err)
 	}
 	if err := postgres.MigrateDown(ctx, pool); err != nil {

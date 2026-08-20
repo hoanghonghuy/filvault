@@ -644,3 +644,100 @@ func TestSharedDownload(t *testing.T) {
 		t.Fatalf("file content = %q, want hello", string(data))
 	}
 }
+
+func TestVersions(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []map[string]any{},
+				"files":   []map[string]any{{"id": "f1", "name": "doc.pdf", "sizeBytes": 10}},
+			})
+		case "/files/f1/versions":
+			json.NewEncoder(w).Encode(map[string]any{
+				"versions": []map[string]any{
+					{"id": "v1", "sizeBytes": 5, "mimeType": "application/pdf", "createdAt": "2026-01-01T00:00:00Z"},
+				},
+			})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.Versions("doc.pdf") })
+	if !strings.Contains(out, "v1") {
+		t.Fatalf("versions output missing id: %q", out)
+	}
+}
+
+func TestVersionDownload(t *testing.T) {
+	var srv *httptest.Server
+	srv = newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []map[string]any{},
+				"files":   []map[string]any{{"id": "f1", "name": "doc.pdf", "sizeBytes": 10}},
+			})
+		case "/files/f1/versions/v1/download":
+			json.NewEncoder(w).Encode(map[string]any{"downloadUrl": srv.URL + "/dl", "expiresAt": "2026-01-01T00:00:00Z"})
+		case "/dl":
+			w.Write([]byte("old-content"))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	dir := t.TempDir()
+	old, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(old)
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.VersionDownload("doc.pdf", "v1") })
+	if !strings.Contains(out, "doc.pdf.v1") {
+		t.Fatalf("version-download output missing: %q", out)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "doc.pdf.v1"))
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if string(data) != "old-content" {
+		t.Fatalf("file content = %q, want old-content", string(data))
+	}
+}
+
+func TestUploadReplace(t *testing.T) {
+	var srv *httptest.Server
+	srv = newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/browser":
+			json.NewEncoder(w).Encode(map[string]any{
+				"folders": []map[string]any{},
+				"files":   []map[string]any{{"id": "f1", "name": "doc.pdf", "sizeBytes": 10}},
+			})
+		case "/files/upload-sessions":
+			json.NewEncoder(w).Encode(map[string]any{
+				"fileId":    "p1",
+				"uploadUrl": srv.URL + "/put",
+				"expiresAt": "2026-01-01T00:00:00Z",
+			})
+		case "/put":
+			w.WriteHeader(http.StatusOK)
+		case "/files/p1/complete":
+			json.NewEncoder(w).Encode(map[string]any{"id": "f1", "name": "doc.pdf", "sizeBytes": 20})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "new.pdf")
+	if err := os.WriteFile(src, []byte("new-content"), 0o600); err != nil {
+		t.Fatalf("write src: %v", err)
+	}
+
+	out, _ := run(t, srv, func(c *Commands) error { return c.UploadReplace(src, "doc.pdf") })
+	if !strings.Contains(out, "doc.pdf") {
+		t.Fatalf("upload-replace output missing: %q", out)
+	}
+}
