@@ -78,6 +78,277 @@ func TestSearch_ExcludesTrash(t *testing.T) {
 	}
 }
 
+type searchPayload struct {
+	Folders []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"folders"`
+	Files []struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		MimeType  string `json:"mimeType"`
+		SizeBytes int64  `json:"sizeBytes"`
+	} `json:"files"`
+}
+
+func searchNames(p searchPayload) []string {
+	names := make([]string, 0, len(p.Files))
+	for _, f := range p.Files {
+		names = append(names, f.Name)
+	}
+	return names
+}
+
+func containsString(list []string, want string) bool {
+	for _, v := range list {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSearch_TypeFilter(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	uploadReady(t, engine, objs, token, "trip-photo.jpg")
+	uploadReadyPDF(t, engine, objs, token, "trip-notes.pdf")
+
+	code, body := getAuth(t, engine, "/api/v1/search?q=trip&type=image", token)
+	if code != http.StatusOK {
+		t.Fatalf("image search status=%d body=%s", code, body)
+	}
+	var p searchPayload
+	decodeJSON(t, body, &p)
+	if len(p.Folders) != 0 || len(p.Files) != 1 || p.Files[0].Name != "trip-photo.jpg" {
+		t.Fatalf("image filter mismatch: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/search?q=trip&type=document", token)
+	if code != http.StatusOK {
+		t.Fatalf("document search status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 1 || p.Files[0].Name != "trip-notes.pdf" {
+		t.Fatalf("document filter mismatch: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/search?q=trip&type=all", token)
+	if code != http.StatusOK {
+		t.Fatalf("all search status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 2 {
+		t.Fatalf("all filter mismatch: %s", body)
+	}
+}
+
+func TestSearch_TypeFolderReturnsFoldersOnly(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	postAuth(t, engine, "/api/v1/folders", token, map[string]any{"name": "trip-2026"})
+	uploadReady(t, engine, objs, token, "trip-photo.jpg")
+
+	code, body := getAuth(t, engine, "/api/v1/search?q=trip&type=folder", token)
+	if code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", code, body)
+	}
+	var p searchPayload
+	decodeJSON(t, body, &p)
+	if len(p.Folders) != 1 || p.Folders[0].Name != "trip-2026" {
+		t.Fatalf("folder filter mismatch: %s", body)
+	}
+	if len(p.Files) != 0 {
+		t.Fatalf("type=folder must not return files: %s", body)
+	}
+}
+
+func TestSearch_FolderIdScopesToSubtree(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	code, body := postAuth(t, engine, "/api/v1/folders", token, map[string]any{"name": "parent"})
+	if code != http.StatusCreated {
+		t.Fatalf("create parent status=%d body=%s", code, body)
+	}
+	var parent struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &parent)
+
+	code, body = postAuth(t, engine, "/api/v1/folders", token, map[string]any{"name": "child", "parentId": parent.ID})
+	if code != http.StatusCreated {
+		t.Fatalf("create child status=%d body=%s", code, body)
+	}
+	var child struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &child)
+
+	code, body = postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{"name": "elsewhere.txt", "size": 16, "contentType": "text/plain"})
+	if code != http.StatusCreated {
+		t.Fatalf("create root session status=%d body=%s", code, body)
+	}
+
+	code, body = postAuth(t, engine, fmt.Sprintf("/api/v1/files/upload-sessions"), token, map[string]any{"name": "inside.txt", "size": 16, "contentType": "text/plain", "folderId": child.ID})
+	if code != http.StatusCreated {
+		t.Fatalf("create nested session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objKey := file.ObjectKey(userID, session.FileID)
+	objs.PutObject(objKey, objectstore.ObjectStat{Size: 16, ContentType: "text/plain"})
+	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
+	if code != http.StatusOK {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/search?q=.txt&folderId="+parent.ID, token)
+	if code != http.StatusOK {
+		t.Fatalf("scoped status=%d body=%s", code, body)
+	}
+	var p searchPayload
+	decodeJSON(t, body, &p)
+	names := searchNames(p)
+	if len(names) != 1 || !containsString(names, "inside.txt") {
+		t.Fatalf("scoped subtree mismatch: %v %s", names, body)
+	}
+}
+
+func TestSearch_ValidationErrors(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	cases := []struct {
+		name string
+		qs   string
+	}{
+		{"unknown type", "?q=x&type=audio"},
+		{"unknown sort", "?q=x&sort=sizee"},
+		{"unknown order", "?q=x&order=sideways"},
+		{"bad limit zero", "?q=x&limit=0"},
+		{"bad limit over cap", "?q=x&limit=51"},
+		{"bad ulid folderId", "?q=x&folderId=nope"},
+		{"bad from date", "?q=x&from=2026-13-40"},
+		{"from after to", "?q=x&from=2026-05-02&to=2026-05-01"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			code, body := getAuth(t, engine, "/api/v1/search"+tc.qs, token)
+			assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+		})
+	}
+}
+
+func TestSearch_FolderIdUnknownNotFound(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	foreign := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+	code, body := getAuth(t, engine, "/api/v1/search?q=x&folderId="+foreign, token)
+	assertAPIError(t, code, body, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestSearch_DateRange(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	uploadSized(t, engine, objs, token, "dated-report.pdf", "application/pdf", 64)
+
+	now := time.Now().UTC()
+	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
+
+	code, body := getAuth(t, engine, "/api/v1/search?q=dated&from="+yesterday+"&to="+tomorrow, token)
+	if code != http.StatusOK {
+		t.Fatalf("in-range status=%d body=%s", code, body)
+	}
+	var p searchPayload
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 1 || p.Files[0].Name != "dated-report.pdf" {
+		t.Fatalf("in-range mismatch: %s", body)
+	}
+
+	future := now.AddDate(0, 0, 30).Format("2006-01-02")
+	code, body = getAuth(t, engine, "/api/v1/search?q=dated&from="+future, token)
+	if code != http.StatusOK {
+		t.Fatalf("future-from status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 0 {
+		t.Fatalf("future-from must exclude existing file: %s", body)
+	}
+}
+
+func TestSearch_SortSize(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	uploadSized(t, engine, objs, token, "small.txt", "text/plain", 32)
+	uploadSized(t, engine, objs, token, "big.zip", "application/zip", 256)
+
+	code, body := getAuth(t, engine, "/api/v1/search?q=.&sort=size&order=desc", token)
+	if code != http.StatusOK {
+		t.Fatalf("desc status=%d body=%s", code, body)
+	}
+	var p searchPayload
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 2 || p.Files[0].Name != "big.zip" || p.Files[1].Name != "small.txt" {
+		t.Fatalf("desc order mismatch: %+v", searchNames(p))
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/search?q=.&sort=size&order=asc", token)
+	if code != http.StatusOK {
+		t.Fatalf("asc status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 2 || p.Files[0].Name != "small.txt" || p.Files[1].Name != "big.zip" {
+		t.Fatalf("asc order mismatch: %+v", searchNames(p))
+	}
+}
+
+func TestSearch_SortDateDefaultDesc(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	olderID := uploadSized(t, engine, objs, token, "older.txt", "text/plain", 8)
+	time.Sleep(50 * time.Millisecond)
+	newerID := uploadSized(t, engine, objs, token, "newer.txt", "text/plain", 8)
+
+	code, body := getAuth(t, engine, "/api/v1/search?q=.txt&sort=date", token)
+	if code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", code, body)
+	}
+	var p searchPayload
+	decodeJSON(t, body, &p)
+	if len(p.Files) != 2 || p.Files[0].ID != newerID || p.Files[1].ID != olderID {
+		t.Fatalf("date desc mismatch: %+v", searchNames(p))
+	}
+}
+
+func uploadSized(t *testing.T, engine http.Handler, objs *objectstore.Memory, token, name, contentType string, size int64) string {
+	t.Helper()
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":        name,
+		"size":        size,
+		"contentType": contentType,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objectKey := file.ObjectKey(userID, session.FileID)
+	objs.PutObject(objectKey, objectstore.ObjectStat{Size: size, ContentType: contentType})
+	code, body = postAuth(t, engine, "/api/v1/files/"+session.FileID+"/complete", token, nil)
+	if code != http.StatusOK {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+	return session.FileID
+}
+
 func uploadReadyPDF(t *testing.T, engine http.Handler, objs *objectstore.Memory, token, name string) string {
 	t.Helper()
 	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{

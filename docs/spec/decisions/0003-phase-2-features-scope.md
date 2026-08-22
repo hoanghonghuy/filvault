@@ -1,6 +1,6 @@
 # ADR 0003 — Phạm vi tính năng Phase 2 (web)
 
-- Trạng thái: **Proposed** (chuyển Accepted khi bắt đầu slice đầu tiên)
+- Trạng thái: **Accepted** (bắt đầu implement từ S1 ngày 2026-08-22)
 - Ngày: 2026-08-22
 - Spec: [../09-phase-2-features.md](../09-phase-2-features.md)
 

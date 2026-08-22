@@ -12,7 +12,8 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
 import { mimeIcon, mimeLabel, resolveContentType } from '@/lib/mimeIcon'
-import type { Browser, DownloadURL, SearchResult, UploadSession } from '@/api/types'
+import type { Browser, DownloadURL, SearchFilters, SearchResult, UploadSession } from '@/api/types'
+import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +27,8 @@ const searchLoading = ref(false)
 const error = ref('')
 const uploadProgress = ref<number | null>(null)
 const searchQuery = ref('')
+const filterSheetOpen = ref(false)
+const filters = ref<SearchFilters>({ type: 'all', sort: 'relevance', order: 'desc' })
 const newFolderName = ref('')
 const folderSheetOpen = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -89,6 +92,61 @@ async function loadBrowser() {
   }
 }
 
+const hasActiveFilters = computed(
+  () =>
+    filters.value.type !== 'all' ||
+    filters.value.sort !== 'relevance' ||
+    filters.value.order !== 'desc' ||
+    Boolean(filters.value.folderId) ||
+    Boolean(filters.value.from) ||
+    Boolean(filters.value.to),
+)
+
+const TYPE_LABELS: Record<SearchFilters['type'], string> = {
+  all: 'All',
+  image: 'Images',
+  video: 'Videos',
+  document: 'Documents',
+  archive: 'Archives',
+  folder: 'Folders',
+}
+
+const SORT_LABELS: Record<SearchFilters['sort'], string> = {
+  relevance: 'Best match',
+  name: 'Name',
+  date: 'Date',
+  size: 'Size',
+}
+
+const activeFilterChips = computed(() => {
+  const f = filters.value
+  const chips: Array<{ key: keyof SearchFilters; label: string }> = []
+  if (f.type !== 'all') chips.push({ key: 'type', label: TYPE_LABELS[f.type] })
+  if (f.folderId) chips.push({ key: 'folderId', label: 'This folder' })
+  if (f.from) chips.push({ key: 'from', label: `From ${f.from}` })
+  if (f.to) chips.push({ key: 'to', label: `To ${f.to}` })
+  if (f.sort !== 'relevance') {
+    chips.push({ key: 'sort', label: `Sort: ${SORT_LABELS[f.sort]}` })
+  }
+  if (f.sort !== 'relevance' && f.order !== 'desc') {
+    chips.push({ key: 'order', label: 'Ascending' })
+  }
+  return chips
+})
+
+function buildSearchQuery(): string {
+  const params = new URLSearchParams()
+  params.set('q', searchQuery.value.trim())
+  const f = filters.value
+  if (f.type !== 'all') params.set('type', f.type)
+  if (f.folderId) params.set('folderId', f.folderId)
+  if (f.from) params.set('from', f.from)
+  if (f.to) params.set('to', f.to)
+  if (f.sort !== 'relevance') params.set('sort', f.sort)
+  if (f.order !== 'desc') params.set('order', f.order)
+  return params.toString()
+}
+
 async function runSearch() {
   if (!searchQuery.value.trim()) {
     searchResults.value = null
@@ -98,7 +156,7 @@ async function runSearch() {
   error.value = ''
   searchLoading.value = true
   try {
-    searchResults.value = await api<SearchResult>(`/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
+    searchResults.value = await api<SearchResult>(`/search?${buildSearchQuery()}`)
   } catch (e) {
     error.value = formatApiError(e, 'Search failed')
   } finally {
@@ -111,6 +169,28 @@ watch(searchQuery, () => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(runSearch, 300)
 })
+
+watch(filters, runSearch)
+
+function onFiltersApply(applied: SearchFilters) {
+  filterSheetOpen.value = false
+  filters.value = applied
+  if (searchTimer) clearTimeout(searchTimer)
+  void runSearch()
+}
+
+function clearFilters() {
+  filters.value = { type: 'all', sort: 'relevance', order: 'desc' }
+}
+
+function removeFilter(key: keyof SearchFilters) {
+  const next = { ...filters.value }
+  if (key === 'type') next.type = 'all'
+  else if (key === 'sort') next.sort = 'relevance'
+  else if (key === 'order') next.order = 'desc'
+  else delete next[key]
+  filters.value = next
+}
 
 async function openFolder(id: string | null) {
   await router.push(id ? { path: '/files', query: { folderId: id } } : { path: '/files' })
@@ -455,6 +535,15 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         aria-label="Search files"
         enterkeyhint="search"
       />
+      <button
+        class="btn icon-only filter-toggle"
+        :class="{ 'filter-active': hasActiveFilters }"
+        type="button"
+        aria-label="Search filters"
+        @click="filterSheetOpen = true"
+      >
+        <Icon name="filter" :size="18" />
+      </button>
       <button class="btn accent desktop-only" type="button" @click="triggerUpload">Upload</button>
       <button class="btn desktop-only" type="button" @click="triggerFolderUpload">Upload folder</button>
       <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">New folder</button>
@@ -477,7 +566,19 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
 
     <TransitionGroup v-if="!loading && searchResults" name="row" tag="section" class="list">
-      <h2 key="search-title" class="section-title">Search results</h2>
+      <h2 key="search-title" class="section-title">
+        {{ searchResults.folders.length + searchResults.files.length }} results
+        <template v-if="hasActiveFilters"> · filtered</template>
+      </h2>
+      <div v-if="hasActiveFilters" key="filter-chips" class="filter-chips">
+        <span v-for="chip in activeFilterChips" :key="chip.key" class="filter-chip">
+          {{ chip.label }}
+          <button type="button" class="chip-remove" aria-label="Remove filter" @click="removeFilter(chip.key)">
+            ×
+          </button>
+        </span>
+        <button type="button" class="chip-clear" @click="clearFilters">Clear all</button>
+      </div>
       <div
         v-for="folder in searchResults.folders"
         :key="folder.id"
@@ -504,10 +605,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <EmptyState
         v-if="searchResults.folders.length === 0 && searchResults.files.length === 0"
         key="search-empty"
-        title="No results"
-        description="Try a different search term."
+        :title="hasActiveFilters ? 'No results match your filters' : 'No results'"
+        :description="hasActiveFilters ? 'Try removing some filters.' : 'Try a different search term.'"
         icon="file"
-      />
+      >
+        <button v-if="hasActiveFilters" type="button" class="btn" @click="clearFilters">Clear filters</button>
+      </EmptyState>
     </TransitionGroup>
 
     <TransitionGroup v-else-if="!loading" name="row" tag="section" class="list">
@@ -565,6 +668,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       confirm-label="Move here"
       @select="onPickerSelect"
       @close="pickerOpen = false"
+    />
+
+    <SearchFilterSheet
+      :open="filterSheetOpen"
+      :filters="filters"
+      @apply="onFiltersApply"
+      @close="filterSheetOpen = false"
     />
   </div>
 </template>
@@ -627,6 +737,68 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
 .toolbar-sticky .search-input {
   flex: 1 1 100%;
+}
+
+.filter-toggle {
+  border: 1px solid var(--hairline);
+}
+
+.filter-toggle.filter-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  min-height: 28px;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-remove:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.chip-clear {
+  min-height: 28px;
+  padding: 0 var(--space-xs);
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .breadcrumb {
