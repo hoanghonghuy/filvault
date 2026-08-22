@@ -67,6 +67,14 @@ touch:
   preferred-target: 48px
   fab-size: 56px
 
+motion:
+  ease-standard: cubic-bezier(0.2, 0, 0, 1)
+  ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1)
+  ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15)
+  duration-short: 100ms
+  duration-medium: 200ms
+  duration-long: 300ms
+
 breakpoints:
   mobile: 0–767px
   tablet: 768–1023px
@@ -89,7 +97,30 @@ Filvault là **personal cloud** (My Files + Photos trên cùng một kho). UI ph
 
 **Tone:** calm utility, confident hierarchy, mobile-first.  
 **Density:** list/file rows hơi dày (Cal.com product fragment feel); Photos grid thoáng hơn.  
-**Motion:** ngắn (150–250ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast — không decorative.
+**Motion:** ngắn (100–300ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast — không decorative.
+
+### Motion tokens (Material 3)
+
+| Token | Value | Dùng cho |
+|-------|-------|----------|
+| `--ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Mọi transition mặc định |
+| `--ease-emphasized-decelerate` | `cubic-bezier(0.05, 0.7, 0.1, 1)` | Sheet/trang đi vào |
+| `--ease-emphasized-accelerate` | `cubic-bezier(0.3, 0, 0.8, 0.15)` | Sheet/trang rời đi |
+| `--duration-short` | `100ms` | Press state, hover màu |
+| `--duration-medium` | `200ms` | Fade, item move, toast ra |
+| `--duration-long` | `300ms` | Sheet slide-up, toast vào |
+
+Rules:
+- Chỉ animate `transform` + `opacity`; cấm `transition: all`.
+- Vào chậm hơn ra (enter ≥ leave duration) — cảm giác phản hồi nhanh.
+- Press feedback: `.btn` scale 0.97, `.row.tappable` scale 0.98 khi `:active`.
+- Mọi motion phải được vô hiệu hoá bởi global `prefers-reduced-motion` guard trong `main.css`.
+- Route change: `<Transition name="page" mode="out-in">` trong `AppShell` — fade-out 100ms, fade-in + translateY(8px) 200ms.
+- List/grid thay đổi (xóa, move, search): `<TransitionGroup name="row">` — item rời đi scale-fade 100ms, item còn lại trượt vào chỗ (`move`) 200ms.
+- Grid Photos / album list xuất hiện lần đầu: class `.appear` + stagger từ `lib/motion.ts` (`cellDelay`, 30ms/cell, tối đa 240ms).
+- Bottom/side nav: indicator pill trượt bằng `transform: scale` (200ms emphasized-decelerate) — không animate layout.
+- FAB: hover nâng shadow, press scale 0.94 + hạ shadow (100ms).
+- Optimistic UI cho thao tác phá hủy (delete/restore): gỡ row khỏi list **trước** khi gọi API để TransitionGroup chạy move animation; lỗi thì `loadBrowser()`/`load()` rollback kèm error alert. Toast chỉ hiện khi API thành công.
 
 **Key characteristics**
 - Canvas trắng (`{colors.canvas}`), surface phụ xám rất nhạt (`{colors.surface-soft}` / `{colors.surface-card}`).

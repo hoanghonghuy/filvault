@@ -10,6 +10,7 @@ import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import MediaPickerSheet from '@/components/MediaPickerSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingSkeletonAlbum from '@/components/LoadingSkeletonAlbum.vue'
+import { cellDelay } from '@/lib/motion'
 import type { AlbumDetail, DownloadURL, TimelineItem } from '@/api/types'
 
 const route = useRoute()
@@ -176,11 +177,13 @@ watch(() => route.params.id, load, { immediate: true })
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
         <PhotoThumb
-          v-for="item in album.items"
+          v-for="(item, index) in album.items"
           :key="item.id"
           :mime-type="item.mimeType"
           :name="item.name"
           :thumbnail-url="item.thumbnailUrl"
+          class="appear"
+          :style="{ animationDelay: cellDelay(index) }"
           @click="openItemActions(item)"
         />
       </div>

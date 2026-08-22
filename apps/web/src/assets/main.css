@@ -41,6 +41,14 @@
   --header-h: 56px;
   --content-max: 1100px;
 
+  /* motion (Material 3 easing & duration) */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --duration-short: 100ms;
+  --duration-medium: 200ms;
+  --duration-long: 300ms;
+
   /* legacy aliases */
   --text: var(--ink);
   --border: var(--hairline);
@@ -100,11 +108,18 @@ textarea:focus-visible {
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  transition: transform var(--duration-short) var(--ease-standard),
+    background-color var(--duration-short) var(--ease-standard),
+    border-color var(--duration-short) var(--ease-standard);
 }
 
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.btn:not(:disabled):active {
+  transform: scale(0.97);
 }
 
 .btn.ink {
@@ -247,6 +262,59 @@ textarea:focus-visible {
 
 .row.tappable {
   cursor: pointer;
+  transition: transform var(--duration-short) var(--ease-standard);
+}
+
+.row.tappable:active {
+  transform: scale(0.98);
+}
+
+/* TransitionGroup list rows (Files, Trash) */
+.row-enter-active {
+  transition: opacity var(--duration-medium) var(--ease-emphasized-decelerate),
+    transform var(--duration-medium) var(--ease-emphasized-decelerate);
+}
+
+.row-leave-active {
+  position: absolute;
+  transition: opacity var(--duration-short) var(--ease-standard),
+    transform var(--duration-short) var(--ease-standard);
+}
+
+.row-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.row-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.row-move {
+  transition: transform var(--duration-medium) var(--ease-standard);
+}
+
+/* Staggered appear on first paint (Photos grid, album list).
+   Delay comes from lib/motion.ts cellDelay() via animation-delay.
+   Fill "backwards" only: after the animation the element returns to its
+   natural styles so :active press feedback keeps working. */
+.appear {
+  animation: appear-in var(--duration-medium) var(--ease-emphasized-decelerate) backwards;
+}
+
+@keyframes appear-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .appear {
+    animation: none;
+    transition-delay: 0ms !important;
+  }
 }
 
 .row .name {
@@ -627,6 +695,19 @@ textarea:focus-visible {
 @media (min-width: 768px) {
   .sk-grid.photos {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+/* Motion accessibility: honor the OS "reduce motion" setting globally.
+   Component-level rules must not override this with their own durations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

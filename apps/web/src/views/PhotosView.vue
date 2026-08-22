@@ -9,6 +9,7 @@ import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
+import { cellDelay } from '@/lib/motion'
 import type { Album, DownloadURL, Timeline, TimelineItem } from '@/api/types'
 
 const router = useRouter()
@@ -164,9 +165,10 @@ onMounted(load)
         </form>
         <div v-if="albums.length" class="list">
           <div
-            v-for="album in albums"
+            v-for="(album, index) in albums"
             :key="album.id"
-            class="row tappable"
+            class="row tappable appear"
+            :style="{ animationDelay: cellDelay(index) }"
             @click="router.push(`/photos/albums/${album.id}`)"
           >
             <button type="button" class="name link-btn" @click.stop="router.push(`/photos/albums/${album.id}`)">
@@ -191,11 +193,13 @@ onMounted(load)
         <h2 class="section-title">{{ group.date }}</h2>
         <div class="grid photos">
           <PhotoThumb
-            v-for="item in group.items"
+            v-for="(item, index) in group.items"
             :key="item.id"
             :mime-type="item.mimeType"
             :name="item.name"
             :thumbnail-url="item.thumbnailUrl"
+            class="appear"
+            :style="{ animationDelay: cellDelay(index) }"
             @click="openMedia(item)"
           />
         </div>

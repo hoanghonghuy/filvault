@@ -52,22 +52,24 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="sheet-root" role="presentation">
-      <div class="sheet-backdrop" @click="onBackdropClick" />
-      <div
-        ref="panelRef"
-        class="sheet-panel"
-        role="dialog"
-        aria-modal="true"
-        tabindex="-1"
-        :aria-labelledby="title ? titleId : undefined"
-        :aria-label="title ? undefined : 'Dialog'"
-      >
-        <div class="sheet-handle" aria-hidden="true" />
-        <h2 v-if="title" :id="titleId" class="sheet-title">{{ title }}</h2>
-        <slot />
+    <Transition name="sheet">
+      <div v-if="open" class="sheet-root" role="presentation">
+        <div class="sheet-backdrop" @click="onBackdropClick" />
+        <div
+          ref="panelRef"
+          class="sheet-panel"
+          role="dialog"
+          aria-modal="true"
+          tabindex="-1"
+          :aria-labelledby="title ? titleId : undefined"
+          :aria-label="title ? undefined : 'Dialog'"
+        >
+          <div class="sheet-handle" aria-hidden="true" />
+          <h2 v-if="title" :id="titleId" class="sheet-title">{{ title }}</h2>
+          <slot />
+        </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -85,6 +87,32 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background: var(--overlay);
+}
+
+.sheet-enter-active {
+  transition: opacity var(--duration-long) var(--ease-standard);
+}
+
+.sheet-enter-active .sheet-panel {
+  transition: transform var(--duration-long) var(--ease-emphasized-decelerate);
+}
+
+.sheet-leave-active {
+  transition: opacity var(--duration-medium) var(--ease-emphasized-accelerate);
+}
+
+.sheet-leave-active .sheet-panel {
+  transition: transform var(--duration-medium) var(--ease-emphasized-accelerate);
+}
+
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+
+.sheet-enter-from .sheet-panel,
+.sheet-leave-to .sheet-panel {
+  transform: translateY(100%);
 }
 
 .sheet-panel {

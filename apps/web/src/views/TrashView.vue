@@ -31,23 +31,33 @@ async function load() {
   }
 }
 
+/** Optimistic UI: drop the row immediately so TransitionGroup animates the removal. */
+function removeFromLocal(id: string) {
+  const t = trash.value
+  if (!t) return
+  t.folders = t.folders.filter((folder) => folder.id !== id)
+  t.files = t.files.filter((file) => file.id !== id)
+}
+
 async function restoreFile(id: string) {
+  removeFromLocal(id)
   try {
     await api(`/files/${id}/restore`, { method: 'POST', body: '{}' })
     ui.showToast('File restored')
-    await load()
   } catch (e) {
     error.value = formatApiError(e, 'Restore failed')
+    await load()
   }
 }
 
 async function restoreFolder(id: string) {
+  removeFromLocal(id)
   try {
     await api(`/folders/${id}/restore`, { method: 'POST', body: '{}' })
     ui.showToast('Folder restored')
-    await load()
   } catch (e) {
     error.value = formatApiError(e, 'Restore failed')
+    await load()
   }
 }
 
@@ -59,12 +69,13 @@ async function permanentDelete(type: 'files' | 'folders', id: string, name: stri
     danger: true,
   })
   if (!ok) return
+  removeFromLocal(id)
   try {
     await api(`/trash/${type}/${id}`, { method: 'DELETE' })
     ui.showToast('Deleted permanently')
-    await load()
   } catch (e) {
     error.value = formatApiError(e, 'Delete failed')
+    await load()
   }
 }
 
@@ -102,8 +113,8 @@ onMounted(load)
         icon="trash"
       />
 
-      <section v-if="trash?.folders.length" class="list">
-        <h2 class="section-title">Folders</h2>
+      <TransitionGroup v-if="trash?.folders.length" name="row" tag="section" class="list">
+        <h2 key="folders-title" class="section-title">Folders</h2>
         <div
           v-for="folder in trash.folders"
           :key="folder.id"
@@ -115,10 +126,10 @@ onMounted(load)
             <Icon name="more" :size="18" />
           </button>
         </div>
-      </section>
+      </TransitionGroup>
 
-      <section v-if="trash?.files.length" class="list files-section">
-        <h2 class="section-title">Files</h2>
+      <TransitionGroup v-if="trash?.files.length" name="row" tag="section" class="list files-section">
+        <h2 key="files-title" class="section-title">Files</h2>
         <div
           v-for="file in trash.files"
           :key="file.id"
@@ -131,7 +142,7 @@ onMounted(load)
             <Icon name="more" :size="18" />
           </button>
         </div>
-      </section>
+      </TransitionGroup>
     </div>
   </div>
 </template>

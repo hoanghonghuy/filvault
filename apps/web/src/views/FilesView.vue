@@ -292,6 +292,20 @@ async function onPickerSelect(targetFolderId: string | null) {
   }
 }
 
+/** Optimistic UI: drop the row immediately so TransitionGroup animates the removal. */
+function removeOptimistic(id: string) {
+  const b = browser.value
+  if (b) {
+    b.folders = b.folders.filter((folder) => folder.id !== id)
+    b.files = b.files.filter((file) => file.id !== id)
+  }
+  const s = searchResults.value
+  if (s) {
+    s.folders = s.folders.filter((folder) => folder.id !== id)
+    s.files = s.files.filter((file) => file.id !== id)
+  }
+}
+
 async function deleteFile(id: string) {
   const ok = await ui.confirm({
     title: 'Move to trash?',
@@ -301,13 +315,14 @@ async function deleteFile(id: string) {
   })
   if (!ok) return
   error.value = ''
+  removeOptimistic(id)
   try {
     await api(`/files/${id}`, { method: 'DELETE' })
     ui.showToast('Moved to trash')
-    await loadBrowser()
     await reloadStorage?.()
   } catch (e) {
     error.value = formatApiError(e, 'Delete failed')
+    await loadBrowser()
   }
 }
 
@@ -320,12 +335,13 @@ async function deleteFolder(id: string) {
   })
   if (!ok) return
   error.value = ''
+  removeOptimistic(id)
   try {
     await api(`/folders/${id}`, { method: 'DELETE' })
     ui.showToast('Moved to trash')
-    await loadBrowser()
   } catch (e) {
     error.value = formatApiError(e, 'Delete failed')
+    await loadBrowser()
   }
 }
 
@@ -418,8 +434,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <LoadingSkeletonFiles v-if="loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
 
-    <section v-if="!loading && searchResults" class="list">
-      <h2 class="section-title">Search results</h2>
+    <TransitionGroup v-if="!loading && searchResults" name="row" tag="section" class="list">
+      <h2 key="search-title" class="section-title">Search results</h2>
       <div
         v-for="folder in searchResults.folders"
         :key="folder.id"
@@ -445,13 +461,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </div>
       <EmptyState
         v-if="searchResults.folders.length === 0 && searchResults.files.length === 0"
+        key="search-empty"
         title="No results"
         description="Try a different search term."
         icon="file"
       />
-    </section>
+    </TransitionGroup>
 
-    <section v-else-if="!loading" class="list">
+    <TransitionGroup v-else-if="!loading" name="row" tag="section" class="list">
       <div
         v-for="folder in browser?.folders ?? []"
         :key="folder.id"
@@ -477,13 +494,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </div>
       <EmptyState
         v-if="isEmpty"
+        key="browse-empty"
         title="No files here"
         description="Upload a file or create a folder to get started."
         action-label="Upload file"
         icon="folder"
         @action="triggerUpload"
       />
-    </section>
+    </TransitionGroup>
 
     <input ref="fileInputRef" type="file" class="sr-only" multiple @change="onUploadChange" />
     <input ref="folderInputRef" type="file" class="sr-only" webkitdirectory @change="onFolderUploadChange" />

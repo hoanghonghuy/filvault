@@ -42,6 +42,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
           :to="item.to"
           class="side-link"
         >
+          <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="20" />
           <span>{{ item.label }}</span>
         </RouterLink>
@@ -63,7 +64,11 @@ const storageVisible = computed(() => showStorageBar(route.path))
       </header>
       <StorageBar v-show="storageVisible" ref="storageBarRef" />
       <main class="main">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </main>
     </div>
 
@@ -75,6 +80,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
           class="bottom-link"
         >
         <span class="bottom-icon">
+          <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="24" />
         </span>
         <span class="bottom-label">{{ item.shortLabel }}</span>
@@ -188,6 +194,24 @@ const storageVisible = computed(() => showStorageBar(route.path))
   padding: var(--space-md);
 }
 
+.page-enter-active {
+  transition: opacity var(--duration-medium) var(--ease-standard),
+    transform var(--duration-medium) var(--ease-standard);
+}
+
+.page-leave-active {
+  transition: opacity var(--duration-short) var(--ease-standard);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
 .bottom-nav {
   position: fixed;
   left: 0;
@@ -230,9 +254,8 @@ const storageVisible = computed(() => showStorageBar(route.path))
   color: var(--accent);
 }
 
-.bottom-link.router-link-active .bottom-icon {
-  background: var(--accent-soft);
-  border-radius: var(--radius-md);
+.bottom-link.router-link-active .nav-indicator {
+  transform: translateX(-50%) scaleX(1);
 }
 
 .bottom-icon {
@@ -242,6 +265,22 @@ const storageVisible = computed(() => showStorageBar(route.path))
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+}
+
+/* Sliding active indicator — animates with transform only */
+.nav-indicator {
+  position: absolute;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform var(--duration-medium) var(--ease-emphasized-decelerate);
+}
+
+.bottom-link {
+  position: relative;
 }
 
 .bottom-label {
@@ -304,6 +343,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
   }
 
   .side-link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -313,7 +353,8 @@ const storageVisible = computed(() => showStorageBar(route.path))
     color: var(--muted);
     font-size: 14px;
     font-weight: 600;
-    transition: background-color 150ms ease, color 150ms ease;
+    transition: background-color var(--duration-short) var(--ease-standard),
+      color var(--duration-short) var(--ease-standard);
   }
 
   .side-link:hover {
@@ -329,6 +370,17 @@ const storageVisible = computed(() => showStorageBar(route.path))
   .side-link.router-link-active {
     color: var(--accent);
     background: var(--accent-soft);
+  }
+
+  .side-link .nav-indicator {
+    left: 0;
+    width: 3px;
+    height: 20px;
+    transform: translateX(0) scaleY(0);
+  }
+
+  .side-link.router-link-active .nav-indicator {
+    transform: translateX(0) scaleY(1);
   }
 
   .side-user {

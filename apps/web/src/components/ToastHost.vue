@@ -11,10 +11,12 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
 
 <template>
   <Teleport to="body">
-    <div v-if="toastMessage" class="toast" :class="toastType" role="status" aria-live="polite">
-      <Icon :name="iconName(toastType)" :size="18" class="toast-icon" />
-      <span>{{ toastMessage }}</span>
-    </div>
+    <Transition name="toast">
+      <div v-if="toastMessage" class="toast" :class="toastType" role="status" aria-live="polite">
+        <Icon :name="iconName(toastType)" :size="18" class="toast-icon" />
+        <span>{{ toastMessage }}</span>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -41,6 +43,22 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
 
 .toast-icon {
   flex-shrink: 0;
+}
+
+.toast-enter-active {
+  transition: opacity var(--duration-medium) var(--ease-emphasized-decelerate),
+    transform var(--duration-medium) var(--ease-emphasized-decelerate);
+}
+
+.toast-leave-active {
+  transition: opacity var(--duration-short) var(--ease-standard),
+    transform var(--duration-short) var(--ease-standard);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 .toast.error {

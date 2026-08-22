@@ -40,6 +40,9 @@ const emit = defineEmits<{
   color: var(--on-accent);
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  transition: transform var(--duration-short) var(--ease-standard),
+    box-shadow var(--duration-short) var(--ease-standard),
+    background-color var(--duration-short) var(--ease-standard);
 }
 
 .fab:focus-visible {
@@ -49,6 +52,12 @@ const emit = defineEmits<{
 
 .fab:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.45);
+}
+
+.fab:not(:disabled):active {
+  transform: scale(0.94);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
 }
 
 .fab:disabled {
