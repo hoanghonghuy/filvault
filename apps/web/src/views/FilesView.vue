@@ -347,10 +347,10 @@ async function deleteFolder(id: string) {
 
 async function openFolderActions(folder: { id: string; name: string }) {
   const action = await ui.openActionSheet(folder.name, [
-    { id: 'open', label: 'Open' },
-    { id: 'rename', label: 'Rename' },
-    { id: 'move', label: 'Move' },
-    { id: 'delete', label: 'Move to trash', danger: true },
+    { id: 'open', label: 'Open', icon: 'arrow-right' },
+    { id: 'rename', label: 'Rename', icon: 'pencil' },
+    { id: 'move', label: 'Move', icon: 'move' },
+    { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
   ])
   if (action === 'open') await openFolder(folder.id)
   if (action === 'rename') await renameFolder(folder.id, folder.name)
@@ -360,10 +360,10 @@ async function openFolderActions(folder: { id: string; name: string }) {
 
 async function openFileActions(file: { id: string; name: string }) {
   const action = await ui.openActionSheet(file.name, [
-    { id: 'download', label: 'Download' },
-    { id: 'rename', label: 'Rename' },
-    { id: 'move', label: 'Move' },
-    { id: 'delete', label: 'Move to trash', danger: true },
+    { id: 'download', label: 'Download', icon: 'download' },
+    { id: 'rename', label: 'Rename', icon: 'pencil' },
+    { id: 'move', label: 'Move', icon: 'move' },
+    { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
   ])
   if (action === 'download') await downloadFile(file.id)
   if (action === 'rename') await renameFile(file.id, file.name)

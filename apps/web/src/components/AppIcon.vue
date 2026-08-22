@@ -39,6 +39,11 @@ const icons: Record<string, string[]> = {
   plus: ['M12 5v14', 'M5 12h14'],
   search: ['M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z', 'm21 21-4.3-4.3'],
   upload: ['M12 16V4', 'm6 10 6-6 6 6', 'M4 20h16'],
+  download: ['M12 4v12', 'm6 10 6 6 6-6', 'M4 20h16'],
+  pencil: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z'],
+  move: ['M5 9c-1.1 0-2 .9-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2', 'M9 3h6a2 2 0 0 1 2 2v12'],
+  eye: ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
+  restore: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 3'],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.file)

@@ -67,3 +67,45 @@ describe('optimistic trash actions contract (TrashView)', () => {
     }
   })
 })
+
+describe('nav indicator stacking contract (icon above pill)', () => {
+  const shell = readSrc('../components/AppShell.vue')
+
+  it('keeps the icon paintable above the pill background', () => {
+    const styledBlock = shell.match(/\.nav-indicator\s*\{[^}]*background:[^}]*\}/)?.[0] ?? ''
+    expect(styledBlock).toMatch(/z-index:\s*0/)
+    expect(shell).toMatch(/\.bottom-icon\s*>?\s*svg\s*\{[^}]*position:\s*relative/)
+  })
+})
+
+describe('action sheet row contract', () => {
+  const sheet = readSrc('../components/GlobalActionSheet.vue')
+
+  it('renders rows with icons instead of bordered buttons', () => {
+    expect(sheet).toContain('class="sheet-row"')
+    expect(sheet).toContain(':name="item.icon')
+    expect(sheet).not.toContain('btn block action')
+  })
+
+  it('separates the cancel action into its own group', () => {
+    expect(sheet).toContain('sheet-cancel-group')
+    expect(sheet).not.toContain('btn block ghost')
+  })
+
+  it('types every action item with an optional icon', () => {
+    const uiStore = readSrc('../stores/ui.ts')
+    expect(uiStore).toMatch(/icon\?:\s*string/)
+  })
+
+  it('provides an icon for every action sheet call site', () => {
+    for (const view of ['FilesView.vue', 'TrashView.vue', 'PhotosView.vue', 'AlbumView.vue']) {
+      const source = readSrc(`../views/${view}`)
+      const items = source.match(/\{ id: '[^']+', label: '[^']+'[^}]*\}/g) ?? []
+      expect(items.length, `${view} has action items`).toBeGreaterThan(0)
+      for (const item of items) {
+        expect(item, `${view}: ${item}`).toMatch(/icon: '/)
+      }
+      expect(source).not.toMatch(/\{ id: '[^']+', label: '[^']+' \}/)
+    }
+  })
+})

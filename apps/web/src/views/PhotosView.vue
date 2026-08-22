@@ -81,9 +81,9 @@ async function createAlbum() {
 
 async function openAlbumActions(album: Album) {
   const action = await ui.openActionSheet(album.name, [
-    { id: 'open', label: 'Open' },
-    { id: 'rename', label: 'Rename' },
-    { id: 'delete', label: 'Delete album', danger: true },
+    { id: 'open', label: 'Open', icon: 'arrow-right' },
+    { id: 'rename', label: 'Rename', icon: 'pencil' },
+    { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
   ])
   if (action === 'open') await router.push(`/photos/albums/${album.id}`)
   if (action === 'rename') await renameAlbum(album)

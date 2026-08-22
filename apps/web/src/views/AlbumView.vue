@@ -42,9 +42,9 @@ async function load() {
 async function openAlbumMenu() {
   if (!album.value) return
   const action = await ui.openActionSheet(album.value.name, [
-    { id: 'add', label: 'Add photos' },
-    { id: 'rename', label: 'Rename album' },
-    { id: 'delete', label: 'Delete album', danger: true },
+    { id: 'add', label: 'Add photos', icon: 'plus' },
+    { id: 'rename', label: 'Rename album', icon: 'pencil' },
+    { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
   ])
   if (action === 'add') pickerOpen.value = true
   if (action === 'rename') await renameAlbum()
@@ -108,9 +108,9 @@ async function addItem(fileId: string) {
 
 async function openItemActions(item: TimelineItem) {
   const action = await ui.openActionSheet(item.name, [
-    { id: 'view', label: 'View' },
-    { id: 'download', label: 'Download' },
-    { id: 'remove', label: 'Remove from album', danger: true },
+    { id: 'view', label: 'View', icon: 'eye' },
+    { id: 'download', label: 'Download', icon: 'download' },
+    { id: 'remove', label: 'Remove from album', icon: 'trash', danger: true },
   ])
   if (action === 'view') {
     mediaItem.value = item

@@ -81,8 +81,8 @@ async function permanentDelete(type: 'files' | 'folders', id: string, name: stri
 
 async function openFolderActions(folder: { id: string; name: string }) {
   const action = await ui.openActionSheet(folder.name, [
-    { id: 'restore', label: 'Restore' },
-    { id: 'delete', label: 'Delete forever', danger: true },
+    { id: 'restore', label: 'Restore', icon: 'restore' },
+    { id: 'delete', label: 'Delete forever', icon: 'trash', danger: true },
   ])
   if (action === 'restore') await restoreFolder(folder.id)
   if (action === 'delete') await permanentDelete('folders', folder.id, folder.name)
@@ -90,8 +90,8 @@ async function openFolderActions(folder: { id: string; name: string }) {
 
 async function openFileActions(file: { id: string; name: string }) {
   const action = await ui.openActionSheet(file.name, [
-    { id: 'restore', label: 'Restore' },
-    { id: 'delete', label: 'Delete forever', danger: true },
+    { id: 'restore', label: 'Restore', icon: 'restore' },
+    { id: 'delete', label: 'Delete forever', icon: 'trash', danger: true },
   ])
   if (action === 'restore') await restoreFile(file.id)
   if (action === 'delete') await permanentDelete('files', file.id, file.name)

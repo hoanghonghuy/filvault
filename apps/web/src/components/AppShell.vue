@@ -267,7 +267,9 @@ const storageVisible = computed(() => showStorageBar(route.path))
   flex-shrink: 0;
 }
 
-/* Sliding active indicator — animates with transform only */
+/* Sliding active indicator — background pill under the icon.
+   z-index 0 keeps it in the positioned layer but below the icon,
+   which gets position: relative to paint above it. */
 .nav-indicator {
   position: absolute;
   left: 50%;
@@ -277,6 +279,11 @@ const storageVisible = computed(() => showStorageBar(route.path))
   background: var(--accent-soft);
   transform: translateX(-50%) scaleX(0);
   transition: transform var(--duration-medium) var(--ease-emphasized-decelerate);
+  z-index: 0;
+}
+
+.bottom-icon > svg {
+  position: relative;
 }
 
 .bottom-link {
