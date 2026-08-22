@@ -48,6 +48,7 @@ const profileLabel = computed(
           :to="item.to"
           class="side-link"
         >
+          <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="20" />
           <span>{{ item.label }}</span>
         </RouterLink>
@@ -75,7 +76,11 @@ const profileLabel = computed(
       </header>
       <StorageBar v-show="storageVisible" ref="storageBarRef" />
       <main class="main">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </main>
     </div>
 
@@ -87,6 +92,7 @@ const profileLabel = computed(
           class="bottom-link"
         >
         <span class="bottom-icon">
+          <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="24" />
         </span>
         <span class="bottom-label">{{ item.shortLabel }}</span>
@@ -236,6 +242,24 @@ const profileLabel = computed(
   padding: var(--space-md);
 }
 
+.page-enter-active {
+  transition: opacity var(--duration-medium) var(--ease-standard),
+    transform var(--duration-medium) var(--ease-standard);
+}
+
+.page-leave-active {
+  transition: opacity var(--duration-short) var(--ease-standard);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
 .bottom-nav {
   position: fixed;
   left: 0;
@@ -284,9 +308,8 @@ const profileLabel = computed(
   color: var(--accent);
 }
 
-.bottom-link.router-link-active .bottom-icon {
-  background: var(--accent-soft);
-  border-radius: var(--radius-md);
+.bottom-link.router-link-active .nav-indicator {
+  transform: translateX(-50%) scaleX(1);
 }
 
 .bottom-icon {
@@ -296,6 +319,29 @@ const profileLabel = computed(
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+}
+
+/* Sliding active indicator — background pill under the icon.
+   z-index 0 keeps it in the positioned layer but below the icon,
+   which gets position: relative to paint above it. */
+.nav-indicator {
+  position: absolute;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform var(--duration-medium) var(--ease-emphasized-decelerate);
+  z-index: 0;
+}
+
+.bottom-icon > svg {
+  position: relative;
+}
+
+.bottom-link {
+  position: relative;
 }
 
 .bottom-label {
@@ -358,6 +404,7 @@ const profileLabel = computed(
   }
 
   .side-link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -385,6 +432,17 @@ const profileLabel = computed(
   .side-link.router-link-active {
     color: var(--accent);
     background: var(--accent-soft);
+  }
+
+  .side-link .nav-indicator {
+    left: 0;
+    width: 3px;
+    height: 20px;
+    transform: translateX(0) scaleY(0);
+  }
+
+  .side-link.router-link-active .nav-indicator {
+    transform: translateX(0) scaleY(1);
   }
 
   .side-user {

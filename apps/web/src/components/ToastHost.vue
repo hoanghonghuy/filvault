@@ -45,6 +45,22 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
   flex-shrink: 0;
 }
 
+.toast-enter-active {
+  transition: opacity var(--duration-medium) var(--ease-emphasized-decelerate),
+    transform var(--duration-medium) var(--ease-emphasized-decelerate);
+}
+
+.toast-leave-active {
+  transition: opacity var(--duration-short) var(--ease-standard),
+    transform var(--duration-short) var(--ease-standard);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
 .toast.error {
   background: var(--danger);
 }

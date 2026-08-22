@@ -69,6 +69,15 @@ export interface SearchResult {
   files: BrowserFile[]
 }
 
+export interface SearchFilters {
+  type: 'all' | 'image' | 'video' | 'document' | 'archive' | 'folder'
+  sort: 'relevance' | 'name' | 'date' | 'size'
+  order: 'asc' | 'desc'
+  folderId?: string
+  from?: string
+  to?: string
+}
+
 export interface TimelineItem {
   id: string
   name: string

@@ -20,6 +20,7 @@ export type PromptOptions = {
 export type ActionSheetItem = {
   id: string
   label: string
+  icon?: string
   danger?: boolean
 }
 

@@ -3,11 +3,13 @@ package postgres_test
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"filvault/internal/platform/postgres"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -78,11 +80,7 @@ func assertPhase1Tables(t *testing.T, ctx context.Context, pool *pgxpool.Pool, w
 	for _, table := range want {
 		var exists bool
 		err := pool.QueryRow(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM information_schema.tables
-				WHERE table_schema = 'public' AND table_name = $1
-			)
+			SELECT to_regclass($1) IS NOT NULL
 		`, table).Scan(&exists)
 		if err != nil {
 			t.Fatalf("check table %s: %v", table, err)
@@ -101,9 +99,26 @@ func openTestPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		t.Fatal("FILVAULT_DATABASE_URL is required")
 	}
 
-	pool, err := pgxpool.New(ctx, url)
+	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
-		t.Fatalf("pgxpool.New: %v", err)
+		t.Fatalf("pgxpool.ParseConfig: %v", err)
+	}
+
+	// Isolate this test in its own schema so MigrateDown does not drop the
+	// shared `public` tables that other packages rely on when tests run in
+	// parallel against the same database.
+	schema := "schema_test_" + strings.ToLower(strings.ReplaceAll(t.Name(), "/", "_"))
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		if _, err := conn.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS `+schema); err != nil {
+			return err
+		}
+		_, err := conn.Exec(ctx, `SET search_path TO `+schema)
+		return err
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("pgxpool.NewWithConfig: %v", err)
 	}
 	if err := pool.Ping(ctx); err != nil {
 		t.Fatalf("ping: %v", err)

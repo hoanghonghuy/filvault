@@ -22,6 +22,33 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
     emit('close')
+    return
+  }
+  if (event.key === 'Tab') trapFocus(event)
+}
+
+function trapFocus(event: KeyboardEvent) {
+  const panel = panelRef.value
+  if (!panel) return
+  const focusables = panel.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  if (!first || !last) {
+    event.preventDefault()
+    panel.focus()
+    return
+  }
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || active === panel)) {
+    event.preventDefault()
+    last.focus()
+    return
+  }
+  if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
   }
 }
 
@@ -86,6 +113,32 @@ onUnmounted(unlockPage)
   position: absolute;
   inset: 0;
   background: var(--overlay);
+}
+
+.sheet-enter-active {
+  transition: opacity var(--duration-long) var(--ease-standard);
+}
+
+.sheet-enter-active .sheet-panel {
+  transition: transform var(--duration-long) var(--ease-emphasized-decelerate);
+}
+
+.sheet-leave-active {
+  transition: opacity var(--duration-medium) var(--ease-emphasized-accelerate);
+}
+
+.sheet-leave-active .sheet-panel {
+  transition: transform var(--duration-medium) var(--ease-emphasized-accelerate);
+}
+
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+
+.sheet-enter-from .sheet-panel,
+.sheet-leave-to .sheet-panel {
+  transform: translateY(100%);
 }
 
 .sheet-panel {

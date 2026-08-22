@@ -29,17 +29,23 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [07-phase-1-business.md](07-phase-1-business.md) | Nghiệp vụ đã chốt: invite, verify, Photos, allowlist, trash |
 | [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao Phase 1; việc tiếp theo: smoke test tay |
 | [09-cli.md](09-cli.md) | CLI `filvault` (Phase 4): login, whoami, ls, upload, download |
+| [09-phase-2-features.md](09-phase-2-features.md) | Spec tính năng Phase 2 web (Accepted): search, cover, favorites, share, activity |
+| [10-phase-2-status.md](10-phase-2-status.md) | Checklist bàn giao Phase 2; S1 done → tiếp S2 |
 | [10-sharing.md](10-sharing.md) | Sharing (Phase 5): chia sẻ file/folder cho user khác |
 | [11-versioning.md](11-versioning.md) | Versioning (Phase 6): lịch sử phiên bản file khi replace |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
-| [`../../DESIGN.md`](../../DESIGN.md) | Design system web Phase 1 (Cal.com-like + teal, mobile-first) |
+| [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md) | ADR: phạm vi tính năng Phase 2 (**Accepted**) |
+| [`../../DESIGN.md`](../../DESIGN.md) | Design system web (Cal.com-like + teal, mobile-first; §9a Phase 2) |
 
-Phase 1 **đã có spec và đã implement** (tiến độ bàn giao: [08-phase-1-status.md](08-phase-1-status.md)). Spec phase sau (sharing, worker, CLI, Terraform) viết khi vào phase đó.
+**Phase 1** đã có spec + implement (checklist: [08](08-phase-1-status.md)).  
+**Phase 2 web:** spec [09](09-phase-2-features.md) Accepted; tiến độ [10](10-phase-2-status.md) — **S1 xong**, tiếp **S2**.
 
 ## Chưa viết (đúng lúc)
 
-- Database/API cho sharing, versioning, sync
+- ADR bảo mật share link (token TTL, rate limit số cụ thể) — **bắt buộc trước khi code S4**
+- Chi tiết UI/endpoint share user nội bộ (S5) — viết khi vào slice
+- Database/API cho versioning, sync
 - Terraform / RDS deploy spec
 - JobQueue + worker spec (Phase 3)
 - Sync spec (CLI slice đầu đã có: [09-cli.md](09-cli.md))
@@ -50,3 +56,4 @@ Phase 1 **đã có spec và đã implement** (tiến độ bàn giao: [08-phase-
 - **Thiết kế sẵn ≠ implement sẵn.** Interface (giao diện lập trình) và mapping được ghi trong spec; code adapter chỉ viết khi phase cần.
 - Tên dịch vụ AWS giữ nguyên tiếng Anh. Thuật ngữ khó có giải thích ngắn trong ngoặc.
 - Mọi thay đổi kiến trúc mới phải có ADR trong `decisions/`.
+- Mỗi slice Phase 2: TDD + DoD trong [09 §0.1](09-phase-2-features.md) và tick [10](10-phase-2-status.md).

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import BottomSheet from '@/components/BottomSheet.vue'
+import Icon from '@/components/AppIcon.vue'
 import { useUiStore } from '@/stores/ui'
 
 const ui = useUiStore()
@@ -22,13 +23,16 @@ function onClose() {
         v-for="item in actionSheetState.items"
         :key="item.id"
         type="button"
-        class="btn block action"
+        class="sheet-row"
         :class="{ danger: item.danger }"
         @click="pick(item.id)"
       >
-        {{ item.label }}
+        <Icon :name="item.icon ?? 'file'" :size="20" class="sheet-row-icon" />
+        <span class="sheet-row-label">{{ item.label }}</span>
       </button>
-      <button type="button" class="btn block ghost" @click="onClose">Cancel</button>
+    </div>
+    <div class="sheet-cancel-group">
+      <button type="button" class="btn block ink" @click="onClose">Cancel</button>
     </div>
   </BottomSheet>
 </template>
@@ -37,15 +41,54 @@ function onClose() {
 .actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
 }
 
-.action {
-  justify-content: flex-start;
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
 
-.action.danger {
+.sheet-row:hover {
+  background: var(--surface-soft);
+}
+
+.sheet-row:active {
+  transform: scale(0.98);
+}
+
+.sheet-row-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.sheet-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-row.danger,
+.sheet-row.danger .sheet-row-icon {
   color: var(--danger);
-  border-color: var(--danger-soft);
+}
+
+.sheet-cancel-group {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--hairline-soft);
 }
 </style>

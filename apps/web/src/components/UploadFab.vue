@@ -53,9 +53,10 @@ const emit = defineEmits<{
 
 .fab:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.45);
 }
 
-.fab:active:not(:disabled) {
+.fab:not(:disabled):active {
   transform: scale(0.94);
   background: var(--accent-hover);
   box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
