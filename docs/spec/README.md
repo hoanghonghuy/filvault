@@ -28,15 +28,19 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [06-phase-1-plan.md](06-phase-1-plan.md) | Thứ tự slice + Definition of Done |
 | [07-phase-1-business.md](07-phase-1-business.md) | Nghiệp vụ đã chốt: invite, verify, Photos, allowlist, trash |
 | [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao Phase 1; việc tiếp theo: smoke test tay |
+| [09-phase-2-features.md](09-phase-2-features.md) | Spec tính năng Phase 2 web: search filter, album cover, favorites, share link, activity |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
+| [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md) | ADR: phạm vi tính năng Phase 2 (Proposed) |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web Phase 1 (Cal.com-like + teal, mobile-first) |
 
-Phase 1 **đã có spec và đã implement** (tiến độ bàn giao: [08-phase-1-status.md](08-phase-1-status.md)). Spec phase sau (sharing, worker, CLI, Terraform) viết khi vào phase đó.
+Phase 1 **đã có spec và đã implement** (tiến độ bàn giao: [08-phase-1-status.md](08-phase-1-status.md)). Tính năng Phase 2 web đã có spec đề xuất: [09-phase-2-features.md](09-phase-2-features.md) + [ADR 0003](decisions/0003-phase-2-features-scope.md).
 
 ## Chưa viết (đúng lúc)
 
-- Database/API cho sharing, versioning, sync
+- Chi tiết bảo mật share link (token TTL, rate limit số cụ thể) — bổ sung ADR khi bắt đầu slice S4
+- Chi tiết UI/endpoint share user nội bộ (S5) — viết khi vào slice
+- Database/API cho versioning, sync
 - Terraform / RDS deploy spec
 - JobQueue + worker spec (Phase 3)
 - CLI / sync spec

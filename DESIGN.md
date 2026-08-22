@@ -387,11 +387,39 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 | Login / Register | Form ink CTA | auth |
 | Verify email | OTP 6 số + resend | verify / resend |
 | Overview (`/`) | Greeting + quota, 2 destination cards (Files/Photos), recent files/photos | me, browser, photos/timeline |
-| Files | Browser, search, create folder, upload, rename/move/delete file & folder | browser, folders, files, search |
-| Photos | Timeline (+ load more), albums CRUD, add/remove items, open/download | photos/* |
-| Album detail | Grid + manage | albums/:id, items |
-| Trash | Restore / delete forever | trash, restore |
-| Settings | displayName, trash prefs, password, logout | users/me, password |
+| Files | Browser, search + filter sheet, favorites segment, create folder, upload (progress bar + drag & drop), rename/move/delete/share file & folder | browser, folders, files, search, favorites, shares |
+| Photos | Timeline (+ load more), albums CRUD + cover, add/remove items, open/download, set cover, favorite | photos/* |
+| Album detail | Grid + cover thumb + manage (set/remove cover) | albums/:id, items, cover |
+| Trash | Restore / delete forever (optimistic UI) | trash, restore |
+| Settings | displayName, trash prefs, password, shared links, activity log, logout | users/me, password, shares, activity |
+| Public share (`/s/:token`) | Card giữa màn: tên + loại + size + Download. **Không** shell/nav; 404 = card lỗi chung chung | public/shares |
+
+---
+
+## 9a. Surface mới Phase 2 (spec 09)
+
+### FilterSheet (Files search)
+- `BottomSheet` title "Filter"; các nhóm option dạng pill chọn 1: Type (All/Image/Video/Doc/Archive/Folder), Sort (Relevance/Name/Date/Size), Date range (2 input date).
+- Nút "Apply" ink full-width; "Reset" ghost bên trái. State filter sống ở query string (`?q=&type=...`) để share/reload giữ được.
+
+### Album cover
+- Card album: khung ảnh bìa 1:1 radius-lg phía trên tên; trống → icon photos trên `surface-card`.
+- Set/Remove cover nằm trong action sheet item (icon `image` / `restore`), không có nút riêng ngoài grid.
+
+### Share link
+- Action sheet file thêm "Share link" (icon `share`) → `ShareSheet`: chọn hạn (segmented Forever/1h/24h/7d) → tạo → hiển thị URL + nút Copy + "Revoke link" danger.
+- Settings section "Shared links": list tên file + hạn + revoke (confirm trước khi thu hồi).
+
+### Favorites
+- Icon sao: outline khi chưa, fill `warning` (#d97706) khi đã — điểm màu thứ hai duy nhất được phép.
+- Files root: segment "Favorites | All" trên list; Overview ưu tiên section Favorites khi có dữ liệu.
+
+### Public share page
+- Canvas `surface-soft`, card trắng radius-xl max-width 420px giữa màn: brand mark F, tên file (truncate 2 dòng), meta loại · size, nút Download ink full-width, caption "Shared via Filvault".
+- Lỗi (token sai/hết hạn/thu hồi): cùng layout, icon alert, message chung "This link is not available" — không phân biệt nguyên nhân.
+
+### Activity log
+- List trong Settings: icon theo type + targetName (1 dòng truncate) + thời gian tương đối muted; "Load more" pattern như timeline.
 
 ---
 
