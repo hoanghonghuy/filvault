@@ -76,12 +76,36 @@ func (s *Store) GetAlbum(ctx context.Context, ownerID, id string) (*photo.Album,
 	var a photo.Album
 	err := s.pool.QueryRow(ctx, `
 		SELECT a.id, a.owner_id, a.name, a.created_at, a.updated_at,
-			COUNT(ai.file_id) AS item_count
+			COUNT(ai.file_id) AS item_count,
+			COALESCE(pinned.file_id, auto.file_id, ''),
+			COALESCE(pinned.object_key, auto.object_key, ''),
+			COALESCE(pinned.mime_type, auto.mime_type, '')
 		FROM albums a
 		LEFT JOIN album_items ai ON ai.album_id = a.id
+		LEFT JOIN LATERAL (
+			SELECT ai2.file_id, f.object_key, f.mime_type
+			FROM album_items ai2
+			JOIN files f ON f.id = ai2.file_id AND f.deleted_at IS NULL AND f.status = 'READY'
+				AND f.mime_type = ANY($3::text[])
+			WHERE ai2.album_id = a.id
+			ORDER BY f.created_at DESC, ai2.file_id DESC
+			LIMIT 1
+		) auto ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT ai3.file_id, f.object_key, f.mime_type
+			FROM album_items ai3
+			JOIN files f ON f.id = ai3.file_id AND f.deleted_at IS NULL AND f.status = 'READY'
+				AND f.mime_type = ANY($3::text[])
+			WHERE ai3.album_id = a.id AND ai3.file_id = a.cover_file_id
+			LIMIT 1
+		) pinned ON TRUE
 		WHERE a.owner_id = $1 AND a.id = $2
-		GROUP BY a.id
-	`, ownerID, id).Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt, &a.ItemCount)
+		GROUP BY a.id, auto.file_id, auto.object_key, auto.mime_type,
+			pinned.file_id, pinned.object_key, pinned.mime_type
+	`, ownerID, id, photo.PhotoMIMESlice()).Scan(
+		&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt, &a.ItemCount,
+		&a.CoverFileID, &a.CoverObjectKey, &a.CoverMime,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -94,13 +118,34 @@ func (s *Store) GetAlbum(ctx context.Context, ownerID, id string) (*photo.Album,
 func (s *Store) ListAlbums(ctx context.Context, ownerID string) ([]photo.Album, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT a.id, a.owner_id, a.name, a.created_at, a.updated_at,
-			COUNT(ai.file_id) AS item_count
+			COUNT(ai.file_id) AS item_count,
+			COALESCE(pinned.file_id, auto.file_id, ''),
+			COALESCE(pinned.object_key, auto.object_key, ''),
+			COALESCE(pinned.mime_type, auto.mime_type, '')
 		FROM albums a
 		LEFT JOIN album_items ai ON ai.album_id = a.id
+		LEFT JOIN LATERAL (
+			SELECT ai2.file_id, f.object_key, f.mime_type
+			FROM album_items ai2
+			JOIN files f ON f.id = ai2.file_id AND f.deleted_at IS NULL AND f.status = 'READY'
+				AND f.mime_type = ANY($2::text[])
+			WHERE ai2.album_id = a.id
+			ORDER BY f.created_at DESC, ai2.file_id DESC
+			LIMIT 1
+		) auto ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT ai3.file_id, f.object_key, f.mime_type
+			FROM album_items ai3
+			JOIN files f ON f.id = ai3.file_id AND f.deleted_at IS NULL AND f.status = 'READY'
+				AND f.mime_type = ANY($2::text[])
+			WHERE ai3.album_id = a.id AND ai3.file_id = a.cover_file_id
+			LIMIT 1
+		) pinned ON TRUE
 		WHERE a.owner_id = $1
-		GROUP BY a.id
+		GROUP BY a.id, auto.file_id, auto.object_key, auto.mime_type,
+			pinned.file_id, pinned.object_key, pinned.mime_type
 		ORDER BY a.name ASC
-	`, ownerID)
+	`, ownerID, photo.PhotoMIMESlice())
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +153,7 @@ func (s *Store) ListAlbums(ctx context.Context, ownerID string) ([]photo.Album, 
 	var out []photo.Album
 	for rows.Next() {
 		var a photo.Album
-		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt, &a.ItemCount); err != nil {
+		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.CreatedAt, &a.UpdatedAt, &a.ItemCount, &a.CoverFileID, &a.CoverObjectKey, &a.CoverMime); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -151,7 +196,74 @@ func (s *Store) RemoveAlbumItem(ctx context.Context, albumID, fileID string) err
 	_, err := s.pool.Exec(ctx, `
 		DELETE FROM album_items WHERE album_id = $1 AND file_id = $2
 	`, albumID, fileID)
+	if err != nil {
+		return err
+	}
+	return s.clearCoverIfPinned(ctx, albumID, fileID)
+}
+
+func (s *Store) clearCoverIfPinned(ctx context.Context, albumID, fileID string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE albums SET cover_file_id = NULL
+		WHERE id = $1 AND cover_file_id = $2
+	`, albumID, fileID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil
+	}
+	_, err = s.pool.Exec(ctx, `
+		UPDATE albums SET updated_at = now() WHERE id = $1
+	`, albumID)
 	return err
+}
+
+// SetAlbumCover pins the cover after validating the file belongs to the album.
+func (s *Store) SetAlbumCover(ctx context.Context, ownerID, albumID, fileID string) error {
+	mimes := photo.PhotoMIMESlice()
+	var exists bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM album_items ai
+			JOIN albums a ON a.id = ai.album_id AND a.owner_id = $2
+			JOIN files f ON f.id = ai.file_id AND f.deleted_at IS NULL AND f.status = 'READY'
+				AND f.mime_type = ANY($4::text[])
+			WHERE ai.album_id = $1 AND ai.file_id = $3
+		)
+	`, albumID, ownerID, fileID, mimes).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return apperr.Validation
+	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE albums SET cover_file_id = $3, updated_at = now()
+		WHERE id = $1 AND owner_id = $2
+	`, albumID, ownerID, fileID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
+}
+
+// ClearAlbumCover un-pins the cover; the effective cover falls back to auto.
+func (s *Store) ClearAlbumCover(ctx context.Context, ownerID, albumID, _ string) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE albums SET cover_file_id = NULL, updated_at = now()
+		WHERE id = $1 AND owner_id = $2
+	`, albumID, ownerID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
 }
 
 func (s *Store) ListAlbumItems(ctx context.Context, ownerID, albumID string) ([]photo.TimelineItem, error) {
@@ -235,6 +347,14 @@ func (r photoRepo) RemoveAlbumItem(ctx context.Context, albumID, fileID string) 
 
 func (r photoRepo) ListAlbumItems(ctx context.Context, ownerID, albumID string) ([]photo.TimelineItem, error) {
 	return r.store.ListAlbumItems(ctx, ownerID, albumID)
+}
+
+func (r photoRepo) SetAlbumCover(ctx context.Context, ownerID, albumID, fileID string) error {
+	return r.store.SetAlbumCover(ctx, ownerID, albumID, fileID)
+}
+
+func (r photoRepo) ClearAlbumCover(ctx context.Context, ownerID, albumID, fileID string) error {
+	return r.store.ClearAlbumCover(ctx, ownerID, albumID, fileID)
 }
 
 var _ photo.Repository = photoRepo{}

@@ -107,9 +107,13 @@ async function addItem(fileId: string) {
 }
 
 async function openItemActions(item: TimelineItem) {
+  const isCover = album.value?.coverFileId === item.id
   const action = await ui.openActionSheet(item.name, [
     { id: 'view', label: 'View', icon: 'eye' },
     { id: 'download', label: 'Download', icon: 'download' },
+    isCover
+      ? { id: 'unset-cover', label: 'Remove cover', icon: 'restore' }
+      : { id: 'set-cover', label: 'Set cover', icon: 'image' },
     { id: 'remove', label: 'Remove from album', icon: 'trash', danger: true },
   ])
   if (action === 'view') {
@@ -120,7 +124,34 @@ async function openItemActions(item: TimelineItem) {
     mediaItem.value = item
     await downloadMedia()
   }
+  if (action === 'set-cover') await setCover(item)
+  if (action === 'unset-cover') await removeCover()
   if (action === 'remove') await removeItem(item.id, item.name)
+}
+
+async function setCover(item: TimelineItem) {
+  error.value = ''
+  try {
+    await api(`/photos/albums/${albumId.value}/cover`, {
+      method: 'POST',
+      body: JSON.stringify({ fileId: item.id }),
+    })
+    ui.showToast('Cover updated')
+    await load()
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to set cover')
+  }
+}
+
+async function removeCover() {
+  error.value = ''
+  try {
+    await api(`/photos/albums/${albumId.value}/cover`, { method: 'DELETE' })
+    ui.showToast('Cover reset to automatic')
+    await load()
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to remove cover')
+  }
 }
 
 async function removeItem(fileId: string, name: string) {

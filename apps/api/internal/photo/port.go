@@ -19,4 +19,7 @@ type Repository interface {
 	AddAlbumItem(ctx context.Context, albumID, fileID string, position int, at time.Time) error
 	RemoveAlbumItem(ctx context.Context, albumID, fileID string) error
 	ListAlbumItems(ctx context.Context, ownerID, albumID string) ([]TimelineItem, error)
+
+	SetAlbumCover(ctx context.Context, ownerID, albumID, fileID string) error
+	ClearAlbumCover(ctx context.Context, ownerID, albumID, fileID string) error
 }

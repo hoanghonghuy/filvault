@@ -103,6 +103,10 @@ export interface Album {
   itemCount: number
   createdAt: string
   updatedAt: string
+  /** Effective cover file (pinned or auto-selected newest item). */
+  coverFileId?: string
+  /** Presigned URL, present only when the cover is an image and prefs allow. */
+  coverUrl?: string
 }
 
 export interface AlbumDetail extends Album {

@@ -30,6 +30,8 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.DELETE("/photos/albums/:id", append(middleware, h.deleteAlbum)...)
 	g.POST("/photos/albums/:id/items", append(middleware, h.addItems)...)
 	g.DELETE("/photos/albums/:id/items/:fileId", append(middleware, h.removeItem)...)
+	g.POST("/photos/albums/:id/cover", append(middleware, h.setAlbumCover)...)
+	g.DELETE("/photos/albums/:id/cover", append(middleware, h.removeAlbumCover)...)
 }
 
 func userIDFrom(c *gin.Context) (string, bool) {
@@ -237,6 +239,53 @@ func (h *Handler) removeItem(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+type setCoverReq struct {
+	FileID string `json:"fileId"`
+}
+
+func (h *Handler) setAlbumCover(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	albumID, ok := parseULIDParam(c, "id")
+	if !ok {
+		return
+	}
+	var req setCoverReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	if _, err := ulid.ParseStrict(req.FileID); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	if err := h.svc.SetAlbumCover(c.Request.Context(), userID, albumID, req.FileID); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) removeAlbumCover(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	albumID, ok := parseULIDParam(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.RemoveAlbumCover(c.Request.Context(), userID, albumID); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func publicGroups(groups []TimelineGroup) []gin.H {
 	out := make([]gin.H, 0, len(groups))
 	for _, g := range groups {
@@ -264,13 +313,20 @@ func publicItem(it TimelineItem) gin.H {
 }
 
 func publicAlbum(a Album) gin.H {
-	return gin.H{
+	out := gin.H{
 		"id":        a.ID,
 		"name":      a.Name,
 		"itemCount": a.ItemCount,
 		"createdAt": a.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updatedAt": a.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+	if a.CoverFileID != "" {
+		out["coverFileId"] = a.CoverFileID
+	}
+	if a.CoverURL != "" {
+		out["coverUrl"] = a.CoverURL
+	}
+	return out
 }
 
 func publicAlbumDetail(d AlbumDetail) gin.H {

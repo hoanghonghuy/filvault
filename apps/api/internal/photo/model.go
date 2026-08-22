@@ -25,12 +25,16 @@ type Timeline struct {
 }
 
 type Album struct {
-	ID        string
-	OwnerID   string
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ItemCount int
+	ID             string
+	OwnerID        string
+	Name           string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ItemCount      int
+	CoverFileID    string
+	CoverURL       string
+	CoverObjectKey string
+	CoverMime      string
 }
 
 type AlbumDetail struct {

@@ -271,6 +271,179 @@ func TestPhotos_DuplicateAlbumName(t *testing.T) {
 	assertAPIError(t, code, body, http.StatusConflict, "CONFLICT")
 }
 
+func createAlbumForTest(t *testing.T, engine http.Handler, token, name string) string {
+	t.Helper()
+	code, body := postAuth(t, engine, "/api/v1/photos/albums", token, map[string]any{"name": name})
+	if code != http.StatusCreated {
+		t.Fatalf("create album status=%d body=%s", code, body)
+	}
+	var album struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &album)
+	return album.ID
+}
+
+func TestPhotos_AlbumCover_SetRemoveAndAutoFallback(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	firstID := uploadReady(t, engine, objs, token, "first.jpg")
+	secondID := uploadReady(t, engine, objs, token, "second.jpg")
+	albumID := createAlbumForTest(t, engine, token, "Covers")
+
+	code, _ := postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/items", token, map[string]any{
+		"fileIds": []string{firstID, secondID},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("add items status=%d", code)
+	}
+
+	code, body := getAuth(t, engine, "/api/v1/photos/albums/"+albumID, token)
+	if code != http.StatusOK || !strings.Contains(body, `"coverFileId":"`+secondID+`"`) {
+		t.Fatalf("auto cover must pick newest item: status=%d body=%s", code, body)
+	}
+
+	code, body = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": firstID,
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("set cover status=%d body=%s", code, body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/photos/albums/"+albumID, token)
+	if code != http.StatusOK || !strings.Contains(body, `"coverFileId":"`+firstID+`"`) {
+		t.Fatalf("pinned cover not applied: status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, `"coverUrl"`) {
+		t.Fatalf("image cover must expose coverUrl: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/photos/albums", token)
+	if code != http.StatusOK || !strings.Contains(body, `"coverUrl"`) {
+		t.Fatalf("list albums must include coverUrl for image cover: %s", body)
+	}
+
+	code, _ = deleteAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token)
+	if code != http.StatusNoContent {
+		t.Fatalf("remove cover status=%d", code)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/photos/albums/"+albumID, token)
+	if code != http.StatusOK || strings.Contains(body, `"coverFileId":"`+firstID+`"`) {
+		t.Fatalf("remove cover must fall back to auto: %s", body)
+	}
+}
+
+func TestPhotos_AlbumCover_VideoCoverHasNoURL(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	videoID := uploadReadyVideo(t, engine, objs, token, "clip.mp4")
+	albumID := createAlbumForTest(t, engine, token, "Videos")
+
+	code, _ := postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/items", token, map[string]any{
+		"fileIds": []string{videoID},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("add item status=%d", code)
+	}
+
+	code, _ = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": videoID,
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("set video cover status=%d", code)
+	}
+
+	code, body := getAuth(t, engine, "/api/v1/photos/albums/"+albumID, token)
+	if code != http.StatusOK || !strings.Contains(body, `"coverFileId":"`+videoID+`"`) {
+		t.Fatalf("video cover not applied: %s", body)
+	}
+	if strings.Contains(body, `"coverUrl"`) {
+		t.Fatalf("video cover must not expose coverUrl: %s", body)
+	}
+}
+
+func TestPhotos_AlbumCover_FileNotInAlbumRejected(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	outsiderID := uploadReady(t, engine, objs, token, "outsider.jpg")
+	pdfID := uploadReadyPDF(t, engine, objs, token, "doc.pdf")
+	albumID := createAlbumForTest(t, engine, token, "Strict")
+
+	code, body := postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": outsiderID,
+	})
+	assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+
+	code, body = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": pdfID,
+	})
+	assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+
+	code, body = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": "",
+	})
+	assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+
+	code, body = postAuth(t, engine, "/api/v1/photos/albums/01ARZ3NDEKTSV4RRFFQ69G5FAV/cover", token, map[string]any{
+		"fileId": outsiderID,
+	})
+	assertAPIError(t, code, body, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestPhotos_AlbumCover_ClearedWhenItemRemovedOrTrashed(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	itemID := uploadReady(t, engine, objs, token, "pinned.jpg")
+	albumID := createAlbumForTest(t, engine, token, "Cleanup")
+
+	code, _ := postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/items", token, map[string]any{
+		"fileIds": []string{itemID},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("add item status=%d", code)
+	}
+	code, _ = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": itemID,
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("set cover status=%d", code)
+	}
+
+	code, _ = deleteAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/items/"+itemID, token)
+	if code != http.StatusNoContent {
+		t.Fatalf("remove item status=%d", code)
+	}
+
+	code, body := getAuth(t, engine, "/api/v1/photos/albums/"+albumID, token)
+	if code != http.StatusOK || strings.Contains(body, `"coverFileId":"`+itemID+`"`) {
+		t.Fatalf("removing pinned item must clear cover: %s", body)
+	}
+
+	code, _ = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/items", token, map[string]any{
+		"fileIds": []string{itemID},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("re-add item status=%d", code)
+	}
+	code, _ = postAuth(t, engine, "/api/v1/photos/albums/"+albumID+"/cover", token, map[string]any{
+		"fileId": itemID,
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("set cover again status=%d", code)
+	}
+
+	code, _ = deleteAuth(t, engine, "/api/v1/files/"+itemID, token)
+	if code != http.StatusNoContent {
+		t.Fatalf("trash file status=%d", code)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/photos/albums/"+albumID, token)
+	if code != http.StatusOK || strings.Contains(body, `"coverFileId":"`+itemID+`"`) {
+		t.Fatalf("trashing pinned item must clear cover: %s", body)
+	}
+}
+
 func uploadReadyPDF(t *testing.T, engine http.Handler, objs *objectstore.Memory, token, name string) string {
 	t.Helper()
 	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{

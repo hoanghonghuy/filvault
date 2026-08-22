@@ -171,6 +171,11 @@ onMounted(load)
             :style="{ animationDelay: cellDelay(index) }"
             @click="router.push(`/photos/albums/${album.id}`)"
           >
+            <div class="album-cover" aria-hidden="true">
+              <img v-if="album.coverUrl" :src="album.coverUrl" alt="" loading="lazy" />
+              <Icon v-else-if="album.coverFileId" name="video" :size="20" />
+              <Icon v-else name="photos" :size="20" />
+            </div>
             <button type="button" class="name link-btn" @click.stop="router.push(`/photos/albums/${album.id}`)">
               {{ album.name }}
             </button>
@@ -274,6 +279,25 @@ onMounted(load)
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.album-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  color: var(--muted);
+  overflow: hidden;
+}
+
+.album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .load-more {
