@@ -40,7 +40,7 @@ defineExpose({ reload })
       <div
         class="fill"
         :class="fillClass"
-        :style="{ width: `${Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100)}%` }"
+        :style="{ '--fill-ratio': Math.min(1, usage.usedBytes / usage.quotaBytes) }"
       />
     </div>
     <div class="numbers" aria-hidden="true">{{ formatBytes(usage.usedBytes) }} / {{ formatBytes(usage.quotaBytes) }}</div>
@@ -79,7 +79,9 @@ defineExpose({ reload })
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 0.2s ease;
+  transform: scaleX(var(--fill-ratio, 0));
+  transform-origin: left center;
+  transition: transform var(--duration-medium) var(--ease-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {

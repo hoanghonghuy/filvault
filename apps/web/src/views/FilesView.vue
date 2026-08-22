@@ -5,6 +5,7 @@ import { api, formatBytes, uploadToPresigned } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import UploadFab from '@/components/UploadFab.vue'
+import UploadProgress from '@/components/UploadProgress.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -29,6 +30,31 @@ const newFolderName = ref('')
 const folderSheetOpen = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const folderInputRef = ref<HTMLInputElement | null>(null)
+const dragDepth = ref(0)
+const isDragging = computed(() => dragDepth.value > 0)
+
+function onDragEnter(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  dragDepth.value += 1
+}
+
+function onDragOver(event: DragEvent) {
+  if (!event.dataTransfer?.types.includes('Files')) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'copy'
+}
+
+function onDragLeave() {
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+}
+
+function onDrop(event: DragEvent) {
+  dragDepth.value = 0
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  if (files.length === 0) return
+  event.preventDefault()
+  void uploadFiles(files)
+}
 
 const pickerOpen = ref(false)
 const pickerMode = ref<'file' | 'folder' | null>(null)
@@ -134,10 +160,7 @@ async function uploadOneFile(file: File, targetFolderId: string | null) {
   await api(`/files/${session.fileId}/complete`, { method: 'POST', body: '{}' })
 }
 
-async function onUploadChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  input.value = ''
+async function uploadFiles(files: File[]) {
   if (files.length === 0) return
   error.value = ''
   uploadProgress.value = 0
@@ -156,6 +179,13 @@ async function onUploadChange(event: Event) {
   } finally {
     uploadProgress.value = null
   }
+}
+
+async function onUploadChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  await uploadFiles(files)
 }
 
 async function onFolderUploadChange(event: Event) {
@@ -375,7 +405,21 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 </script>
 
 <template>
-  <div class="files-page">
+  <div
+    class="files-page"
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
+    <Transition name="page">
+      <div v-if="isDragging" class="drop-overlay" aria-hidden="true">
+        <div class="drop-card">
+          <span class="drop-icon">⬆</span>
+          <p class="drop-label">Drop files to upload</p>
+        </div>
+      </div>
+    </Transition>
     <h1 class="page-title desktop-only">My Files</h1>
 
     <nav class="breadcrumb" aria-label="Folder path">
@@ -427,9 +471,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </button>
     </div>
 
-    <p v-if="uploadProgress !== null" class="muted upload-status">
-      Uploading… {{ Math.round(uploadProgress * 100) }}%
-    </p>
+    <UploadProgress :progress="uploadProgress" />
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonFiles v-if="loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
@@ -533,15 +575,45 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   padding-bottom: calc(var(--fab-size) + var(--space-md));
 }
 
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: var(--overlay);
+}
+
+.drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-xl);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-xl);
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.drop-icon {
+  font-size: 32px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.drop-label {
+  margin: 0;
+  font-weight: 600;
+}
+
 .row-icon {
   flex-shrink: 0;
   color: var(--muted);
   vertical-align: -0.2em;
   margin-right: var(--space-xs);
-}
-
-.upload-status {
-  margin-bottom: var(--space-sm);
 }
 
 .toolbar-sticky {

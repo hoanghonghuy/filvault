@@ -22,6 +22,33 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
     emit('close')
+    return
+  }
+  if (event.key === 'Tab') trapFocus(event)
+}
+
+function trapFocus(event: KeyboardEvent) {
+  const panel = panelRef.value
+  if (!panel) return
+  const focusables = panel.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  if (!first || !last) {
+    event.preventDefault()
+    panel.focus()
+    return
+  }
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || active === panel)) {
+    event.preventDefault()
+    last.focus()
+    return
+  }
+  if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
   }
 }
 

@@ -67,6 +67,12 @@ async function changePassword() {
 }
 
 async function logout() {
+  const ok = await ui.confirm({
+    title: 'Log out?',
+    message: 'You will need to sign in again to access your files.',
+    confirmLabel: 'Log out',
+  })
+  if (!ok) return
   await auth.logout()
   window.location.href = '/login'
 }
@@ -178,7 +184,7 @@ async function logout() {
   height: 24px;
   border-radius: var(--radius-pill);
   background: var(--hairline);
-  transition: background-color 150ms ease;
+  transition: background-color var(--duration-short) var(--ease-standard);
 }
 
 .switch-track::after {
@@ -191,7 +197,7 @@ async function logout() {
   border-radius: 50%;
   background: var(--canvas);
   box-shadow: 0 1px 3px rgba(17, 24, 39, 0.25);
-  transition: transform 150ms ease;
+  transition: transform var(--duration-short) var(--ease-emphasized-decelerate);
 }
 
 .switch-input:checked + .switch-track {

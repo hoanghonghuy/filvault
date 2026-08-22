@@ -121,6 +121,10 @@ Rules:
 - Bottom/side nav: indicator pill trượt bằng `transform: scale` (200ms emphasized-decelerate) — không animate layout.
 - FAB: hover nâng shadow, press scale 0.94 + hạ shadow (100ms).
 - Optimistic UI cho thao tác phá hủy (delete/restore): gỡ row khỏi list **trước** khi gọi API để TransitionGroup chạy move animation; lỗi thì `loadBrowser()`/`load()` rollback kèm error alert. Toast chỉ hiện khi API thành công.
+- Router: luôn có `scrollBehavior` — reset về đầu trang khi điều hướng, khôi phục vị trí khi back/forward (`savedPosition`).
+- Logout và mọi action thoát app phải đi qua confirm sheet.
+- Bottom sheet bắt buộc có focus trap (Tab loop trong panel) + trả focus về trigger khi đóng.
+- Upload: progress bar component (`UploadProgress`, `role="progressbar"` + `aria-live="polite"`), fill animate bằng `transform: scaleX` — không animate `width`. Files hỗ trợ drag & drop với overlay "Drop files to upload".
 
 **Key characteristics**
 - Canvas trắng (`{colors.canvas}`), surface phụ xám rất nhạt (`{colors.surface-soft}` / `{colors.surface-card}`).
