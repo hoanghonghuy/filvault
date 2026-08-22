@@ -22,14 +22,14 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 
 **CI:** lint / typecheck / test (BE + FE) + workflow AI review PR (2026-08-18).
 
-→ **Việc tiếp theo không phải deploy/AWS.** Làm **smoke test tay** xuyên suốt. Chỉ khi smoke test xanh mới bàn Phase 2.
+→ **Việc tiếp theo không phải deploy/AWS.** Làm **smoke test tay** xuyên suốt. Feature Phase 2 web (search, cover, …) đã chốt riêng — xem [10-phase-2-status.md](10-phase-2-status.md); không nhầm với cửa deploy/RDS.
 
 ### Bắt đầu từ đây
 
 1. `make up` → mở `http://localhost:5173`.
 2. Đăng nhập `dev@filvault.com` / `Dev1234@`.
 3. Smoke test tay (checklist dưới). Ghi lệch spec / bug nếu thấy.
-4. Chỉ khi bước 3 xong mới bàn Phase 2 (Terraform, RDS, S3 AWS thật).
+4. Feature Phase 2 web: [10-phase-2-status.md](10-phase-2-status.md). Deploy/AWS: bàn riêng sau smoke Phase 1.
 
 ---
 
@@ -152,4 +152,4 @@ Không phải nợ. Không nhét vào công việc tiếp theo.
 1. `make up` → login `dev@filvault.com` / `Dev1234@`.
 2. Chạy hết checklist **Smoke test tay** ở trên; ghi bug nếu lệch spec / `DESIGN.md`.
 3. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
-4. Smoke test xanh → mới bàn Phase 2.
+4. Smoke test Phase 1 xanh **không chặn** làm feature Phase 2 web đã chốt — xem [10-phase-2-status.md](10-phase-2-status.md) (S1 done → tiếp S2). Deploy/AWS vẫn tách khỏi checklist feature.

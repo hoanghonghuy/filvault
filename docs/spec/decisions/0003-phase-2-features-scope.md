@@ -1,8 +1,9 @@
 # ADR 0003 — Phạm vi tính năng Phase 2 (web)
 
-- Trạng thái: **Accepted** (bắt đầu implement từ S1 ngày 2026-08-22)
+- Trạng thái: **Accepted** (2026-08-22)
 - Ngày: 2026-08-22
 - Spec: [../09-phase-2-features.md](../09-phase-2-features.md)
+- Tiến độ: [../10-phase-2-status.md](../10-phase-2-status.md) — S1 Done; tiếp S2
 
 ## Bối cảnh
 
@@ -24,6 +25,14 @@ Phase 1 đã bàn giao đủ 6 màn (Auth, Files, Photos, Album, Trash, Settings
 ## Hệ quả
 
 - Migration chỉ tạo khi slice tương ứng bắt đầu (giữ rule "không tạo bảng trống cho tương lai"); riêng `share_links` có cột `recipient_user_id NULL` giành chỗ từ đầu để S5 không phải migrate lại.
-- S4 cần bổ sung ADR chi tiết bảo mật link (token TTL, rate limit số cụ thể) khi bắt đầu slice.
-- Web có thêm trang public `/s/:token` không cần login — surface duy nhất nằm ngoài shell; DESIGN.md bổ sung anatomy riêng.
-- Spec 04 §7 và spec 03 §6 được thay thế bởi spec này cho các mục share/activity kể từ khi slice tương ứng vào implementation.
+- S4 cần bổ sung ADR chi tiết bảo mật link (token TTL, rate limit số cụ thể) khi bắt đầu slice — **không code S4 trước ADR đó**.
+- Web có thêm trang public `/s/:token` không cần login — surface duy nhất nằm ngoài shell; DESIGN.md bổ sung anatomy riêng (§9a).
+- Spec 04 §7 và spec 03 §6 được thay thế bởi spec 09 cho các mục share/activity kể từ khi slice tương ứng vào implementation.
+- Checklist bàn giao / DoD slice: [10-phase-2-status.md](../10-phase-2-status.md).
+
+## Tiến độ (cập nhật kèm file 10)
+
+| Slice | Ghi chú |
+|---|---|
+| S1 | Implemented 2026-08-22 — giữ ILIKE + filter/sort theo quyết định 2 |
+| S2–S6 | Chưa |

@@ -1,25 +1,42 @@
 # 09 — Spec tính năng Phase 2 (web)
 
-Trạng thái: **đề xuất — chờ duyệt trước khi implement**. Không đụng kiến trúc Phase 1; chỉ thêm bảng/migration/API/UI theo slice dưới đây.
+Trạng thái: **Accepted** (2026-08-22). ADR: [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md).  
+Tiến độ thực tế: [10-phase-2-status.md](10-phase-2-status.md).
 
-Nguồn nền: spec 03 (schema), spec 04 (API), spec 07 (nghiệp vụ), [`DESIGN.md`](../../DESIGN.md) (UI). Quy tắc cũ vẫn đúng: **thiết kế sẵn ≠ implement sẵn** — mỗi slice implement khi đến lượt, migration chỉ tạo khi slice đó bắt đầu.
+Không đụng kiến trúc Phase 1; chỉ thêm bảng/migration/API/UI theo slice dưới đây. Quy tắc: **thiết kế sẵn ≠ implement sẵn** — mỗi slice implement khi đến lượt, migration chỉ tạo khi slice đó bắt đầu.
+
+Nguồn nền: spec 03 (schema), spec 04 (API), spec 07 (nghiệp vụ), [`DESIGN.md`](../../DESIGN.md) (UI, §9a surface Phase 2).
 
 ## 0. Tổng quan slice
 
-| # | Slice | Phụ thuộc | Độ lớn ước tính |
-|---|---|---|---|
-| S1 | Search nâng cao (filter + sort, giữ engine ILIKE) | không | nhỏ |
-| S2 | Album cover (tự động + ghim tay) | không | nhỏ |
-| S3 | Favorites (đánh dấu sao file/ảnh) | không | vừa |
-| S4 | Share qua **public link** | không | lớn |
-| S5 | Share cho **user nội bộ** (email, quyền read) | S4 | lớn |
-| S6 | Activity log (hiển thị trong Settings) | không | nhỏ |
+| # | Slice | Phụ thuộc | Độ lớn | Trạng thái |
+|---|---|---|---|---|
+| S1 | Search nâng cao (filter + sort, giữ engine ILIKE) | không | nhỏ | **Done** (2026-08-22) |
+| S2 | Album cover (tự động + ghim tay) | không | nhỏ | Chưa |
+| S3 | Favorites (đánh dấu sao file/ảnh) | không | vừa | Chưa |
+| S4 | Share qua **public link** | không | lớn | Chưa — cần ADR bảo mật trước khi code |
+| S5 | Share cho **user nội bộ** (email, quyền read) | S4 | lớn | Chưa — bổ sung chi tiết API/UI khi vào slice |
+| S6 | Activity log (hiển thị trong Settings) | không | nhỏ | Chưa |
 
-Thứ tự khuyến nghị: S1 → S2 → S3 → S4 → S6 → S5. S4 phải có ADR riêng về bảo mật link (làm khi bắt đầu slice).
+Thứ tự khuyến nghị: S1 → S2 → S3 → S4 → S6 → S5.
+
+### 0.1 Cách triển khai mỗi slice (bắt buộc)
+
+1. **TDD:** viết test API (handler/service) và/hoặc test hợp đồng FE **trước**, xác nhận fail (Red), rồi implement tối thiểu để pass (Green), rồi refactor.
+2. **Migration** chỉ khi slice cần bảng/cột mới (xem §7). Không tạo bảng “giành chỗ” ngoài cột `recipient_user_id` đã chốt cho S4.
+3. **API + UI cùng slice** — không để endpoint treo không có màn, trừ public share page thuộc S4.
+4. **DoD slice** (tick trong [10](10-phase-2-status.md) trước khi sang slice tiếp):
+   - `go test ./...` xanh; web `npm run lint` + `npm run type-check` + `npm test` xanh
+   - Hành vi khớp § tương ứng bên dưới + anatomy `DESIGN.md` §9a
+   - Ownership: ID lạ / không thuộc user → `404` (không dò ID)
+   - Smoke tay tối thiểu cho slice (checklist trong 10)
+5. **S4:** không bắt đầu code trước khi có ADR bảo mật link (token TTL, rate limit số, mã lỗi public). **S5:** viết thêm mục API/UI chi tiết vào file này (hoặc file con) khi bắt đầu.
 
 ---
 
 ## 1. S1 — Search nâng cao
+
+> **Đã implement** (2026-08-22). Giữ mục này làm hợp đồng hành vi; đừng viết lại engine.
 
 ### 1.1 Phạm vi
 
