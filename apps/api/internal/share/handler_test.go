@@ -173,12 +173,26 @@ func TestShares_UnknownEmailNotFound(t *testing.T) {
 	var folder folderResp
 	decodeJSON(t, body, &folder)
 
+	// Anti-probing: unknown emails get 201 + invite mail, never a 404 that
+	// would reveal which addresses have accounts.
 	code, body := postAuth(t, engine, "/api/v1/shares", tokenA, map[string]any{
 		"resourceType": "folder",
 		"resourceId":   folder.ID,
 		"email":        "nobody@example.com",
 	})
-	assertAPIError(t, code, body, http.StatusNotFound, "NOT_FOUND")
+	if code != http.StatusCreated {
+		t.Fatalf("status=%d want 201 body=%s", code, body)
+	}
+	var created struct {
+		Invited bool `json:"invited"`
+	}
+	decodeJSON(t, body, &created)
+	if !created.Invited {
+		t.Fatalf("expected invited=true, got %s", body)
+	}
+	if mem.LastCode("nobody@example.com") == "" {
+		t.Fatalf("invite mail missing")
+	}
 }
 
 func TestShares_RevokeByNonOwnerNotFound(t *testing.T) {
@@ -272,14 +286,6 @@ func uploadFile(t *testing.T, engine http.Handler, objs *objectstore.Memory, tok
 		t.Fatalf("complete status=%d body=%s", code, body)
 	}
 	return s.FileID
-}
-
-func emailAOf(t *testing.T, token string) string {
-	t.Helper()
-	// We don't have the email directly; derive from a fresh register is not
-	// possible. Instead, self-share is tested via a dedicated helper that
-	// registers a known email. This is a placeholder to satisfy the test.
-	return ""
 }
 
 func registerOnly(t *testing.T, engine http.Handler, email string) string {

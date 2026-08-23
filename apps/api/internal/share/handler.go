@@ -60,11 +60,17 @@ func (h *Handler) create(c *gin.Context) {
 		httpx.Error(c, err)
 		return
 	}
+	if sh.Invited {
+		c.JSON(http.StatusCreated, gin.H{"invited": true})
+		return
+	}
+	recipient := h.svc.RecipientOf(sh.Share)
 	c.JSON(http.StatusCreated, gin.H{
-		"id":           sh.ID,
-		"resourceType": sh.ResourceType,
-		"resourceId":   sh.ResourceID,
-		"createdAt":    sh.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"id":           sh.Share.ID,
+		"resourceType": sh.Share.ResourceType,
+		"resourceId":   sh.Share.ResourceID,
+		"recipient":    recipient,
+		"createdAt":    sh.Share.CreatedAt.UTC().Format(time.RFC3339Nano),
 	})
 }
 

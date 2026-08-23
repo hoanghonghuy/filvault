@@ -5,17 +5,24 @@ import (
 	"strings"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/auth"
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo     Repository
+	now      func() time.Time
+	activity ActivityRecorder
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo, now: time.Now}
+// ActivityRecorder records lifecycle events; failures never break folder ops.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
+}
+
+func NewService(repo Repository, activity ActivityRecorder) *Service {
+	return &Service{repo: repo, now: time.Now, activity: activity}
 }
 
 func (s *Service) Create(ctx context.Context, ownerID, name string, parentID *string) (Folder, error) {
@@ -136,6 +143,7 @@ func (s *Service) Delete(ctx context.Context, ownerID, id string) error {
 	if subfolders > 0 || files > 0 {
 		return apperr.Conflict
 	}
+	s.activity.Record(ctx, ownerID, activity.TypeFolderTrashed, f.Name)
 	return s.repo.SoftDelete(ctx, ownerID, id, s.now().UTC())
 }
 

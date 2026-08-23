@@ -3,6 +3,7 @@ package file
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"filvault/internal/apperr"
@@ -22,6 +23,9 @@ func NewHandler(svc *Service) *Handler {
 
 func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFunc) {
 	g.POST("/files/upload-sessions", append(middleware, h.createSession)...)
+	g.GET("/files/favorites", append(middleware, h.listFavorites)...)
+	g.PUT("/files/:id/favorite", append(middleware, h.setFavorite)...)
+	g.DELETE("/files/:id/favorite", append(middleware, h.unsetFavorite)...)
 	g.POST("/files/:id/complete", append(middleware, h.complete)...)
 	g.GET("/files/:id", append(middleware, h.get)...)
 	g.GET("/files/:id/download", append(middleware, h.download)...)
@@ -29,6 +33,7 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.GET("/files/:id/versions/:versionId/download", append(middleware, h.downloadVersion)...)
 	g.PATCH("/files/:id", append(middleware, h.patch)...)
 	g.DELETE("/files/:id", append(middleware, h.delete)...)
+
 }
 
 func userIDFrom(c *gin.Context) (string, bool) {
@@ -270,4 +275,72 @@ func publicFrom(f File) publicFile {
 		CreatedAt: f.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt: f.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+}
+
+func (h *Handler) setFavorite(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.SetFavorite(c.Request.Context(), userID, id); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) unsetFavorite(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.svc.UnsetFavorite(c.Request.Context(), userID, id); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) listFavorites(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	limit := DefaultFavoritesLimit
+	if raw := c.Query("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			httpx.Validation(c)
+			return
+		}
+		limit = n
+	}
+	items, err := h.svc.ListFavorites(c.Request.Context(), userID, limit)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	out := make([]gin.H, 0, len(items))
+	for _, it := range items {
+		out = append(out, gin.H{
+			"id":          it.ID,
+			"name":        it.Name,
+			"mimeType":    it.MimeType,
+			"sizeBytes":   it.SizeBytes,
+			"updatedAt":   it.UpdatedAt.UTC().Format(time.RFC3339Nano),
+			"favoritedAt": it.FavoritedAt.UTC().Format(time.RFC3339Nano),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"files": out})
 }

@@ -31,25 +31,25 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [09-cli.md](09-cli.md) | CLI `filvault` (Phase 4): login, whoami, ls, upload, download |
 | [09-phase-2-features.md](09-phase-2-features.md) | Spec tính năng Phase 2 web (Accepted): search, cover, favorites, share, activity |
 | [10-phase-2-status.md](10-phase-2-status.md) | Checklist bàn giao Phase 2; S1 done → tiếp S2 |
-| [10-sharing.md](10-sharing.md) | Sharing (Phase 5): chia sẻ file/folder cho user khác |
+| [10-sharing.md](10-sharing.md) | Sharing (Phase 5): chia sẻ file/folder cho user khác; đã đồng bộ S5 (anti-probing, mail mời, activity, UI `/shared`) |
 | [11-versioning.md](11-versioning.md) | Versioning (Phase 6): lịch sử phiên bản file khi replace |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
 | [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md) | ADR: phạm vi tính năng Phase 2 (**Accepted**) |
+| [decisions/0004-public-share-link-security.md](decisions/0004-public-share-link-security.md) | ADR: bảo mật public share link S4 (**Accepted**) |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web (Cal.com-like + teal, mobile-first; §9a Phase 2) |
 
 **Phase 1** đã có spec + implement (checklist: [08](08-phase-1-status.md)).  
-**Phase 2 web:** spec [09](09-phase-2-features.md) Accepted; tiến độ [10](10-phase-2-status.md) — **S1 xong**, tiếp **S2**.
+**Phase 2 web:** spec [09](09-phase-2-features.md) Accepted; tiến độ [10](10-phase-2-status.md) — **đủ 6/6 slice Done** (S5 xong 2026-08-23).
 
 ## Chưa viết (đúng lúc)
 
-- ADR bảo mật share link (token TTL, rate limit số cụ thể) — **bắt buộc trước khi code S4**
-- Chi tiết UI/endpoint share user nội bộ (S5) — viết khi vào slice
-- Database/API cho versioning, sync
+- Sync spec (CLI slice đầu đã có: [09-cli.md](09-cli.md); API/database sync chưa có)
 - Terraform / RDS deploy spec
 - JobQueue + worker spec (Phase 3)
-- Sync spec (CLI slice đầu đã có: [09-cli.md](09-cli.md))
 - Tích hợp app khác (full API + API key/tenant) — sau khi sản phẩm Filvault hoàn chỉnh
+
+> Versioning (Phase 6) **đã spec + implement**: [11-versioning.md](11-versioning.md) — không còn ở mục này.
 
 ## Quy ước
 

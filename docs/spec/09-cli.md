@@ -95,7 +95,7 @@ filvault login
 
 - `POST /auth/login` `{ email, password }` → `200` `{ user, accessToken, refreshToken }`.
 - Lưu token file. In `Logged in as <email>`.
-- Password đọc ẩn qua `golang.org/x/term` (không echo); fallback stdin thường khi không có TTY (piped input).
+- Password đọc ẩn qua `golang.org/x/term` (không echo); khi không có TTY (piped input) đọc cả email + password từ **một reader duy nhất** trên stdin (đọc 2 reader riêng sẽ EOF dòng 2 — đã sửa kèm test).
 - Sai mật khẩu → `401 UNAUTHORIZED` → in message, exit 1.
 - Chưa verify: login vẫn `200` (spec 04 §2) — CLI in cảnh báo `Email not verified` nhưng vẫn lưu token (để `whoami` chạy được).
 
@@ -250,6 +250,20 @@ TDD theo slice. Ưu tiên:
 | Command | `login`/`logout`/`ls`/`whoami`/`upload`/`download`/`mkdir`/`rm`/`mv`/`trash`/`restore`/`search`/`storage`/`cd`/`pwd`/`purge`/`lsGlob` gọi đúng endpoint + parse response (fake server) |
 
 Không cần test thật MinIO/S3 — upload/download dùng fake server trả presigned URL.
+
+### 6.1 Smoke thật trên stack local (2026-08-23)
+
+Chạy end-to-end bằng binary build từ `apps/cli` chống API + MinIO thật
+(user tạm `smoke-p1-*`, config file qua `FILVAULT_CONFIG_PATH`). Kết quả:
+
+- PASS: login (piped stdin), whoami, mkdir, cd, pwd, upload, ls, download
+  (bytes khớp), search, storage, rm → trash → restore, rm -f purge,
+  share/shares/unshare, upload --replace → versions hiện archive,
+  version-download tải bản cũ được; logout.
+- Bug tìm thấy & sửa: `login` piped EOF (chi tiết §4.1) — TDD Red→Green với
+  test `readCredentials`.
+- Lưu ý cú pháp: Go `flag` chỉ parse flag **trước** positional arg, nên
+  replace dùng `upload --replace <name> <file>`; usage text đã sửa cho khớp.
 
 ## 7. Không làm ở slice này
 

@@ -12,7 +12,7 @@ import {
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
 } from '@/lib/shellNav'
-import type { Browser, BrowserFile, Timeline, TimelineGroup } from '@/api/types'
+import type { Browser, BrowserFile, FavoriteFile, Timeline, TimelineGroup } from '@/api/types'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -22,6 +22,7 @@ const filesError = ref('')
 const photosError = ref('')
 const files = ref<BrowserFile[]>([])
 const groups = ref<TimelineGroup[]>([])
+const favorites = ref<FavoriteFile[]>([])
 
 const recentFiles = computed(() => recentFilesFromBrowser(files.value))
 const recentPhotos = computed(() => recentPhotosFromTimeline(groups.value))
@@ -39,9 +40,10 @@ async function load() {
   filesError.value = ''
   photosError.value = ''
   try {
-    const [browserResult, timelineResult] = await Promise.allSettled([
+    const [browserResult, timelineResult, favoritesResult] = await Promise.allSettled([
       api<Browser>('/browser'),
       api<Timeline>('/photos/timeline'),
+      api<{ files: FavoriteFile[] }>('/files/favorites?limit=5'),
     ])
     if (browserResult.status === 'fulfilled') {
       files.value = browserResult.value.files
@@ -54,6 +56,11 @@ async function load() {
     } else {
       groups.value = []
       photosError.value = formatApiError(timelineResult.reason, 'Could not load photos')
+    }
+    if (favoritesResult.status === 'fulfilled') {
+      favorites.value = favoritesResult.value.files
+    } else {
+      favorites.value = []
     }
   } finally {
     loading.value = false
@@ -101,6 +108,31 @@ onMounted(load)
     </div>
 
     <template v-else>
+      <section
+        v-if="favorites.length"
+        class="section"
+        aria-labelledby="favorites-heading"
+      >
+        <div class="section-head">
+          <h2 id="favorites-heading" class="section-title">Favorites</h2>
+          <RouterLink class="see-all" :to="{ path: '/files', query: { view: 'favorites' } }">See all</RouterLink>
+        </div>
+        <div class="list">
+          <RouterLink
+            v-for="file in favorites"
+            :key="file.id"
+            class="row tappable"
+            to="/files"
+          >
+            <span class="name">
+              <Icon name="star-filled" :size="18" class="row-icon star-icon" />
+              {{ file.name }}
+            </span>
+            <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
+          </RouterLink>
+        </div>
+      </section>
+
       <section class="section" aria-labelledby="recent-files-heading">
         <div class="section-head">
           <h2 id="recent-files-heading" class="section-title">Recent files</h2>
@@ -281,6 +313,10 @@ onMounted(load)
   margin-right: 0.4rem;
   vertical-align: -3px;
   color: var(--muted);
+}
+
+.star-icon {
+  color: var(--warning);
 }
 
 .empty-inline {

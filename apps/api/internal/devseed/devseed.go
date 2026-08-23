@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/auth"
 	"filvault/internal/platform/config"
 	"filvault/internal/platform/mailer"
@@ -35,6 +36,17 @@ type Result struct {
 	Created     bool
 	Verified    bool
 }
+
+// nopRepo swallows activity events; seeding never records activity.
+type nopRepo struct{}
+
+func (nopRepo) Append(context.Context, activity.Event) error { return nil }
+
+func (nopRepo) List(context.Context, string, time.Time, int) ([]activity.Event, error) {
+	return nil, nil
+}
+
+func (nopRepo) DeleteOlderThan(context.Context, time.Time) (int64, error) { return 0, nil }
 
 func (o Options) withDefaults() Options {
 	if o.Email == "" {
@@ -85,7 +97,7 @@ func EnsureDevUser(ctx context.Context, pool *pgxpool.Pool, opts Options) (Resul
 		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
 	}
 	mem := mailer.NewMemory()
-	svc := auth.NewService(cfg, store, auth.NewTokens("seed-unused"), mem)
+	svc := auth.NewService(cfg, store, auth.NewTokens("seed-unused"), mem, activity.NewRecorder(nopRepo{}))
 
 	if _, err := svc.Register(ctx, opts.Email, opts.Password, opts.DisplayName, opts.InviteCode); err != nil {
 		return Result{}, fmt.Errorf("register: %w", err)

@@ -35,4 +35,8 @@ Phase 1 đã bàn giao đủ 6 màn (Auth, Files, Photos, Album, Trash, Settings
 | Slice | Ghi chú |
 |---|---|
 | S1 | Implemented 2026-08-22 — giữ ILIKE + filter/sort theo quyết định 2 |
-| S2–S6 | Chưa |
+| S2 | Implemented 2026-08-22 — cover_file_id + auto/pin theo quyết định 3 |
+| S3 | Implemented 2026-08-22 — favorites |
+| S4 | Implemented 2026-08-23 — theo [ADR 0004](0004-public-share-link-security.md) |
+| S5 | Implemented 2026-08-23 — chống dò email + mail mời; UI /shared theo §5 của spec 09 |
+| S6 | Implemented 2026-08-23 — activity log 90 ngày, fail-open |

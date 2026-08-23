@@ -38,5 +38,6 @@ type Config struct {
 	DefaultVideoThumbnails    bool
 	DefaultTrashAutoDelete    bool
 	DefaultTrashRetentionDays int
+	PublicShareRateLimitPerMin int
 	CORSAllowedOrigins        []string
 }

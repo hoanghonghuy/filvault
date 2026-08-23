@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"filvault/internal/apperr"
+	"filvault/internal/auth"
 	"filvault/internal/file"
 
 	"github.com/jackc/pgx/v5"
@@ -145,6 +146,49 @@ const fileSelect = `
 	WHERE deleted_at IS NULL
 `
 
+// AddFavorite inserts a favorite row; re-favoriting keeps the original mark.
+func (s *Store) AddFavorite(ctx context.Context, ownerID, fileID string, at time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO favorites (id, owner_id, file_id, created_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (owner_id, file_id) DO NOTHING
+	`, auth.NewID(), ownerID, fileID, at)
+	return err
+}
+
+// RemoveFavorite deletes the favorite row if present; idempotent.
+func (s *Store) RemoveFavorite(ctx context.Context, ownerID, fileID string) error {
+	_, err := s.pool.Exec(ctx, `
+		DELETE FROM favorites WHERE owner_id = $1 AND file_id = $2
+	`, ownerID, fileID)
+	return err
+}
+
+// ListFavorites returns the user's favorited files, newest favorite first.
+func (s *Store) ListFavorites(ctx context.Context, ownerID string, limit int) ([]file.FavoriteFile, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT f.id, f.name, f.mime_type, f.size_bytes, f.updated_at, fav.created_at
+		FROM favorites fav
+		JOIN files f ON f.id = fav.file_id
+		WHERE fav.owner_id = $1 AND f.deleted_at IS NULL AND f.status = 'READY'
+		ORDER BY fav.created_at DESC
+		LIMIT $2
+	`, ownerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []file.FavoriteFile
+	for rows.Next() {
+		var it file.FavoriteFile
+		if err := rows.Scan(&it.ID, &it.Name, &it.MimeType, &it.SizeBytes, &it.UpdatedAt, &it.FavoritedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
 func scanFile(row pgx.Row) (*file.File, error) {
 	var f file.File
 	err := row.Scan(
@@ -202,6 +246,18 @@ func (r fileRepo) ListVersions(ctx context.Context, fileID string) ([]file.FileV
 
 func (r fileRepo) GetVersion(ctx context.Context, fileID, versionID string) (*file.FileVersion, error) {
 	return r.store.GetFileVersion(ctx, fileID, versionID)
+}
+
+func (r fileRepo) AddFavorite(ctx context.Context, ownerID, fileID string, at time.Time) error {
+	return r.store.AddFavorite(ctx, ownerID, fileID, at)
+}
+
+func (r fileRepo) RemoveFavorite(ctx context.Context, ownerID, fileID string) error {
+	return r.store.RemoveFavorite(ctx, ownerID, fileID)
+}
+
+func (r fileRepo) ListFavorites(ctx context.Context, ownerID string, limit int) ([]file.FavoriteFile, error) {
+	return r.store.ListFavorites(ctx, ownerID, limit)
 }
 
 type quotaRepo struct {

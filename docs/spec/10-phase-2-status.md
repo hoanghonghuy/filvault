@@ -15,13 +15,13 @@ Phase 2 đợt này = **tính năng web** (search / cover / favorites / share / 
 | Slice | Trạng thái |
 |---|---|
 | S1 Search filter + sort | **Done** |
-| S2 Album cover | Chưa |
-| S3 Favorites | Chưa |
-| S4 Public share link | Chưa (cần ADR bảo mật trước) |
-| S6 Activity log | Chưa |
-| S5 Share user nội bộ | Chưa (sau S4; cần bổ sung spec chi tiết) |
+| S2 Album cover | **Done** |
+| S3 Favorites | **Done** |
+| S4 Public share link | **Done** (ADR 0004) |
+| S6 Activity log | **Done** (2026-08-23) |
+| S5 Share user nội bộ | **Done** (2026-08-23) — spec §5.1–5.6 |
 
-→ **Việc tiếp theo:** bắt đầu **S2** theo TDD (xem 09 §0.1). Không nhảy S4 trước ADR.
+→ **Phase 2 đủ 6/6 slice.** Việc còn lại: smoke tay tích lũy (mục cuối file này) + các mục "không làm" đã ghi rõ.
 
 ---
 
@@ -67,39 +67,53 @@ Tick khi DoD 09 §0.1 xanh **và** smoke tay slice xong.
 
 ### S2 — Album cover
 
-- [ ] Migration `albums.cover_file_id`
-- [ ] API: list albums có `coverUrl?`; `POST/DELETE .../cover`; detail có `coverFileId`
-- [ ] UI: card cover trên Photos; Set/Remove cover trong AlbumView action sheet
-- [ ] Test API + smoke: ghim → đổi bìa; remove item bìa → fallback auto
+- [x] Migration `albums.cover_file_id`
+- [x] API: list albums có `coverUrl?`; `POST/DELETE .../cover`; detail có `coverFileId`
+- [x] UI: card cover trên Photos; Set/Remove cover trong AlbumView action sheet
+- [x] Test API + smoke: ghim → đổi bìa; remove item bìa → fallback auto
+
+**File chính:** `apps/api/migrations/00006_album_cover.*.sql`, `apps/api/internal/photo/*`, `apps/api/internal/platform/postgres/photo_store.go`, `apps/web/src/views/PhotosView.vue`, `apps/web/src/views/AlbumView.vue`, `apps/web/src/api/types.ts`.
 
 ### S3 — Favorites
 
-- [ ] Migration `favorites`
-- [ ] API: PUT/DELETE favorite; GET favorites
-- [ ] UI: action sheet star; segment Favorites | All ở Files root; Overview ưu tiên Favorites
-- [ ] Test API + smoke: trash ẩn khỏi list; permanent delete xóa row
+- [x] Migration `favorites`
+- [x] API: PUT/DELETE favorite; GET favorites
+- [x] UI: action sheet star (FilesView, PhotoMediaSheet cho Photos/Album); segment Favorites | All ở Files; section Favorites ở Overview
+- [x] Test API: trash ẩn khỏi list; permanent delete xóa row (`favorite_handler_test.go`, 4 case)
+
+**File chính:** `apps/api/migrations/00007_favorites.*.sql`, `apps/api/internal/file/{model,port,service,handler,favorite_handler_test}.go`, `apps/api/internal/platform/postgres/file_store.go`, `apps/web/src/api/types.ts`, `apps/web/src/components/{AppIcon,PhotoMediaSheet}.vue`, `apps/web/src/views/{FilesView,PhotosView,AlbumView,OverviewView}.vue`.
 
 ### S4 — Public share link
 
-- [ ] **ADR bảo mật link** (TTL, rate limit, 404 chung) — **bắt buộc trước code**
-- [ ] Migration `share_links` (kèm `recipient_user_id NULL`)
-- [ ] API owner + public `GET /s/:token`
-- [ ] UI: ShareSheet, Settings “Shared links”, trang public `/s/:token`
-- [ ] Test: token hash, revoke, hết hạn, rate limit, ownership
+- [x] **ADR bảo mật link** ([ADR 0004](decisions/0004-public-share-link-security.md): token 32B hash SHA-256, TTL NULL/1h/24h/7d, 404 chung, rate limit 30/phút/IP, cap 20 link/user, 1 link/file)
+- [x] Migration `share_links` (kèm `recipient_user_id NULL`)
+- [x] API owner: `POST/DELETE /files/{id}/share`, `GET /share-links`; public `GET /public/shares/{token}[/download]` (rate limit 429)
+- [x] UI: ShareSheet (TTL segmented, copy, revoke), Settings "Shared links", trang public `/s/:token` ngoài shell
+- [x] Test: `apps/api/internal/sharelink` (5 case: create/revoke, recreate, list, trash/purge, 404 chống dò)
+
+**File chính:** `apps/api/migrations/00008_share_links.*.sql`, `apps/api/internal/sharelink/*`, `apps/api/internal/platform/postgres/share_link_store.go`, `apps/api/internal/platform/httpx/rate_limit.go`, `apps/web/src/components/ShareSheet.vue`, `apps/web/src/views/{FilesView,SettingsView,PublicShareView}.vue`.
 
 ### S6 — Activity log
 
-- [ ] Migration `activity_events`
-- [ ] Ghi fail-open tại upload / trash / restore / share / password / settings
-- [ ] API `GET /activity`; ticker dọn >90 ngày
-- [ ] UI: section Activity trong Settings + Load more
-- [ ] Test ghi/đọc + smoke Settings
+- [x] Migration `activity_events` (index `owner_id, created_at DESC`)
+- [x] Ghi fail-open tại upload / trash / restore / share create+revoke / password change (tầng service qua `ActivityRecorder`)
+- [x] API `GET /activity?before=&limit=`; ticker dọn >90 ngày (nhịp 1 giờ, wire trong `cmd/api/main.go`)
+- [x] Ghi đủ enum: bổ sung `folder.trashed`/`folder.restored` (tầng `folder`/`trash`) + `file.purged` với `targetName` — test case 6, go test 95/95 xanh; smoke live xác nhận cả 3 type
+- [x] UI: section Activity trong Settings + Load more theo `nextBefore`
+- [x] Test: `apps/api/internal/activity` (6 case: lifecycle, share/password, folder+purge, pagination, isolation, validation)
+
+**File chính:** `apps/api/migrations/00009_activity_events.*.sql`, `apps/api/internal/activity/*`, `apps/api/internal/platform/postgres/{activity_store.go,schema_test.go}`, `apps/api/internal/{folder,file,trash,sharelink,share,auth}/service.go`, `apps/api/internal/ids/ids.go`, `apps/web/src/api/types.ts`, `apps/web/src/views/SettingsView.vue`.
 
 ### S5 — Share user nội bộ
 
-- [ ] Bổ sung chi tiết API/UI vào 09 (hoặc file con) trước khi code
-- [ ] Reuse `share_links.recipient_user_id`; quyền read-only
-- [ ] Test + smoke
+- [x] Spec chi tiết §5.1–5.6 viết vào 09 trước khi code
+- [x] API chống dò email: email chưa đăng ký → `201 {invited:true}` + mail mời (fail-open), không lộ account tồn tại; email tồn tại → 201 kèm `recipient`
+- [x] Activity: `share.created` / `share.revoked` ghi cho share nội bộ (`targetName` = tên resource)
+- [x] UI owner: "Share with user" trong action sheet file (`ShareUserSheet`); toast phân biệt share / invite
+- [x] UI recipient: `/shared` (`SharedWithMeView`) — list incoming, download file, browse folder 1 cấp; entry từ Overview card thứ 3 (giữ 4 tab nav)
+- [x] Test: `internal/share/internal_share_test.go` (3 case mới) + cập nhật case email lạ; go test 94/94 xanh; web lint/type-check/test 71/71 + build xanh
+
+**File chính:** `apps/api/internal/share/{service.go,port.go,handler.go,internal_share_test.go}`, `apps/api/internal/share/handler_test.go`, `apps/api/internal/platform/postgres/share_store.go`, `apps/api/internal/app/app.go`, `apps/web/src/components/ShareUserSheet.vue`, `apps/web/src/views/{FilesView.vue,SharedWithMeView.vue}`, `apps/web/src/lib/shellNav.ts`, `apps/web/src/router/index.ts`, `apps/web/src/api/types.ts`, `apps/web/src/components/AppIcon.vue`.
 
 ---
 
@@ -108,11 +122,11 @@ Tick khi DoD 09 §0.1 xanh **và** smoke tay slice xong.
 Sau mỗi slice, tick thêm (dùng `dev@filvault.com`):
 
 - [x] S1: search + filter type/date/sort; chip × và Clear all; empty có filter
-- [ ] S2: album có/không cover; Set cover / Remove cover
-- [ ] S3: favorite/unfavorite; list Favorites; trash không hiện trong favorites
-- [ ] S4: tạo link → mở ẩn danh tải được; revoke → 404; hết hạn → 404
-- [ ] S6: Settings Activity hiện event sau upload/trash
-- [ ] S5: share theo email user nội bộ (khi có)
+- [x] S2: album có/không cover; Set cover / Remove cover (smoke API 2026-08-23: auto = item mới nhất, pin/unpin, coverUrl xuất hiện khi bật image thumbnails)
+- [x] S3: favorite/unfavorite; list Favorites; trash không hiện trong favorites (smoke API 2026-08-23: PUT 204, list có tên, DELETE 204)
+- [x] S4: tạo link → mở ẩn danh tải được; revoke → 404 (smoke API 2026-08-23: public meta + download anonymous, sau revoke 404; hết hạn theo TTL unit test)
+- [x] S6: Settings Activity hiện event sau upload/trash (smoke API 2026-08-23: feed chứa file.uploaded, share.created, share.revoked)
+- [x] S5: share theo email user nội bộ; trang /shared thấy item nhận được; download file được share; email lạ → "Invitation sent" (smoke API 2026-08-23: invited=true + mail log, recipient payload, with-me, shared download, revoke / non-owner blocked / 409 / 400, activity share.created + share.revoked)
 
 ---
 

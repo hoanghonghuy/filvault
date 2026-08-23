@@ -17,6 +17,7 @@ export const SHELL_NAV = [
 export const OVERVIEW_DESTINATIONS = [
   { to: '/files', label: 'My Files', hint: 'Browse and upload', icon: 'folder' },
   { to: '/photos', label: 'Photos', hint: 'Timeline and albums', icon: 'photos' },
+  { to: '/shared', label: 'Shared with me', hint: 'Items shared to you', icon: 'users' },
 ] as const
 
 export function pageTitleForRoute(path: string, routeName?: string | symbol | null): string {
@@ -25,6 +26,7 @@ export function pageTitleForRoute(path: string, routeName?: string | symbol | nu
   if (path === '/files' || path.startsWith('/files/')) return 'My Files'
   if (path === '/photos' || path.startsWith('/photos/')) return 'Photos'
   if (path === '/trash') return 'Trash'
+  if (path === '/shared') return 'Shared with me'
   if (path === '/settings') return 'Settings'
   if (path === '/profile') return 'Profile'
   return 'Filvault'

@@ -41,6 +41,36 @@ export interface BrowserFile {
   updatedAt: string
 }
 
+export interface FavoriteFile {
+  id: string
+  name: string
+  mimeType: string
+  sizeBytes: number
+  updatedAt: string
+  favoritedAt: string
+}
+
+export interface ShareLinkInfo {
+  id: string
+  fileId: string
+  url?: string
+  token?: string
+  fileName?: string
+  mimeType?: string
+  sizeBytes?: number
+  expiresAt: string | null
+  createdAt: string
+}
+
+export interface PublicShareMeta {
+  name: string
+  mimeType: string
+  sizeBytes: number
+  expiresAt: string | null
+}
+
+export type ShareLinkTTL = '1h' | '24h' | '7d'
+
 export interface Browser {
   folder: Folder | null
   breadcrumb: Folder[]
@@ -124,4 +154,72 @@ export interface TrashItem {
 export interface TrashList {
   folders: TrashItem[]
   files: TrashItem[]
+}
+
+export type ActivityEventType =
+  | 'file.uploaded'
+  | 'file.trashed'
+  | 'file.restored'
+  | 'file.purged'
+  | 'folder.trashed'
+  | 'folder.restored'
+  | 'share.created'
+  | 'share.revoked'
+  | 'password.changed'
+  | 'settings.changed'
+
+export interface ActivityEvent {
+  id: string
+  type: ActivityEventType
+  targetName: string
+  createdAt: string
+}
+
+export interface ActivityPage {
+  events: ActivityEvent[]
+  nextBefore?: string
+}
+
+export type ShareResourceType = 'file' | 'folder'
+
+export interface ShareUserRef {
+  id: string
+  email: string
+  displayName: string
+}
+
+export interface OutgoingShare {
+  id: string
+  resourceType: ShareResourceType
+  resourceId: string
+  resourceName: string
+  recipient: ShareUserRef
+  createdAt: string
+}
+
+export interface IncomingShare {
+  id: string
+  resourceType: ShareResourceType
+  resourceId: string
+  resourceName: string
+  owner: ShareUserRef
+  createdAt: string
+}
+
+export interface SharedFolderInfo {
+  id: string
+  name: string
+}
+
+export interface SharedFileInfo {
+  id: string
+  name: string
+  mimeType: string
+  sizeBytes: number
+}
+
+export interface SharedBrowser {
+  folder: SharedFolderInfo | null
+  folders: SharedFolderInfo[]
+  files: SharedFileInfo[]
 }

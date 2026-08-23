@@ -1,8 +1,10 @@
 # 10 — Sharing spec (Phase 5)
 
-Trạng thái: **chốt slice đầu**. Nguồn API: [04-api.md](04-api.md). Schema: [03-database.md](03-database.md). Nghiệp vụ: [07-phase-1-business.md](07-phase-1-business.md).
+Trạng thái: **chốt slice đầu; mở rộng bởi S5 (đã implement 2026-08-23)**. Nguồn API: [04-api.md](04-api.md). Schema: [03-database.md](03-database.md). Nghiệp vụ: [07-phase-1-business.md](07-phase-1-business.md). Chi tiết mở rộng S5: [09-phase-2-features.md](09-phase-2-features.md) §5.
 
 Sharing cho phép user A chia sẻ **file** hoặc **folder** cho user B (theo email). B chỉ **đọc** (xem + tải), không sửa/xóa. Đây là slice đầu, chưa có link công khai, chưa có quyền ghi.
+
+> Lưu ý đồng bộ: các thay đổi từ S5 (chống dò email §4.1, activity events, UI web `/shared`, mail mời) **đã nằm trong spec này luôn** — file này là nguồn chuẩn cho sharing nội bộ; §5 của [09](09-phase-2-features.md) chỉ tóm tắt lý do quyết định.
 
 ## 1. Phạm vi
 
@@ -15,7 +17,7 @@ GET    /api/v1/shared/folders/{id}       # browse folder được share (recipie
 GET    /api/v1/shared/files/{id}/download # tải file được share (recipient)
 ```
 
-Chưa làm: link công khai, quyền ghi, share cho nhóm, thông báo email, share folder đệ quy sâu (chỉ browse 1 cấp + tải file trực tiếp).
+Chưa làm: quyền ghi, share cho nhóm, thông báo email khi được share (mail mời cho email chưa đăng ký **đã có** từ S5), share folder đệ quy sâu (chỉ browse 1 cấp + tải file trực tiếp). Link công khai tách riêng sang S4 + [ADR 0004](decisions/0004-public-share-link-security.md) — không nằm trong Phase 5 này.
 
 ## 2. Data model
 
@@ -47,13 +49,16 @@ UNIQUE (owner_id, resource_type, resource_id, recipient_id)
 
 ### 4.1 Tạo share
 
-`POST /shares` `{ resourceType, resourceId, email }` → `201` `{ id, resourceType, resourceId, recipient: { id, email, displayName }, createdAt }`.
+`POST /shares` `{ resourceType, resourceId, email }`.
 
 - `resourceType` ∈ `file` | `folder`.
-- `email` lowercase, resolve sang user. Không tồn tại → `NOT_FOUND`.
-- `email` = chính owner → `VALIDATION_ERROR`.
-- Resource không thuộc owner / đã xóa → `NOT_FOUND`.
+- **Email đã đăng ký** → `201` `{ id, resourceType, resourceId, recipient: { id, email, displayName }, createdAt }`.
+- **Email chưa đăng ký** → `201 { invited: true }` + **mail mời** (`<Owner> invited you to Filvault`, nêu tên người chia sẻ + tên resource; gửi qua mailer sẵn có, lỗi gửi mail fail-open — vẫn 201). **Không** tạo row share vì schema chốt `recipient_id NOT NULL`; owner share lại sau khi người nhận đăng ký (UI toast hướng dẫn).
+- Email = chính owner → `VALIDATION_ERROR`.
+- Resource không thuộc owner / đã trash → `NOT_FOUND`.
 - Trùng share → `CONFLICT`.
+
+> Đổi so với bản đầu: email lạ từng trả `404 NOT_FOUND`; S5 đổi sang `201 invited:true` để chống dò email (không lộ account tồn tại). Activity `share.created` / `share.revoked` ghi kèm từ S5.
 
 ### 4.2 Danh sách outgoing
 
@@ -121,9 +126,9 @@ TDD theo slice. Ưu tiên:
 ## 8. Không làm ở slice này
 
 ```text
-public link (share link)
+public link (share link)        # đã có riêng: S4 + ADR 0004 (share_links)
 quyền ghi / edit
 share cho nhóm
-thông báo email khi được share
+thông báo email khi được share  # mail MỜI cho email chưa đăng ký đã có từ S5; mail thông báo cho user đã đăng ký vẫn chưa làm
 share folder đệ quy sâu (browse nhiều cấp)
 ```

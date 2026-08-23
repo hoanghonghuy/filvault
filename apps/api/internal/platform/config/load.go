@@ -31,6 +31,7 @@ func Load() (Config, error) {
 		DefaultVideoThumbnails:    getenv("FILVAULT_DEFAULT_VIDEO_THUMBNAILS", "true") == "true",
 		DefaultTrashAutoDelete:    getenv("FILVAULT_DEFAULT_TRASH_AUTO_DELETE", "false") == "true",
 		DefaultTrashRetentionDays: DefaultTrashRetentionDays,
+		PublicShareRateLimitPerMin: 30,
 		CORSAllowedOrigins:        parseCSV(getenv("FILVAULT_CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),
 	}
 	if days := os.Getenv("FILVAULT_DEFAULT_TRASH_RETENTION_DAYS"); days != "" {
@@ -39,6 +40,13 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("FILVAULT_DEFAULT_TRASH_RETENTION_DAYS must be >= 1")
 		}
 		cfg.DefaultTrashRetentionDays = n
+	}
+	if raw := os.Getenv("FILVAULT_PUBLIC_SHARE_RATE_LIMIT_PER_MIN"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("FILVAULT_PUBLIC_SHARE_RATE_LIMIT_PER_MIN must be >= 1")
+		}
+		cfg.PublicShareRateLimitPerMin = n
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("FILVAULT_DATABASE_URL is required")

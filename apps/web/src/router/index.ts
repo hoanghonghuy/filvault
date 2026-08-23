@@ -26,8 +26,19 @@ const router = createRouter({
       meta: { auth: true, verified: true },
     },
     { path: '/trash', name: 'trash', component: () => import('@/views/TrashView.vue'), meta: { auth: true, verified: true } },
+    {
+      path: '/shared',
+      name: 'shared',
+      component: () => import('@/views/SharedWithMeView.vue'),
+      meta: { auth: true, verified: true },
+    },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true, verified: true } },
     { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { auth: true, verified: true } },
+    {
+      path: '/s/:token',
+      name: 'public-share',
+      component: () => import('@/views/PublicShareView.vue'),
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

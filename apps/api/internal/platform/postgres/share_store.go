@@ -61,6 +61,12 @@ func (s *Store) GetShareByRecipientResource(ctx context.Context, recipientID, re
 	`, recipientID, resourceType, resourceID))
 }
 
+func (s *Store) GetShareByOwnerID(ctx context.Context, ownerID, id string) (*share.Share, error) {
+	return scanShare(s.pool.QueryRow(ctx, shareSelect+`
+		WHERE owner_id = $1 AND id = $2
+	`, ownerID, id))
+}
+
 func (s *Store) GetFileByIDAny(ctx context.Context, id string) (*file.File, error) {
 	return scanFile(s.pool.QueryRow(ctx, fileSelectAny+` AND id = $1`, id))
 }
@@ -140,6 +146,10 @@ func (r shareRepo) DeleteShare(ctx context.Context, ownerID, id string) error {
 
 func (r shareRepo) GetShareByRecipientResource(ctx context.Context, recipientID, resourceType, resourceID string) (*share.Share, error) {
 	return r.store.GetShareByRecipientResource(ctx, recipientID, resourceType, resourceID)
+}
+
+func (r shareRepo) GetShareByOwnerID(ctx context.Context, ownerID, id string) (*share.Share, error) {
+	return r.store.GetShareByOwnerID(ctx, ownerID, id)
 }
 
 func (r shareRepo) ListAliveFolderChildren(ctx context.Context, ownerID string, parentID *string) ([]folder.Folder, error) {

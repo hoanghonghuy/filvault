@@ -45,6 +45,17 @@ const icons: Record<string, string[]> = {
   eye: ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
   restore: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 3'],
   filter: ['M4 5h16l-6.5 7.5V19l-3-1.5v-5z'],
+  star: [
+    'm12 3.5 2.6 5.27 5.82.85-4.21 4.1.99 5.8L12 16.77l-5.2 2.75.99-5.8-4.21-4.1 5.82-.85z',
+  ],
+  share: ['M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7', 'M12 16V3', 'm7 8 5-5 5 5'],
+  users: [
+    'M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2',
+    'M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+    'M22 21v-2a4 4 0 0 0-3-3.87',
+    'M15.5 3.13a4 4 0 0 1 0 7.75',
+  ],
+  'star-filled': ['m12 3.5 2.6 5.27 5.82.85-4.21 4.1.99 5.8L12 16.77l-5.2 2.75.99-5.8-4.21-4.1 5.82-.85z'],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.file)
@@ -58,6 +69,7 @@ const size = computed(() => props.size ?? 20)
       :key="i"
       :d="d"
       stroke="currentColor"
+      :fill="name === 'star-filled' ? 'currentColor' : 'none'"
       stroke-width="1.8"
       stroke-linecap="round"
       stroke-linejoin="round"

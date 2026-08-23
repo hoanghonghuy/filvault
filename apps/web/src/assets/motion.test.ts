@@ -95,7 +95,8 @@ describe('list move transition contract (TransitionGroup)', () => {
 
   it('uses TransitionGroup for Files browser rows', () => {
     const files = readSrc('../views/FilesView.vue')
-    expect(files.match(transitionGroupPattern())?.length).toBe(2)
+    // search results + browser rows + favorites list
+    expect(files.match(transitionGroupPattern())?.length).toBe(3)
   })
 
   it('uses TransitionGroup for Trash sections', () => {

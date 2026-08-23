@@ -10,9 +10,20 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
+import ShareSheet from '@/components/ShareSheet.vue'
+import ShareUserSheet from '@/components/ShareUserSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
 import { mimeIcon, mimeLabel, resolveContentType } from '@/lib/mimeIcon'
-import type { Browser, DownloadURL, SearchFilters, SearchResult, UploadSession } from '@/api/types'
+import type {
+  Browser,
+  DownloadURL,
+  FavoriteFile,
+  SearchFilters,
+  SearchResult,
+  ShareLinkInfo,
+  ShareLinkTTL,
+  UploadSession,
+} from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 
 const route = useRoute()
@@ -35,6 +46,9 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const folderInputRef = ref<HTMLInputElement | null>(null)
 const dragDepth = ref(0)
 const isDragging = computed(() => dragDepth.value > 0)
+const segment = ref<'all' | 'favorites'>(route.query.view === 'favorites' ? 'favorites' : 'all')
+const favorites = ref<FavoriteFile[] | null>(null)
+const favoritesLoading = ref(false)
 
 function onDragEnter(event: DragEvent) {
   if (!event.dataTransfer?.types.includes('Files')) return
@@ -468,17 +482,187 @@ async function openFolderActions(folder: { id: string; name: string }) {
   if (action === 'delete') await deleteFolder(folder.id)
 }
 
+async function loadFavorites() {
+  error.value = ''
+  favoritesLoading.value = true
+  try {
+    const out = await api<{ files: FavoriteFile[] }>('/files/favorites')
+    favorites.value = out.files
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to load favorites')
+  } finally {
+    favoritesLoading.value = false
+  }
+}
+
+watch(segment, (next) => {
+  if (next === 'favorites' && favorites.value === null) void loadFavorites()
+})
+
+watch(
+  () => route.query.view,
+  (view) => {
+    const next = view === 'favorites' ? 'favorites' : 'all'
+    if (segment.value !== next) segment.value = next
+  },
+)
+
+const isFavorited = (id: string) => favorites.value?.some((f) => f.id === id) ?? false
+
+async function toggleFavorite(fileId: string, name: string) {
+  const wasFavorited = isFavorited(fileId)
+  error.value = ''
+  try {
+    if (wasFavorited) {
+      await api(`/files/${fileId}/favorite`, { method: 'DELETE' })
+      ui.showToast(`Removed "${name}" from favorites`)
+    } else {
+      await api(`/files/${fileId}/favorite`, { method: 'PUT' })
+      ui.showToast(`Added "${name}" to favorites`)
+    }
+    await loadFavorites()
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to update favorite')
+  }
+}
+
 async function openFileActions(file: { id: string; name: string }) {
+  const favorited = isFavorited(file.id)
   const action = await ui.openActionSheet(file.name, [
     { id: 'download', label: 'Download', icon: 'download' },
+    {
+      id: 'favorite',
+      label: favorited ? 'Remove from favorites' : 'Add to favorites',
+      icon: favorited ? 'star-filled' : 'star',
+    },
+    { id: 'share', label: 'Share link', icon: 'share' },
+    { id: 'share-user', label: 'Share with user', icon: 'users' },
     { id: 'rename', label: 'Rename', icon: 'pencil' },
     { id: 'move', label: 'Move', icon: 'move' },
     { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
   ])
   if (action === 'download') await downloadFile(file.id)
+  if (action === 'favorite') await toggleFavorite(file.id, file.name)
+  if (action === 'share') {
+    shareFileName.value = file.name
+    await openShareSheet(file.id)
+  }
+  if (action === 'share-user') {
+    shareUserFileName.value = file.name
+    shareUserTargetId.value = file.id
+    shareUserOpen.value = true
+  }
   if (action === 'rename') await renameFile(file.id, file.name)
   if (action === 'move') openMoveFile(file.id)
   if (action === 'delete') await deleteFile(file.id)
+}
+
+const shareSheetOpen = ref(false)
+const shareFileName = ref('')
+const shareTargetId = ref<string | null>(null)
+const existingLink = ref<{ url: string; expiresAt: string | null; createdAt: string } | null>(null)
+
+/** The owner API does not expose the token again; reuse the create response
+ *  within this session so Copy works without a second request. */
+const sessionLinks = new Map<string, { url: string; expiresAt: string | null; createdAt: string }>()
+
+async function openShareSheet(fileId: string) {
+  shareTargetId.value = fileId
+  const cached = sessionLinks.get(fileId)
+  if (cached) {
+    existingLink.value = cached
+    shareFileName.value = shareFileName.value || ''
+  }
+  // Ask the list endpoint for expiry info; url/token only exist right after creation.
+  try {
+    const out = await api<{ links: ShareLinkInfo[] }>('/share-links')
+    const link = out.links.find((l) => l.fileId === fileId)
+    existingLink.value = cached ?? (link ? sessionLinkFromList(link) : null)
+  } catch {
+    if (!cached) existingLink.value = null
+  }
+  shareSheetOpen.value = true
+}
+
+function sessionLinkFromList(link: ShareLinkInfo) {
+  return {
+    url: link.url ?? '',
+    expiresAt: link.expiresAt,
+    createdAt: link.createdAt,
+  }
+}
+
+async function createShareLink(ttl: ShareLinkTTL | null) {
+  const fileId = shareTargetId.value
+  if (!fileId) return
+  error.value = ''
+  try {
+    const created = await api<ShareLinkInfo>(`/files/${fileId}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ expiresIn: ttl }),
+    })
+    const entry = { url: created.url ?? '', expiresAt: created.expiresAt, createdAt: created.createdAt }
+    sessionLinks.set(fileId, entry)
+    existingLink.value = entry
+    ui.showToast('Share link created')
+  } catch (e) {
+    error.value = formatApiError(e, 'Could not create link')
+  }
+}
+
+async function copyShareLink(url: string) {
+  try {
+    await navigator.clipboard.writeText(window.location.origin + url)
+    ui.showToast('Link copied')
+  } catch {
+    ui.showToast('Copy failed', 'info')
+  }
+}
+
+async function revokeShareLink() {
+  const fileId = shareTargetId.value
+  if (!fileId) return
+  const ok = await ui.confirm({
+    title: 'Revoke link?',
+    message: 'Anyone who has this link will lose access immediately.',
+    confirmLabel: 'Revoke link',
+    danger: true,
+  })
+  if (!ok) return
+  error.value = ''
+  try {
+    await api(`/files/${fileId}/share`, { method: 'DELETE' })
+    sessionLinks.delete(fileId)
+    existingLink.value = null
+    ui.showToast('Link revoked')
+  } catch (e) {
+    error.value = formatApiError(e, 'Could not revoke link')
+  }
+}
+
+const shareUserOpen = ref(false)
+const shareUserFileName = ref('')
+const shareUserTargetId = ref<string | null>(null)
+
+async function shareWithUser(email: string) {
+  const fileId = shareUserTargetId.value
+  if (!fileId) return
+  const name = shareUserFileName.value
+  error.value = ''
+  try {
+    const res = await api<{ invited?: boolean }>(`/shares`, {
+      method: 'POST',
+      body: JSON.stringify({ resourceType: 'file', resourceId: fileId, email }),
+    })
+    shareUserOpen.value = false
+    if (res.invited) {
+      ui.showToast(`Invitation sent to ${email}`)
+    } else {
+      ui.showToast(`Shared "${name}" with ${email}`, 'success')
+    }
+  } catch (e) {
+    error.value = formatApiError(e, 'Could not share')
+  }
 }
 
 watch(() => route.query.folderId, loadBrowser, { immediate: true })
@@ -502,7 +686,30 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     </Transition>
     <h1 class="page-title desktop-only">My Files</h1>
 
-    <nav class="breadcrumb" aria-label="Folder path">
+    <div class="segment-tabs" role="tablist" aria-label="File views">
+      <button
+        type="button"
+        role="tab"
+        class="segment-tab"
+        :class="{ active: segment === 'all' }"
+        :aria-selected="segment === 'all'"
+        @click="segment = 'all'"
+      >
+        All
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="segment-tab"
+        :class="{ active: segment === 'favorites' }"
+        :aria-selected="segment === 'favorites'"
+        @click="segment = 'favorites'"
+      >
+        Favorites
+      </button>
+    </div>
+
+    <nav v-if="segment === 'all'" class="breadcrumb" aria-label="Folder path">
       <button
         v-if="folderId"
         type="button"
@@ -526,7 +733,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <span v-else-if="!folderId" class="mobile-current">Root</span>
     </nav>
 
-    <div class="toolbar toolbar-sticky">
+    <div v-if="segment === 'all'" class="toolbar toolbar-sticky">
       <input
         v-model="searchQuery"
         class="search-input"
@@ -562,10 +769,10 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <UploadProgress :progress="uploadProgress" />
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <LoadingSkeletonFiles v-if="loading && !searchResults" mode="browse" />
+    <LoadingSkeletonFiles v-if="segment === 'all' && loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
 
-    <TransitionGroup v-if="!loading && searchResults" name="row" tag="section" class="list">
+    <TransitionGroup v-if="segment === 'all' && !loading && searchResults" name="row" tag="section" class="list">
       <h2 key="search-title" class="section-title">
         {{ searchResults.folders.length + searchResults.files.length }} results
         <template v-if="hasActiveFilters"> · filtered</template>
@@ -613,7 +820,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </EmptyState>
     </TransitionGroup>
 
-    <TransitionGroup v-else-if="!loading" name="row" tag="section" class="list">
+    <TransitionGroup
+      v-else-if="segment === 'all' && !loading"
+      name="row"
+      tag="section"
+      class="list"
+    >
       <div
         v-for="folder in browser?.folders ?? []"
         :key="folder.id"
@@ -631,7 +843,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         </button>
       </div>
       <div v-for="file in browser?.files ?? []" :key="file.id" class="row tappable" @click="openFileActions(file)">
-        <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
+        <span class="name">
+          <Icon
+            :name="isFavorited(file.id) ? 'star-filled' : mimeIcon(file.mimeType)"
+            :size="18"
+            class="row-icon favorite-icon"
+          />{{ file.name }}
+        </span>
         <span class="meta desktop-only">{{ mimeLabel(file.mimeType) }} · {{ formatBytes(file.sizeBytes) }}</span>
         <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
           <Icon name="more" :size="18" />
@@ -648,10 +866,42 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       />
     </TransitionGroup>
 
+    <TransitionGroup v-else-if="segment === 'favorites'" name="row" tag="section" class="list">
+      <LoadingSkeletonFiles v-if="favoritesLoading" key="fav-skeleton" mode="browse" />
+      <template v-else>
+        <div
+          v-for="file in favorites ?? []"
+          :key="file.id"
+          class="row tappable"
+          @click="openFileActions(file)"
+        >
+          <span class="name">
+            <Icon name="star-filled" :size="18" class="row-icon favorite-icon" />{{ file.name }}
+          </span>
+          <span class="meta desktop-only">{{ formatBytes(file.sizeBytes) }}</span>
+          <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+            <Icon name="more" :size="18" />
+          </button>
+        </div>
+        <EmptyState
+          v-if="(favorites ?? []).length === 0"
+          key="favorites-empty"
+          title="No favorites yet"
+          description="Use the star action on a file to pin it here for quick access."
+          icon="star"
+        />
+      </template>
+    </TransitionGroup>
+
     <input ref="fileInputRef" type="file" class="sr-only" multiple @change="onUploadChange" />
     <input ref="folderInputRef" type="file" class="sr-only" webkitdirectory @change="onFolderUploadChange" />
 
-    <UploadFab label="Upload file" :disabled="uploadProgress !== null" @click="triggerUpload" />
+    <UploadFab
+      v-if="segment === 'all'"
+      label="Upload file"
+      :disabled="uploadProgress !== null"
+      @click="triggerUpload"
+    />
 
     <BottomSheet :open="folderSheetOpen" title="New folder" @close="folderSheetOpen = false">
       <label class="field">
@@ -675,6 +925,23 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       :filters="filters"
       @apply="onFiltersApply"
       @close="filterSheetOpen = false"
+    />
+
+    <ShareSheet
+      :open="shareSheetOpen"
+      :name="shareFileName"
+      :existing="existingLink"
+      @create="createShareLink"
+      @copy="copyShareLink"
+      @revoke="revokeShareLink"
+      @close="shareSheetOpen = false"
+    />
+
+    <ShareUserSheet
+      :open="shareUserOpen"
+      :name="shareUserFileName"
+      @share="shareWithUser"
+      @close="shareUserOpen = false"
     />
   </div>
 </template>
@@ -724,6 +991,37 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   color: var(--muted);
   vertical-align: -0.2em;
   margin-right: var(--space-xs);
+}
+
+.favorite-icon {
+  color: var(--accent);
+}
+
+.segment-tabs {
+  display: inline-flex;
+  gap: var(--space-xxs);
+  padding: 3px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  margin-bottom: var(--space-sm);
+}
+
+.segment-tab {
+  min-height: 32px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-short) var(--ease-standard), color var(--duration-short) var(--ease-standard);
+}
+
+.segment-tab.active {
+  background: var(--accent);
+  color: var(--on-accent, #fff);
 }
 
 .toolbar-sticky {

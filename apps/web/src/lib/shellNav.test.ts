@@ -23,8 +23,8 @@ describe('PROFILE_PATH', () => {
 })
 
 describe('OVERVIEW_DESTINATIONS', () => {
-  it('exposes Files and Photos only', () => {
-    expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos'])
+  it('exposes Files, Photos and Shared with me', () => {
+    expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos', '/shared'])
   })
 })
 
@@ -39,6 +39,7 @@ describe('showStorageBar', () => {
     expect(showStorageBar('/photos')).toBe(true)
     expect(showStorageBar('/photos/albums/01ABC')).toBe(true)
     expect(showStorageBar('/trash')).toBe(true)
+    expect(showStorageBar('/shared')).toBe(true)
     expect(showStorageBar('/settings')).toBe(true)
   })
 })
@@ -60,6 +61,7 @@ describe('pageTitleForRoute', () => {
   it('maps the other shell destinations', () => {
     expect(pageTitleForRoute('/photos')).toBe('Photos')
     expect(pageTitleForRoute('/trash')).toBe('Trash')
+    expect(pageTitleForRoute('/shared')).toBe('Shared with me')
     expect(pageTitleForRoute('/settings')).toBe('Settings')
     expect(pageTitleForRoute('/profile')).toBe('Profile')
   })

@@ -22,6 +22,7 @@ type Repository interface {
 	ListSharesByRecipient(ctx context.Context, recipientID string) ([]Share, error)
 	DeleteShare(ctx context.Context, ownerID, id string) error
 	GetShareByRecipientResource(ctx context.Context, recipientID, resourceType, resourceID string) (*Share, error)
+	GetShareByOwnerID(ctx context.Context, ownerID, id string) (*Share, error)
 
 	ListAliveFolderChildren(ctx context.Context, ownerID string, parentID *string) ([]folder.Folder, error)
 	ListAliveFilesInFolder(ctx context.Context, ownerID string, folderID *string) ([]folder.BrowserFile, error)

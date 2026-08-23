@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/platform/config"
 	"filvault/internal/platform/mailer"
@@ -14,12 +15,18 @@ import (
 )
 
 type Service struct {
-	cfg    config.Config
-	repo   Repository
-	tokens *Tokens
-	mailer mailer.Mailer
-	now    func() time.Time
-	dummy  string
+	cfg      config.Config
+	repo     Repository
+	tokens   *Tokens
+	mailer   mailer.Mailer
+	activity ActivityRecorder
+	now      func() time.Time
+	dummy    string
+}
+
+// ActivityRecorder records security events; failures never break auth flows.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
 }
 
 type Session struct {
@@ -28,14 +35,15 @@ type Session struct {
 	RefreshToken string
 }
 
-func NewService(cfg config.Config, repo Repository, tokens *Tokens, mailer mailer.Mailer) *Service {
+func NewService(cfg config.Config, repo Repository, tokens *Tokens, mailer mailer.Mailer, activity ActivityRecorder) *Service {
 	return &Service{
-		cfg:    cfg,
-		repo:   repo,
-		tokens: tokens,
-		mailer: mailer,
-		now:    time.Now,
-		dummy:  dummyPasswordHash(),
+		cfg:      cfg,
+		repo:     repo,
+		tokens:   tokens,
+		mailer:   mailer,
+		activity: activity,
+		now:      time.Now,
+		dummy:    dummyPasswordHash(),
 	}
 }
 
@@ -224,6 +232,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, n
 	if err := s.repo.RevokeAllRefreshTokensForUser(ctx, userID, now); err != nil {
 		return Session{}, err
 	}
+	s.activity.Record(ctx, userID, activity.TypePasswordChanged, "")
 	u.PasswordHash = hash
 	return s.issueSession(ctx, u, now)
 }

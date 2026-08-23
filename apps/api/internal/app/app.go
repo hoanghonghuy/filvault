@@ -1,6 +1,7 @@
 package app
 
 import (
+	"filvault/internal/activity"
 	"filvault/internal/auth"
 	"filvault/internal/file"
 	"filvault/internal/folder"
@@ -12,6 +13,7 @@ import (
 	"filvault/internal/platform/postgres"
 	"filvault/internal/search"
 	"filvault/internal/share"
+	"filvault/internal/sharelink"
 	"filvault/internal/storage"
 	"filvault/internal/trash"
 
@@ -34,20 +36,26 @@ func NewWithMailer(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer) *gin.
 func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj objectstore.ObjectStore) *gin.Engine {
 	store := postgres.NewStore(pool)
 	tokens := auth.NewTokens(cfg.JWTSecret)
-	authSvc := auth.NewService(cfg, store, tokens, m)
+
+	activityRepo := postgres.NewActivityRepository(store)
+	activityRecorder := activity.NewRecorder(activityRepo)
+	activitySvc := activity.NewService(activityRepo)
+	activityHandlers := activity.NewHandler(activitySvc)
+
+	authSvc := auth.NewService(cfg, store, tokens, m, activityRecorder)
 	authHandlers := auth.NewHandler(authSvc)
 
 	folderRepo := postgres.NewFolderRepository(store)
-	folderSvc := folder.NewService(folderRepo)
+	folderSvc := folder.NewService(folderRepo, activityRecorder)
 	folderHandlers := folder.NewHandler(folderSvc)
 
 	fileRepo := postgres.NewFileRepository(store)
 	quota := postgres.NewQuotaStore(store)
-	fileSvc := file.NewService(fileRepo, folderRepo, quota, obj)
+	fileSvc := file.NewService(fileRepo, folderRepo, quota, obj, activityRecorder)
 	fileHandlers := file.NewHandler(fileSvc)
 
 	trashRepo := postgres.NewTrashRepository(store)
-	trashSvc := trash.NewService(trashRepo, quota, obj)
+	trashSvc := trash.NewService(trashRepo, quota, obj, activityRecorder)
 	trashHandlers := trash.NewHandler(trashSvc)
 
 	photoRepo := postgres.NewPhotoRepository(store)
@@ -59,8 +67,12 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	searchHandlers := search.NewHandler(searchSvc)
 
 	shareRepo := postgres.NewShareRepository(store)
-	shareSvc := share.NewService(shareRepo, obj)
+	shareSvc := share.NewService(shareRepo, obj, m, activityRecorder)
 	shareHandlers := share.NewHandler(shareSvc)
+
+	shareLinkRepo := postgres.NewShareLinkRepository(store)
+	shareLinkSvc := sharelink.NewService(shareLinkRepo, obj, activityRecorder)
+	shareLinkHandlers := sharelink.NewHandler(shareLinkSvc)
 
 	storageHandlers := storage.NewHandler(quota)
 
@@ -84,11 +96,21 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	searchHandlers.RegisterRoutes(v1, storage...)
 	shareHandlers.RegisterRoutes(v1, storage...)
 	storageHandlers.RegisterRoutes(v1, storage...)
+	shareLinkHandlers.RegisterOwnerRoutes(v1, storage...)
+	activityHandlers.Register(engine, authHandlers.AuthRequired(), authHandlers.EmailVerifiedRequired())
+
+	public := v1.Group("", httpx.NewIPRateLimiter(cfg.PublicShareRateLimitPerMin).Middleware())
+	shareLinkHandlers.RegisterPublicRoutes(public)
 
 	return engine
 }
 
 func NewTrashService(pool *pgxpool.Pool, obj objectstore.ObjectStore) *trash.Service {
 	store := postgres.NewStore(pool)
-	return trash.NewService(postgres.NewTrashRepository(store), postgres.NewQuotaStore(store), obj)
+	recorder := activity.NewRecorder(postgres.NewActivityRepository(store))
+	return trash.NewService(postgres.NewTrashRepository(store), postgres.NewQuotaStore(store), obj, recorder)
+}
+
+func NewActivityRepository(pool *pgxpool.Pool) activity.Repository {
+	return postgres.NewActivityRepository(postgres.NewStore(pool))
 }

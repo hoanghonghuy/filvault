@@ -16,6 +16,10 @@ type Repository interface {
 	CreateVersion(ctx context.Context, v FileVersion) error
 	ListVersions(ctx context.Context, fileID string) ([]FileVersion, error)
 	GetVersion(ctx context.Context, fileID, versionID string) (*FileVersion, error)
+
+	AddFavorite(ctx context.Context, ownerID, fileID string, at time.Time) error
+	RemoveFavorite(ctx context.Context, ownerID, fileID string) error
+	ListFavorites(ctx context.Context, ownerID string, limit int) ([]FavoriteFile, error)
 }
 
 type QuotaStore interface {

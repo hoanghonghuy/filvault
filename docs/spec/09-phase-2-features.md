@@ -12,11 +12,11 @@ Nguồn nền: spec 03 (schema), spec 04 (API), spec 07 (nghiệp vụ), [`DESIG
 | # | Slice | Phụ thuộc | Độ lớn | Trạng thái |
 |---|---|---|---|---|
 | S1 | Search nâng cao (filter + sort, giữ engine ILIKE) | không | nhỏ | **Done** (2026-08-22) |
-| S2 | Album cover (tự động + ghim tay) | không | nhỏ | Chưa |
-| S3 | Favorites (đánh dấu sao file/ảnh) | không | vừa | Chưa |
-| S4 | Share qua **public link** | không | lớn | Chưa — cần ADR bảo mật trước khi code |
-| S5 | Share cho **user nội bộ** (email, quyền read) | S4 | lớn | Chưa — bổ sung chi tiết API/UI khi vào slice |
-| S6 | Activity log (hiển thị trong Settings) | không | nhỏ | Chưa |
+| S2 | Album cover (tự động + ghim tay) | không | nhỏ | **Done** (2026-08-22) |
+| S3 | Favorites (đánh dấu sao file/ảnh) | không | vừa | **Done** (2026-08-22) |
+| S4 | Share qua **public link** | không | lớn | **Done** (2026-08-23) — theo ADR 0004 |
+| S5 | Share cho **user nội bộ** (email, quyền read) | S4 | lớn | **Done** (2026-08-23) — chống dò email + mail mời, xem §5 |
+| S6 | Activity log (hiển thị trong Settings) | không | nhỏ | **Done** (2026-08-23) — enum type đã chốt, xem §6.2a |
 
 Thứ tự khuyến nghị: S1 → S2 → S3 → S4 → S6 → S5.
 
@@ -105,6 +105,8 @@ DELETE /photos/albums/{id}/cover            → 204 (bỏ ghim, về auto)
 
 ## 3. S3 — Favorites
 
+> **Đã implement** (2026-08-22). Migration `favorites`, API PUT/DELETE/GET, UI star action + segment Favorites | All ở FilesView + section Favorites ở Overview.
+
 ### 3.1 Nghiệp vụ
 
 - User đánh dấu **sao** file (mọi loại) và item ảnh/video. Folder **không** favorite (giữ đơn giản).
@@ -133,6 +135,8 @@ GET    /api/v1/files/favorites?limit= → { files: [...] }  (mới nhất trư�
 
 ## 4. S4 — Share qua public link
 
+> **Đã implement** (2026-08-23) theo [ADR 0004](decisions/0004-public-share-link-security.md): token 32 byte hash SHA-256, TTL NULL/1h/24h/7d, 404 chung, rate limit 30 req/phút/IP (429), cap 20 link/user + 1 link/file.
+
 ### 4.1 Nghiệp vụ
 
 - User tạo **link công khai** cho 1 file (Phase này **chưa** share folder).
@@ -147,8 +151,10 @@ GET    /api/v1/files/favorites?limit= → { files: [...] }  (mới nhất trư�
 ```text
 POST   /api/v1/files/{id}/share        { expiresIn?: "1h"|"24h"|"7d"|null } → 201
 DELETE /api/v1/files/{id}/share        → 204 (thu hồi)
-GET    /api/v1/shares                  → { shares: [...] }  (link đang hoạt động)
+GET    /api/v1/share-links             → { links: [...] }   (link đang hoạt động)
 ```
+
+> **Điều chỉnh bởi [ADR 0004](decisions/0004-public-share-link-security.md):** list link dùng `/share-links` thay vì `GET /shares`, vì route đó đã bị share nội bộ (Phase 5, spec 10-sharing) chiếm.
 
 `201` trả:
 
@@ -189,11 +195,63 @@ GET /api/v1/public/shares/{token}/download  → { downloadUrl } (presign 5 phút
 
 ## 5. S5 — Share cho user nội bộ
 
-- **Chỉ làm sau S4.** Chia sẻ file cho user Filvault khác bằng email, quyền **read** (xem + tải).
-- Người nhận thấy mục "Shared with me" trong web (nav thứ 5 hoặc entry từ Overview — chốt khi implement UI).
-- Reuse bảng `shares` của S4, thêm `recipient_user_id` (null = public link). Quyền check ở mọi endpoint đọc: owner **hoặc** recipient.
-- Email người nhận không tồn tại → vẫn `201` + gửi mail mời (chống dò email, cùng triết lý resend spec 04 §2).
-- Chi tiết UI/endpoint viết bổ sung khi bắt đầu slice — phần này chỉ **giành chỗ** trong schema.
+> **Đã implement** (2026-08-23). Chi tiết API/UI chốt trước khi code theo rule §0.1.5.
+
+### 5.1 Phạm vi & nền tảng
+
+- Nền tảng: module `share` nội bộ Phase 5 đã có sẵn (`10-sharing.md`): bảng `shares` (migration 00003, `recipient_id NOT NULL`), endpoints `POST /shares`, `GET /shares`, `GET /shares/with-me`, `DELETE /shares/{id}`, `GET /shared/folders/{id}`, `GET /shared/files/{id}/download`. **Không migration mới** cho S5 (không đụng `recipient_user_id` của bảng `share_links` — cột đó thuộc public link S4).
+- S5 bổ sung 4 việc:
+  1. **Chống dò email** ở `POST /shares` (mục 5.2).
+  2. **Activity events** cho share nội bộ (mục 5.3).
+  3. **UI owner**: share file theo email từ action sheet (mục 5.4).
+  4. **UI recipient**: trang "Shared with me" (mục 5.5).
+
+### 5.2 API — `POST /shares` chống dò email
+
+Hợp đồng cũ (10-sharing.md §4.1) giữ nguyên cho email đã tồn tại. Thay đổi một nhánh:
+
+```text
+POST /api/v1/shares { resourceType: "file"|"folder", resourceId, email }
+```
+
+| Trường hợp | Kết quả |
+|---|---|
+| Email đã đăng ký | `201 { id, resourceType, resourceId, recipient: {id, email, displayName}, createdAt }` (bổ sung `recipient`) |
+| **Email chưa đăng ký** | `201 { invited: true }` + **mail mời**; **không** tạo row share (bảng yêu cầu `recipient_id NOT NULL`) |
+| Email = chính mình | `400 VALIDATION_ERROR` (giữ) |
+| Resource lạ / đã trash | `404 NOT_FOUND` (giữ) |
+| Trùng share | `409 CONFLICT` (giữ) |
+
+- Mail mời: subject `<Owner> invited you to Filvault`, body nêu tên người chia sẻ + tên file/folder + hướng dẫn đăng ký. Gửi qua `mailer.Mailer` sẵn có; lỗi gửi mail **fail-open** (vẫn 201).
+- Lý do không tạo row cho email lạ: schema chốt không cho `recipient_id` NULL; khi người nhận đăng ký xong, owner share lại (UI sẽ hướng dẫn bằng toast "Invitation sent — share again after they sign up").
+
+### 5.3 Activity events
+
+- `share.created` khi tạo share nội bộ thành công; `share.revoked` khi thu hồi. `targetName` = tên resource.
+- Dùng lại `ActivityRecorder` của S6 (fail-open, cùng enum §6.2a).
+
+### 5.4 UI owner (share theo email)
+
+- `FilesView` action sheet file: thêm **"Share with user"** (icon `users` mới) cạnh "Share link".
+- `ShareUserSheet` mới: input email + nút "Share". Toast phản hồi:
+  - Đã share: `Shared with <email>`
+  - Mail mời: `Invitation sent to <email>`
+
+### 5.5 UI recipient — "Shared with me"
+
+- Route `/shared` (`SharedWithMeView`), meta auth+verified. **Không** thêm tab bottom nav (giữ 4 tab, rule DESIGN.md §5); entry bằng card thứ 3 trong `OVERVIEW_DESTINATIONS` (Overview) — đúng phương án "entry từ Overview" của §5.
+- Trang list `GET /shares/with-me`: mỗi dòng = icon theo loại + `resourceName` + owner displayName + thời gian tương đối.
+  - File: nút **Download** → `GET /shared/files/{id}/download` rồi mở `downloadUrl`.
+  - Folder: bấm dòng → browse 1 cấp trong cùng trang (`GET /shared/folders/{id}`), có nút Back về list; file trong folder bấm để download.
+- Empty state: "Nothing shared with you yet".
+- `pageTitleForRoute('/shared')` → `Shared with me`.
+
+### 5.6 Test
+
+| Tầng | Gì |
+|---|---|
+| API | email lạ → 201 + mail mời (Memory mailer bắt được); email tồn tại → 201 + recipient; activity ghi đúng; các case cũ vẫn xanh |
+| Web | unit test nav (`/shared` title, destinations) |
 
 ---
 
@@ -221,6 +279,19 @@ GET /api/v1/activity?before=&limit=   → { events: [...], nextBefore? }
 
 - `type` enum chốt khi implement; mỗi event tối đa 1 `targetName` (đơn giản, đủ đọc).
 - Chỉ owner đọc được activity của mình. Ghi log **fail-open**: lỗi ghi log không làm fail request chính.
+
+### 6.2a Enum `type` đã chốt (kết quả implement 2026-08-23)
+
+```text
+file.uploaded    file.trashed    file.restored   file.purged
+folder.trashed   folder.restored
+share.created    share.revoked
+password.changed settings.changed
+```
+
+- Cursor `before` = timestamp RFC3339Nano của event cuối trang trước.
+- `limit` mặc định 20, tối đa 50; ngoài khoảng → `400 VALIDATION_ERROR`.
+- Ghi sự kiện nằm ở tầng service (`folder`, `file`, `trash`, `sharelink`, `share`, `auth`) qua interface `ActivityRecorder`; toàn bộ enum trên đã ghi (folder trash/restore + file.purged bổ sung 2026-08-23).
 
 ### 6.3 UI
 

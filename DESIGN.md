@@ -434,7 +434,13 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 
 ### Activity log
 - List trong Settings: icon theo type + targetName (1 dòng truncate) + thời gian tương đối muted; "Load more" pattern như timeline.
-> **Lưu ý merge:** các surface §9a (favorites, share link, public share, activity, album cover) mới có spec — UI chưa implement trên nhánh này. Sharing/versioning hiện là backend + CLI (spec [10-sharing](docs/spec/10-sharing.md), [11-versioning](docs/spec/11-versioning.md)).
+
+### Shared with me (S5)
+- Entry từ Overview: card thứ 3 trong destinations (icon `users`), **không** thêm tab bottom nav.
+- `/shared`: list dòng = icon loại + tên + "by {owner} · {thời gian tương đối}"; file → download qua presign; folder → browse 1 cấp ngay trong trang (nút Back về list). Empty state icon `users` "Nothing shared with you yet".
+- Owner share theo email: action sheet file "Share with user" → sheet input email; email lạ vẫn thành công (toast "Invitation sent").
+
+> **Trạng thái (2026-08-23): toàn bộ surface §9a đã implement** — S1 filter, S2 album cover, S3 favorites, S4 share link + public page, S5 shared-with-me + share user nội bộ, S6 activity log. Chi tiết hợp đồng: spec [09](docs/spec/09-phase-2-features.md), tiến độ [10](docs/spec/10-phase-2-status.md).
 
 ---
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -185,17 +186,32 @@ func run(args []string) error {
 }
 
 func login(cmds *command.Commands, cfg config.Config) error {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Fprint(os.Stderr, "email: ")
-	email, _ := reader.ReadString('\n')
-	email = strings.TrimSpace(email)
+	var email, password string
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprint(os.Stderr, "email: ")
+		e, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil && e == "" {
+			return err
+		}
+		email = e
 
-	fmt.Fprint(os.Stderr, "password: ")
-	password, err := readPassword()
-	if err != nil {
-		return err
+		fmt.Fprint(os.Stderr, "password: ")
+		data, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return err
+		}
+		password = string(data)
+	} else {
+		// Piped input: read both lines from one shared reader.
+		var err error
+		email, password, err = readCredentials(os.Stdin)
+		if err != nil {
+			return err
+		}
 	}
-	fmt.Fprintln(os.Stderr)
+	email = strings.TrimSpace(email)
+	password = strings.TrimSpace(password)
 
 	return cmds.Login(email, password, func(access, refresh string) error {
 		cfg.AccessToken = access
@@ -205,30 +221,34 @@ func login(cmds *command.Commands, cfg config.Config) error {
 	})
 }
 
+// readCredentials reads email and password from r using a single reader so
+// piped input is not drained before the password line.
+func readCredentials(r io.Reader) (string, string, error) {
+	reader := bufio.NewReader(r)
+	readLine := func() (string, error) {
+		line, err := reader.ReadString('\n')
+		if err != nil && line == "" {
+			return "", err
+		}
+		return strings.TrimSpace(line), nil
+	}
+	email, err := readLine()
+	if err != nil {
+		return "", "", err
+	}
+	password, err := readLine()
+	if err != nil && password == "" {
+		return "", "", err
+	}
+	return email, password, nil
+}
+
 func logout(cmds *command.Commands, cfg config.Config) error {
 	return cmds.Logout(cfg.RefreshToken, func() error {
 		cfg.AccessToken = ""
 		cfg.RefreshToken = ""
 		return config.Save(cfg)
 	})
-}
-
-// readPassword reads a password without echoing it to the terminal.
-// Falls back to plain stdin when not attached to a TTY (e.g. piped input).
-func readPassword() (string, error) {
-	if term.IsTerminal(int(os.Stdin.Fd())) {
-		data, err := term.ReadPassword(int(os.Stdin.Fd()))
-		if err != nil {
-			return "", err
-		}
-		return string(data), nil
-	}
-	reader := bufio.NewReader(os.Stdin)
-	line, err := reader.ReadString('\n')
-	if err != nil && line == "" {
-		return "", err
-	}
-	return strings.TrimSpace(line), nil
 }
 
 func upload(cmds *command.Commands, args []string) error {
@@ -301,7 +321,7 @@ func usageText() string {
   filvault cd [name|..]
   filvault pwd
   filvault upload <file> [--folder <id>]
-  filvault upload <file> --replace <name>
+  filvault upload --replace <name> <file>
   filvault download <name>
   filvault versions <name>
   filvault version-download <name> <versionId>

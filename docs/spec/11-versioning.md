@@ -1,6 +1,6 @@
 # 11 — Versioning spec (Phase 6)
 
-Trạng thái: **chốt slice đầu**. Nguồn API: [04-api.md](04-api.md). Schema: [03-database.md](03-database.md).
+Trạng thái: **chốt slice đầu; đã implement + smoke thật (2026-08-23)** — API, CLI (`upload --replace`, `versions`), UI. Nguồn API: [04-api.md](04-api.md). Schema: [03-database.md](03-database.md).
 
 Versioning giữ lịch sử các phiên bản cũ của một file khi file bị **thay thế** (replace). File giữ nguyên `id` và `name`; mỗi lần replace, bản cũ được lưu vào `file_versions`, bản mới trở thành bản hiện tại.
 
@@ -74,7 +74,7 @@ Khi file PENDING có `replaces_file_id`:
 ## 5. CLI
 
 ```text
-filvault upload <file> --replace <name>   # thay thế file theo tên (folder hiện tại)
+filvault upload --replace <name> <file>   # thay thế file theo tên (folder hiện tại); flag đứng trước positional (Go flag)
 filvault versions <name>                  # liệt kê phiên bản file theo tên
 filvault version-download <name> <versionId>  # tải một phiên bản
 ```

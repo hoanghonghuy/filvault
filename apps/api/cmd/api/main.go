@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/app"
 	"filvault/internal/platform/config"
 	"filvault/internal/platform/objectstore"
@@ -49,6 +50,7 @@ func main() {
 	defer tickerCancel()
 	trashSvc := app.NewTrashService(pool, mustObjectStore(cfg))
 	trash.StartTicker(tickerCtx, trashSvc, trash.DefaultTickerInterval)
+	activity.StartTicker(tickerCtx, app.NewActivityRepository(pool), activity.DefaultTickerInterval)
 
 	slog.Info("api listening", "addr", cfg.HTTPAddr)
 	if err := engine.Run(cfg.HTTPAddr); err != nil {

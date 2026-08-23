@@ -23,6 +23,7 @@ const loading = ref(false)
 const pickerOpen = ref(false)
 const mediaOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
+const favoriteIds = ref<Set<string>>(new Set())
 
 const albumId = computed(() => String(route.params.id))
 const itemIds = computed(() => album.value?.items.map((i) => i.id) ?? [])
@@ -32,11 +33,41 @@ async function load() {
   error.value = ''
   try {
     album.value = await api<AlbumDetail>(`/photos/albums/${albumId.value}`)
+    await loadFavorites()
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load album')
   } finally {
     loading.value = false
   }
+}
+
+const isFavorited = (id: string) => favoriteIds.value.has(id)
+
+async function loadFavorites() {
+  const out = await api<{ files: Array<{ id: string }> }>('/files/favorites?limit=100')
+  favoriteIds.value = new Set(out.files.map((f) => f.id))
+}
+
+async function toggleFavorite(item: TimelineItem) {
+  const wasFavorited = isFavorited(item.id)
+  error.value = ''
+  try {
+    if (wasFavorited) {
+      await api(`/files/${item.id}/favorite`, { method: 'DELETE' })
+      ui.showToast(`Removed "${item.name}" from favorites`)
+    } else {
+      await api(`/files/${item.id}/favorite`, { method: 'PUT' })
+      ui.showToast(`Added "${item.name}" to favorites`)
+    }
+    await loadFavorites()
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to update favorite')
+  }
+}
+
+async function toggleFavoriteFromSheet() {
+  if (!mediaItem.value) return
+  await toggleFavorite(mediaItem.value)
 }
 
 async function openAlbumMenu() {
@@ -232,8 +263,10 @@ watch(() => route.params.id, load, { immediate: true })
     <PhotoMediaSheet
       :open="mediaOpen"
       :name="mediaItem?.name ?? ''"
+      :favorited="mediaItem ? isFavorited(mediaItem.id) : false"
       @view="viewMedia"
       @download="downloadMedia"
+      @favorite="toggleFavoriteFromSheet"
       @close="mediaOpen = false"
     />
 

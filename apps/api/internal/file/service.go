@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/auth"
 	"filvault/internal/folder"
@@ -14,20 +15,27 @@ import (
 )
 
 type Service struct {
-	repo    Repository
-	folders folder.Repository
-	quota   QuotaStore
-	objects objectstore.ObjectStore
-	now     func() time.Time
+	repo     Repository
+	folders  folder.Repository
+	quota    QuotaStore
+	objects  objectstore.ObjectStore
+	activity ActivityRecorder
+	now      func() time.Time
 }
 
-func NewService(repo Repository, folders folder.Repository, quota QuotaStore, objects objectstore.ObjectStore) *Service {
+// ActivityRecorder records lifecycle events; failures never break uploads.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
+}
+
+func NewService(repo Repository, folders folder.Repository, quota QuotaStore, objects objectstore.ObjectStore, activity ActivityRecorder) *Service {
 	return &Service{
-		repo:    repo,
-		folders: folders,
-		quota:   quota,
-		objects: objects,
-		now:     time.Now,
+		repo:     repo,
+		folders:  folders,
+		quota:    quota,
+		objects:  objects,
+		activity: activity,
+		now:      time.Now,
 	}
 }
 
@@ -201,6 +209,7 @@ func (s *Service) Complete(ctx context.Context, ownerID, fileID string) (File, e
 	if err := s.quota.AddStorageUsed(ctx, ownerID, stat.Size); err != nil {
 		return File{}, err
 	}
+	s.activity.Record(ctx, ownerID, activity.TypeFileUploaded, rec.Name)
 	return rec, nil
 }
 
@@ -299,4 +308,44 @@ func (s *Service) markFailed(ctx context.Context, f File) error {
 	f.Status = StatusFailed
 	f.UpdatedAt = now
 	return s.repo.Update(ctx, f)
+}
+
+// SetFavorite marks an alive file as favorite; idempotent.
+func (s *Service) SetFavorite(ctx context.Context, ownerID, fileID string) error {
+	f, err := s.getAliveFile(ctx, ownerID, fileID)
+	if err != nil {
+		return err
+	}
+	return s.repo.AddFavorite(ctx, ownerID, f.ID, s.now().UTC())
+}
+
+// UnsetFavorite removes the favorite mark; idempotent.
+func (s *Service) UnsetFavorite(ctx context.Context, ownerID, fileID string) error {
+	f, err := s.getAliveFile(ctx, ownerID, fileID)
+	if err != nil {
+		return err
+	}
+	return s.repo.RemoveFavorite(ctx, ownerID, f.ID)
+}
+
+// ListFavorites returns favorited files, newest favorite first.
+func (s *Service) ListFavorites(ctx context.Context, ownerID string, limit int) ([]FavoriteFile, error) {
+	if limit <= 0 {
+		limit = DefaultFavoritesLimit
+	}
+	if limit > MaxFavoritesLimit {
+		limit = MaxFavoritesLimit
+	}
+	return s.repo.ListFavorites(ctx, ownerID, limit)
+}
+
+func (s *Service) getAliveFile(ctx context.Context, ownerID, fileID string) (*File, error) {
+	f, err := s.repo.GetByID(ctx, ownerID, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.DeletedAt != nil || f.Status != StatusReady {
+		return nil, apperr.NotFound
+	}
+	return f, nil
 }

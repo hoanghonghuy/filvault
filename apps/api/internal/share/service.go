@@ -2,51 +2,81 @@ package share
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/auth"
 	"filvault/internal/file"
 	"filvault/internal/folder"
 	"filvault/internal/platform/config"
+	"filvault/internal/platform/mailer"
 	"filvault/internal/platform/objectstore"
 	"filvault/internal/user"
 )
 
 type Service struct {
-	repo    Repository
-	objects ObjectStore
-	now     func() time.Time
+	repo     Repository
+	objects  ObjectStore
+	mailer   InviteMailer
+	activity ActivityRecorder
+	now      func() time.Time
 }
 
-func NewService(repo Repository, objects ObjectStore) *Service {
-	return &Service{repo: repo, objects: objects, now: time.Now}
+// InviteMailer sends invitation emails for unregistered recipients.
+type InviteMailer interface {
+	Send(ctx context.Context, msg mailer.Message) error
 }
 
-// Create shares a file or folder with the user identified by email.
-func (s *Service) Create(ctx context.Context, ownerID, resourceType, resourceID, email string) (Share, error) {
+// ActivityRecorder records share lifecycle events; failures never break shares.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
+}
+
+func NewService(repo Repository, objects ObjectStore, inviteMailer InviteMailer, activity ActivityRecorder) *Service {
+	return &Service{repo: repo, objects: objects, mailer: inviteMailer, activity: activity, now: time.Now}
+}
+
+// CreateResult reports whether the share row was created or only an invite
+// was mailed (anti-probing: both are 201 for the caller).
+type CreateResult struct {
+	Share    *Share
+	Invited  bool
+	OwnerName string
+}
+
+// Create shares a file or folder with the user identified by email. Unknown
+// emails get an invite mail and invited=true instead of a 404, so the
+// endpoint cannot be used to probe which addresses signed up.
+func (s *Service) Create(ctx context.Context, ownerID, resourceType, resourceID, email string) (CreateResult, error) {
 	resourceType = strings.ToLower(strings.TrimSpace(resourceType))
 	if resourceType != ResourceFile && resourceType != ResourceFolder {
-		return Share{}, apperr.Validation
+		return CreateResult{}, apperr.Validation
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
-		return Share{}, apperr.Validation
+		return CreateResult{}, apperr.Validation
 	}
 	recipient, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return Share{}, err
+		return CreateResult{}, err
 	}
-	if recipient == nil {
-		return Share{}, apperr.NotFound
-	}
-	if recipient.ID == ownerID {
-		return Share{}, apperr.Validation
+	if recipient != nil && recipient.ID == ownerID {
+		return CreateResult{}, apperr.Validation
 	}
 	if err := s.validateResource(ctx, ownerID, resourceType, resourceID); err != nil {
-		return Share{}, err
+		return CreateResult{}, err
 	}
+	name := s.resourceDisplayName(ctx, ownerID, resourceType, resourceID)
+
+	if recipient == nil {
+		s.sendInvite(ctx, ownerID, email, name)
+		return CreateResult{Invited: true}, nil
+	}
+
 	sh := Share{
 		ID:           auth.NewID(),
 		OwnerID:      ownerID,
@@ -56,9 +86,10 @@ func (s *Service) Create(ctx context.Context, ownerID, resourceType, resourceID,
 		CreatedAt:    s.now().UTC(),
 	}
 	if err := s.repo.CreateShare(ctx, sh); err != nil {
-		return Share{}, err
+		return CreateResult{}, err
 	}
-	return sh, nil
+	s.activity.Record(ctx, ownerID, activity.TypeShareCreated, name)
+	return CreateResult{Share: &sh}, nil
 }
 
 // ListOutgoing returns shares the owner created, with resource names resolved.
@@ -119,7 +150,65 @@ func (s *Service) ListIncoming(ctx context.Context, recipientID string) ([]Incom
 
 // Revoke removes a share. Only the owner may revoke.
 func (s *Service) Revoke(ctx context.Context, ownerID, id string) error {
-	return s.repo.DeleteShare(ctx, ownerID, id)
+	sh, err := s.repo.GetShareByOwnerID(ctx, ownerID, id)
+	if err != nil {
+		return err
+	}
+	if sh == nil {
+		return apperr.NotFound
+	}
+	name := s.resourceDisplayName(ctx, ownerID, sh.ResourceType, sh.ResourceID)
+	if err := s.repo.DeleteShare(ctx, ownerID, id); err != nil {
+		return err
+	}
+	s.activity.Record(ctx, ownerID, activity.TypeShareRevoked, name)
+	return nil
+}
+
+// resourceDisplayName resolves the current name of the shared resource for
+// activity logging; failures degrade to an empty name.
+func (s *Service) resourceDisplayName(ctx context.Context, ownerID, resourceType, resourceID string) string {
+	switch resourceType {
+	case ResourceFile:
+		f, err := s.repo.GetFileByIDAny(ctx, resourceID)
+		if err == nil && f != nil {
+			return f.Name
+		}
+	case ResourceFolder:
+		f, err := s.repo.GetAliveFolderByID(ctx, ownerID, resourceID)
+		if err == nil && f != nil {
+			return f.Name
+		}
+	}
+	return ""
+}
+
+// sendInvite mails an unregistered recipient; errors are swallowed (fail-open)
+// so probing cannot distinguish "invite failed" from "invite sent".
+func (s *Service) sendInvite(ctx context.Context, ownerID, email, resourceName string) {
+	if s.mailer == nil {
+		return
+	}
+	ownerName := s.ownerDisplayName(ctx, ownerID)
+	msg := mailer.Message{
+		To:      email,
+		Subject: ownerName + " invited you to Filvault",
+		Body: fmt.Sprintf(
+			"%s wants to share %q with you on Filvault.\n\nSign up at Filvault with this email to access it: ask them to share it again once your account is ready.\n",
+			ownerName, resourceName,
+		),
+	}
+	if err := s.mailer.Send(ctx, msg); err != nil {
+		slog.Warn("share invite mail", "err", err)
+	}
+}
+
+func (s *Service) ownerDisplayName(ctx context.Context, ownerID string) string {
+	u, err := s.repo.GetUserByID(ctx, ownerID)
+	if err != nil || u == nil || u.DisplayName == "" {
+		return "A Filvault user"
+	}
+	return u.DisplayName
 }
 
 // BrowseFolder lists the direct children of a folder shared with the recipient.
@@ -250,4 +339,16 @@ func userRef(u *user.User) UserRef {
 		return UserRef{}
 	}
 	return UserRef{ID: u.ID, Email: u.Email, DisplayName: u.DisplayName}
+}
+
+// RecipientOf returns the public payload of the share's recipient.
+func (s *Service) RecipientOf(sh *Share) UserRef {
+	if sh == nil {
+		return UserRef{}
+	}
+	u, err := s.repo.GetUserByID(context.Background(), sh.RecipientID)
+	if err != nil {
+		return UserRef{}
+	}
+	return userRef(u)
 }
