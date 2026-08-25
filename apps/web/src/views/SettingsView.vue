@@ -4,10 +4,12 @@ import { api, setTokens } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { setLocale, useI18n, type Locale } from '@/lib/i18n'
 import type { User } from '@/api/types'
 
 const auth = useAuthStore()
 const ui = useUiStore()
+const { locale, t } = useI18n()
 
 const displayName = ref(auth.user?.displayName ?? '')
 const imageThumbnailsEnabled = ref(auth.user?.imageThumbnailsEnabled ?? true)
@@ -19,6 +21,22 @@ const newPassword = ref('')
 const error = ref('')
 const savingProfile = ref(false)
 const changingPassword = ref(false)
+const darkModeEnabled = ref(document.documentElement.dataset.theme === 'dark')
+
+function toggleDarkMode() {
+  darkModeEnabled.value = !darkModeEnabled.value
+  if (darkModeEnabled.value) {
+    document.documentElement.dataset.theme = 'dark'
+    localStorage.setItem('filvault.theme', 'dark')
+    return
+  }
+  delete document.documentElement.dataset.theme
+  localStorage.setItem('filvault.theme', 'light')
+}
+
+function chooseLocale(next: Locale) {
+  setLocale(next)
+}
 
 async function saveProfile() {
   error.value = ''
@@ -80,18 +98,47 @@ async function logout() {
 
 <template>
   <div>
-    <h1 class="page-title desktop-only">Settings</h1>
+    <h1 class="page-title desktop-only">{{ t.settingsTitle }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
 
     <section class="card section">
-      <h2 class="section-title">Profile</h2>
+      <h2 class="section-title">{{ t.appearance }}</h2>
+      <label class="toggle-row">
+        <input :checked="darkModeEnabled" type="checkbox" class="switch-input" @change="toggleDarkMode" />
+        <span class="switch-track" aria-hidden="true"></span>
+        <span class="toggle-label">{{ t.darkMode }}</span>
+      </label>
+      <p class="field-hint">{{ t.darkModeHint }}</p>
+      <div class="language-row" aria-label="Language">
+        <button
+          type="button"
+          class="btn"
+          :class="{ ink: locale === 'vi' }"
+          @click="chooseLocale('vi')"
+        >
+          {{ t.vietnamese }}
+        </button>
+        <button
+          type="button"
+          class="btn"
+          :class="{ ink: locale === 'en' }"
+          @click="chooseLocale('en')"
+        >
+          {{ t.english }}
+        </button>
+      </div>
+      <p class="field-hint">filvault.locale · {{ t.languageHint }}</p>
+    </section>
+
+    <section class="card section">
+      <h2 class="section-title">{{ t.profile }}</h2>
       <p class="muted">{{ auth.user?.email }}</p>
       <label class="field">
-        <span>Display name</span>
+        <span>{{ t.displayName }}</span>
         <input v-model="displayName" autocomplete="nickname" />
       </label>
       <button class="btn ink save-btn" type="button" :disabled="savingProfile" @click="saveProfile">
-        {{ savingProfile ? 'Saving…' : 'Save profile' }}
+        {{ savingProfile ? t.saving : t.saveProfile }}
       </button>
     </section>
 
@@ -217,6 +264,12 @@ async function logout() {
   font-size: 14px;
   font-weight: 500;
   color: var(--ink);
+}
+
+.language-row {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
 }
 
 .save-btn {

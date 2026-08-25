@@ -6,6 +6,7 @@ import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
+import MediaLightbox from '@/components/MediaLightbox.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
@@ -25,6 +26,8 @@ const error = ref('')
 
 const mediaOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
+const lightboxOpen = ref(false)
+const lightboxUrl = ref('')
 
 async function loadTimeline(before?: string) {
   const params = new URLSearchParams()
@@ -124,25 +127,34 @@ async function deleteAlbum(id: string, name: string) {
   }
 }
 
-function openMedia(item: TimelineItem) {
-  mediaItem.value = item
-  mediaOpen.value = true
-}
-
 async function viewMedia() {
   if (!mediaItem.value) return
+  await openLightbox(mediaItem.value)
+  mediaOpen.value = false
+}
+
+async function openLightbox(item: TimelineItem) {
+  error.value = ''
+  mediaItem.value = item
   error.value = ''
   try {
-    const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
-    window.open(out.downloadUrl, '_blank', 'noopener')
-    mediaOpen.value = false
+    const out = await api<DownloadURL>(`/files/${item.id}/download`)
+    lightboxUrl.value = out.downloadUrl
+    lightboxOpen.value = true
   } catch (e) {
     error.value = formatApiError(e, 'View failed')
   }
 }
 
 async function downloadMedia() {
-  await viewMedia()
+  if (!mediaItem.value) return
+  error.value = ''
+  try {
+    const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
+    window.open(out.downloadUrl, '_blank', 'noopener')
+  } catch (e) {
+    error.value = formatApiError(e, 'Download failed')
+  }
 }
 
 onMounted(load)
@@ -200,7 +212,7 @@ onMounted(load)
             :thumbnail-url="item.thumbnailUrl"
             class="appear"
             :style="{ animationDelay: cellDelay(index) }"
-            @click="openMedia(item)"
+            @click="openLightbox(item)"
           />
         </div>
       </section>
@@ -225,6 +237,15 @@ onMounted(load)
         @view="viewMedia"
         @download="downloadMedia"
         @close="mediaOpen = false"
+      />
+
+      <MediaLightbox
+        :open="lightboxOpen"
+        :name="mediaItem?.name ?? ''"
+        :mime-type="mediaItem?.mimeType ?? ''"
+        :url="lightboxUrl"
+        @download="downloadMedia"
+        @close="lightboxOpen = false"
       />
     </div>
   </div>

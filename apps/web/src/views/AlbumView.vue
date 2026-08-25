@@ -7,6 +7,7 @@ import { useUiStore } from '@/stores/ui'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import Icon from '@/components/AppIcon.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
+import MediaLightbox from '@/components/MediaLightbox.vue'
 import MediaPickerSheet from '@/components/MediaPickerSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingSkeletonAlbum from '@/components/LoadingSkeletonAlbum.vue'
@@ -23,6 +24,8 @@ const loading = ref(false)
 const pickerOpen = ref(false)
 const mediaOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
+const lightboxOpen = ref(false)
+const lightboxUrl = ref('')
 
 const albumId = computed(() => String(route.params.id))
 const itemIds = computed(() => album.value?.items.map((i) => i.id) ?? [])
@@ -113,8 +116,7 @@ async function openItemActions(item: TimelineItem) {
     { id: 'remove', label: 'Remove from album', icon: 'trash', danger: true },
   ])
   if (action === 'view') {
-    mediaItem.value = item
-    mediaOpen.value = true
+    await openLightbox(item)
   }
   if (action === 'download') {
     mediaItem.value = item
@@ -143,18 +145,32 @@ async function removeItem(fileId: string, name: string) {
 
 async function viewMedia() {
   if (!mediaItem.value) return
+  await openLightbox(mediaItem.value)
+  mediaOpen.value = false
+}
+
+async function openLightbox(item: TimelineItem) {
+  error.value = ''
+  mediaItem.value = item
   error.value = ''
   try {
-    const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
-    window.open(out.downloadUrl, '_blank', 'noopener')
-    mediaOpen.value = false
+    const out = await api<DownloadURL>(`/files/${item.id}/download`)
+    lightboxUrl.value = out.downloadUrl
+    lightboxOpen.value = true
   } catch (e) {
     error.value = formatApiError(e, 'View failed')
   }
 }
 
 async function downloadMedia() {
-  await viewMedia()
+  if (!mediaItem.value) return
+  error.value = ''
+  try {
+    const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
+    window.open(out.downloadUrl, '_blank', 'noopener')
+  } catch (e) {
+    error.value = formatApiError(e, 'Download failed')
+  }
 }
 
 watch(() => route.params.id, load, { immediate: true })
@@ -184,7 +200,8 @@ watch(() => route.params.id, load, { immediate: true })
           :thumbnail-url="item.thumbnailUrl"
           class="appear"
           :style="{ animationDelay: cellDelay(index) }"
-          @click="openItemActions(item)"
+          @click="openLightbox(item)"
+          @contextmenu.prevent="openItemActions(item)"
         />
       </div>
 
@@ -204,6 +221,15 @@ watch(() => route.params.id, load, { immediate: true })
       @view="viewMedia"
       @download="downloadMedia"
       @close="mediaOpen = false"
+    />
+
+    <MediaLightbox
+      :open="lightboxOpen"
+      :name="mediaItem?.name ?? ''"
+      :mime-type="mediaItem?.mimeType ?? ''"
+      :url="lightboxUrl"
+      @download="downloadMedia"
+      @close="lightboxOpen = false"
     />
 
     <MediaPickerSheet

@@ -30,9 +30,11 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao Phase 1; smoke test tay |
 | [09-phase-2-features.md](09-phase-2-features.md) | Spec tính năng Phase 2 web (Accepted): search, cover, favorites, share, activity |
 | [10-phase-2-status.md](10-phase-2-status.md) | Checklist bàn giao Phase 2; S1 done → tiếp S2 |
+| [11-chat-experience.md](11-chat-experience.md) | Spec đề xuất Chat kiểu Messenger; tách riêng Vault/Photos |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
 | [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md) | ADR: phạm vi tính năng Phase 2 (**Accepted**) |
+| [decisions/0004-chat-separate-surface.md](decisions/0004-chat-separate-surface.md) | ADR đề xuất: Chat là surface riêng, media reuse storage |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web (Cal.com-like + teal, mobile-first; §9a Phase 2) |
 
 **Phase 1** đã có spec + implement (checklist: [08](08-phase-1-status.md)).  
@@ -42,6 +44,7 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 
 - ADR bảo mật share link (token TTL, rate limit số cụ thể) — **bắt buộc trước khi code S4**
 - Chi tiết UI/endpoint share user nội bộ (S5) — viết khi vào slice
+- ADR realtime chat (polling/SSE/WebSocket) — viết trước khi code Chat C4
 - Database/API cho versioning, sync
 - Terraform / RDS deploy spec
 - JobQueue + worker spec (Phase 3)

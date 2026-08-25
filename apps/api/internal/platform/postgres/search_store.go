@@ -87,25 +87,41 @@ func fileSortColumn(sort search.SortField) (string, bool) {
 	}
 }
 
+type searchSQL struct {
+	sb   strings.Builder
+	args []any
+}
+
+func newSearchSQL(base string, ownerID string) *searchSQL {
+	q := &searchSQL{args: []any{ownerID}}
+	q.sb.WriteString(base)
+	return q
+}
+
+func (q *searchSQL) addArg(value any) string {
+	q.args = append(q.args, value)
+	return fmt.Sprintf("$%d", len(q.args))
+}
+
+func (q *searchSQL) appendLimit(limit int) {
+	fmt.Fprintf(&q.sb, " LIMIT %d", limit)
+}
+
 func (s *Store) SearchFolders(ctx context.Context, ownerID string, q search.Query) ([]search.FolderHit, error) {
-	sql := strings.Builder{}
-	args := []any{ownerID}
-	sb := &sql
-	sb.WriteString(searchFolderSelect)
-	sb.WriteString(" AND name ILIKE '%' || $2 || '%' ESCAPE '\\'")
-	args = append(args, ilikePatternArg(q.Text))
+	sql := newSearchSQL(searchFolderSelect, ownerID)
+	textArg := sql.addArg(ilikePatternArg(q.Text))
+	fmt.Fprintf(&sql.sb, " AND name ILIKE '%%' || %s || '%%' ESCAPE '\\'", textArg)
 	if q.FolderID != nil {
-		args = append(args, *q.FolderID)
-		fmt.Fprintf(sb, " AND id IN (%s)", folderSubtreeSQL(fmt.Sprintf("$%d", len(args))))
+		fmt.Fprintf(&sql.sb, " AND id IN (%s)", folderSubtreeSQL(sql.addArg(*q.FolderID)))
 	}
 	if col, ok := folderSortColumn(q.Sort); ok {
-		sb.WriteString(orderClause(col, q.Order))
+		sql.sb.WriteString(orderClause(col, q.Order))
 	} else {
-		sb.WriteString(" ORDER BY name ASC")
+		sql.sb.WriteString(" ORDER BY name ASC")
 	}
-	fmt.Fprintf(sb, " LIMIT %d", q.Limit)
+	sql.appendLimit(q.Limit)
 
-	rows, err := s.pool.Query(ctx, sb.String(), args...)
+	rows, err := s.pool.Query(ctx, sql.sb.String(), sql.args...)
 	if err != nil {
 		return nil, err
 	}
@@ -122,41 +138,34 @@ func (s *Store) SearchFolders(ctx context.Context, ownerID string, q search.Quer
 }
 
 func (s *Store) SearchFiles(ctx context.Context, ownerID string, q search.Query) ([]search.FileHit, error) {
-	sql := strings.Builder{}
-	args := []any{ownerID}
-	sb := &sql
-	sb.WriteString(searchFileSelect)
-	sb.WriteString(" AND name ILIKE '%' || $2 || '%' ESCAPE '\\'")
-	args = append(args, ilikePatternArg(q.Text))
+	sql := newSearchSQL(searchFileSelect, ownerID)
+	textArg := sql.addArg(ilikePatternArg(q.Text))
+	fmt.Fprintf(&sql.sb, " AND name ILIKE '%%' || %s || '%%' ESCAPE '\\'", textArg)
 
 	if groups := mimeGroupsFor(q.Type); len(groups) > 0 {
 		patterns := make([]string, 0, len(groups))
 		for _, g := range groups {
-			args = append(args, g)
-			patterns = append(patterns, fmt.Sprintf("mime_type LIKE $%d", len(args)))
+			patterns = append(patterns, fmt.Sprintf("mime_type LIKE %s", sql.addArg(g)))
 		}
-		fmt.Fprintf(sb, " AND (%s)", strings.Join(patterns, " OR "))
+		fmt.Fprintf(&sql.sb, " AND (%s)", strings.Join(patterns, " OR "))
 	}
 	if q.FolderID != nil {
-		args = append(args, *q.FolderID)
-		fmt.Fprintf(sb, " AND folder_id IN (%s)", folderSubtreeSQL(fmt.Sprintf("$%d", len(args))))
+		fmt.Fprintf(&sql.sb, " AND folder_id IN (%s)", folderSubtreeSQL(sql.addArg(*q.FolderID)))
 	}
 	if q.From != nil {
-		args = append(args, *q.From)
-		fmt.Fprintf(sb, " AND created_at >= $%d", len(args))
+		fmt.Fprintf(&sql.sb, " AND created_at >= %s", sql.addArg(*q.From))
 	}
 	if q.To != nil {
-		args = append(args, *q.To)
-		fmt.Fprintf(sb, " AND created_at < ($%d::timestamptz + interval '1 day')", len(args))
+		fmt.Fprintf(&sql.sb, " AND created_at < (%s::timestamptz + interval '1 day')", sql.addArg(*q.To))
 	}
 	col, ok := fileSortColumn(q.Sort)
 	if !ok {
 		col = "name"
 	}
-	sb.WriteString(orderClause(col, q.Order))
-	fmt.Fprintf(sb, " LIMIT %d", q.Limit)
+	sql.sb.WriteString(orderClause(col, q.Order))
+	sql.appendLimit(q.Limit)
 
-	rows, err := s.pool.Query(ctx, sb.String(), args...)
+	rows, err := s.pool.Query(ctx, sql.sb.String(), sql.args...)
 	if err != nil {
 		return nil, err
 	}

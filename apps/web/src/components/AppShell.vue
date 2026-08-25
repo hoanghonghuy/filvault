@@ -9,10 +9,12 @@ import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
 import { HOME_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
+import { useI18n } from '@/lib/i18n'
 
 const auth = useAuthStore()
 const route = useRoute()
 const storageBarRef = ref<InstanceType<typeof StorageBar> | null>(null)
+const { t } = useI18n()
 
 provide('reloadStorage', async () => {
   await storageBarRef.value?.reload()
@@ -21,6 +23,12 @@ provide('reloadStorage', async () => {
 const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
 const storageVisible = computed(() => showStorageBar(route.path))
+const navLabels = computed(() => ({
+  '/files': t.value.navFiles,
+  '/photos': t.value.navPhotos,
+  '/trash': t.value.navTrash,
+  '/settings': t.value.navSettings,
+}))
 </script>
 
 <template>
@@ -44,7 +52,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
         >
           <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="20" />
-          <span>{{ item.label }}</span>
+          <span>{{ navLabels[item.to] }}</span>
         </RouterLink>
       </nav>
       <div class="side-user">
@@ -83,7 +91,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
           <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="24" />
         </span>
-        <span class="bottom-label">{{ item.shortLabel }}</span>
+        <span class="bottom-label">{{ navLabels[item.to] }}</span>
       </RouterLink>
     </nav>
   </div>

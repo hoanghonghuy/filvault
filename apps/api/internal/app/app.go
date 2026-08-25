@@ -1,6 +1,10 @@
 package app
 
 import (
+	"context"
+	"net/http"
+	"time"
+
 	"filvault/internal/auth"
 	"filvault/internal/file"
 	"filvault/internal/folder"
@@ -65,6 +69,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	if len(cfg.CORSAllowedOrigins) > 0 {
 		engine.Use(httpx.CORS(cfg.CORSAllowedOrigins))
 	}
+	engine.GET("/healthz", healthz(pool))
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
 
@@ -80,6 +85,18 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	storageHandlers.RegisterRoutes(v1, storage...)
 
 	return engine
+}
+
+func healthz(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	}
 }
 
 func NewTrashService(pool *pgxpool.Pool, obj objectstore.ObjectStore) *trash.Service {
