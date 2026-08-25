@@ -10,6 +10,13 @@ type Conversation struct {
 	UpdatedAt time.Time
 }
 
+type ConversationPreview struct {
+	MessageID     string
+	Body          string
+	CreatedAt     time.Time
+	AttachmentIDs []string
+}
+
 type Message struct {
 	ID             string
 	ConversationID string

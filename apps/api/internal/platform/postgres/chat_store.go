@@ -78,6 +78,71 @@ func (s *Store) CreateAttachment(ctx context.Context, a chat.Attachment) error {
 	return err
 }
 
+func (s *Store) ListMessagesBefore(ctx context.Context, ownerID, conversationID, before string, limit int) ([]chat.Message, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, conversation_id, owner_id, body, created_at
+		FROM (
+			SELECT id, conversation_id, owner_id, body, created_at
+			FROM messages
+			WHERE owner_id = $1
+				AND conversation_id = $2
+				AND deleted_at IS NULL
+				AND ($3::char(26) IS NULL OR id < $3::char(26))
+			ORDER BY created_at DESC, id DESC
+			LIMIT $4
+		) latest
+		ORDER BY created_at ASC, id ASC
+	`, ownerID, conversationID, nullableCursor(before), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []chat.Message
+	for rows.Next() {
+		var m chat.Message
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		attachments, err := s.listMessageAttachments(ctx, out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Attachments = attachments
+	}
+	return out, nil
+}
+
+func (s *Store) LastMessageForConversation(ctx context.Context, ownerID, conversationID string) (*chat.Message, error) {
+	var m chat.Message
+	err := s.pool.QueryRow(ctx, `
+		SELECT id, conversation_id, owner_id, body, created_at
+		FROM messages
+		WHERE owner_id = $1 AND conversation_id = $2 AND deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, ownerID, conversationID).Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+func nullableCursor(before string) any {
+	if before == "" {
+		return nil
+	}
+	return before
+}
+
 func (s *Store) ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Message, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, conversation_id, owner_id, body, created_at
@@ -226,6 +291,14 @@ func (r chatRepo) CreateMessage(ctx context.Context, m chat.Message) error {
 
 func (r chatRepo) ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Message, error) {
 	return r.store.ListMessages(ctx, ownerID, conversationID, limit)
+}
+
+func (r chatRepo) ListMessagesBefore(ctx context.Context, ownerID, conversationID, before string, limit int) ([]chat.Message, error) {
+	return r.store.ListMessagesBefore(ctx, ownerID, conversationID, before, limit)
+}
+
+func (r chatRepo) LastMessageForConversation(ctx context.Context, ownerID, conversationID string) (*chat.Message, error) {
+	return r.store.LastMessageForConversation(ctx, ownerID, conversationID)
 }
 
 func (r chatRepo) SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]chat.Message, error) {

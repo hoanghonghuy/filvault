@@ -35,9 +35,11 @@ Một file ảnh gửi qua Chat có **hai mặt**:
 | C2 | Gửi ảnh/file attachment bằng upload flow hiện có | Done: reuse upload session/object store |
 | C3 | Attachment media xuất hiện trong Photos + metadata chat | Done ở mức MVP: file chat là `READY` media nên vào Photos timeline |
 | C4 | Realtime nhẹ (SSE hoặc WebSocket) | ADR riêng trước khi chọn |
-| C5 | Search trong chat + media gallery theo conversation | sau khi C1–C3 ổn |
+| C5 | Search trong chat + media gallery theo conversation | Done: `/messages/search?q=` + `/media` |
+| C6 | Chat là bare surface riêng: route `meta.bare`, full-screen Messenger layout ngoài shell Vault | Done: `/chat` không bottom/side nav, mobile master–detail + Back |
+| C7 | Polish motion + API đáp ứng UI: cursor pagination (`before`/`limit`, trả `hasMore`/`nextBefore`), preview tin cuối (`?includePreview=true`), optimistic send, TransitionGroup bubble, jump-to-latest, composer auto-grow | Done |
 
-Không làm C4 trước C1–C3.
+C4 (realtime) cần ADR riêng trước khi làm.
 
 ## 3. Database dự kiến
 
@@ -110,7 +112,7 @@ Quy tắc:
 
 ## 5. UI/UX Chat
 
-Chat có shell riêng, không dùng layout list Files.
+Chat là **bare surface**: route `/chat` có `meta: { bare: true }` để `AppShell` không render shell Filvault (bottom nav/side nav/header/storage bar). Trải nghiệm độc lập, truy cập trực tiếp qua URL, layout full-screen kiểu Messenger. Chi tiết visual chuẩn hoá trong `DESIGN.md` §9a "Chat".
 
 ### 5.1 Desktop
 

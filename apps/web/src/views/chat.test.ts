@@ -8,40 +8,56 @@ const readSrc = (relativePath: string) =>
 describe('chat surface contract', () => {
   const router = readSrc('../router/index.ts')
   const nav = readSrc('../lib/shellNav.ts')
+  const shell = readSrc('../components/AppShell.vue')
   const chat = readSrc('./ChatView.vue')
   const types = readSrc('../api/types.ts')
 
-  it('adds Chat as a dedicated authenticated route and shell nav item', () => {
+  it('serves Chat at its own URL outside the Filvault shell', () => {
     expect(router).toMatch(/path:\s*'\/chat'/)
     expect(router).toMatch(/name:\s*'chat'/)
-    expect(nav).toMatch(/to:\s*'\/chat'/)
-    expect(nav).toMatch(/icon:\s*'chat'/)
+    expect(router).toMatch(/meta:\s*\{[^}]*bare:\s*true/)
+    expect(nav).not.toMatch(/to:\s*'\/chat'/)
+    expect(shell).toMatch(/meta\.bare|!isBare/)
   })
 
-  it('keeps a Messenger-like three-area layout', () => {
-    expect(chat).toMatch(/class="chat-layout"/)
-    expect(chat).toMatch(/class="conversation-list"/)
+  it('keeps a Messenger-like full-screen anatomy', () => {
+    expect(chat).toMatch(/class="chat-app/)
+    expect(chat).toMatch(/class="chat-rail"/)
     expect(chat).toMatch(/class="message-thread"/)
     expect(chat).toMatch(/class="chat-composer"/)
   })
 
-  it('supports text messages and media attachment uploads', () => {
+  it('switches rail/thread on mobile with an accessible back action', () => {
+    expect(chat).toMatch(/'in-thread':/)
+    expect(chat).toMatch(/aria-label="Back"/)
+    expect(chat).toMatch(/function backToRail/)
+  })
+
+  it('supports search, media panel and attachment uploads', () => {
     expect(chat).toMatch(/\/chat\/conversations/)
-    expect(chat).toMatch(/\/chat\/attachments\/upload-sessions/)
-    expect(chat).toMatch(/\/chat\/attachments\/\$\{[^}]+\.fileId\}\/complete/)
+    expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/messages\/search/)
+    expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/media/)
     expect(chat).toMatch(/type="file"/)
+  })
+
+  it('animates new messages and keeps the latest window visible', () => {
+    expect(chat).toMatch(/<TransitionGroup[^>]*name="msg"/)
+    expect(chat).toMatch(/\.msg-enter-active/)
+    expect(chat).toMatch(/function scrollToLatest|scrollToLatest\(\)/)
+    expect(chat).toMatch(/class="jump-latest"/)
+    expect(chat).toMatch(/showJump/)
+  })
+
+  it('sends optimistically with a pending bubble and composer auto-grow', () => {
+    expect(chat).toMatch(/pendingMessage|isPending/)
+    expect(chat).toMatch(/function autoGrow/)
+    expect(chat).toMatch(/\?includePreview=true/)
+    expect(chat).toMatch(/nextBefore|hasMore/)
   })
 
   it('defines typed chat API payloads', () => {
     expect(types).toMatch(/export interface ChatConversation/)
     expect(types).toMatch(/export interface ChatMessage/)
     expect(types).toMatch(/export interface ChatAttachment/)
-  })
-
-  it('adds message search and a conversation media panel', () => {
-    expect(chat).toMatch(/class="chat-search"/)
-    expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/messages\/search/)
-    expect(chat).toMatch(/class="chat-media-panel"/)
-    expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/media/)
   })
 })

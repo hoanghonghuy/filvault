@@ -70,6 +70,19 @@ func (h *Handler) listConversations(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
+	if c.Query("includePreview") == "true" {
+		list, err := h.svc.ListConversationsWithPreview(c.Request.Context(), userID)
+		if err != nil {
+			httpx.Error(c, err)
+			return
+		}
+		out := make([]gin.H, 0, len(list))
+		for _, view := range list {
+			out = append(out, publicConversationView(view))
+		}
+		c.JSON(http.StatusOK, gin.H{"conversations": out})
+		return
+	}
 	list, err := h.svc.ListConversations(c.Request.Context(), userID)
 	if err != nil {
 		httpx.Error(c, err)
@@ -129,16 +142,20 @@ func (h *Handler) listMessages(c *gin.Context) {
 		}
 		limit = n
 	}
-	list, err := h.svc.ListMessages(c.Request.Context(), userID, conversationID, limit)
+	page, err := h.svc.ListMessagePage(c.Request.Context(), userID, conversationID, c.Query("before"), limit)
 	if err != nil {
 		httpx.Error(c, err)
 		return
 	}
-	out := make([]gin.H, 0, len(list))
-	for _, m := range list {
+	out := make([]gin.H, 0, len(page.Messages))
+	for _, m := range page.Messages {
 		out = append(out, publicMessage(m))
 	}
-	c.JSON(http.StatusOK, gin.H{"messages": out})
+	resp := gin.H{"messages": out, "hasMore": page.HasMore}
+	if page.NextBefore != "" {
+		resp["nextBefore"] = page.NextBefore
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handler) searchMessages(c *gin.Context) {
@@ -266,6 +283,20 @@ func publicConversation(c Conversation) gin.H {
 		"createdAt": c.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updatedAt": c.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+}
+
+func publicConversationView(view ConversationView) gin.H {
+	out := publicConversation(view.Conversation)
+	if view.Preview != nil {
+		out["preview"] = gin.H{
+			"messageId":   view.Preview.MessageID,
+			"body":        view.Preview.Body,
+			"createdAt":   view.Preview.CreatedAt.UTC().Format(time.RFC3339Nano),
+			"attachments": view.Preview.AttachmentIDs,
+		}
+		out["lastMessageAt"] = out["updatedAt"]
+	}
+	return out
 }
 
 func publicMessage(m Message) gin.H {

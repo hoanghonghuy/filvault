@@ -20,9 +20,22 @@ type Repository interface {
 	GetConversation(ctx context.Context, ownerID, id string) (*Conversation, error)
 	CreateMessage(ctx context.Context, m Message) error
 	ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]Message, error)
+	ListMessagesBefore(ctx context.Context, ownerID, conversationID, before string, limit int) ([]Message, error)
+	LastMessageForConversation(ctx context.Context, ownerID, conversationID string) (*Message, error)
 	SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]Message, error)
 	CreateAttachment(ctx context.Context, a Attachment) error
 	ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error)
+}
+
+type MessagePage struct {
+	Messages   []Message
+	HasMore    bool
+	NextBefore string
+}
+
+type ConversationView struct {
+	Conversation
+	Preview *ConversationPreview `json:"preview,omitempty"`
 }
 
 type Service struct {
@@ -98,6 +111,62 @@ func (s *Service) ListMessages(ctx context.Context, ownerID, conversationID stri
 		limit = 50
 	}
 	return s.repo.ListMessages(ctx, ownerID, conversationID, limit)
+}
+
+func (s *Service) ListMessagePage(ctx context.Context, ownerID, conversationID, before string, limit int) (MessagePage, error) {
+	if err := s.ensureConversation(ctx, ownerID, conversationID); err != nil {
+		return MessagePage{}, err
+	}
+	if limit <= 0 || limit > 100 {
+		return MessagePage{}, apperr.Validation
+	}
+	if before != "" {
+		if _, err := ulid.ParseStrict(before); err != nil {
+			return MessagePage{}, apperr.Validation
+		}
+	}
+	messages, err := s.repo.ListMessagesBefore(ctx, ownerID, conversationID, before, limit)
+	if err != nil {
+		return MessagePage{}, err
+	}
+	page := MessagePage{Messages: messages, HasMore: len(messages) == limit}
+	if page.HasMore && len(messages) > 0 {
+		page.NextBefore = messages[0].ID
+	}
+	return page, nil
+}
+
+func (s *Service) ListConversationsWithPreview(ctx context.Context, ownerID string) ([]ConversationView, error) {
+	conversations, err := s.repo.ListConversations(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ConversationView, 0, len(conversations))
+	for _, conv := range conversations {
+		view := ConversationView{Conversation: conv}
+		preview, err := s.repo.LastMessageForConversation(ctx, ownerID, conv.ID)
+		if err != nil {
+			return nil, err
+		}
+		if preview != nil {
+			view.Preview = &ConversationPreview{
+				MessageID:     preview.ID,
+				Body:          preview.Body,
+				CreatedAt:     preview.CreatedAt,
+				AttachmentIDs: attachmentIDs(preview.Attachments),
+			}
+		}
+		out = append(out, view)
+	}
+	return out, nil
+}
+
+func attachmentIDs(attachments []Attachment) []string {
+	ids := make([]string, 0, len(attachments))
+	for _, a := range attachments {
+		ids = append(ids, a.FileID)
+	}
+	return ids
 }
 
 func (s *Service) SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]Message, error) {

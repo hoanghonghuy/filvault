@@ -64,6 +64,76 @@ func TestChat_CreateConversationAndTextMessage(t *testing.T) {
 	}
 }
 
+func TestChat_MessagePaginationAndPreview(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Paging"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	for _, text := range []string{"msg-1", "msg-2", "msg-3"} {
+		code, body := postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token, map[string]any{"body": text})
+		if code != http.StatusCreated {
+			t.Fatalf("send %s status=%d body=%s", text, code, body)
+		}
+	}
+
+	code, body := getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", token)
+	if code != http.StatusOK {
+		t.Fatalf("list with preview status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, `"preview"`) || !strings.Contains(body, "msg-3") || !strings.Contains(body, `"lastMessageAt"`) {
+		t.Fatalf("conversation preview missing: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=2", token)
+	if code != http.StatusOK {
+		t.Fatalf("latest page status=%d body=%s", code, body)
+	}
+	var latest struct {
+		Messages []struct {
+			Body string `json:"body"`
+		} `json:"messages"`
+		HasMore    bool   `json:"hasMore"`
+		NextBefore string `json:"nextBefore"`
+	}
+	decodeJSON(t, body, &latest)
+	if len(latest.Messages) != 2 || latest.Messages[0].Body != "msg-2" || latest.Messages[1].Body != "msg-3" {
+		t.Fatalf("latest window wrong: %+v", latest.Messages)
+	}
+	if !latest.HasMore || latest.NextBefore == "" {
+		t.Fatalf("expected hasMore + cursor: %+v %+v", latest.HasMore, latest.NextBefore)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=2&before="+latest.NextBefore, token)
+	if code != http.StatusOK {
+		t.Fatalf("older page status=%d body=%s", code, body)
+	}
+	var older struct {
+		Messages []struct {
+			Body string `json:"body"`
+		} `json:"messages"`
+		HasMore bool `json:"hasMore"`
+	}
+	decodeJSON(t, body, &older)
+	if len(older.Messages) != 1 || older.Messages[0].Body != "msg-1" {
+		t.Fatalf("older page wrong: %+v", older.Messages)
+	}
+	if older.HasMore {
+		t.Fatalf("older page should not have more")
+	}
+
+	if code, body := getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=0", token); code != http.StatusBadRequest {
+		t.Fatalf("limit=0 status=%d body=%s", code, body)
+	}
+	if code, body := getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?before=not-a-ulid", token); code != http.StatusBadRequest {
+		t.Fatalf("bad cursor status=%d body=%s", code, body)
+	}
+}
+
 func TestChat_ImageAttachmentAppearsInPhotos(t *testing.T) {
 	engine, mem, objs := newEngine(t)
 	token := registerVerified(t, engine, mem, uniqueEmail())

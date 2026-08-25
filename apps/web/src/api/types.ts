@@ -120,6 +120,13 @@ export interface ChatConversation {
   title: string
   createdAt: string
   updatedAt: string
+  lastMessageAt?: string
+  preview?: {
+    messageId: string
+    body: string
+    createdAt: string
+    attachments: string[]
+  }
 }
 
 export interface Album {
