@@ -227,6 +227,58 @@ func TestChat_SearchMessagesAndMediaGallery(t *testing.T) {
 	}
 }
 
+func TestChat_MediaThumbnails(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Thumbs"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	for _, name := range []string{"pic.jpg", "doc.pdf"} {
+		code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+			"conversationId": conv.ID,
+			"name":           name,
+			"size":           64,
+			"contentType":    map[string]string{"pic.jpg": "image/jpeg", "doc.pdf": "application/pdf"}[name],
+		})
+		if code != http.StatusCreated {
+			t.Fatalf("session %s status=%d", name, code)
+		}
+		var session struct {
+			FileID string `json:"fileId"`
+		}
+		decodeJSON(t, body, &session)
+		userID := decodeUserID(t, engine, token)
+		objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 64, ContentType: map[string]string{"pic.jpg": "image/jpeg", "doc.pdf": "application/pdf"}[name]})
+		code, _ = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{"conversationId": conv.ID})
+		if code != http.StatusCreated {
+			t.Fatalf("complete %s status=%d", name, code)
+		}
+	}
+
+	code, body := getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/media", token)
+	if code != http.StatusOK {
+		t.Fatalf("media status=%d body=%s", code, body)
+	}
+	var mediaResp struct {
+		Media []struct {
+			Name         string `json:"name"`
+			MimeType     string `json:"mimeType"`
+			ThumbnailURL string `json:"thumbnailUrl"`
+		} `json:"media"`
+	}
+	decodeJSON(t, body, &mediaResp)
+	if len(mediaResp.Media) != 1 || mediaResp.Media[0].Name != "pic.jpg" {
+		t.Fatalf("gallery should contain only the image: %s", body)
+	}
+	if mediaResp.Media[0].ThumbnailURL == "" {
+		t.Fatalf("image should have thumbnailUrl: %s", body)
+	}
+}
+
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

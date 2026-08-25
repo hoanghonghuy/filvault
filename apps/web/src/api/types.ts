@@ -105,6 +105,7 @@ export interface ChatAttachment {
   mimeType: string
   sizeBytes: number
   createdAt: string
+  thumbnailUrl?: string
 }
 
 export interface ChatMessage {

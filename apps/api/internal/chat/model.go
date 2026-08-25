@@ -35,6 +35,7 @@ type Attachment struct {
 	MimeType     string
 	SizeBytes    int64
 	CreatedAt    time.Time
+	ThumbnailURL string
 }
 
 type UploadSession struct {

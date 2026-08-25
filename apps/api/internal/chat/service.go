@@ -190,7 +190,30 @@ func (s *Service) ListMedia(ctx context.Context, ownerID, conversationID string,
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	return s.repo.ListMedia(ctx, ownerID, conversationID, limit)
+	items, err := s.repo.ListMedia(ctx, ownerID, conversationID, limit)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		if !strings.HasPrefix(items[i].MimeType, "image/") && !strings.HasPrefix(items[i].MimeType, "video/") {
+			continue
+		}
+		f, err := s.files.GetByID(ctx, ownerID, items[i].FileID)
+		if err != nil {
+			return nil, err
+		}
+		if f == nil || s.objects == nil {
+			continue
+		}
+		url, err := s.objects.CreateDownloadURL(ctx, f.ObjectKey, objectstore.DownloadOptions{
+			Expires: config.ThumbnailPresignTTL,
+		})
+		if err != nil {
+			return nil, err
+		}
+		items[i].ThumbnailURL = url.URL
+	}
+	return items, nil
 }
 
 func (s *Service) CreateAttachmentSession(ctx context.Context, ownerID, conversationID, name, contentType string, size int64) (UploadSession, error) {

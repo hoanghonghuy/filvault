@@ -314,7 +314,7 @@ func publicMessage(m Message) gin.H {
 }
 
 func publicAttachment(a Attachment) gin.H {
-	return gin.H{
+	out := gin.H{
 		"id":           a.ID,
 		"fileId":       a.FileID,
 		"originalName": a.OriginalName,
@@ -323,6 +323,10 @@ func publicAttachment(a Attachment) gin.H {
 		"sizeBytes":    a.SizeBytes,
 		"createdAt":    a.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
+	if a.ThumbnailURL != "" {
+		out["thumbnailUrl"] = a.ThumbnailURL
+	}
+	return out
 }
 
 func queryLimit(c *gin.Context) (int, bool) {

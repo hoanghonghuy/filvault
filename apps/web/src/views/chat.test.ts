@@ -55,6 +55,15 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/nextBefore|hasMore/)
   })
 
+  it('supports enter-to-send, day separators, timestamps and media thumbnails', () => {
+    expect(chat).toMatch(/@keydown.enter/)
+    expect(chat).toMatch(/shiftKey/)
+    expect(chat).toMatch(/class="day-separator"/)
+    expect(chat).toMatch(/function shouldShowDate|shouldShowDate\(/)
+    expect(chat).toMatch(/formatTime\(/)
+    expect(chat).toMatch(/item\.thumbnailUrl/)
+  })
+
   it('defines typed chat API payloads', () => {
     expect(types).toMatch(/export interface ChatConversation/)
     expect(types).toMatch(/export interface ChatMessage/)

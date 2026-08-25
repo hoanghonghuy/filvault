@@ -157,6 +157,36 @@ function autoGrow() {
   el.style.height = `${Math.min(el.scrollHeight, 140)}px`
 }
 
+function shouldShowDate(index: number): boolean {
+  const list = visibleMessages.value
+  const current = list[index]
+  if (!current || index === 0) return true
+  const prev = list[index - 1]
+  if (!prev) return true
+  return new Date(prev.createdAt).toDateString() !== new Date(current.createdAt).toDateString()
+}
+
+function formatDayLabel(iso: string): string {
+  const date = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+function onComposerKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault()
+    void sendText()
+  }
+}
+
 async function searchMessages() {
   if (!selectedId.value || searchQuery.value.trim().length < 2) {
     searchResults.value = null
@@ -342,24 +372,28 @@ watch(visibleMessages, () => {
           <p v-if="loadingOlder" class="loading-older">Loading older…</p>
           <div v-if="visibleMessages.length" class="message-list">
             <TransitionGroup name="msg">
-              <article
-                v-for="message in visibleMessages"
-                :key="message.id"
-                class="message-bubble"
-              >
-                <p v-if="message.body">{{ message.body }}</p>
-                <button
-                  v-for="attachment in message.attachments"
-                  :key="attachment.id"
-                  type="button"
-                  class="attachment-card"
-                  @click="openAttachment(attachment.fileId)"
+              <template v-for="(message, index) in visibleMessages" :key="message.id">
+                <div v-if="shouldShowDate(index)" class="day-separator">
+                  <span>{{ formatDayLabel(message.createdAt) }}</span>
+                </div>
+                <article
+                  class="message-bubble"
                 >
-                  <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
-                  <span class="attachment-name">{{ attachment.name }}</span>
-                  <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
-                </button>
-              </article>
+                  <p v-if="message.body">{{ message.body }}</p>
+                  <button
+                    v-for="attachment in message.attachments"
+                    :key="attachment.id"
+                    type="button"
+                    class="attachment-card"
+                    @click="openAttachment(attachment.fileId)"
+                  >
+                    <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
+                    <span class="attachment-name">{{ attachment.name }}</span>
+                    <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
+                  </button>
+                  <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
+                </article>
+              </template>
             </TransitionGroup>
             <Transition name="msg">
               <article v-if="pendingMessage" class="message-bubble pending" aria-live="polite">
@@ -389,6 +423,7 @@ watch(visibleMessages, () => {
             placeholder="Aa"
             :disabled="sending"
             @input="autoGrow"
+            @keydown.enter="onComposerKeydown"
           ></textarea>
           <button class="send-btn" type="submit" aria-label="Send" :disabled="!draft.trim() || sending">
             <Icon name="check" :size="18" />
@@ -409,7 +444,14 @@ watch(visibleMessages, () => {
         class="media-card"
         @click="openAttachment(item.fileId)"
       >
-        <Icon :name="item.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
+        <img
+          v-if="item.thumbnailUrl"
+          :src="item.thumbnailUrl"
+          :alt="item.name"
+          class="media-thumb"
+          loading="lazy"
+        />
+        <Icon v-else :name="item.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
         <span class="media-name">{{ item.name }}</span>
         <small>{{ new Date(item.createdAt).toLocaleDateString() }}</small>
       </button>
@@ -724,6 +766,24 @@ watch(visibleMessages, () => {
   opacity: 0.55;
 }
 
+.bubble-time {
+  display: block;
+  margin-top: 2px;
+  text-align: right;
+  opacity: 0.65;
+  font-size: 11px;
+}
+
+.day-separator {
+  align-self: center;
+  padding: var(--space-xxs) var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .msg-enter-active {
   transition: opacity var(--duration-medium) var(--ease-emphasized-decelerate),
     transform var(--duration-medium) var(--ease-emphasized-decelerate);
@@ -898,6 +958,13 @@ watch(visibleMessages, () => {
   .media-card:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
+  }
+
+  .media-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
   }
 
   .media-name,
