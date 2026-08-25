@@ -73,6 +73,14 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/composerRef\.value\?\.(focus|value)/)
   })
 
+  it('gives the conversation rail Messenger-like filtering and identity', () => {
+    expect(chat).toMatch(/railFilter|filterQuery/)
+    expect(chat).toMatch(/filteredConversations/)
+    expect(chat).toMatch(/avatarClass|avatar-color/)
+    expect(chat).toMatch(/function formatRelativeDay|formatRelativeDay\(/)
+    expect(chat).toMatch(/rail-empty/)
+  })
+
   it('defines typed chat API payloads', () => {
     expect(types).toMatch(/export interface ChatConversation/)
     expect(types).toMatch(/export interface ChatMessage/)

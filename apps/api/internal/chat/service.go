@@ -129,6 +129,13 @@ func (s *Service) ListMessagePage(ctx context.Context, ownerID, conversationID, 
 	if err != nil {
 		return MessagePage{}, err
 	}
+	for i := range messages {
+		for j := range messages[i].Attachments {
+			if err := s.presignThumbnail(ctx, ownerID, &messages[i].Attachments[j]); err != nil {
+				return MessagePage{}, err
+			}
+		}
+	}
 	page := MessagePage{Messages: messages, HasMore: len(messages) == limit}
 	if page.HasMore && len(messages) > 0 {
 		page.NextBefore = messages[0].ID
@@ -195,25 +202,32 @@ func (s *Service) ListMedia(ctx context.Context, ownerID, conversationID string,
 		return nil, err
 	}
 	for i := range items {
-		if !strings.HasPrefix(items[i].MimeType, "image/") && !strings.HasPrefix(items[i].MimeType, "video/") {
-			continue
-		}
-		f, err := s.files.GetByID(ctx, ownerID, items[i].FileID)
-		if err != nil {
+		if err := s.presignThumbnail(ctx, ownerID, &items[i]); err != nil {
 			return nil, err
 		}
-		if f == nil || s.objects == nil {
-			continue
-		}
-		url, err := s.objects.CreateDownloadURL(ctx, f.ObjectKey, objectstore.DownloadOptions{
-			Expires: config.ThumbnailPresignTTL,
-		})
-		if err != nil {
-			return nil, err
-		}
-		items[i].ThumbnailURL = url.URL
 	}
 	return items, nil
+}
+
+func (s *Service) presignThumbnail(ctx context.Context, ownerID string, a *Attachment) error {
+	if !strings.HasPrefix(a.MimeType, "image/") && !strings.HasPrefix(a.MimeType, "video/") {
+		return nil
+	}
+	f, err := s.files.GetByID(ctx, ownerID, a.FileID)
+	if err != nil {
+		return err
+	}
+	if f == nil || s.objects == nil {
+		return nil
+	}
+	url, err := s.objects.CreateDownloadURL(ctx, f.ObjectKey, objectstore.DownloadOptions{
+		Expires: config.ThumbnailPresignTTL,
+	})
+	if err != nil {
+		return err
+	}
+	a.ThumbnailURL = url.URL
+	return nil
 }
 
 func (s *Service) CreateAttachmentSession(ctx context.Context, ownerID, conversationID, name, contentType string, size int64) (UploadSession, error) {

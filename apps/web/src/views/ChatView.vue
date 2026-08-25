@@ -40,7 +40,30 @@ const lightboxFileId = ref('')
 const loadingThread = ref(true)
 
 const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
+const railFilter = ref('')
+const filteredConversations = computed(() => {
+  const q = railFilter.value.trim().toLowerCase()
+  if (!q) return conversations.value
+  return conversations.value.filter((c) => (c.title || '').toLowerCase().includes(q))
+})
 const visibleMessages = computed(() => searchResults.value ?? messages.value)
+
+function avatarClass(title: string): string {
+  const palette = ['a', 'b', 'c', 'd', 'e', 'f']
+  let sum = 0
+  for (const ch of title) sum += ch.codePointAt(0) ?? 0
+  return `avatar-color-${palette[sum % palette.length]}`
+}
+
+function formatRelativeDay(iso: string): string {
+  const date = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return formatTime(iso)
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })
+}
 const inThread = computed({
   get: () => Boolean(selectedId.value),
   set: (value: boolean) => {
@@ -363,10 +386,21 @@ watch(visibleMessages, () => {
           <Icon name="pencil" :size="18" />
         </button>
       </form>
+      <div class="rail-filter">
+        <label class="sr-only" for="rail-filter-input">Filter chats</label>
+        <input
+          id="rail-filter-input"
+          v-model="railFilter"
+          type="search"
+          placeholder="Search chats"
+          autocomplete="off"
+        />
+      </div>
       <div v-if="error && !inThread" class="alert" role="alert">{{ error }}</div>
       <nav class="conversation-list">
+        <p v-if="!filteredConversations.length" class="rail-empty">No chats match "{{ railFilter }}".</p>
         <button
-          v-for="conv in conversations"
+          v-for="conv in filteredConversations"
           :key="conv.id"
           type="button"
           class="conversation-row"
@@ -374,12 +408,12 @@ watch(visibleMessages, () => {
           :aria-current="conv.id === selectedId ? 'true' : undefined"
           @click="selectConversation(conv.id)"
         >
-          <span class="avatar" aria-hidden="true">{{ conv.title.slice(0, 1).toUpperCase() }}</span>
+          <span class="avatar" :class="avatarClass(conv.title || '?')" aria-hidden="true">{{ conv.title.slice(0, 1).toUpperCase() }}</span>
           <span class="conversation-meta">
             <span class="conversation-title">{{ conv.title || 'Untitled chat' }}</span>
             <span class="conversation-preview">{{ conv.preview?.body || (conv.preview?.attachments?.length ? 'Attachment' : 'No messages yet') }}</span>
-            <span class="conversation-date">{{ new Date(conv.updatedAt).toLocaleDateString() }}</span>
           </span>
+          <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
         </button>
       </nav>
     </aside>
@@ -390,7 +424,7 @@ watch(visibleMessages, () => {
           <button type="button" class="icon-btn back-btn" aria-label="Back" @click="backToRail">
             <Icon name="close" :size="20" />
           </button>
-          <span class="thread-avatar" aria-hidden="true">{{ selectedConversation.title.slice(0, 1).toUpperCase() }}</span>
+          <span class="thread-avatar" :class="avatarClass(selectedConversation.title || '?')" aria-hidden="true">{{ selectedConversation.title.slice(0, 1).toUpperCase() }}</span>
           <h2>{{ selectedConversation.title || 'Untitled chat' }}</h2>
           <button class="ghost-btn" type="button" @click="loadMessages()">Refresh</button>
         </header>
@@ -700,6 +734,41 @@ watch(visibleMessages, () => {
   background: var(--surface-card);
   color: var(--ink);
   font-weight: 600;
+}
+
+.avatar-color-a { background: #e0e7ff; color: #3730a3; }
+.avatar-color-b { background: #fce7f3; color: #9d174d; }
+.avatar-color-c { background: #dcfce7; color: #166534; }
+.avatar-color-d { background: #ffedd5; color: #9a3412; }
+.avatar-color-e { background: #cffafe; color: #155e75; }
+.avatar-color-f { background: #f3e8ff; color: #6b21a8; }
+
+.rail-filter {
+  padding: 0 var(--space-md) var(--space-sm);
+}
+
+.rail-filter input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.rail-filter input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rail-empty {
+  margin: 0;
+  padding: var(--space-md);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .conversation-meta {
