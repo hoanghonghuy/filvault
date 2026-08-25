@@ -64,6 +64,15 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/item\.thumbnailUrl/)
   })
 
+  it('renders inline images with a lightbox and polished send/skeleton states', () => {
+    expect(chat).toMatch(/MediaLightbox/)
+    expect(chat).toMatch(/function openInlineImage|openInlineImage\(/)
+    expect(chat).toMatch(/class="inline-image"/)
+    expect(chat).toMatch(/:class="\{\s*active:.*draft/)
+    expect(chat).toMatch(/LoadingSkeletonThread/)
+    expect(chat).toMatch(/composerRef\.value\?\.(focus|value)/)
+  })
+
   it('defines typed chat API payloads', () => {
     expect(types).toMatch(/export interface ChatConversation/)
     expect(types).toMatch(/export interface ChatMessage/)

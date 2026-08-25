@@ -6,6 +6,8 @@ import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import MediaLightbox from '@/components/MediaLightbox.vue'
+import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
@@ -30,6 +32,12 @@ const composerRef = ref<HTMLTextAreaElement | null>(null)
 const hasMore = ref(false)
 const nextBefore = ref<string | null>(null)
 const loadingOlder = ref(false)
+const lightboxOpen = ref(false)
+const lightboxName = ref('')
+const lightboxMime = ref('')
+const lightboxUrl = ref('')
+const lightboxFileId = ref('')
+const loadingThread = ref(true)
 
 const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
 const visibleMessages = computed(() => searchResults.value ?? messages.value)
@@ -88,12 +96,15 @@ async function selectConversation(id: string) {
   selectedId.value = id
   searchQuery.value = ''
   searchResults.value = null
+  loadingThread.value = true
   await Promise.all([loadMessages(id), loadMedia(id)])
+  focusComposer()
 }
 
 async function loadMessages(id = selectedId.value) {
   if (!id) return
   error.value = ''
+  loadingThread.value = true
   try {
     const out = await api<{ messages: ChatMessage[]; hasMore?: boolean; nextBefore?: string }>(
       `/chat/conversations/${id}/messages?limit=50`,
@@ -105,6 +116,8 @@ async function loadMessages(id = selectedId.value) {
     showJump.value = false
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load messages')
+  } finally {
+    loadingThread.value = false
   }
 }
 
@@ -300,6 +313,29 @@ async function openAttachment(fileId: string) {
   }
 }
 
+async function openInlineImage(attachment: ChatAttachment) {
+  error.value = ''
+  try {
+    const out = await api<DownloadURL>(`/files/${attachment.fileId}/download`)
+    lightboxFileId.value = attachment.fileId
+    lightboxName.value = attachment.name
+    lightboxMime.value = attachment.mimeType
+    lightboxUrl.value = out.downloadUrl
+    lightboxOpen.value = true
+  } catch (e) {
+    error.value = formatApiError(e, 'View failed')
+  }
+}
+
+async function downloadLightbox() {
+  if (!lightboxFileId.value) return
+  await openAttachment(lightboxFileId.value)
+}
+
+function focusComposer() {
+  void nextTick(() => composerRef.value?.focus())
+}
+
 onMounted(loadConversations)
 
 watch(visibleMessages, () => {
@@ -369,28 +405,41 @@ watch(visibleMessages, () => {
         <p v-if="error && inThread" class="alert" role="alert">{{ error }}</p>
 
         <div ref="threadBodyRef" class="message-body" @scroll.passive="onThreadScroll">
-          <p v-if="loadingOlder" class="loading-older">Loading older…</p>
-          <div v-if="visibleMessages.length" class="message-list">
+          <LoadingSkeletonThread v-if="loadingThread" />
+          <p v-else-if="loadingOlder" class="loading-older">Loading older…</p>
+          <div v-if="!loadingThread && visibleMessages.length" class="message-list">
             <TransitionGroup name="msg">
               <template v-for="(message, index) in visibleMessages" :key="message.id">
                 <div v-if="shouldShowDate(index)" class="day-separator">
                   <span>{{ formatDayLabel(message.createdAt) }}</span>
                 </div>
-                <article
-                  class="message-bubble"
-                >
+                <article class="message-bubble">
                   <p v-if="message.body">{{ message.body }}</p>
-                  <button
-                    v-for="attachment in message.attachments"
-                    :key="attachment.id"
-                    type="button"
-                    class="attachment-card"
-                    @click="openAttachment(attachment.fileId)"
-                  >
-                    <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
-                    <span class="attachment-name">{{ attachment.name }}</span>
-                    <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
-                  </button>
+                  <template v-for="attachment in message.attachments" :key="attachment.id">
+                    <button
+                      v-if="attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
+                      type="button"
+                      class="inline-image"
+                      :aria-label="`View ${attachment.name}`"
+                      @click="openInlineImage(attachment)"
+                    >
+                      <img
+                        :src="attachment.thumbnailUrl"
+                        :alt="attachment.name"
+                        loading="lazy"
+                      />
+                    </button>
+                    <button
+                      v-else
+                      type="button"
+                      class="attachment-card"
+                      @click="openAttachment(attachment.fileId)"
+                    >
+                      <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
+                      <span class="attachment-name">{{ attachment.name }}</span>
+                      <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
+                    </button>
+                  </template>
                   <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
                 </article>
               </template>
@@ -425,7 +474,13 @@ watch(visibleMessages, () => {
             @input="autoGrow"
             @keydown.enter="onComposerKeydown"
           ></textarea>
-          <button class="send-btn" type="submit" aria-label="Send" :disabled="!draft.trim() || sending">
+          <button
+            class="send-btn"
+            type="submit"
+            aria-label="Send"
+            :class="{ active: Boolean(draft.trim()) }"
+            :disabled="!draft.trim() || sending"
+          >
             <Icon name="check" :size="18" />
           </button>
           <label class="sr-only" for="chat-attachment">Attachment</label>
@@ -457,6 +512,15 @@ watch(visibleMessages, () => {
       </button>
       <p v-if="!media.length" class="muted-hint">No shared photos or videos yet.</p>
     </aside>
+
+    <MediaLightbox
+      :open="lightboxOpen"
+      :name="lightboxName"
+      :mime-type="lightboxMime"
+      :url="lightboxUrl"
+      @download="downloadLightbox"
+      @close="lightboxOpen = false"
+    />
   </div>
 </template>
 
@@ -774,6 +838,30 @@ watch(visibleMessages, () => {
   font-size: 11px;
 }
 
+.inline-image {
+  display: block;
+  width: min(260px, 100%);
+  margin-top: var(--space-xs);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: zoom-in;
+  background: transparent;
+}
+
+.inline-image img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+.inline-image:focus-visible {
+  outline: 2px solid var(--on-ink, #ffffff);
+  outline-offset: 2px;
+}
+
 .day-separator {
   align-self: center;
   padding: var(--space-xxs) var(--space-md);
@@ -877,6 +965,15 @@ watch(visibleMessages, () => {
 .send-btn {
   background: var(--primary-cta, #111827);
   color: var(--on-ink, #ffffff);
+  opacity: 0.4;
+  transition:
+    opacity var(--duration-short) var(--ease-standard),
+    transform var(--duration-short) var(--ease-standard);
+}
+
+.send-btn.active {
+  opacity: 1;
+  transform: scale(1.04);
 }
 
 .media-panel {
