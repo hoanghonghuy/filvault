@@ -1,7 +1,9 @@
 GO ?= $(HOME)/.local/go/bin/go
 COMPOSE ?= docker compose
-DSN ?= postgres://filvault:filvault@127.0.0.1:5435/filvault?sslmode=disable
+FILVAULT_POSTGRES_PASSWORD ?= filvault
+DSN ?= postgres://filvault:$(FILVAULT_POSTGRES_PASSWORD)@127.0.0.1:5435/filvault?sslmode=disable
 export PATH := $(HOME)/.local/go/bin:$(PATH)
+export FILVAULT_POSTGRES_PASSWORD
 
 .PHONY: compose-up compose-down up down migrate migrate-down seed test run-api dev-api dev-web \
 	lint-api typecheck-api lint-web typecheck-web ci-api ci-web

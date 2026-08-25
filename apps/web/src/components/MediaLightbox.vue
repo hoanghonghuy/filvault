@@ -41,7 +41,14 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="page">
-      <dialog ref="dialogRef" class="lightbox" :aria-label="name" @close="emit('close')" @keydown.esc="emit('close')">
+      <dialog
+        v-show="open"
+        ref="dialogRef"
+        class="lightbox"
+        :aria-label="name"
+        @close="emit('close')"
+        @keydown.esc="emit('close')"
+      >
         <button class="lightbox-backdrop" type="button" :aria-label="t.closePreview" @click="emit('close')" />
         <div class="lightbox-panel">
           <div class="lightbox-bar">
