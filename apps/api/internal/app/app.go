@@ -1,8 +1,13 @@
 package app
 
 import (
+	"context"
+	"net/http"
+	"time"
+
 	"filvault/internal/activity"
 	"filvault/internal/auth"
+	"filvault/internal/chat"
 	"filvault/internal/file"
 	"filvault/internal/folder"
 	"filvault/internal/photo"
@@ -74,6 +79,10 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	shareLinkSvc := sharelink.NewService(shareLinkRepo, obj, activityRecorder)
 	shareLinkHandlers := sharelink.NewHandler(shareLinkSvc)
 
+	chatRepo := postgres.NewChatRepository(store)
+	chatSvc := chat.NewService(chatRepo, fileRepo, quota, obj)
+	chatHandlers := chat.NewHandler(chatSvc)
+
 	storageHandlers := storage.NewHandler(quota)
 
 	engine := gin.New()
@@ -82,6 +91,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	if len(cfg.CORSAllowedOrigins) > 0 {
 		engine.Use(httpx.CORS(cfg.CORSAllowedOrigins))
 	}
+	engine.GET("/healthz", healthz(pool))
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
 
@@ -95,6 +105,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	photoHandlers.RegisterRoutes(v1, storage...)
 	searchHandlers.RegisterRoutes(v1, storage...)
 	shareHandlers.RegisterRoutes(v1, storage...)
+	chatHandlers.RegisterRoutes(v1, storage...)
 	storageHandlers.RegisterRoutes(v1, storage...)
 	shareLinkHandlers.RegisterOwnerRoutes(v1, storage...)
 	activityHandlers.Register(engine, authHandlers.AuthRequired(), authHandlers.EmailVerifiedRequired())
@@ -103,6 +114,18 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	shareLinkHandlers.RegisterPublicRoutes(public)
 
 	return engine
+}
+
+func healthz(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	}
 }
 
 func NewTrashService(pool *pgxpool.Pool, obj objectstore.ObjectStore) *trash.Service {

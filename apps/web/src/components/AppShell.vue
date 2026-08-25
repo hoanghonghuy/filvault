@@ -10,24 +10,33 @@ import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
 import { HOME_PATH, PROFILE_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
 import { userInitials } from '@/lib/userInitials'
+import { useI18n } from '@/lib/i18n'
 
 const auth = useAuthStore()
 const route = useRoute()
 const storageBarRef = ref<InstanceType<typeof StorageBar> | null>(null)
+const { t } = useI18n()
 
 provide('reloadStorage', async () => {
   await storageBarRef.value?.reload()
 })
 
 const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
-const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
+const showShell = computed(() => auth.isAuthenticated && auth.isVerified && !route.meta.bare)
 const storageVisible = computed(() => showStorageBar(route.path))
 const avatarInitials = computed(() =>
   userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
 )
 const profileLabel = computed(
   () => `Open profile for ${auth.user?.displayName || auth.user?.email || 'account'}`,
-)</script>
+)
+const navLabels = computed(() => ({
+  '/files': t.value.navFiles,
+  '/photos': t.value.navPhotos,
+  '/trash': t.value.navTrash,
+  '/settings': t.value.navSettings,
+}))
+</script>
 
 <template>
   <ToastHost />
@@ -50,7 +59,7 @@ const profileLabel = computed(
         >
           <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="20" />
-          <span>{{ item.label }}</span>
+          <span>{{ navLabels[item.to] }}</span>
         </RouterLink>
       </nav>
       <div class="side-user">
@@ -95,7 +104,7 @@ const profileLabel = computed(
           <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="24" />
         </span>
-        <span class="bottom-label">{{ item.shortLabel }}</span>
+        <span class="bottom-label">{{ navLabels[item.to] }}</span>
       </RouterLink>
     </nav>
   </div>

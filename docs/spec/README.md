@@ -33,10 +33,12 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [10-phase-2-status.md](10-phase-2-status.md) | Checklist bàn giao Phase 2; S1 done → tiếp S2 |
 | [10-sharing.md](10-sharing.md) | Sharing (Phase 5): chia sẻ file/folder cho user khác; đã đồng bộ S5 (anti-probing, mail mời, activity, UI `/shared`) |
 | [11-versioning.md](11-versioning.md) | Versioning (Phase 6): lịch sử phiên bản file khi replace |
+| [11-chat-experience.md](11-chat-experience.md) | Spec đề xuất Chat kiểu Messenger; tách riêng Vault/Photos |
 | [decisions/0001-aws-first-provider-agnostic.md](decisions/0001-aws-first-provider-agnostic.md) | ADR: AWS-first, provider-agnostic |
 | [decisions/0002-phase-1-business.md](decisions/0002-phase-1-business.md) | ADR: nghiệp vụ Phase 1 |
 | [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md) | ADR: phạm vi tính năng Phase 2 (**Accepted**) |
 | [decisions/0004-public-share-link-security.md](decisions/0004-public-share-link-security.md) | ADR: bảo mật public share link S4 (**Accepted**) |
+| [decisions/0004-chat-separate-surface.md](decisions/0004-chat-separate-surface.md) | ADR đề xuất: Chat là surface riêng, media reuse storage |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web (Cal.com-like + teal, mobile-first; §9a Phase 2) |
 
 **Phase 1** đã có spec + implement (checklist: [08](08-phase-1-status.md)).  
@@ -45,6 +47,8 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 ## Chưa viết (đúng lúc)
 
 - Sync spec (CLI slice đầu đã có: [09-cli.md](09-cli.md); API/database sync chưa có)
+- ADR realtime chat (polling/SSE/WebSocket) — viết trước khi code Chat C4
+- Database/API cho versioning, sync
 - Terraform / RDS deploy spec
 - JobQueue + worker spec (Phase 3)
 - Tích hợp app khác (full API + API key/tenant) — sau khi sản phẩm Filvault hoàn chỉnh

@@ -442,6 +442,15 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 
 > **Trạng thái (2026-08-23): toàn bộ surface §9a đã implement** — S1 filter, S2 album cover, S3 favorites, S4 share link + public page, S5 shared-with-me + share user nội bộ, S6 activity log. Chi tiết hợp đồng: spec [09](docs/spec/09-phase-2-features.md), tiến độ [10](docs/spec/10-phase-2-status.md).
 
+### Chat (`/chat` — bare surface, spec 11)
+- **Surface riêng hoàn toàn**: không dùng shell Filvault (không bottom nav/side nav/header/storage bar). Route có `meta: { bare: true }`; `AppShell` bỏ chrome khi route bare. Truy cập trực tiếp bằng URL `/chat`.
+- Layout full-screen kiểu Messenger: rail hội thoại (trái) + thread (giữa) + media panel (phải, ≥1024px).
+- Mobile `<768`: master–detail — hiện rail HOẶC thread, không xếp dọc; nút Back (≥44px) quay lại rail.
+- Rail: header "Chats" + brand mark F (link về `/`) + input tạo chat mới + list conversation (avatar tròn chữ đầu, title truncate, ngày muted).
+- Thread: header avatar + title + Refresh; search pill; bubble ink đậm bo góc lớn (gửi bên phải); composer pill "Aa" + attach `+` + send ink.
+- Media panel: ảnh/video đã gửi trong chat (tên + ngày), click mở download — tách khỏi Photos timeline của Vault.
+- Touch targets ≥44px; focus ring accent 2px; safe-area top/bottom; motion theo token chung.
+
 ---
 
 ## 10. Agent Prompt Guide

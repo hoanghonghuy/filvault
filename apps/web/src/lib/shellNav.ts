@@ -25,6 +25,7 @@ export function pageTitleForRoute(path: string, routeName?: string | symbol | nu
   if (routeName === 'album') return 'Album'
   if (path === '/files' || path.startsWith('/files/')) return 'My Files'
   if (path === '/photos' || path.startsWith('/photos/')) return 'Photos'
+  if (path === '/chat' || path.startsWith('/chat/')) return 'Chat'
   if (path === '/trash') return 'Trash'
   if (path === '/shared') return 'Shared with me'
   if (path === '/settings') return 'Settings'

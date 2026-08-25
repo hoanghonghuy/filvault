@@ -127,6 +127,39 @@ export interface Timeline {
   nextBefore?: string
 }
 
+export interface ChatAttachment {
+  id: string
+  fileId: string
+  originalName: string
+  name: string
+  mimeType: string
+  sizeBytes: number
+  createdAt: string
+  thumbnailUrl?: string
+}
+
+export interface ChatMessage {
+  id: string
+  conversationId: string
+  body: string
+  createdAt: string
+  attachments: ChatAttachment[]
+}
+
+export interface ChatConversation {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  lastMessageAt?: string
+  preview?: {
+    messageId: string
+    body: string
+    createdAt: string
+    attachments: string[]
+  }
+}
+
 export interface Album {
   id: string
   name: string

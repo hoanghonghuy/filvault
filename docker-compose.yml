@@ -6,7 +6,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: filvault
-      POSTGRES_PASSWORD: filvault
+      POSTGRES_PASSWORD: ${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}
       POSTGRES_DB: filvault
     ports:
       - "5435:5432"
@@ -55,7 +55,7 @@ services:
     environment:
       FILVAULT_METADATA_STORE: postgres
       FILVAULT_OBJECT_STORE: s3
-      FILVAULT_DATABASE_URL: postgres://filvault:filvault@postgres:5432/filvault?sslmode=disable
+      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}@postgres:5432/filvault?sslmode=disable
       FILVAULT_S3_ENDPOINT: http://minio:9000
       FILVAULT_S3_PUBLIC_ENDPOINT: http://localhost:9002
       FILVAULT_S3_BUCKET: filvault
@@ -78,6 +78,11 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
 
   web:
