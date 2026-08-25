@@ -110,6 +110,53 @@ func TestChat_ImageAttachmentAppearsInPhotos(t *testing.T) {
 	}
 }
 
+func TestChat_SearchMessagesAndMediaGallery(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Search"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token, map[string]any{"body": "alpha plain"})
+	postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token, map[string]any{"body": "family sunset memory"})
+
+	code, body := getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages/search?q=sunset", token)
+	if code != http.StatusOK {
+		t.Fatalf("search status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "family sunset memory") || strings.Contains(body, "alpha plain") {
+		t.Fatalf("search result mismatch: %s", body)
+	}
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conv.ID,
+		"name":           "gallery-sunset.jpg",
+		"size":           256,
+		"contentType":    "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 256, ContentType: "image/jpeg"})
+	postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{"conversationId": conv.ID})
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/media", token)
+	if code != http.StatusOK {
+		t.Fatalf("media status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "gallery-sunset.jpg") || !strings.Contains(body, "image/jpeg") {
+		t.Fatalf("media gallery mismatch: %s", body)
+	}
+}
+
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

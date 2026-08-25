@@ -5,7 +5,7 @@ import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import type { ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
+import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const ui = useUiStore()
 
@@ -13,6 +13,9 @@ const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>(null)
 const messages = ref<ChatMessage[]>([])
 const draft = ref('')
+const searchQuery = ref('')
+const searchResults = ref<ChatMessage[] | null>(null)
+const media = ref<ChatAttachment[]>([])
 const newTitle = ref('')
 const loading = ref(false)
 const sending = ref(false)
@@ -30,6 +33,7 @@ async function loadConversations() {
     if (!selectedId.value && out.conversations[0]) {
       selectedId.value = out.conversations[0].id
       await loadMessages(out.conversations[0].id)
+      await loadMedia(out.conversations[0].id)
     }
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load chats')
@@ -56,7 +60,10 @@ async function createConversation() {
 
 async function selectConversation(id: string) {
   selectedId.value = id
+  searchQuery.value = ''
+  searchResults.value = null
   await loadMessages(id)
+  await loadMedia(id)
 }
 
 async function loadMessages(id = selectedId.value) {
@@ -70,6 +77,31 @@ async function loadMessages(id = selectedId.value) {
   }
 }
 
+async function searchMessages() {
+  if (!selectedId.value || searchQuery.value.trim().length < 2) {
+    searchResults.value = null
+    return
+  }
+  error.value = ''
+  try {
+    const q = encodeURIComponent(searchQuery.value.trim())
+    const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${selectedId.value}/messages/search?q=${q}`)
+    searchResults.value = out.messages
+  } catch (e) {
+    error.value = formatApiError(e, 'Search failed')
+  }
+}
+
+async function loadMedia(id = selectedId.value) {
+  if (!id) return
+  try {
+    const out = await api<{ media: ChatAttachment[] }>(`/chat/conversations/${id}/media`)
+    media.value = out.media
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to load media')
+  }
+}
+
 async function sendText() {
   if (!selectedId.value || !draft.value.trim()) return
   sending.value = true
@@ -80,6 +112,7 @@ async function sendText() {
       body: JSON.stringify({ body: draft.value.trim() }),
     })
     messages.value = [...messages.value, message]
+    searchResults.value = null
     draft.value = ''
     await loadConversations()
     selectedId.value = message.conversationId
@@ -117,6 +150,8 @@ async function onAttachmentChange(event: Event) {
       body: JSON.stringify({ conversationId: selectedId.value, body: draft.value.trim() }),
     })
     messages.value = [...messages.value, message]
+    searchResults.value = null
+    await loadMedia()
     draft.value = ''
     ui.showToast('Attachment sent')
   } catch (e) {
@@ -168,8 +203,15 @@ onMounted(loadConversations)
           <button class="btn ghost" type="button" :disabled="!selectedId" @click="loadMessages()">Refresh</button>
         </header>
 
-        <div v-if="messages.length" class="message-list">
-          <article v-for="message in messages" :key="message.id" class="message-bubble">
+        <form class="chat-search" @submit.prevent="searchMessages">
+          <label class="sr-only" for="chat-search">Search messages</label>
+          <input id="chat-search" v-model="searchQuery" type="search" placeholder="Search messages" :disabled="!selectedId" />
+          <button class="btn ghost" type="submit" :disabled="!selectedId || searchQuery.trim().length < 2">Search</button>
+          <button v-if="searchResults" class="btn ghost" type="button" @click="searchResults = null">Clear</button>
+        </form>
+
+        <div v-if="(searchResults ?? messages).length" class="message-list">
+          <article v-for="message in searchResults ?? messages" :key="message.id" class="message-bubble">
             <p v-if="message.body">{{ message.body }}</p>
             <button
               v-for="attachment in message.attachments"
@@ -197,6 +239,22 @@ onMounted(loadConversations)
           <input id="chat-attachment" ref="fileInputRef" type="file" class="sr-only" @change="onAttachmentChange" />
         </form>
       </section>
+
+      <aside class="chat-media-panel" aria-label="Conversation media">
+        <h2>Media</h2>
+        <button
+          v-for="item in media"
+          :key="item.id"
+          type="button"
+          class="media-card"
+          @click="openAttachment(item.fileId)"
+        >
+          <Icon :name="item.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
+          <span>{{ item.name }}</span>
+          <small>{{ new Date(item.createdAt).toLocaleDateString() }}</small>
+        </button>
+        <p v-if="!media.length" class="muted">No shared photos or videos yet.</p>
+      </aside>
     </div>
   </div>
 </template>
@@ -282,6 +340,18 @@ onMounted(loadConversations)
   border-bottom: 1px solid var(--hairline);
 }
 
+.chat-search {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.chat-search input {
+  min-width: 0;
+  flex: 1;
+}
+
 .thread-header h2 {
   margin: 0;
   color: var(--ink);
@@ -341,13 +411,56 @@ onMounted(loadConversations)
   resize: vertical;
 }
 
+.chat-media-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  background: var(--canvas);
+}
+
+.chat-media-panel h2 {
+  margin: 0 0 var(--space-xs);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.media-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-xxs) var(--space-xs);
+  align-items: center;
+  padding: var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.media-card span,
+.media-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-card small {
+  grid-column: 2;
+  color: var(--muted);
+}
+
 .desktop-only {
   display: none;
 }
 
 @media (min-width: 900px) {
   .chat-layout {
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr) 220px;
   }
 
   .desktop-only {

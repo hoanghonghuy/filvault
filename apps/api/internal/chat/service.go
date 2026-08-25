@@ -20,7 +20,9 @@ type Repository interface {
 	GetConversation(ctx context.Context, ownerID, id string) (*Conversation, error)
 	CreateMessage(ctx context.Context, m Message) error
 	ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]Message, error)
+	SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]Message, error)
 	CreateAttachment(ctx context.Context, a Attachment) error
+	ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error)
 }
 
 type Service struct {
@@ -96,6 +98,30 @@ func (s *Service) ListMessages(ctx context.Context, ownerID, conversationID stri
 		limit = 50
 	}
 	return s.repo.ListMessages(ctx, ownerID, conversationID, limit)
+}
+
+func (s *Service) SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]Message, error) {
+	query = strings.TrimSpace(query)
+	if len(query) < 2 || len(query) > 100 {
+		return nil, apperr.Validation
+	}
+	if err := s.ensureConversation(ctx, ownerID, conversationID); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return s.repo.SearchMessages(ctx, ownerID, conversationID, query, limit)
+}
+
+func (s *Service) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error) {
+	if err := s.ensureConversation(ctx, ownerID, conversationID); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return s.repo.ListMedia(ctx, ownerID, conversationID, limit)
 }
 
 func (s *Service) CreateAttachmentSession(ctx context.Context, ownerID, conversationID, name, contentType string, size int64) (UploadSession, error) {

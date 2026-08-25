@@ -37,4 +37,11 @@ describe('chat surface contract', () => {
     expect(types).toMatch(/export interface ChatMessage/)
     expect(types).toMatch(/export interface ChatAttachment/)
   })
+
+  it('adds message search and a conversation media panel', () => {
+    expect(chat).toMatch(/class="chat-search"/)
+    expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/messages\/search/)
+    expect(chat).toMatch(/class="chat-media-panel"/)
+    expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/media/)
+  })
 })

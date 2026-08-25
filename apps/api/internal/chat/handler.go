@@ -26,6 +26,8 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.POST("/chat/conversations", append(middleware, h.createConversation)...)
 	g.GET("/chat/conversations/:id/messages", append(middleware, h.listMessages)...)
 	g.POST("/chat/conversations/:id/messages", append(middleware, h.createMessage)...)
+	g.GET("/chat/conversations/:id/messages/search", append(middleware, h.searchMessages)...)
+	g.GET("/chat/conversations/:id/media", append(middleware, h.listMedia)...)
 	g.POST("/chat/attachments/upload-sessions", append(middleware, h.createAttachmentSession)...)
 	g.POST("/chat/attachments/:fileId/complete", append(middleware, h.completeAttachment)...)
 }
@@ -139,6 +141,58 @@ func (h *Handler) listMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"messages": out})
 }
 
+func (h *Handler) searchMessages(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	limit, ok := queryLimit(c)
+	if !ok {
+		return
+	}
+	list, err := h.svc.SearchMessages(c.Request.Context(), userID, conversationID, c.Query("q"), limit)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	out := make([]gin.H, 0, len(list))
+	for _, m := range list {
+		out = append(out, publicMessage(m))
+	}
+	c.JSON(http.StatusOK, gin.H{"messages": out})
+}
+
+func (h *Handler) listMedia(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	limit, ok := queryLimit(c)
+	if !ok {
+		return
+	}
+	list, err := h.svc.ListMedia(c.Request.Context(), userID, conversationID, limit)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	out := make([]gin.H, 0, len(list))
+	for _, a := range list {
+		out = append(out, publicAttachment(a))
+	}
+	c.JSON(http.StatusOK, gin.H{"media": out})
+}
+
 type attachmentSessionReq struct {
 	ConversationID string `json:"conversationId"`
 	Name           string `json:"name"`
@@ -217,15 +271,7 @@ func publicConversation(c Conversation) gin.H {
 func publicMessage(m Message) gin.H {
 	attachments := make([]gin.H, 0, len(m.Attachments))
 	for _, a := range m.Attachments {
-		attachments = append(attachments, gin.H{
-			"id":           a.ID,
-			"fileId":       a.FileID,
-			"originalName": a.OriginalName,
-			"name":         a.Name,
-			"mimeType":     a.MimeType,
-			"sizeBytes":    a.SizeBytes,
-			"createdAt":    a.CreatedAt.UTC().Format(time.RFC3339Nano),
-		})
+		attachments = append(attachments, publicAttachment(a))
 	}
 	return gin.H{
 		"id":             m.ID,
@@ -234,4 +280,29 @@ func publicMessage(m Message) gin.H {
 		"createdAt":      m.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"attachments":    attachments,
 	}
+}
+
+func publicAttachment(a Attachment) gin.H {
+	return gin.H{
+		"id":           a.ID,
+		"fileId":       a.FileID,
+		"originalName": a.OriginalName,
+		"name":         a.Name,
+		"mimeType":     a.MimeType,
+		"sizeBytes":    a.SizeBytes,
+		"createdAt":    a.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func queryLimit(c *gin.Context) (int, bool) {
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			httpx.Validation(c)
+			return 0, false
+		}
+		limit = n
+	}
+	return limit, true
 }

@@ -111,6 +111,72 @@ func (s *Store) ListMessages(ctx context.Context, ownerID, conversationID string
 	return out, nil
 }
 
+func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]chat.Message, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, conversation_id, owner_id, body, created_at
+		FROM messages
+		WHERE owner_id = $1
+			AND conversation_id = $2
+			AND deleted_at IS NULL
+			AND body ILIKE '%' || $3 || '%'
+		ORDER BY created_at DESC
+		LIMIT $4
+	`, ownerID, conversationID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []chat.Message
+	for rows.Next() {
+		var m chat.Message
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		attachments, err := s.listMessageAttachments(ctx, out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Attachments = attachments
+	}
+	return out, nil
+}
+
+func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT a.id, a.message_id, a.file_id, a.original_name, f.name, f.mime_type, f.size_bytes, a.created_at
+		FROM message_attachments a
+		JOIN messages m ON m.id = a.message_id
+		JOIN files f ON f.id = a.file_id
+		WHERE m.owner_id = $1
+			AND m.conversation_id = $2
+			AND m.deleted_at IS NULL
+			AND f.deleted_at IS NULL
+			AND f.status = 'READY'
+			AND (f.mime_type LIKE 'image/%' OR f.mime_type LIKE 'video/%')
+		ORDER BY a.created_at DESC
+		LIMIT $3
+	`, ownerID, conversationID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []chat.Attachment
+	for rows.Next() {
+		var a chat.Attachment
+		if err := rows.Scan(&a.ID, &a.MessageID, &a.FileID, &a.OriginalName, &a.Name, &a.MimeType, &a.SizeBytes, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) listMessageAttachments(ctx context.Context, messageID string) ([]chat.Attachment, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT a.id, a.message_id, a.file_id, a.original_name, f.name, f.mime_type, f.size_bytes, a.created_at
@@ -162,8 +228,16 @@ func (r chatRepo) ListMessages(ctx context.Context, ownerID, conversationID stri
 	return r.store.ListMessages(ctx, ownerID, conversationID, limit)
 }
 
+func (r chatRepo) SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]chat.Message, error) {
+	return r.store.SearchMessages(ctx, ownerID, conversationID, query, limit)
+}
+
 func (r chatRepo) CreateAttachment(ctx context.Context, a chat.Attachment) error {
 	return r.store.CreateAttachment(ctx, a)
+}
+
+func (r chatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
+	return r.store.ListMedia(ctx, ownerID, conversationID, limit)
 }
 
 var _ chat.Repository = chatRepo{}
