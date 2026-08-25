@@ -17,7 +17,7 @@ function onClose() {
 </script>
 
 <template>
-  <BottomSheet :open="actionSheetState.open" :title="actionSheetState.title" @close="onClose">
+  <BottomSheet :open="actionSheetState.open" :title="actionSheetState.title" @close="onClose" @after-leave="ui.notifyActionSheetAfterLeave()">
     <div class="actions">
       <button
         v-for="item in actionSheetState.items"

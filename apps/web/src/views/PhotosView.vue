@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
@@ -87,6 +87,7 @@ async function openAlbumActions(album: Album) {
     { id: 'rename', label: 'Rename', icon: 'pencil' },
     { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
   ])
+  if (!action) return
   if (action === 'open') await router.push(`/photos/albums/${album.id}`)
   if (action === 'rename') await renameAlbum(album)
   if (action === 'delete') await deleteAlbum(album.id, album.name)
@@ -177,6 +178,10 @@ async function downloadMedia() {
 }
 
 onMounted(load)
+
+onBeforeUnmount(() => {
+  mediaOpen.value = false
+})
 </script>
 
 <template>

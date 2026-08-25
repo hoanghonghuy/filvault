@@ -59,7 +59,11 @@ export const useUiStore = defineStore('ui', () => {
     open: false,
     items: [],
   })
-  let actionSheetResolve: ((id: string | null) => void) | null = null
+  // Resolver for the sheet currently on screen.
+  let actionSheetActiveResolve: ((id: string | null) => void) | null = null
+  // Selection is held here until the sheet's leave transition has finished,
+  // so every caller resumes only when the screen is clear for the next dialog.
+  let actionSheetClosing: { id: string | null; resolve: (value: string | null) => void } | null = null
 
   function showToast(message: string, type: 'success' | 'error' | 'info' = 'info', durationMs = 3000) {
     toastMessage.value = message
@@ -110,16 +114,40 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function openActionSheet(title: string | undefined, items: ActionSheetItem[]): Promise<string | null> {
+    // Opening over a visible sheet swaps content in place: no leave transition
+    // fires, so the replaced caller settles immediately with null.
+    if (actionSheetActiveResolve !== null) {
+      const replaced = actionSheetActiveResolve
+      actionSheetActiveResolve = null
+      replaced(null)
+    }
+    // Re-opening mid-leave cancels that leave (after-leave never fires),
+    // so settle the closing caller here as well to avoid a hang.
+    if (actionSheetClosing !== null) {
+      const closing = actionSheetClosing
+      actionSheetClosing = null
+      closing.resolve(closing.id)
+    }
     return new Promise((resolve) => {
-      actionSheetResolve = resolve
+      actionSheetActiveResolve = resolve
       actionSheetState.value = { open: true, title, items }
     })
   }
 
   function resolveActionSheet(id: string | null) {
+    if (actionSheetActiveResolve === null) return
+    const resolve = actionSheetActiveResolve
+    actionSheetActiveResolve = null
     actionSheetState.value = { ...actionSheetState.value, open: false }
-    actionSheetResolve?.(id)
-    actionSheetResolve = null
+    // Hold the result until the leave transition reports completion.
+    actionSheetClosing = { id: id ?? null, resolve }
+  }
+
+  function notifyActionSheetAfterLeave() {
+    if (actionSheetClosing === null) return
+    const closing = actionSheetClosing
+    actionSheetClosing = null
+    closing.resolve(closing.id)
   }
 
   return {
@@ -135,5 +163,6 @@ export const useUiStore = defineStore('ui', () => {
     resolvePrompt,
     openActionSheet,
     resolveActionSheet,
+    notifyActionSheetAfterLeave,
   }
 })

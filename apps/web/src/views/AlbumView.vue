@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
@@ -77,6 +77,7 @@ async function openAlbumMenu() {
     { id: 'rename', label: 'Rename album', icon: 'pencil' },
     { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
   ])
+  if (!action) return
   if (action === 'add') pickerOpen.value = true
   if (action === 'rename') await renameAlbum()
   if (action === 'delete') await deleteAlbum()
@@ -147,6 +148,7 @@ async function openItemActions(item: TimelineItem) {
       : { id: 'set-cover', label: 'Set cover', icon: 'image' },
     { id: 'remove', label: 'Remove from album', icon: 'trash', danger: true },
   ])
+  if (!action) return
   if (action === 'view') {
     mediaItem.value = item
     mediaOpen.value = true
@@ -220,6 +222,11 @@ async function downloadMedia() {
 }
 
 watch(() => route.params.id, load, { immediate: true })
+
+onBeforeUnmount(() => {
+  mediaOpen.value = false
+  pickerOpen.value = false
+})
 </script>
 
 <template>

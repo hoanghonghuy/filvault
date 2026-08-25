@@ -1,3 +1,11 @@
+<script lang="ts">
+// Shared across all mounted BottomSheet instances: Escape (and focus trap)
+// must only affect the topmost open sheet, not every open sheet at once.
+const openSheets: number[] = []
+let sheetCounter = 0
+let lockedCount = 0
+</script>
+
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, useId, watch } from 'vue'
 
@@ -8,17 +16,25 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  'after-leave': []
 }>()
 
 const titleId = useId()
 const panelRef = ref<HTMLElement | null>(null)
+const sheetId = sheetCounter++
 let previousFocus: HTMLElement | null = null
+let released = true
 
 function onBackdropClick() {
   emit('close')
 }
 
+function isTopSheet() {
+  return openSheets[openSheets.length - 1] === sheetId
+}
+
 function onKeydown(event: KeyboardEvent) {
+  if (!isTopSheet()) return
   if (event.key === 'Escape') {
     event.preventDefault()
     emit('close')
@@ -52,20 +68,41 @@ function trapFocus(event: KeyboardEvent) {
   }
 }
 
+function lockPage() {
+  if (!released) return
+  released = false
+  openSheets.push(sheetId)
+  if (lockedCount === 0) document.body.style.overflow = 'hidden'
+  lockedCount++
+  previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  document.addEventListener('keydown', onKeydown)
+}
+
 function unlockPage() {
-  document.body.style.overflow = ''
+  if (released) return
+  released = true
+  const idx = openSheets.indexOf(sheetId)
+  if (idx !== -1) openSheets.splice(idx, 1)
+  lockedCount--
+  if (lockedCount <= 0) {
+    lockedCount = 0
+    document.body.style.overflow = ''
+  }
   document.removeEventListener('keydown', onKeydown)
   previousFocus?.focus()
   previousFocus = null
+}
+
+function onAfterLeave() {
+  unlockPage()
+  emit('after-leave')
 }
 
 watch(
   () => props.open,
   async (open) => {
     if (open) {
-      previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      document.body.style.overflow = 'hidden'
-      document.addEventListener('keydown', onKeydown)
+      lockPage()
       await nextTick()
       panelRef.value?.focus()
     }
@@ -78,7 +115,7 @@ onUnmounted(unlockPage)
 
 <template>
   <Teleport to="body">
-    <Transition name="sheet" @after-leave="unlockPage">
+    <Transition name="sheet" @after-leave="onAfterLeave">
       <div v-if="open" class="sheet-root" role="presentation">
         <div class="sheet-backdrop" @click="onBackdropClick" />
         <div
