@@ -1,0 +1,234 @@
+package chat_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"filvault/internal/app"
+	"filvault/internal/file"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/mailer"
+	"filvault/internal/platform/objectstore"
+	"filvault/internal/platform/postgres"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestMain(m *testing.M) {
+	gin.SetMode(gin.TestMode)
+	os.Exit(m.Run())
+}
+
+func TestChat_CreateConversationAndTextMessage(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	code, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Family"})
+	if code != http.StatusCreated {
+		t.Fatalf("create conversation status=%d body=%s", code, body)
+	}
+	var conv struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+	decodeJSON(t, body, &conv)
+	if conv.ID == "" || conv.Title != "Family" {
+		t.Fatalf("conversation mismatch: %+v body=%s", conv, body)
+	}
+
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token, map[string]any{
+		"body": "hello chat",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("create message status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "hello chat") {
+		t.Fatalf("message body missing: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token)
+	if code != http.StatusOK {
+		t.Fatalf("list messages status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "hello chat") {
+		t.Fatalf("listed message missing: %s", body)
+	}
+}
+
+func TestChat_ImageAttachmentAppearsInPhotos(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Images"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conv.ID,
+		"name":           "chat-sunset.jpg",
+		"size":           128,
+		"contentType":    "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 128, ContentType: "image/jpeg"})
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conv.ID,
+		"body":           "sent from chat",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "chat-sunset.jpg") {
+		t.Fatalf("attachment name missing: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/photos/timeline", token)
+	if code != http.StatusOK {
+		t.Fatalf("timeline status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, "chat-sunset.jpg") {
+		t.Fatalf("chat image must appear in Photos timeline: %s", body)
+	}
+}
+
+func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	t.Cleanup(cancel)
+	url := os.Getenv("FILVAULT_DATABASE_URL")
+	if url == "" {
+		t.Fatal("FILVAULT_DATABASE_URL is required")
+	}
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatalf("pgxpool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	if err := pool.Ping(ctx); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+	if err := postgres.Migrate(ctx, pool); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	mem := mailer.NewMemory()
+	objs := objectstore.NewMemory()
+	engine := app.NewWithDeps(config.Config{
+		InviteCode:                "secret-invite",
+		JWTSecret:                 "test-jwt-secret-not-for-prod",
+		DefaultTrashAutoDelete:    false,
+		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
+		MetadataStore:             "postgres",
+	}, pool, mem, objs)
+	return engine, mem, objs
+}
+
+func decodeUserID(t *testing.T, engine http.Handler, token string) string {
+	t.Helper()
+	code, body := getAuth(t, engine, "/api/v1/users/me", token)
+	if code != http.StatusOK {
+		t.Fatalf("me status=%d body=%s", code, body)
+	}
+	var me struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &me)
+	return me.ID
+}
+
+func registerVerified(t *testing.T, engine http.Handler, mem *mailer.Memory, email string) string {
+	t.Helper()
+	code, _ := postJSON(t, engine, "/api/v1/auth/register", map[string]any{
+		"email":       email,
+		"password":    "password1",
+		"displayName": "User",
+		"inviteCode":  "secret-invite",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("register status=%d", code)
+	}
+	code, _ = postJSON(t, engine, "/api/v1/auth/resend-verification", map[string]any{"email": email})
+	if code != http.StatusNoContent {
+		t.Fatalf("resend status=%d", code)
+	}
+	code, _ = postJSON(t, engine, "/api/v1/auth/verify-email", map[string]any{
+		"email": email,
+		"code":  mem.LastCode(email),
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("verify status=%d", code)
+	}
+	code, body := postJSON(t, engine, "/api/v1/auth/login", map[string]any{
+		"email":    email,
+		"password": "password1",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("login status=%d body=%s", code, body)
+	}
+	var login struct {
+		AccessToken string `json:"accessToken"`
+	}
+	decodeJSON(t, body, &login)
+	return login.AccessToken
+}
+
+func uniqueEmail() string {
+	return fmt.Sprintf("chat-%d@example.com", time.Now().UnixNano())
+}
+
+func decodeJSON(t *testing.T, body string, v any) {
+	t.Helper()
+	if err := json.Unmarshal([]byte(body), v); err != nil {
+		t.Fatalf("json: %v body=%s", err, body)
+	}
+}
+
+func doJSON(t *testing.T, engine http.Handler, method, path, token string, payload map[string]any) (int, string) {
+	t.Helper()
+	var body []byte
+	if payload != nil {
+		var err error
+		body, err = json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+	}
+	req := httptest.NewRequest(method, path, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	return rec.Code, rec.Body.String()
+}
+
+func postJSON(t *testing.T, engine http.Handler, path string, payload map[string]any) (int, string) {
+	return doJSON(t, engine, http.MethodPost, path, "", payload)
+}
+
+func postAuth(t *testing.T, engine http.Handler, path, token string, payload map[string]any) (int, string) {
+	return doJSON(t, engine, http.MethodPost, path, token, payload)
+}
+
+func getAuth(t *testing.T, engine http.Handler, path, token string) (int, string) {
+	return doJSON(t, engine, http.MethodGet, path, token, nil)
+}

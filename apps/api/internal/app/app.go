@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"filvault/internal/auth"
+	"filvault/internal/chat"
 	"filvault/internal/file"
 	"filvault/internal/folder"
 	"filvault/internal/photo"
@@ -61,6 +62,10 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	searchSvc := search.NewService(searchRepo)
 	searchHandlers := search.NewHandler(searchSvc)
 
+	chatRepo := postgres.NewChatRepository(store)
+	chatSvc := chat.NewService(chatRepo, fileRepo, quota, obj)
+	chatHandlers := chat.NewHandler(chatSvc)
+
 	storageHandlers := storage.NewHandler(quota)
 
 	engine := gin.New()
@@ -82,6 +87,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	trashHandlers.RegisterRoutes(v1, storage...)
 	photoHandlers.RegisterRoutes(v1, storage...)
 	searchHandlers.RegisterRoutes(v1, storage...)
+	chatHandlers.RegisterRoutes(v1, storage...)
 	storageHandlers.RegisterRoutes(v1, storage...)
 
 	return engine

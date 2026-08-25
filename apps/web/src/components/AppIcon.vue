@@ -46,6 +46,7 @@ const icons: Record<string, string[]> = {
   restore: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 3'],
   filter: ['M4 5h16l-6.5 7.5V19l-3-1.5v-5z'],
   close: ['M18 6 6 18', 'M6 6l12 12'],
+  chat: ['M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z'],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.file)

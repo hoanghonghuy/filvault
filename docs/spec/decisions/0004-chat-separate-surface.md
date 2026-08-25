@@ -1,6 +1,6 @@
 # ADR 0004 — Chat là surface riêng, media reuse storage
 
-- Trạng thái: **Proposed**
+- Trạng thái: **Accepted**
 - Ngày: 2026-08-25
 - Spec: [../11-chat-experience.md](../11-chat-experience.md)
 

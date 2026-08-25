@@ -1,6 +1,6 @@
 # 11 — Spec trải nghiệm Chat (Messenger-like)
 
-Trạng thái: **Proposed**. Đây là một **product surface riêng** sau Phase 2 web features. Không thay thế Files/Vault hoặc Photos.
+Trạng thái: **Accepted / C1-C3 MVP implemented**. Đây là một **product surface riêng** sau Phase 2 web features. Không thay thế Files/Vault hoặc Photos.
 
 Nguồn nền: spec 03 (schema), spec 04 (API), spec 05 (architecture), spec 09 (Phase 2 web), `DESIGN.md`.
 
@@ -31,9 +31,9 @@ Một file ảnh gửi qua Chat có **hai mặt**:
 
 | Slice | Nội dung | Ghi chú |
 |---|---|---|
-| C1 | Chat shell + conversation list + message list text-only | chưa realtime; polling hoặc manual refresh |
-| C2 | Gửi ảnh/file attachment bằng upload flow hiện có | reuse upload session/object store |
-| C3 | Attachment media xuất hiện trong Photos + metadata chat | không trộn UI |
+| C1 | Chat shell + conversation list + message list text-only | Done: `/chat`, conversation/message API, manual refresh |
+| C2 | Gửi ảnh/file attachment bằng upload flow hiện có | Done: reuse upload session/object store |
+| C3 | Attachment media xuất hiện trong Photos + metadata chat | Done ở mức MVP: file chat là `READY` media nên vào Photos timeline |
 | C4 | Realtime nhẹ (SSE hoặc WebSocket) | ADR riêng trước khi chọn |
 | C5 | Search trong chat + media gallery theo conversation | sau khi C1–C3 ổn |
 

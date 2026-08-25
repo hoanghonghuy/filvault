@@ -19,6 +19,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: () => import('@/views/OverviewView.vue'), meta: { auth: true, verified: true } },
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
+    { path: '/chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true } },
     {
       path: '/photos/albums/:id',
       name: 'album',

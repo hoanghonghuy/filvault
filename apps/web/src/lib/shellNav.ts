@@ -8,6 +8,7 @@ export const RECENT_PHOTO_LIMIT = 6
 export const SHELL_NAV = [
   { to: '/files', label: 'Files', shortLabel: 'Files', icon: 'folder' },
   { to: '/photos', label: 'Photos', shortLabel: 'Photos', icon: 'photos' },
+  { to: '/chat', label: 'Chat', shortLabel: 'Chat', icon: 'chat' },
   { to: '/trash', label: 'Trash', shortLabel: 'Trash', icon: 'trash' },
   { to: '/settings', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
 ] as const
@@ -23,6 +24,7 @@ export function pageTitleForRoute(path: string, routeName?: string | symbol | nu
   if (routeName === 'album') return 'Album'
   if (path === '/files' || path.startsWith('/files/')) return 'My Files'
   if (path === '/photos' || path.startsWith('/photos/')) return 'Photos'
+  if (path === '/chat' || path.startsWith('/chat/')) return 'Chat'
   if (path === '/trash') return 'Trash'
   if (path === '/settings') return 'Settings'
   return 'Filvault'

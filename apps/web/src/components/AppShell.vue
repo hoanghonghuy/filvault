@@ -26,6 +26,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
 const navLabels = computed(() => ({
   '/files': t.value.navFiles,
   '/photos': t.value.navPhotos,
+  '/chat': t.value.navChat,
   '/trash': t.value.navTrash,
   '/settings': t.value.navSettings,
 }))
