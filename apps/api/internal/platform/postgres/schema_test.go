@@ -35,7 +35,7 @@ func TestMigrate_CreatesPhase1Tables(t *testing.T) {
 
 func assertChatAttachmentLifecycle(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	var hasSource, hasCompletedMessage, hasDisplayName, hasNullableFileID bool
+	var hasSource, hasCompletedMessage, hasDisplayName, hasMimeType, hasSizeBytes, hasNullableFileID, hasPurgeJobs bool
 	if err := pool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM information_schema.columns
@@ -61,14 +61,33 @@ func assertChatAttachmentLifecycle(t *testing.T, ctx context.Context, pool *pgxp
 		t.Fatalf("check attachment snapshot: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'message_attachments' AND column_name = 'mime_type'
+		)
+	`).Scan(&hasMimeType); err != nil {
+		t.Fatalf("check attachment mime snapshot: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'message_attachments' AND column_name = 'size_bytes'
+		)
+	`).Scan(&hasSizeBytes); err != nil {
+		t.Fatalf("check attachment size snapshot: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
 		SELECT is_nullable = 'YES'
 		FROM information_schema.columns
 		WHERE table_name = 'message_attachments' AND column_name = 'file_id'
 	`).Scan(&hasNullableFileID); err != nil {
 		t.Fatalf("check nullable attachment file: %v", err)
 	}
-	if !hasSource || !hasCompletedMessage || !hasDisplayName || !hasNullableFileID {
-		t.Fatalf("chat attachment lifecycle schema incomplete: source=%v completedMessage=%v displayName=%v nullableFileID=%v", hasSource, hasCompletedMessage, hasDisplayName, hasNullableFileID)
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('file_purge_jobs') IS NOT NULL`).Scan(&hasPurgeJobs); err != nil {
+		t.Fatalf("check file purge jobs: %v", err)
+	}
+	if !hasSource || !hasCompletedMessage || !hasDisplayName || !hasMimeType || !hasSizeBytes || !hasNullableFileID || !hasPurgeJobs {
+		t.Fatalf("chat attachment lifecycle schema incomplete: source=%v completedMessage=%v displayName=%v mimeType=%v sizeBytes=%v nullableFileID=%v purgeJobs=%v", hasSource, hasCompletedMessage, hasDisplayName, hasMimeType, hasSizeBytes, hasNullableFileID, hasPurgeJobs)
 	}
 }
 

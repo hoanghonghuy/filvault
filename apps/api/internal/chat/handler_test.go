@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -391,6 +392,74 @@ func TestChat_CompleteAttachmentIsIdempotent(t *testing.T) {
 	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=50", token)
 	if code != http.StatusOK || strings.Count(body, `"conversationId"`) != 1 {
 		t.Fatalf("retry should leave one message: status=%d body=%s", code, body)
+	}
+}
+
+func TestChat_ConcurrentCompleteCreatesOneMessage(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Concurrent"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conv.ID,
+		"name":           "concurrent.jpg",
+		"size":           128,
+		"contentType":    "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 128, ContentType: "image/jpeg"})
+
+	type result struct {
+		code int
+		body string
+	}
+	results := make(chan result, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			code, body := postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+				"conversationId": conv.ID,
+				"body":           "one logical message",
+			})
+			results <- result{code: code, body: body}
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	var messageID string
+	for result := range results {
+		if result.code != http.StatusCreated {
+			t.Fatalf("concurrent complete status=%d body=%s", result.code, result.body)
+		}
+		var message struct {
+			ID string `json:"id"`
+		}
+		decodeJSON(t, result.body, &message)
+		if messageID == "" {
+			messageID = message.ID
+		} else if message.ID != messageID {
+			t.Fatalf("concurrent complete created different messages: %s and %s", messageID, message.ID)
+		}
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=50", token)
+	if code != http.StatusOK || strings.Count(body, `"conversationId"`) != 1 {
+		t.Fatalf("concurrent complete should leave one message: status=%d body=%s", code, body)
 	}
 }
 

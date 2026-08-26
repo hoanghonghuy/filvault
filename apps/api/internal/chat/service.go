@@ -272,12 +272,15 @@ func (s *Service) CompleteAttachment(ctx context.Context, ownerID, conversationI
 	if f.Status == file.StatusPending && f.UploadExpiresAt != nil && !now.Before(*f.UploadExpiresAt) {
 		return Message{}, apperr.UploadExpired
 	}
-	stat, err := s.objects.Head(ctx, f.ObjectKey)
-	if err != nil {
-		if errors.Is(err, objectstore.ErrObjectNotFound) {
-			return Message{}, apperr.UploadExpired
+	var stat objectstore.ObjectStat
+	if f.Status == file.StatusPending {
+		stat, err = s.objects.Head(ctx, f.ObjectKey)
+		if err != nil {
+			if errors.Is(err, objectstore.ErrObjectNotFound) {
+				return Message{}, apperr.UploadExpired
+			}
+			return Message{}, err
 		}
-		return Message{}, err
 	}
 	return s.repo.CompleteAttachment(ctx, ownerID, conversationID, *f, stat, body, now)
 }

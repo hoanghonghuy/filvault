@@ -94,11 +94,25 @@ func (s *Store) PurgeFile(ctx context.Context, ownerID, id string) (string, erro
 }
 
 func (s *Store) CompleteFilePurge(ctx context.Context, ownerID, fileID string) error {
-	_, err := s.pool.Exec(ctx, `
+	tag, err := s.pool.Exec(ctx, `
 		UPDATE file_purge_jobs
 		SET completed_at = now()
 		WHERE owner_id = $1 AND file_id = $2 AND completed_at IS NULL
 	`, ownerID, fileID)
+	if err == nil && tag.RowsAffected() == 0 {
+		var exists bool
+		if lookupErr := s.pool.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM file_purge_jobs
+				WHERE owner_id = $1 AND file_id = $2 AND completed_at IS NOT NULL
+			)
+		`, ownerID, fileID).Scan(&exists); lookupErr != nil {
+			return lookupErr
+		} else if !exists {
+			return apperr.NotFound
+		}
+	}
 	return err
 }
 
