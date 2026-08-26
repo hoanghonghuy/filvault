@@ -6,7 +6,6 @@ import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import Icon from '@/components/AppIcon.vue'
-import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import MediaPickerSheet from '@/components/MediaPickerSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -22,9 +21,7 @@ const album = ref<AlbumDetail | null>(null)
 const error = ref('')
 const loading = ref(false)
 const pickerOpen = ref(false)
-const mediaOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
-const favoriteIds = ref<Set<string>>(new Set())
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
 
@@ -36,41 +33,11 @@ async function load() {
   error.value = ''
   try {
     album.value = await api<AlbumDetail>(`/photos/albums/${albumId.value}`)
-    await loadFavorites()
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load album')
   } finally {
     loading.value = false
   }
-}
-
-const isFavorited = (id: string) => favoriteIds.value.has(id)
-
-async function loadFavorites() {
-  const out = await api<{ files: Array<{ id: string }> }>('/files/favorites?limit=100')
-  favoriteIds.value = new Set(out.files.map((f) => f.id))
-}
-
-async function toggleFavorite(item: TimelineItem) {
-  const wasFavorited = isFavorited(item.id)
-  error.value = ''
-  try {
-    if (wasFavorited) {
-      await api(`/files/${item.id}/favorite`, { method: 'DELETE' })
-      ui.showToast(`Removed "${item.name}" from favorites`)
-    } else {
-      await api(`/files/${item.id}/favorite`, { method: 'PUT' })
-      ui.showToast(`Added "${item.name}" to favorites`)
-    }
-    await loadFavorites()
-  } catch (e) {
-    error.value = formatApiError(e, 'Failed to update favorite')
-  }
-}
-
-async function toggleFavoriteFromSheet() {
-  if (!mediaItem.value) return
-  await toggleFavorite(mediaItem.value)
 }
 
 async function openAlbumMenu() {
@@ -149,7 +116,7 @@ async function openItemActions(item: TimelineItem) {
     isCover
       ? { id: 'unset-cover', label: 'Remove cover', icon: 'restore' }
       : { id: 'set-cover', label: 'Set cover', icon: 'image' },
-    { id: 'remove', label: 'Remove from album', icon: 'trash', danger: true },
+    { id: 'remove', label: 'Remove from this album', icon: 'trash', danger: true },
   ])
   if (!action) return
   if (action === 'view') {
@@ -207,12 +174,6 @@ async function removeItem(fileId: string, name: string) {
   }
 }
 
-async function viewMedia() {
-  if (!mediaItem.value) return
-  await openLightbox(mediaItem.value)
-  mediaOpen.value = false
-}
-
 async function openLightbox(item: TimelineItem) {
   error.value = ''
   mediaItem.value = item
@@ -240,7 +201,6 @@ async function downloadMedia() {
 watch(() => route.params.id, load, { immediate: true })
 
 onBeforeUnmount(() => {
-  mediaOpen.value = false
   pickerOpen.value = false
 })
 </script>
@@ -269,7 +229,8 @@ onBeforeUnmount(() => {
           :thumbnail-url="item.thumbnailUrl"
           class="appear"
           :style="{ animationDelay: cellDelay(index) }"
-          @click="openLightbox(item)"
+          :aria-label="`Actions for ${item.name}`"
+          @click="openItemActions(item)"
           @contextmenu.prevent="openItemActions(item)"
         />
       </div>
@@ -283,16 +244,6 @@ onBeforeUnmount(() => {
         @action="pickerOpen = true"
       />
     </div>
-
-    <PhotoMediaSheet
-      :open="mediaOpen"
-      :name="mediaItem?.name ?? ''"
-      :favorited="mediaItem ? isFavorited(mediaItem.id) : false"
-      @view="viewMedia"
-      @download="downloadMedia"
-      @favorite="toggleFavoriteFromSheet"
-      @close="mediaOpen = false"
-    />
 
     <MediaLightbox
       :open="lightboxOpen"

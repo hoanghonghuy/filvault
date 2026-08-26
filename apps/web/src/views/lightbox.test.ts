@@ -26,8 +26,24 @@ describe('media lightbox contract', () => {
     }
   })
 
-  it('opens lightbox from Photos and Album thumbnails', () => {
-    expect(photos).toMatch(/@click="openLightbox\(item\)"/)
-    expect(album).toMatch(/@click="openLightbox\(item\)"/)
+  it('opens an action sheet before previewing Photos and Album thumbnails', () => {
+    expect(photos).toMatch(/@click="openMedia\(item\)"/)
+    expect(photos).not.toMatch(/@click="openLightbox\(item\)"/)
+    expect(album).toMatch(/@click="openItemActions\(item\)"/)
+    expect(album).not.toMatch(/@click="openLightbox\(item\)"/)
+  })
+
+  it('keeps View as the only action that opens the lightbox', () => {
+    expect(photos).toMatch(/async function viewMedia\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
+    expect(album).toMatch(/if \(action === 'view'\) \{[\s\S]*?openLightbox\(item\)/)
+  })
+
+  it('keeps album actions contextual and removes from album last', () => {
+    expect(album).toMatch(/label: 'View'/)
+    expect(album).toMatch(/label: 'Download'/)
+    expect(album).toMatch(/label: 'Remove from this album'/)
+    expect(album).toMatch(/action === 'set-cover'/)
+    expect(album).toMatch(/action === 'unset-cover'/)
+    expect(album).toMatch(/action === 'remove'/)
   })
 })

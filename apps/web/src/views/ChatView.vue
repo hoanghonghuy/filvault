@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, uploadToPresigned, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
@@ -8,6 +8,7 @@ import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
+import UploadProgress from '@/components/UploadProgress.vue'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
@@ -40,6 +41,13 @@ const lightboxFileId = ref('')
 const loadingThread = ref(true)
 
 const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
+const threadSearchOpen = ref(false)
+const uploadProgress = ref<number | null>(null)
+const isMobile = ref(false)
+let activeSelection = 0
+function isMobileViewport() {
+  return isMobile.value
+}
 const railFilter = ref('')
 const filteredConversations = computed(() => {
   const q = railFilter.value.trim().toLowerCase()
@@ -79,6 +87,18 @@ function backToRail() {
   inThread.value = false
 }
 
+function updateViewport() {
+  isMobile.value = window.matchMedia('(max-width: 767px)').matches
+}
+
+function promptNewConversation() {
+  void ui.prompt({ title: 'New chat', label: 'Chat title' }).then((title) => {
+    if (!title?.trim()) return
+    newTitle.value = title.trim()
+    void createConversation()
+  })
+}
+
 function backToVault() {
   void router.push('/')
 }
@@ -89,7 +109,7 @@ async function loadConversations() {
   try {
     const out = await api<{ conversations: ChatConversation[] }>('/chat/conversations?includePreview=true')
     conversations.value = out.conversations
-    if (!selectedId.value && out.conversations[0]) {
+    if (!selectedId.value && out.conversations[0] && !isMobileViewport()) {
       await selectConversation(out.conversations[0].id)
     }
   } catch (e) {
@@ -116,22 +136,30 @@ async function createConversation() {
 }
 
 async function selectConversation(id: string) {
+  const selection = activeSelection + 1
+  activeSelection = selection
   selectedId.value = id
   searchQuery.value = ''
   searchResults.value = null
+  threadSearchOpen.value = false
   loadingThread.value = true
   await Promise.all([loadMessages(id), loadMedia(id)])
+  if (selection !== activeSelection || selectedId.value !== id) return
+  await nextTick()
+  scrollToLatest()
   focusComposer()
 }
 
 async function loadMessages(id = selectedId.value) {
   if (!id) return
+  const selection = activeSelection
   error.value = ''
   loadingThread.value = true
   try {
     const out = await api<{ messages: ChatMessage[]; hasMore?: boolean; nextBefore?: string }>(
       `/chat/conversations/${id}/messages?limit=50`,
     )
+    if (selection !== activeSelection || selectedId.value !== id) return
     messages.value = out.messages
     hasMore.value = out.hasMore ?? false
     nextBefore.value = out.nextBefore ?? null
@@ -146,6 +174,7 @@ async function loadMessages(id = selectedId.value) {
 
 async function loadOlder() {
   const id = selectedId.value
+  const selection = activeSelection
   if (!id || !hasMore.value || !nextBefore.value || loadingOlder.value) return
   loadingOlder.value = true
   error.value = ''
@@ -156,6 +185,7 @@ async function loadOlder() {
     const out = await api<{ messages: ChatMessage[]; hasMore?: boolean; nextBefore?: string }>(
       `/chat/conversations/${id}/messages?limit=50&before=${nextBefore.value}`,
     )
+    if (selection !== activeSelection || selectedId.value !== id) return
     messages.value = [...out.messages, ...messages.value]
     hasMore.value = out.hasMore ?? false
     nextBefore.value = out.nextBefore ?? null
@@ -245,8 +275,10 @@ function clearSearch() {
 
 async function loadMedia(id = selectedId.value) {
   if (!id) return
+  const selection = activeSelection
   try {
     const out = await api<{ media: ChatAttachment[] }>(`/chat/conversations/${id}/media`)
+    if (selection !== activeSelection || selectedId.value !== id) return
     media.value = out.media
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load media')
@@ -299,6 +331,7 @@ async function onAttachmentChange(event: Event) {
   input.value = ''
   if (!file || !selectedId.value) return
   sending.value = true
+  uploadProgress.value = 0
   error.value = ''
   try {
     const session = await api<UploadSession>('/chat/attachments/upload-sessions', {
@@ -310,7 +343,14 @@ async function onAttachmentChange(event: Event) {
         contentType: file.type || 'application/octet-stream',
       }),
     })
-    await uploadToPresigned(session.uploadUrl, file, file.type || 'application/octet-stream')
+    await uploadToPresigned(
+      session.uploadUrl,
+      file,
+      file.type || 'application/octet-stream',
+      (ratio) => {
+        uploadProgress.value = ratio
+      },
+    )
     const message = await api<ChatMessage>(`/chat/attachments/${session.fileId}/complete`, {
       method: 'POST',
       body: JSON.stringify({ conversationId: selectedId.value, body: draft.value.trim() }),
@@ -323,6 +363,7 @@ async function onAttachmentChange(event: Event) {
   } catch (e) {
     error.value = formatApiError(e, 'Failed to send attachment')
   } finally {
+    uploadProgress.value = null
     sending.value = false
   }
 }
@@ -359,12 +400,23 @@ function focusComposer() {
   void nextTick(() => composerRef.value?.focus())
 }
 
-onMounted(loadConversations)
+onMounted(() => {
+  updateViewport()
+  window.addEventListener('resize', updateViewport)
+  void loadConversations()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateViewport)
+})
 
 watch(visibleMessages, () => {
   void nextTick(() => {
     const el = threadBodyRef.value
-    if (el) el.scrollTop = el.scrollHeight
+    if (el && !loadingOlder.value && !searchResults.value) {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      if (distanceFromBottom < 160) el.scrollTop = el.scrollHeight
+    }
   })
 })
 </script>
@@ -378,14 +430,10 @@ watch(visibleMessages, () => {
         <button type="button" class="icon-btn" aria-label="Back to Filvault" @click="backToVault">
           <Icon name="folder" :size="20" />
         </button>
-      </header>
-      <form class="new-chat" @submit.prevent="createConversation">
-        <label class="sr-only" for="new-chat-title">New chat title</label>
-        <input id="new-chat-title" v-model="newTitle" type="text" placeholder="New chat title" />
-        <button class="compose-btn" type="submit" aria-label="Create chat">
-          <Icon name="pencil" :size="18" />
+        <button type="button" class="compose-btn" aria-label="Create chat" @click="promptNewConversation">
+          <Icon name="plus" :size="18" />
         </button>
-      </form>
+      </header>
       <div class="rail-filter">
         <label class="sr-only" for="rail-filter-input">Filter chats</label>
         <input
@@ -422,14 +470,23 @@ watch(visibleMessages, () => {
       <template v-if="selectedConversation">
         <header class="thread-header">
           <button type="button" class="icon-btn back-btn" aria-label="Back" @click="backToRail">
-            <Icon name="close" :size="20" />
+            <Icon name="arrow-left" :size="20" />
           </button>
           <span class="thread-avatar" :class="avatarClass(selectedConversation.title || '?')" aria-hidden="true">{{ selectedConversation.title.slice(0, 1).toUpperCase() }}</span>
           <h2>{{ selectedConversation.title || 'Untitled chat' }}</h2>
           <button class="ghost-btn" type="button" @click="loadMessages()">Refresh</button>
+          <button
+            class="icon-btn"
+            type="button"
+            :aria-expanded="threadSearchOpen"
+            aria-label="Search messages"
+            @click="threadSearchOpen = !threadSearchOpen"
+          >
+            <Icon name="search" :size="18" />
+          </button>
         </header>
 
-        <form class="chat-search" @submit.prevent="searchMessages">
+        <form v-if="threadSearchOpen" class="chat-search" @submit.prevent="searchMessages">
           <label class="sr-only" for="chat-search">Search messages</label>
           <input id="chat-search" v-model="searchQuery" type="search" placeholder="Search in this chat" />
           <button class="ghost-btn" type="submit" :disabled="searchQuery.trim().length < 2">Search</button>
@@ -438,7 +495,12 @@ watch(visibleMessages, () => {
 
         <p v-if="error && inThread" class="alert" role="alert">{{ error }}</p>
 
-        <div ref="threadBodyRef" class="message-body" @scroll.passive="onThreadScroll">
+        <div
+          ref="threadBodyRef"
+          class="message-body"
+          :aria-busy="loadingThread"
+          @scroll.passive="onThreadScroll"
+        >
           <LoadingSkeletonThread v-if="loadingThread" />
           <p v-else-if="loadingOlder" class="loading-older">Loading older…</p>
           <div v-if="!loadingThread && visibleMessages.length" class="message-list">
@@ -493,6 +555,7 @@ watch(visibleMessages, () => {
           </Transition>
         </div>
 
+        <UploadProgress :progress="uploadProgress" />
         <form class="chat-composer" @submit.prevent="sendText">
           <button type="button" class="icon-btn attach-btn" aria-label="Attach file" :disabled="sending" @click="triggerAttachment">
             <Icon name="plus" :size="18" />
@@ -659,27 +722,6 @@ watch(visibleMessages, () => {
 .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.new-chat {
-  display: flex;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-}
-
-.new-chat input {
-  min-width: 0;
-  flex: 1;
-  min-height: 44px;
-  padding: 12px 14px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  font: inherit;
-}
-
-.new-chat input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
 }
 
 .alert {
@@ -878,7 +920,7 @@ watch(visibleMessages, () => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xxs);
-  min-height: 32px;
+  min-height: var(--touch-min);
   padding: 0 var(--space-sm);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
@@ -1008,6 +1050,7 @@ watch(visibleMessages, () => {
 
 .chat-composer {
   display: flex;
+  position: relative;
   align-items: flex-end;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md) calc(var(--space-sm) + env(safe-area-inset-bottom));
@@ -1082,7 +1125,7 @@ watch(visibleMessages, () => {
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1200px) {
   .chat-app {
     grid-template-columns: 300px minmax(0, 1fr) 280px;
   }
@@ -1147,6 +1190,16 @@ watch(visibleMessages, () => {
   }
 }
 
+@media (min-width: 768px) and (max-width: 1199px) {
+  .chat-app {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+
+  .media-panel {
+    display: none;
+  }
+}
+
 /* Mobile master-detail: show rail OR thread, never both stacked */
 @media (max-width: 767px) {
   .media-panel {
@@ -1165,4 +1218,5 @@ watch(visibleMessages, () => {
     display: flex;
   }
 }
+
 </style>

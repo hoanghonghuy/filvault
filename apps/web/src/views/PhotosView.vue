@@ -26,6 +26,7 @@ const error = ref('')
 
 const mediaOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
+const pendingSheetAction = ref<'view' | 'download' | null>(null)
 const favoriteIds = ref<Set<string>>(new Set())
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
@@ -166,7 +167,7 @@ async function toggleFavoriteFromSheet() {
 
 async function viewMedia() {
   if (!mediaItem.value) return
-  await openLightbox(mediaItem.value)
+  pendingSheetAction.value = 'view'
   mediaOpen.value = false
 }
 
@@ -183,8 +184,21 @@ async function openLightbox(item: TimelineItem) {
   }
 }
 
+async function handleSheetAfterLeave() {
+  const action = pendingSheetAction.value
+  pendingSheetAction.value = null
+  if (!action || !mediaItem.value) return
+  if (action === 'view') await openLightbox(mediaItem.value)
+  if (action === 'download') await downloadMedia()
+}
+
 async function downloadMedia() {
   if (!mediaItem.value) return
+  if (mediaOpen.value) {
+    pendingSheetAction.value = 'download'
+    mediaOpen.value = false
+    return
+  }
   error.value = ''
   try {
     const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
@@ -198,6 +212,7 @@ onMounted(load)
 
 onBeforeUnmount(() => {
   mediaOpen.value = false
+  pendingSheetAction.value = null
 })
 </script>
 
@@ -258,7 +273,7 @@ onBeforeUnmount(() => {
             :thumbnail-url="item.thumbnailUrl"
             class="appear"
             :style="{ animationDelay: cellDelay(index) }"
-            @click="openLightbox(item)"
+            @click="openMedia(item)"
           />
         </div>
       </section>
@@ -285,6 +300,7 @@ onBeforeUnmount(() => {
         @download="downloadMedia"
         @favorite="toggleFavoriteFromSheet"
         @close="mediaOpen = false"
+        @after-leave="handleSheetAfterLeave"
       />
 
       <MediaLightbox

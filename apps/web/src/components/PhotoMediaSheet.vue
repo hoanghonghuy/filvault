@@ -13,11 +13,12 @@ const emit = defineEmits<{
   download: []
   favorite: []
   close: []
+  'after-leave': []
 }>()
 </script>
 
 <template>
-  <BottomSheet :open="open" :title="name" @close="emit('close')">
+  <BottomSheet :open="open" :title="name" @close="emit('close')" @after-leave="emit('after-leave')">
     <div class="actions">
       <button type="button" class="btn block ink" @click="emit('view')">View</button>
       <button type="button" class="btn block" @click="emit('download')">Download</button>

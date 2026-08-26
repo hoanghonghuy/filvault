@@ -81,6 +81,21 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/rail-empty/)
   })
 
+  it('keeps mobile in the inbox until a conversation is chosen', () => {
+    expect(chat).toMatch(/function isMobileViewport/)
+    expect(chat).toMatch(/!isMobileViewport\(\)/)
+    expect(chat).toMatch(/class="chat-app" :class="\{ 'in-thread': inThread \}"/)
+    expect(chat).toMatch(/name="arrow-left"/)
+  })
+
+  it('uses responsive Messenger-style details and progressive actions', () => {
+    expect(chat).toMatch(/threadSearchOpen/)
+    expect(chat).toMatch(/promptNewConversation/)
+    expect(chat).toMatch(/<UploadProgress/)
+    expect(chat).toMatch(/@media \(min-width: 1200px\)/)
+    expect(chat).toMatch(/@media \(min-width: 768px\) and \(max-width: 1199px\)/)
+  })
+
   it('defines typed chat API payloads', () => {
     expect(types).toMatch(/export interface ChatConversation/)
     expect(types).toMatch(/export interface ChatMessage/)

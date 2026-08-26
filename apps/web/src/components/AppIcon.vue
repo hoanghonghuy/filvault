@@ -36,6 +36,7 @@ const icons: Record<string, string[]> = {
   alert: ['M12 9v4', 'M12 17h.01', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'],
   more: ['M5 12h.01M12 12h.01M19 12h.01'],
   'arrow-right': ['M5 12h14', 'm13 6 6 6-6 6'],
+  'arrow-left': ['M19 12H5', 'm11 6-6 6 6 6'],
   plus: ['M12 5v14', 'M5 12h14'],
   search: ['M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z', 'm21 21-4.3-4.3'],
   upload: ['M12 16V4', 'm6 10 6-6 6 6', 'M4 20h16'],
