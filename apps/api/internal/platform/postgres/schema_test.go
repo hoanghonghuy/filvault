@@ -25,11 +25,51 @@ func TestMigrate_CreatesPhase1Tables(t *testing.T) {
 	}
 
 	assertPhase1Tables(t, ctx, pool, true)
+	assertChatAttachmentLifecycle(t, ctx, pool)
 
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		t.Fatalf("Migrate second time: %v", err)
 	}
 	assertPhase1Tables(t, ctx, pool, true)
+}
+
+func assertChatAttachmentLifecycle(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	var hasSource, hasCompletedMessage, hasDisplayName, hasNullableFileID bool
+	if err := pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'files' AND column_name = 'source'
+		)
+	`).Scan(&hasSource); err != nil {
+		t.Fatalf("check files.source: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'files' AND column_name = 'completed_message_id'
+		)
+	`).Scan(&hasCompletedMessage); err != nil {
+		t.Fatalf("check files.completed_message_id: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'message_attachments' AND column_name = 'display_name'
+		)
+	`).Scan(&hasDisplayName); err != nil {
+		t.Fatalf("check attachment snapshot: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT is_nullable = 'YES'
+		FROM information_schema.columns
+		WHERE table_name = 'message_attachments' AND column_name = 'file_id'
+	`).Scan(&hasNullableFileID); err != nil {
+		t.Fatalf("check nullable attachment file: %v", err)
+	}
+	if !hasSource || !hasCompletedMessage || !hasDisplayName || !hasNullableFileID {
+		t.Fatalf("chat attachment lifecycle schema incomplete: source=%v completedMessage=%v displayName=%v nullableFileID=%v", hasSource, hasCompletedMessage, hasDisplayName, hasNullableFileID)
+	}
 }
 
 func TestMigrate_DownRemovesPhase1Tables(t *testing.T) {
@@ -55,6 +95,7 @@ func TestMigrate_DownRemovesPhase1Tables(t *testing.T) {
 		t.Fatalf("MigrateDown: %v", err)
 	}
 	for _, name := range []string{
+		"chat attachment lifecycle",
 		"file name uniqueness",
 		"file versions",
 		"shares",

@@ -16,10 +16,12 @@ func (s *Store) CreateFile(ctx context.Context, f file.File) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO files (
 			id, owner_id, folder_id, name, original_name, object_key,
-			mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULL, $12, $13)
+			mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id,
+			source, source_ref_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULL, $12, $13, $14, $15)
 	`, f.ID, f.OwnerID, f.FolderID, f.Name, f.OriginalName, f.ObjectKey,
-		f.MimeType, f.SizeBytes, f.Status, f.CreatedAt, f.UpdatedAt, f.UploadExpiresAt, f.ReplacesFileID)
+		f.MimeType, f.SizeBytes, f.Status, f.CreatedAt, f.UpdatedAt, f.UploadExpiresAt, f.ReplacesFileID,
+		nullableSource(f.Source), f.SourceRefID)
 	if isUniqueViolation(err) {
 		return apperr.Conflict
 	}
@@ -34,9 +36,10 @@ func (s *Store) UpdateFile(ctx context.Context, f file.File) error {
 	_, err := s.pool.Exec(ctx, `
 		UPDATE files
 		SET name = $2, folder_id = $3, mime_type = $4, size_bytes = $5, status = $6,
-			updated_at = $7, upload_expires_at = $8
-		WHERE id = $1 AND owner_id = $9 AND deleted_at IS NULL
-	`, f.ID, f.Name, f.FolderID, f.MimeType, f.SizeBytes, f.Status, f.UpdatedAt, f.UploadExpiresAt, f.OwnerID)
+			updated_at = $7, upload_expires_at = $8, source = $9, source_ref_id = $10
+		WHERE id = $1 AND owner_id = $11 AND deleted_at IS NULL
+	`, f.ID, f.Name, f.FolderID, f.MimeType, f.SizeBytes, f.Status, f.UpdatedAt, f.UploadExpiresAt,
+		nullableSource(f.Source), f.SourceRefID, f.OwnerID)
 	return err
 }
 
@@ -141,7 +144,8 @@ func (s *Store) GetFileVersion(ctx context.Context, fileID, versionID string) (*
 
 const fileSelect = `
 	SELECT id, owner_id, folder_id, name, original_name, object_key,
-		mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id
+		mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id,
+		source, source_ref_id
 	FROM files
 	WHERE deleted_at IS NULL
 `
@@ -194,6 +198,7 @@ func scanFile(row pgx.Row) (*file.File, error) {
 	err := row.Scan(
 		&f.ID, &f.OwnerID, &f.FolderID, &f.Name, &f.OriginalName, &f.ObjectKey,
 		&f.MimeType, &f.SizeBytes, &f.Status, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt, &f.UploadExpiresAt, &f.ReplacesFileID,
+		&f.Source, &f.SourceRefID,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -202,6 +207,13 @@ func scanFile(row pgx.Row) (*file.File, error) {
 		return nil, err
 	}
 	return &f, nil
+}
+
+func nullableSource(source string) any {
+	if source == "" {
+		return "vault"
+	}
+	return source
 }
 
 type fileRepo struct {

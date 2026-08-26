@@ -322,6 +322,7 @@ func publicAttachment(a Attachment) gin.H {
 		"mimeType":     a.MimeType,
 		"sizeBytes":    a.SizeBytes,
 		"createdAt":    a.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"availability": a.Availability,
 	}
 	if a.ThumbnailURL != "" {
 		out["thumbnailUrl"] = a.ThumbnailURL

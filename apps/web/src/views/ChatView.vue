@@ -285,6 +285,12 @@ async function loadMedia(id = selectedId.value) {
   }
 }
 
+function attachmentLabel(attachment: ChatAttachment): string {
+  if (attachment.availability === 'trashed') return 'File moved to Trash'
+  if (attachment.availability === 'purged') return 'File permanently deleted'
+  return ''
+}
+
 async function sendText() {
   if (!selectedId.value || !draft.value.trim()) return
   const conversationId = selectedId.value
@@ -368,7 +374,8 @@ async function onAttachmentChange(event: Event) {
   }
 }
 
-async function openAttachment(fileId: string) {
+async function openAttachment(fileId: string | null) {
+  if (!fileId) return
   try {
     const out = await api<DownloadURL>(`/files/${fileId}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
@@ -378,6 +385,7 @@ async function openAttachment(fileId: string) {
 }
 
 async function openInlineImage(attachment: ChatAttachment) {
+  if (attachment.availability !== 'available' || !attachment.fileId) return
   error.value = ''
   try {
     const out = await api<DownloadURL>(`/files/${attachment.fileId}/download`)
@@ -447,7 +455,7 @@ watch(visibleMessages, () => {
       <div v-if="error && !inThread" class="alert" role="alert">{{ error }}</div>
       <nav class="conversation-list">
         <p v-if="!filteredConversations.length" class="rail-empty">No chats match "{{ railFilter }}".</p>
-        <button
+    <button
           v-for="conv in filteredConversations"
           :key="conv.id"
           type="button"
@@ -513,7 +521,7 @@ watch(visibleMessages, () => {
                   <p v-if="message.body">{{ message.body }}</p>
                   <template v-for="attachment in message.attachments" :key="attachment.id">
                     <button
-                      v-if="attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
+                      v-if="attachment.availability === 'available' && attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
                       type="button"
                       class="inline-image"
                       :aria-label="`View ${attachment.name}`"
@@ -529,11 +537,13 @@ watch(visibleMessages, () => {
                       v-else
                       type="button"
                       class="attachment-card"
-                      @click="openAttachment(attachment.fileId)"
+                      :disabled="attachment.availability !== 'available' || !attachment.fileId"
+                      @click="attachment.fileId && openAttachment(attachment.fileId)"
                     >
                       <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
                       <span class="attachment-name">{{ attachment.name }}</span>
                       <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
+                      <span v-if="attachment.availability !== 'available'" class="attachment-status">{{ attachmentLabel(attachment) }}</span>
                     </button>
                   </template>
                   <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
@@ -589,12 +599,13 @@ watch(visibleMessages, () => {
 
     <aside class="media-panel" aria-label="Shared media">
       <h2>Media</h2>
-      <button
+        <button
         v-for="item in media"
         :key="item.id"
         type="button"
         class="media-card"
-        @click="openAttachment(item.fileId)"
+        :disabled="!item.fileId"
+          @click="item.fileId && openAttachment(item.fileId)"
       >
         <img
           v-if="item.thumbnailUrl"

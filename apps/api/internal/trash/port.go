@@ -13,7 +13,8 @@ type Repository interface {
 	GetAnyFile(ctx context.Context, ownerID, id string) (*file.File, error)
 	SoftDeleteFile(ctx context.Context, ownerID, id string, at time.Time) error
 	RestoreFile(ctx context.Context, ownerID, id string) error
-	DeleteFileRow(ctx context.Context, ownerID, id string) error
+	PurgeFile(ctx context.Context, ownerID, id string) (objectKey string, err error)
+	CompleteFilePurge(ctx context.Context, ownerID, fileID string) error
 	ListTrashedFiles(ctx context.Context, ownerID string) ([]file.File, error)
 	ListExpiredTrashedFiles(ctx context.Context, ownerID string, deletedBefore time.Time) ([]file.File, error)
 	ExistsAliveFileByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error)

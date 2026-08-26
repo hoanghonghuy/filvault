@@ -23,6 +23,8 @@ type File struct {
 	DeletedAt       *time.Time
 	UploadExpiresAt *time.Time
 	ReplacesFileID  *string
+	Source          string
+	SourceRefID     *string
 }
 
 // FileVersion is an archived previous version of a file.

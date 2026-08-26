@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"filvault/internal/apperr"
+	"filvault/internal/auth"
 	"filvault/internal/file"
 	"filvault/internal/folder"
 	"filvault/internal/trash"
@@ -15,7 +17,8 @@ import (
 
 const fileSelectAny = `
 	SELECT id, owner_id, folder_id, name, original_name, object_key,
-		mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id
+		mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id,
+		source, source_ref_id
 	FROM files
 	WHERE 1=1
 `
@@ -28,6 +31,75 @@ const folderSelectAny = `
 
 func (s *Store) GetAnyFileByID(ctx context.Context, ownerID, id string) (*file.File, error) {
 	return scanFile(s.pool.QueryRow(ctx, fileSelectAny+` AND owner_id = $1 AND id = $2`, ownerID, id))
+}
+
+func (s *Store) PurgeFile(ctx context.Context, ownerID, id string) (string, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	var objectKey string
+	var sizeBytes int64
+	var status string
+	err = tx.QueryRow(ctx, `
+		SELECT object_key, size_bytes, status
+		FROM files
+		WHERE id = $1 AND owner_id = $2 AND deleted_at IS NOT NULL
+		FOR UPDATE
+	`, id, ownerID).Scan(&objectKey, &sizeBytes, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if err := tx.QueryRow(ctx, `
+			SELECT object_key
+			FROM file_purge_jobs
+			WHERE owner_id = $1 AND file_id = $2 AND completed_at IS NULL
+		`, ownerID, id).Scan(&objectKey); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", apperr.NotFound
+			}
+			return "", err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return "", err
+		}
+		return objectKey, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM files WHERE id = $1 AND owner_id = $2`, id, ownerID); err != nil {
+		return "", err
+	}
+	if status == file.StatusReady && sizeBytes > 0 {
+		if _, err := tx.Exec(ctx, `
+			UPDATE users
+			SET storage_used = storage_used - $2, updated_at = now()
+			WHERE id = $1
+		`, ownerID, sizeBytes); err != nil {
+			return "", err
+		}
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO file_purge_jobs (id, owner_id, file_id, object_key, created_at)
+		VALUES ($1, $2, $3, $4, now())
+		ON CONFLICT (owner_id, file_id) WHERE completed_at IS NULL DO NOTHING
+	`, auth.NewID(), ownerID, id, objectKey); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return objectKey, nil
+}
+
+func (s *Store) CompleteFilePurge(ctx context.Context, ownerID, fileID string) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE file_purge_jobs
+		SET completed_at = now()
+		WHERE owner_id = $1 AND file_id = $2 AND completed_at IS NULL
+	`, ownerID, fileID)
+	return err
 }
 
 func (s *Store) SoftDeleteFile(ctx context.Context, ownerID, id string, at time.Time) error {
@@ -89,6 +161,7 @@ func scanFiles(rows pgx.Rows) ([]file.File, error) {
 		if err := rows.Scan(
 			&f.ID, &f.OwnerID, &f.FolderID, &f.Name, &f.OriginalName, &f.ObjectKey,
 			&f.MimeType, &f.SizeBytes, &f.Status, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt, &f.UploadExpiresAt, &f.ReplacesFileID,
+			&f.Source, &f.SourceRefID,
 		); err != nil {
 			return nil, err
 		}
@@ -222,8 +295,12 @@ func (r trashRepo) RestoreFile(ctx context.Context, ownerID, id string) error {
 	return r.store.RestoreFile(ctx, ownerID, id)
 }
 
-func (r trashRepo) DeleteFileRow(ctx context.Context, ownerID, id string) error {
-	return r.store.DeleteFileRow(ctx, ownerID, id)
+func (r trashRepo) PurgeFile(ctx context.Context, ownerID, id string) (string, error) {
+	return r.store.PurgeFile(ctx, ownerID, id)
+}
+
+func (r trashRepo) CompleteFilePurge(ctx context.Context, ownerID, fileID string) error {
+	return r.store.CompleteFilePurge(ctx, ownerID, fileID)
 }
 
 func (r trashRepo) ListTrashedFiles(ctx context.Context, ownerID string) ([]file.File, error) {

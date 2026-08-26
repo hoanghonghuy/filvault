@@ -104,17 +104,23 @@ func (s *Service) RestoreFolder(ctx context.Context, ownerID, folderID string) e
 
 func (s *Service) PermanentDeleteFile(ctx context.Context, ownerID, fileID string) error {
 	f, err := s.getTrashedFile(ctx, ownerID, fileID)
+	if err != nil && err != apperr.NotFound {
+		return err
+	}
+	objectKey, err := s.repo.PurgeFile(ctx, ownerID, fileID)
 	if err != nil {
 		return err
 	}
-	_ = s.objects.Delete(ctx, f.ObjectKey)
-	if f.Status == file.StatusReady && f.SizeBytes > 0 {
-		if err := s.quota.AddStorageUsed(ctx, ownerID, -f.SizeBytes); err != nil {
-			return err
-		}
+	if err := s.objects.Delete(ctx, objectKey); err != nil {
+		return err
 	}
-	s.activity.Record(ctx, ownerID, activity.TypePurged, f.Name)
-	return s.repo.DeleteFileRow(ctx, ownerID, fileID)
+	if err := s.repo.CompleteFilePurge(ctx, ownerID, fileID); err != nil {
+		return err
+	}
+	if f != nil {
+		s.activity.Record(ctx, ownerID, activity.TypePurged, f.Name)
+	}
+	return nil
 }
 
 func (s *Service) PermanentDeleteFolder(ctx context.Context, ownerID, folderID string) error {

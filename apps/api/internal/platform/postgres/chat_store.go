@@ -3,10 +3,16 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
+	"filvault/internal/apperr"
 	"filvault/internal/chat"
+	"filvault/internal/file"
+	"filvault/internal/platform/objectstore"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/oklog/ulid/v2"
 )
 
 func (s *Store) CreateConversation(ctx context.Context, c chat.Conversation) error {
@@ -70,11 +76,207 @@ func (s *Store) CreateMessage(ctx context.Context, m chat.Message) error {
 	return err
 }
 
+func (s *Store) CreateMessageWithAttachments(ctx context.Context, m chat.Message, fileIDs []string) (chat.Message, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return chat.Message{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO messages (id, conversation_id, owner_id, body, created_at, deleted_at)
+		VALUES ($1, $2, $3, $4, $5, NULL)
+	`, m.ID, m.ConversationID, m.OwnerID, m.Body, m.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	seen := make(map[string]struct{}, len(fileIDs))
+	for _, fileID := range fileIDs {
+		if _, ok := seen[fileID]; ok {
+			continue
+		}
+		seen[fileID] = struct{}{}
+		var f file.File
+		err := tx.QueryRow(ctx, `
+			SELECT id, owner_id, folder_id, name, original_name, object_key,
+				mime_type, size_bytes, status, created_at, updated_at, deleted_at,
+				upload_expires_at, replaces_file_id, source, source_ref_id
+			FROM files
+			WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL AND status = 'READY'
+		`, fileID, m.OwnerID).Scan(
+			&f.ID, &f.OwnerID, &f.FolderID, &f.Name, &f.OriginalName, &f.ObjectKey,
+			&f.MimeType, &f.SizeBytes, &f.Status, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt,
+			&f.UploadExpiresAt, &f.ReplacesFileID, &f.Source, &f.SourceRefID,
+		)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return chat.Message{}, apperr.NotFound
+		}
+		if err != nil {
+			return chat.Message{}, err
+		}
+		a := chat.Attachment{
+			ID:           ulid.Make().String(),
+			MessageID:    m.ID,
+			FileID:       &f.ID,
+			OriginalName: f.OriginalName,
+			Name:         f.Name,
+			MimeType:     f.MimeType,
+			SizeBytes:    f.SizeBytes,
+			CreatedAt:    m.CreatedAt,
+			Availability: chat.AttachmentAvailable,
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO message_attachments
+				(id, message_id, file_id, original_name, display_name, mime_type, size_bytes, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, a.ID, a.MessageID, a.FileID, a.OriginalName, a.Name, a.MimeType, a.SizeBytes, a.CreatedAt); err != nil {
+			return chat.Message{}, err
+		}
+		m.Attachments = append(m.Attachments, a)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE conversations SET updated_at = $3
+		WHERE id = $1 AND owner_id = $2
+	`, m.ConversationID, m.OwnerID, m.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return chat.Message{}, err
+	}
+	return m, nil
+}
+
+func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID string, pending file.File, stat objectstore.ObjectStat, body string, now time.Time) (chat.Message, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return chat.Message{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	var completedMessageID *string
+	var sourceRefID *string
+	err = tx.QueryRow(ctx, `
+		SELECT status, completed_message_id, source_ref_id
+		FROM files
+		WHERE id = $1 AND owner_id = $2
+		FOR UPDATE
+	`, pending.ID, ownerID).Scan(&status, &completedMessageID, &sourceRefID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return chat.Message{}, apperr.NotFound
+	}
+	if err != nil {
+		return chat.Message{}, err
+	}
+	if status == file.StatusReady && completedMessageID != nil {
+		var m chat.Message
+		err := tx.QueryRow(ctx, `
+			SELECT id, conversation_id, owner_id, body, created_at
+			FROM messages
+			WHERE id = $1 AND owner_id = $2
+		`, *completedMessageID, ownerID).Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt)
+		if err != nil {
+			return chat.Message{}, err
+		}
+		if m.ConversationID != conversationID {
+			return chat.Message{}, apperr.NotFound
+		}
+		m.Attachments, err = s.listMessageAttachmentsFrom(ctx, tx, m.ID)
+		if err != nil {
+			return chat.Message{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return chat.Message{}, err
+		}
+		return m, nil
+	}
+	if status == file.StatusReady {
+		return chat.Message{}, apperr.InvalidState
+	}
+	if status != file.StatusPending || sourceRefID == nil || *sourceRefID != conversationID {
+		return chat.Message{}, apperr.InvalidState
+	}
+
+	var conversationOwner string
+	if err := tx.QueryRow(ctx, `
+		SELECT owner_id FROM conversations WHERE id = $1 AND owner_id = $2 AND archived_at IS NULL FOR UPDATE
+	`, conversationID, ownerID).Scan(&conversationOwner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return chat.Message{}, apperr.NotFound
+		}
+		return chat.Message{}, err
+	}
+	var storageUsed int64
+	err = tx.QueryRow(ctx, `
+		UPDATE users
+		SET storage_used = storage_used + $2, updated_at = now()
+		WHERE id = $1 AND storage_used + $2 <= storage_quota
+		RETURNING storage_used
+	`, ownerID, stat.Size).Scan(&storageUsed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return chat.Message{}, apperr.QuotaExceeded
+	}
+	if err != nil {
+		return chat.Message{}, err
+	}
+	m := chat.Message{
+		ID:             ulid.Make().String(),
+		ConversationID: conversationID,
+		OwnerID:        ownerID,
+		Body:           strings.TrimSpace(body),
+		CreatedAt:      now,
+	}
+	mimeType := pending.MimeType
+	if stat.ContentType != "" {
+		mimeType = stat.ContentType
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE files
+		SET status = 'READY', size_bytes = $2, mime_type = $3, upload_expires_at = NULL,
+			updated_at = $4, completed_message_id = $5
+		WHERE id = $1
+	`, pending.ID, stat.Size, mimeType, now, m.ID); err != nil {
+		return chat.Message{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO messages (id, conversation_id, owner_id, body, created_at, deleted_at)
+		VALUES ($1, $2, $3, $4, $5, NULL)
+	`, m.ID, m.ConversationID, m.OwnerID, m.Body, m.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	fileID := pending.ID
+	a := chat.Attachment{
+		ID: ulid.Make().String(), MessageID: m.ID, FileID: &fileID,
+		OriginalName: pending.OriginalName, Name: pending.Name, MimeType: mimeType,
+		SizeBytes: stat.Size, CreatedAt: now, Availability: chat.AttachmentAvailable,
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO message_attachments
+			(id, message_id, file_id, original_name, display_name, mime_type, size_bytes, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, a.ID, a.MessageID, a.FileID, a.OriginalName, a.Name, a.MimeType, a.SizeBytes, a.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE conversations SET updated_at = $3 WHERE id = $1 AND owner_id = $2
+	`, conversationID, ownerID, now); err != nil {
+		return chat.Message{}, err
+	}
+	m.Attachments = []chat.Attachment{a}
+	if err := tx.Commit(ctx); err != nil {
+		return chat.Message{}, err
+	}
+	return m, nil
+}
+
 func (s *Store) CreateAttachment(ctx context.Context, a chat.Attachment) error {
+	if a.FileID == nil {
+		return apperr.Validation
+	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO message_attachments (id, message_id, file_id, original_name, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`, a.ID, a.MessageID, a.FileID, a.OriginalName, a.CreatedAt)
+		INSERT INTO message_attachments
+			(id, message_id, file_id, original_name, display_name, mime_type, size_bytes, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, a.ID, a.MessageID, a.FileID, a.OriginalName, a.Name, a.MimeType, a.SizeBytes, a.CreatedAt)
 	return err
 }
 
@@ -130,6 +332,10 @@ func (s *Store) LastMessageForConversation(ctx context.Context, ownerID, convers
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+	m.Attachments, err = s.listMessageAttachments(ctx, m.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +420,8 @@ func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, que
 
 func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT a.id, a.message_id, a.file_id, a.original_name, f.name, f.mime_type, f.size_bytes, a.created_at
+		SELECT a.id, a.message_id, a.file_id, a.original_name, a.display_name, a.mime_type, a.size_bytes, a.created_at,
+			'available'
 		FROM message_attachments a
 		JOIN messages m ON m.id = a.message_id
 		JOIN files f ON f.id = a.file_id
@@ -234,7 +441,7 @@ func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, l
 	var out []chat.Attachment
 	for rows.Next() {
 		var a chat.Attachment
-		if err := rows.Scan(&a.ID, &a.MessageID, &a.FileID, &a.OriginalName, &a.Name, &a.MimeType, &a.SizeBytes, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.MessageID, &a.FileID, &a.OriginalName, &a.Name, &a.MimeType, &a.SizeBytes, &a.CreatedAt, &a.Availability); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -243,10 +450,22 @@ func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, l
 }
 
 func (s *Store) listMessageAttachments(ctx context.Context, messageID string) ([]chat.Attachment, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT a.id, a.message_id, a.file_id, a.original_name, f.name, f.mime_type, f.size_bytes, a.created_at
+	return s.listMessageAttachmentsFrom(ctx, s.pool, messageID)
+}
+
+func (s *Store) listMessageAttachmentsFrom(ctx context.Context, queryer interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, messageID string) ([]chat.Attachment, error) {
+	rows, err := queryer.Query(ctx, `
+		SELECT a.id, a.message_id, a.file_id, a.original_name, a.display_name, a.mime_type, a.size_bytes, a.created_at,
+			CASE
+				WHEN a.file_id IS NULL THEN 'purged'
+				WHEN f.deleted_at IS NOT NULL THEN 'trashed'
+				WHEN f.status = 'READY' THEN 'available'
+				ELSE 'purged'
+			END
 		FROM message_attachments a
-		JOIN files f ON f.id = a.file_id
+		LEFT JOIN files f ON f.id = a.file_id
 		WHERE a.message_id = $1
 		ORDER BY a.created_at ASC
 	`, messageID)
@@ -257,7 +476,7 @@ func (s *Store) listMessageAttachments(ctx context.Context, messageID string) ([
 	var out []chat.Attachment
 	for rows.Next() {
 		var a chat.Attachment
-		if err := rows.Scan(&a.ID, &a.MessageID, &a.FileID, &a.OriginalName, &a.Name, &a.MimeType, &a.SizeBytes, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.MessageID, &a.FileID, &a.OriginalName, &a.Name, &a.MimeType, &a.SizeBytes, &a.CreatedAt, &a.Availability); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -289,6 +508,10 @@ func (r chatRepo) CreateMessage(ctx context.Context, m chat.Message) error {
 	return r.store.CreateMessage(ctx, m)
 }
 
+func (r chatRepo) CreateMessageWithAttachments(ctx context.Context, m chat.Message, fileIDs []string) (chat.Message, error) {
+	return r.store.CreateMessageWithAttachments(ctx, m, fileIDs)
+}
+
 func (r chatRepo) ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Message, error) {
 	return r.store.ListMessages(ctx, ownerID, conversationID, limit)
 }
@@ -311,6 +534,10 @@ func (r chatRepo) CreateAttachment(ctx context.Context, a chat.Attachment) error
 
 func (r chatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
 	return r.store.ListMedia(ctx, ownerID, conversationID, limit)
+}
+
+func (r chatRepo) CompleteAttachment(ctx context.Context, ownerID, conversationID string, f file.File, stat objectstore.ObjectStat, body string, now time.Time) (chat.Message, error) {
+	return r.store.CompleteAttachment(ctx, ownerID, conversationID, f, stat, body, now)
 }
 
 var _ chat.Repository = chatRepo{}

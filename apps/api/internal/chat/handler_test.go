@@ -335,6 +335,65 @@ func TestChat_MessageAttachmentThumbnails(t *testing.T) {
 	}
 }
 
+func TestChat_CompleteAttachmentIsIdempotent(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Retry"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conv.ID,
+		"name":           "retry.jpg",
+		"size":           128,
+		"contentType":    "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 128, ContentType: "image/jpeg"})
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conv.ID,
+		"body":           "retry me",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("first complete status=%d body=%s", code, body)
+	}
+	var first struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &first)
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conv.ID,
+		"body":           "retry me",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("retry complete status=%d body=%s", code, body)
+	}
+	var second struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &second)
+	if second.ID != first.ID {
+		t.Fatalf("retry created a different message: first=%s second=%s", first.ID, second.ID)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=50", token)
+	if code != http.StatusOK || strings.Count(body, `"conversationId"`) != 1 {
+		t.Fatalf("retry should leave one message: status=%d body=%s", code, body)
+	}
+}
+
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

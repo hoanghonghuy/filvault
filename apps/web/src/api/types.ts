@@ -127,14 +127,17 @@ export interface Timeline {
   nextBefore?: string
 }
 
+export type ChatAttachmentAvailability = 'available' | 'trashed' | 'purged'
+
 export interface ChatAttachment {
   id: string
-  fileId: string
+  fileId: string | null
   originalName: string
   name: string
   mimeType: string
   sizeBytes: number
   createdAt: string
+  availability: ChatAttachmentAvailability
   thumbnailUrl?: string
 }
 

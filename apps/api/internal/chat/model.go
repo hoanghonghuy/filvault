@@ -2,6 +2,12 @@ package chat
 
 import "time"
 
+const (
+	AttachmentAvailable = "available"
+	AttachmentTrashed   = "trashed"
+	AttachmentPurged    = "purged"
+)
+
 type Conversation struct {
 	ID        string
 	OwnerID   string
@@ -29,13 +35,14 @@ type Message struct {
 type Attachment struct {
 	ID           string
 	MessageID    string
-	FileID       string
+	FileID       *string
 	OriginalName string
 	Name         string
 	MimeType     string
 	SizeBytes    int64
 	CreatedAt    time.Time
 	ThumbnailURL string
+	Availability string
 }
 
 type UploadSession struct {
