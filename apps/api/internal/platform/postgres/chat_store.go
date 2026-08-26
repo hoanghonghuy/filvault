@@ -216,17 +216,13 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 	if stat.ContentType != "" {
 		mimeType = stat.ContentType
 	}
-	declaredSize := pending.SizeBytes
-	if stat.Size > 0 || declaredSize == 0 {
-		declaredSize = stat.Size
-	}
 	var storageUsed int64
 	err = tx.QueryRow(ctx, `
 		UPDATE users
 		SET storage_used = storage_used + $2, updated_at = now()
 		WHERE id = $1 AND storage_used + $2 <= storage_quota
 		RETURNING storage_used
-	`, ownerID, declaredSize).Scan(&storageUsed)
+	`, ownerID, stat.Size).Scan(&storageUsed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return chat.Message{}, apperr.QuotaExceeded
 	}
@@ -238,7 +234,7 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 		SET status = 'READY', size_bytes = $2, mime_type = $3, upload_expires_at = NULL,
 			updated_at = $4, completed_message_id = $5
 		WHERE id = $1
-	`, pending.ID, declaredSize, mimeType, now, m.ID); err != nil {
+	`, pending.ID, stat.Size, mimeType, now, m.ID); err != nil {
 		return chat.Message{}, err
 	}
 	if _, err := tx.Exec(ctx, `
@@ -251,7 +247,7 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 	a := chat.Attachment{
 		ID: ulid.Make().String(), MessageID: m.ID, FileID: &fileID,
 		OriginalName: pending.OriginalName, Name: pending.Name, MimeType: mimeType,
-		SizeBytes: declaredSize, CreatedAt: now, Availability: chat.AttachmentAvailable,
+		SizeBytes: stat.Size, CreatedAt: now, Availability: chat.AttachmentAvailable,
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO message_attachments

@@ -463,6 +463,49 @@ func TestChat_ConcurrentCompleteCreatesOneMessage(t *testing.T) {
 	}
 }
 
+func TestChat_CompleteUsesObjectStorageSize(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Object size"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conv.ID,
+		"name":           "empty.txt",
+		"size":           128,
+		"contentType":    "text/plain",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 0, ContentType: "text/plain"})
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conv.ID,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+	var message struct {
+		Attachments []struct {
+			SizeBytes int64 `json:"sizeBytes"`
+		} `json:"attachments"`
+	}
+	decodeJSON(t, body, &message)
+	if len(message.Attachments) != 1 || message.Attachments[0].SizeBytes != 0 {
+		t.Fatalf("attachment size should come from object storage: %+v", message.Attachments)
+	}
+}
+
 func newEngine(t *testing.T) (*gin.Engine, *mailer.Memory, *objectstore.Memory) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
