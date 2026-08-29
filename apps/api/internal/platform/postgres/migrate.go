@@ -27,16 +27,39 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := execSQL(ctx, pool, createSchemaMigrations); err != nil {
 		return fmt.Errorf("schema_migrations: %w", err)
 	}
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("migration connection: %w", err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock(hashtext('filvault:migrations'))`); err != nil {
+		return fmt.Errorf("migration lock: %w", err)
+	}
+	defer conn.Exec(ctx, `SELECT pg_advisory_unlock(hashtext('filvault:migrations'))`)
 
 	versions, err := listVersions()
 	if err != nil {
 		return err
 	}
 
-	applied, err := appliedVersions(ctx, pool)
+	appliedRows, err := conn.Query(ctx, `SELECT version FROM schema_migrations`)
 	if err != nil {
+		return fmt.Errorf("list applied: %w", err)
+	}
+	applied := map[string]bool{}
+	for appliedRows.Next() {
+		var version string
+		if err := appliedRows.Scan(&version); err != nil {
+			appliedRows.Close()
+			return err
+		}
+		applied[version] = true
+	}
+	if err := appliedRows.Err(); err != nil {
+		appliedRows.Close()
 		return err
 	}
+	appliedRows.Close()
 
 	for _, version := range versions {
 		if applied[version] {
@@ -46,10 +69,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		if err != nil {
 			return fmt.Errorf("read %s.up.sql: %w", version, err)
 		}
-		if err := execSQL(ctx, pool, string(sql)); err != nil {
+		if err := execSQLConn(ctx, conn, string(sql)); err != nil {
 			return fmt.Errorf("apply %s: %w", version, err)
 		}
-		if _, err := pool.Exec(ctx, `
+		if _, err := conn.Exec(ctx, `
 			INSERT INTO schema_migrations (version) VALUES ($1)
 		`, version); err != nil {
 			return fmt.Errorf("record %s: %w", version, err)
@@ -63,9 +86,18 @@ func MigrateDown(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("ping postgres: %w", err)
 	}
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("migration connection: %w", err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock(hashtext('filvault:migrations'))`); err != nil {
+		return fmt.Errorf("migration lock: %w", err)
+	}
+	defer conn.Exec(ctx, `SELECT pg_advisory_unlock(hashtext('filvault:migrations'))`)
 
 	var version string
-	err := pool.QueryRow(ctx, `
+	err = conn.QueryRow(ctx, `
 		SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1
 	`).Scan(&version)
 	if err != nil {
@@ -76,10 +108,10 @@ func MigrateDown(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("read %s.down.sql: %w", version, err)
 	}
-	if err := execSQL(ctx, pool, string(sql)); err != nil {
+	if err := execSQLConn(ctx, conn, string(sql)); err != nil {
 		return fmt.Errorf("rollback %s: %w", version, err)
 	}
-	if _, err := pool.Exec(ctx, `
+	if _, err := conn.Exec(ctx, `
 		DELETE FROM schema_migrations WHERE version = $1
 	`, version); err != nil {
 		return fmt.Errorf("unrecord %s: %w", version, err)
@@ -135,6 +167,10 @@ func execSQL(ctx context.Context, pool *pgxpool.Pool, sql string) error {
 	}
 	defer conn.Release()
 
-	_, err = conn.Conn().PgConn().Exec(ctx, sql).ReadAll()
+	return execSQLConn(ctx, conn, sql)
+}
+
+func execSQLConn(ctx context.Context, conn *pgxpool.Conn, sql string) error {
+	_, err := conn.Conn().PgConn().Exec(ctx, sql).ReadAll()
 	return err
 }

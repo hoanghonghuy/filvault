@@ -107,14 +107,8 @@ func (s *Service) PermanentDeleteFile(ctx context.Context, ownerID, fileID strin
 	if err != nil && err != apperr.NotFound {
 		return err
 	}
-	objectKey, err := s.repo.PurgeFile(ctx, ownerID, fileID)
+	_, err = s.repo.PurgeFile(ctx, ownerID, fileID)
 	if err != nil {
-		return err
-	}
-	if err := s.objects.Delete(ctx, objectKey); err != nil {
-		return err
-	}
-	if err := s.repo.CompleteFilePurge(ctx, ownerID, fileID); err != nil {
 		return err
 	}
 	if f != nil {

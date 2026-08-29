@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { api, uploadToPresigned, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
+import { useChatStore } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -13,6 +15,8 @@ import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, Upload
 
 const router = useRouter()
 const ui = useUiStore()
+const chatStore = useChatStore()
+const auth = useAuthStore()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>(null)
@@ -21,7 +25,6 @@ const draft = ref('')
 const searchQuery = ref('')
 const searchResults = ref<ChatMessage[] | null>(null)
 const media = ref<ChatAttachment[]>([])
-const newTitle = ref('')
 const loading = ref(false)
 const sending = ref(false)
 const error = ref('')
@@ -44,6 +47,18 @@ const selectedConversation = computed(() => conversations.value.find((c) => c.id
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
 const isMobile = ref(false)
+type AttachmentUploadStatus = 'queued' | 'uploading' | 'failed' | 'canceled'
+type AttachmentUpload = {
+  id: string
+  file: File
+  conversationId: string
+  body: string
+  status: AttachmentUploadStatus
+  error?: string
+  controller: AbortController
+}
+const attachmentQueue = ref<AttachmentUpload[]>([])
+const pendingMessageError = ref('')
 let activeSelection = 0
 function isMobileViewport() {
   return isMobile.value
@@ -52,9 +67,16 @@ const railFilter = ref('')
 const filteredConversations = computed(() => {
   const q = railFilter.value.trim().toLowerCase()
   if (!q) return conversations.value
-  return conversations.value.filter((c) => (c.title || '').toLowerCase().includes(q))
+  return conversations.value.filter((c) =>
+    `${c.title} ${c.peer?.name ?? ''} ${c.peer?.email ?? ''}`.toLowerCase().includes(q),
+  )
 })
 const visibleMessages = computed(() => searchResults.value ?? messages.value)
+
+function conversationTitle(conversation: ChatConversation | null): string {
+  if (!conversation) return ''
+  return conversation.peer?.name || conversation.peer?.email || conversation.title || 'Untitled chat'
+}
 
 function avatarClass(title: string): string {
   const palette = ['a', 'b', 'c', 'd', 'e', 'f']
@@ -92,10 +114,13 @@ function updateViewport() {
 }
 
 function promptNewConversation() {
-  void ui.prompt({ title: 'New chat', label: 'Chat title' }).then((title) => {
-    if (!title?.trim()) return
-    newTitle.value = title.trim()
-    void createConversation()
+  void ui.prompt({
+    title: 'New direct chat',
+    label: 'Verified email address',
+    confirmLabel: 'Open chat',
+  }).then((email) => {
+    if (!email?.trim()) return
+    void createDirectConversation(email.trim())
   })
 }
 
@@ -119,19 +144,14 @@ async function loadConversations() {
   }
 }
 
-async function createConversation() {
-  const title = newTitle.value.trim() || 'New chat'
+async function createDirectConversation(email: string) {
   error.value = ''
   try {
-    const conv = await api<ChatConversation>('/chat/conversations', {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    })
-    conversations.value = [conv, ...conversations.value]
-    newTitle.value = ''
-    await selectConversation(conv.id)
+    const conversation = await chatStore.createDirectConversation(email)
+    conversations.value = [...chatStore.conversations]
+    await selectConversation(conversation.id)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to create chat')
+    error.value = formatApiError(e, 'Could not open direct chat')
   }
 }
 
@@ -139,6 +159,7 @@ async function selectConversation(id: string) {
   const selection = activeSelection + 1
   activeSelection = selection
   selectedId.value = id
+  void chatStore.openConversation(id)
   searchQuery.value = ''
   searchResults.value = null
   threadSearchOpen.value = false
@@ -285,6 +306,52 @@ async function loadMedia(id = selectedId.value) {
   }
 }
 
+function canMutateMessage(message: ChatMessage): boolean {
+  return (
+    message.senderId === auth.user?.id &&
+    !message.removedAt &&
+    Date.now() - new Date(message.createdAt).getTime() <= 15 * 60 * 1000
+  )
+}
+
+async function editMessage(message: ChatMessage) {
+  const body = await ui.prompt({
+    title: 'Edit message',
+    label: 'Message',
+    initialValue: message.body,
+    confirmLabel: 'Save',
+  })
+  if (!body?.trim() || body.trim() === message.body || !selectedId.value) return
+  try {
+    const updated = await api<ChatMessage>(
+      `/chat/conversations/${selectedId.value}/messages/${message.id}`,
+      { method: 'PATCH', body: JSON.stringify({ body: body.trim() }) },
+    )
+    messages.value = messages.value.map((item) => item.id === updated.id ? updated : item)
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to edit message')
+  }
+}
+
+async function removeMessage(message: ChatMessage) {
+  if (!selectedId.value) return
+  const confirmed = await ui.confirm({
+    title: 'Remove message?',
+    message: 'This message will be replaced with a removal notice for everyone.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })
+  if (!confirmed) return
+  try {
+    await api(`/chat/conversations/${selectedId.value}/messages/${message.id}`, { method: 'DELETE' })
+    messages.value = messages.value.map((item) =>
+      item.id === message.id ? { ...item, body: '', removedAt: new Date().toISOString() } : item,
+    )
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to remove message')
+  }
+}
+
 function attachmentLabel(attachment: ChatAttachment): string {
   if (attachment.availability === 'trashed') return 'File moved to Trash'
   if (attachment.availability === 'purged') return 'File permanently deleted'
@@ -295,24 +362,27 @@ async function sendText() {
   if (!selectedId.value || !draft.value.trim()) return
   const conversationId = selectedId.value
   const body = draft.value.trim()
+  const clientMessageId = crypto.randomUUID()
   const optimistic: ChatMessage = {
     id: `pending-${Date.now()}`,
     conversationId,
+    senderId: auth.user?.id ?? 'self',
+    clientMessageId,
     body,
     createdAt: new Date().toISOString(),
     attachments: [],
   }
   pendingMessage.value = optimistic
+  pendingMessageError.value = ''
   draft.value = ''
   autoGrow()
   error.value = ''
   sending.value = true
   try {
-    const message = await api<ChatMessage>(`/chat/conversations/${conversationId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({ body }),
-    })
-    messages.value = [...messages.value, message]
+    const message = await chatStore.sendMessage(body, clientMessageId, conversationId)
+    messages.value = messages.value.some((item) => item.clientMessageId === clientMessageId)
+      ? messages.value.map((item) => item.clientMessageId === clientMessageId ? message : item)
+      : [...messages.value, message]
     searchResults.value = null
     pendingMessage.value = null
     showJump.value = false
@@ -320,11 +390,23 @@ async function sendText() {
     selectedId.value = message.conversationId
   } catch (e) {
     draft.value = draft.value ? draft.value : body
+    pendingMessageError.value = formatApiError(e, 'Failed to send message')
     error.value = formatApiError(e, 'Failed to send message')
   } finally {
-    pendingMessage.value = null
     sending.value = false
   }
+}
+
+function discardPendingMessage() {
+  pendingMessage.value = null
+  pendingMessageError.value = ''
+}
+
+function retryPendingMessage() {
+  if (!pendingMessage.value) return
+  draft.value = pendingMessage.value.body
+  discardPendingMessage()
+  void sendText()
 }
 
 function triggerAttachment() {
@@ -336,48 +418,80 @@ async function onAttachmentChange(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file || !selectedId.value) return
+  const item: AttachmentUpload = {
+    id: crypto.randomUUID(),
+    file,
+    conversationId: selectedId.value,
+    body: draft.value.trim(),
+    status: 'queued',
+    controller: new AbortController(),
+  }
+  attachmentQueue.value = [...attachmentQueue.value, item]
+  draft.value = ''
+  autoGrow()
+  void processAttachment(item.id)
+}
+
+async function processAttachment(id: string) {
+  const item = attachmentQueue.value.find((entry) => entry.id === id)
+  if (!item || item.status === 'uploading' || item.status === 'canceled') return
+  item.status = 'uploading'
+  item.error = undefined
   sending.value = true
   uploadProgress.value = 0
-  error.value = ''
   try {
+    const contentType = item.file.type || 'application/octet-stream'
     const session = await api<UploadSession>('/chat/attachments/upload-sessions', {
       method: 'POST',
       body: JSON.stringify({
-        conversationId: selectedId.value,
-        name: file.name,
-        size: file.size,
-        contentType: file.type || 'application/octet-stream',
+        conversationId: item.conversationId,
+        name: item.file.name,
+        size: item.file.size,
+        contentType,
       }),
     })
-    await uploadToPresigned(
-      session.uploadUrl,
-      file,
-      file.type || 'application/octet-stream',
-      (ratio) => {
-        uploadProgress.value = ratio
-      },
-    )
+    await uploadToPresigned(session.uploadUrl, item.file, contentType, (ratio) => {
+      uploadProgress.value = ratio
+    }, item.controller.signal)
     const message = await api<ChatMessage>(`/chat/attachments/${session.fileId}/complete`, {
       method: 'POST',
-      body: JSON.stringify({ conversationId: selectedId.value, body: draft.value.trim() }),
+      body: JSON.stringify({ conversationId: item.conversationId, body: item.body }),
     })
-    messages.value = [...messages.value, message]
+    if (selectedId.value === item.conversationId) messages.value = [...messages.value, message]
     searchResults.value = null
-    await loadMedia()
-    draft.value = ''
+    await loadMedia(item.conversationId)
+    attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
     ui.showToast('Attachment sent')
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to send attachment')
+    item.status = 'failed'
+    item.error = formatApiError(e, 'Failed to send attachment')
   } finally {
     uploadProgress.value = null
-    sending.value = false
+    sending.value = attachmentQueue.value.some((entry) => entry.status === 'uploading')
   }
 }
 
+function retryUpload(id: string) {
+  const item = attachmentQueue.value.find((entry) => entry.id === id)
+  if (!item) return
+  item.status = 'queued'
+  void processAttachment(id)
+}
+
+function cancelUpload(id: string) {
+  const item = attachmentQueue.value.find((entry) => entry.id === id)
+  if (!item) return
+  item.status = 'canceled'
+  item.controller.abort()
+  attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
+}
+
 async function openAttachment(fileId: string | null) {
-  if (!fileId) return
+  if (!fileId || !selectedId.value) return
   try {
-    const out = await api<DownloadURL>(`/files/${fileId}/download`)
+    const attachment = messages.value.flatMap((message) => message.attachments).find((item) => item.fileId === fileId)
+    if (attachment && attachment.availability !== 'available') return
+    const out = await api<DownloadURL>(`/chat/conversations/${selectedId.value}/attachments/${attachment?.id ?? fileId}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
     error.value = formatApiError(e, 'Download failed')
@@ -385,10 +499,12 @@ async function openAttachment(fileId: string | null) {
 }
 
 async function openInlineImage(attachment: ChatAttachment) {
-  if (attachment.availability !== 'available' || !attachment.fileId) return
+  if (attachment.availability !== 'available' || !attachment.fileId || !selectedId.value) return
   error.value = ''
   try {
-    const out = await api<DownloadURL>(`/files/${attachment.fileId}/download`)
+    const out = await api<DownloadURL>(
+      `/chat/conversations/${selectedId.value}/attachments/${attachment.id}/download`,
+    )
     lightboxFileId.value = attachment.fileId
     lightboxName.value = attachment.name
     lightboxMime.value = attachment.mimeType
@@ -411,11 +527,17 @@ function focusComposer() {
 onMounted(() => {
   updateViewport()
   window.addEventListener('resize', updateViewport)
+  window.addEventListener('offline', chatStore.markOffline)
+  window.addEventListener('online', chatStore.markOnline)
   void loadConversations()
+  chatStore.connectEvents()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateViewport)
+  window.removeEventListener('offline', chatStore.markOffline)
+  window.removeEventListener('online', chatStore.markOnline)
+  chatStore.stopEvents()
 })
 
 watch(visibleMessages, () => {
@@ -427,6 +549,23 @@ watch(visibleMessages, () => {
     }
   })
 })
+
+watch(
+  () => chatStore.messages[selectedId.value ?? ''],
+  (nextMessages) => {
+    if (nextMessages && selectedId.value) {
+      messages.value = [...nextMessages]
+    }
+  },
+)
+
+watch(
+  () => chatStore.conversations,
+  (nextConversations) => {
+    conversations.value = [...nextConversations]
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -464,9 +603,9 @@ watch(visibleMessages, () => {
           :aria-current="conv.id === selectedId ? 'true' : undefined"
           @click="selectConversation(conv.id)"
         >
-          <span class="avatar" :class="avatarClass(conv.title || '?')" aria-hidden="true">{{ conv.title.slice(0, 1).toUpperCase() }}</span>
+          <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
           <span class="conversation-meta">
-            <span class="conversation-title">{{ conv.title || 'Untitled chat' }}</span>
+            <span class="conversation-title">{{ conversationTitle(conv) }}</span>
             <span class="conversation-preview">{{ conv.preview?.body || (conv.preview?.attachments?.length ? 'Attachment' : 'No messages yet') }}</span>
           </span>
           <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
@@ -475,13 +614,16 @@ watch(visibleMessages, () => {
     </aside>
 
     <section class="message-thread" aria-live="polite">
+      <p v-if="chatStore.connectionState !== 'connected'" class="connection-status" role="status">
+        {{ chatStore.connectionState === 'offline' ? 'Offline — messages will retry when connected.' : 'Reconnecting…' }}
+      </p>
       <template v-if="selectedConversation">
         <header class="thread-header">
           <button type="button" class="icon-btn back-btn" aria-label="Back" @click="backToRail">
             <Icon name="arrow-left" :size="20" />
           </button>
-          <span class="thread-avatar" :class="avatarClass(selectedConversation.title || '?')" aria-hidden="true">{{ selectedConversation.title.slice(0, 1).toUpperCase() }}</span>
-          <h2>{{ selectedConversation.title || 'Untitled chat' }}</h2>
+          <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
+          <h2>{{ conversationTitle(selectedConversation) }}</h2>
           <button class="ghost-btn" type="button" @click="loadMessages()">Refresh</button>
           <button
             class="icon-btn"
@@ -517,7 +659,7 @@ watch(visibleMessages, () => {
                 <div v-if="shouldShowDate(index)" class="day-separator">
                   <span>{{ formatDayLabel(message.createdAt) }}</span>
                 </div>
-                <article class="message-bubble">
+                <article class="message-bubble" :class="{ outgoing: message.senderId === auth.user?.id }">
                   <p v-if="message.body">{{ message.body }}</p>
                   <template v-for="attachment in message.attachments" :key="attachment.id">
                     <button
@@ -546,13 +688,24 @@ watch(visibleMessages, () => {
                       <span v-if="attachment.availability !== 'available'" class="attachment-status">{{ attachmentLabel(attachment) }}</span>
                     </button>
                   </template>
+                  <span v-if="message.removedAt" class="message-status">Message removed</span>
+                  <span v-else-if="message.editedAt" class="message-status">Edited</span>
                   <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
+                  <div v-if="canMutateMessage(message)" class="message-actions">
+                    <button type="button" class="message-action" @click="editMessage(message)">Edit</button>
+                    <button type="button" class="message-action danger-text" @click="removeMessage(message)">Remove</button>
+                  </div>
                 </article>
               </template>
             </TransitionGroup>
             <Transition name="msg">
               <article v-if="pendingMessage" class="message-bubble pending" aria-live="polite">
                 <p>{{ pendingMessage.body }}</p>
+                <span v-if="pendingMessageError" class="message-status">{{ pendingMessageError }}</span>
+                <div v-if="pendingMessageError" class="message-actions">
+                  <button type="button" class="message-action" @click="retryPendingMessage">Retry</button>
+                  <button type="button" class="message-action" @click="discardPendingMessage">Discard</button>
+                </div>
               </article>
             </Transition>
           </div>
@@ -566,6 +719,14 @@ watch(visibleMessages, () => {
         </div>
 
         <UploadProgress :progress="uploadProgress" />
+        <ul v-if="attachmentQueue.length" class="attachment-queue" aria-live="polite">
+          <li v-for="item in attachmentQueue" :key="item.id" class="queue-item">
+            <span class="queue-name">{{ item.file.name }}</span>
+            <span class="queue-status">{{ item.status === 'failed' ? item.error : item.status }}</span>
+            <button v-if="item.status === 'failed'" type="button" class="message-action" @click="retryUpload(item.id)">Retry upload</button>
+            <button v-if="item.status === 'uploading' || item.status === 'queued'" type="button" class="message-action" @click="cancelUpload(item.id)">Cancel upload</button>
+          </li>
+        </ul>
         <form class="chat-composer" @submit.prevent="sendText">
           <button type="button" class="icon-btn attach-btn" aria-label="Attach file" :disabled="sending" @click="triggerAttachment">
             <Icon name="plus" :size="18" />
@@ -1026,6 +1187,81 @@ watch(visibleMessages, () => {
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
   background: var(--primary-cta, #111827);
   color: var(--on-ink, #ffffff);
+}
+
+.message-bubble:not(.outgoing) {
+  align-self: flex-start;
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.message-status {
+  display: inline-block;
+  margin-right: var(--space-xs);
+  color: inherit;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.72;
+}
+
+.message-actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.message-action {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.danger-text {
+  color: var(--danger);
+}
+
+.attachment-queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  border-top: 1px solid var(--hairline);
+  list-style: none;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.queue-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-status {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.connection-status {
+  margin: 0;
+  padding: 6px var(--space-md);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 .message-bubble p {

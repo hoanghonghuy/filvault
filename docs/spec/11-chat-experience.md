@@ -1,6 +1,6 @@
 # 11 — Spec trải nghiệm Chat (Messenger-like)
 
-Trạng thái: **Accepted / C1-C3 MVP implemented**. Đây là một **product surface riêng** sau Phase 2 web features. Không thay thế Files/Vault hoặc Photos.
+Trạng thái: **Accepted / Production Direct Chat in progress**. Đây là một **product surface riêng** sau Phase 2 web features. Không thay thế Files/Vault hoặc Photos.
 
 Nguồn nền: spec 03 (schema), spec 04 (API), spec 05 (architecture), spec 09 (Phase 2 web), `DESIGN.md`.
 
@@ -40,6 +40,23 @@ Một file ảnh gửi qua Chat có **hai mặt**:
 | C7 | Polish motion + API đáp ứng UI: cursor pagination (`before`/`limit`, trả `hasMore`/`nextBefore`), preview tin cuối (`?includePreview=true`), optimistic send, TransitionGroup bubble, jump-to-latest, composer auto-grow | Done |
 
 C4 (realtime) cần ADR riêng trước khi làm.
+
+## 2.1 Production Direct Chat
+
+Production Direct Chat mở rộng C1–C7 thành direct message giữa hai người dùng đã
+xác minh. Contract chính thức nằm trong [ADR 0005](decisions/0005-production-direct-chat.md).
+
+- Mỗi direct conversation có đúng hai members và một cặp user canonical.
+- User bắt đầu chat bằng email chính xác của recipient; API không tiết lộ email có
+  đăng ký hay không trong response lỗi.
+- Message có sender riêng; chỉ sender được sửa/gỡ message của mình trong 15 phút.
+  Hai phía thấy nhãn `Edited` hoặc `Message removed`, không thấy nội dung cũ.
+- File gửi vào chat thuộc quota sender và tự động xuất hiện trong album chung của
+  conversation. Recipient tải qua endpoint Chat-scoped, không qua Files generic.
+- Trash/Purge file nguồn làm attachment/album item unavailable hoặc bị ẩn cho cả
+  hai phía; không sao chép file sang quota recipient.
+- Production realtime dùng REST mutation + SSE với durable event cursor, reconnect
+  và backfill. Presence, typing, read receipt và group chat không nằm trong release.
 
 ## 3. Database dự kiến
 

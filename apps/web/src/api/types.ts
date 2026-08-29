@@ -145,6 +145,10 @@ export interface ChatMessage {
   id: string
   conversationId: string
   body: string
+  senderId: string
+  clientMessageId?: string
+  editedAt?: string
+  removedAt?: string
   createdAt: string
   attachments: ChatAttachment[]
 }
@@ -152,6 +156,12 @@ export interface ChatMessage {
 export interface ChatConversation {
   id: string
   title: string
+  type?: 'legacy' | 'direct'
+  peer?: {
+    id: string
+    name: string
+    email: string
+  }
   createdAt: string
   updatedAt: string
   lastMessageAt?: string

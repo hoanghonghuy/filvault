@@ -23,6 +23,7 @@ func TestCORS_PreflightAllowedOrigin(t *testing.T) {
 	req := httptest.NewRequest(http.MethodOptions, "/ping", nil)
 	req.Header.Set("Origin", "http://localhost:5173")
 	req.Header.Set("Access-Control-Request-Method", "GET")
+	req.Header.Set("Access-Control-Request-Headers", "authorization, last-event-id")
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 
@@ -31,6 +32,9 @@ func TestCORS_PreflightAllowedOrigin(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
 		t.Fatalf("allow-origin=%q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type, Last-Event-ID" {
+		t.Fatalf("allow-headers=%q", got)
 	}
 }
 

@@ -80,7 +80,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	shareLinkHandlers := sharelink.NewHandler(shareLinkSvc)
 
 	chatRepo := postgres.NewChatRepository(store)
-	chatSvc := chat.NewService(chatRepo, fileRepo, quota, obj)
+	chatSvc := chat.NewService(chatRepo, store, fileRepo, quota, obj)
 	chatHandlers := chat.NewHandler(chatSvc)
 
 	storageHandlers := storage.NewHandler(quota)
@@ -88,10 +88,14 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.Use(httpx.RequestLog())
+	metrics := newRequestMetrics()
+	engine.Use(metrics.Middleware())
 	if len(cfg.CORSAllowedOrigins) > 0 {
 		engine.Use(httpx.CORS(cfg.CORSAllowedOrigins))
 	}
 	engine.GET("/healthz", healthz(pool))
+	engine.GET("/readyz", readiness(pool))
+	engine.GET("/metrics", metrics.Handler)
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
 
@@ -125,6 +129,30 @@ func healthz(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	}
+}
+
+func readiness(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready"})
+			return
+		}
+		var migrationsReady bool
+		if err := pool.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM information_schema.tables
+				WHERE table_schema = current_schema()
+					AND table_name = 'schema_migrations'
+			)
+		`).Scan(&migrationsReady); err != nil || !migrationsReady {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	}
 }
 

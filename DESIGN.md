@@ -446,9 +446,12 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 - **Surface riêng hoàn toàn**: không dùng shell Filvault (không bottom nav/side nav/header/storage bar). Route có `meta: { bare: true }`; `AppShell` bỏ chrome khi route bare. Truy cập trực tiếp bằng URL `/chat`.
 - Layout full-screen kiểu Messenger: rail hội thoại (trái) + thread (giữa) + media panel (phải, ≥1024px).
 - Mobile `<768`: master–detail — hiện rail HOẶC thread, không xếp dọc; nút Back (≥44px) quay lại rail.
-- Rail: header "Chats" + brand mark F (link về `/`) + input tạo chat mới + list conversation (avatar tròn chữ đầu, title truncate, ngày muted).
-- Thread: header avatar + title + Refresh; search pill; bubble ink đậm bo góc lớn (gửi bên phải); composer pill "Aa" + attach `+` + send ink.
-- Media panel: ảnh/video đã gửi trong chat (tên + ngày), click mở download — tách khỏi Photos timeline của Vault.
+- Rail: header "Chats" + brand mark F (link về `/`) + contact picker tạo direct chat bằng email đã xác minh + list peer (avatar tròn chữ đầu, tên, preview sender, unread badge, ngày muted).
+- Thread: header avatar + peer name + connection state; search pill; incoming bubble bên trái, outgoing bubble bên phải; sender action sheet sửa/gỡ trong 15 phút; hiển thị `Edited`, `Message removed`, pending/failed/retry.
+- Composer: pill "Aa" + attachment queue (preview/remove/cancel/retry) + send ink; gửi text có `clientMessageId` để retry không tạo tin trùng.
+- Media panel/gallery: mọi ảnh/video/file gửi vào direct chat tự động hiện trong shared album của conversation; có entry trên desktop/tablet/mobile, mở từ Chat hoặc Photos theo quyền của hai member.
+- Attachment bị sender Trash/Purge thì hiện unavailable hoặc bị ẩn đồng bộ ở Chat và shared album; không nới quyền download generic của Vault.
+- Realtime: REST write + SSE receive, trạng thái Reconnecting và Latest; hỗ trợ reconnect/backfill, tôn trọng `prefers-reduced-motion`, focus return và live region hẹp.
 - Touch targets ≥44px; focus ring accent 2px; safe-area top/bottom; motion theo token chung.
 
 ---

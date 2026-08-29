@@ -1,0 +1,215 @@
+import { computed, ref } from 'vue'
+import { defineStore } from 'pinia'
+import { API_BASE, api, getAccessToken, refreshAccessToken } from '@/api/client'
+import type { ChatConversation, ChatMessage } from '@/api/types'
+
+type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline'
+type ChatEvent = { type: string; payload: string }
+
+export const useChatStore = defineStore('chat', () => {
+  const conversations = ref<ChatConversation[]>([])
+  const messages = ref<Record<string, ChatMessage[]>>({})
+  const selectedId = ref<string | null>(null)
+  const connectionState = ref<ConnectionState>('idle')
+  const lastEventId = ref(0)
+  const isLoadingConversations = ref(false)
+  const seenEventIds = new Set<number>()
+  let eventController: AbortController | null = null
+  let reconnectTimer: number | null = null
+
+  const selectedConversation = computed(() =>
+    conversations.value.find((conversation) => conversation.id === selectedId.value) ?? null,
+  )
+
+  async function loadConversations(): Promise<void> {
+    if (isLoadingConversations.value) return
+    isLoadingConversations.value = true
+    try {
+      const out = await api<{ conversations: ChatConversation[] }>('/chat/conversations?includePreview=true')
+      conversations.value = out.conversations
+    } finally {
+      isLoadingConversations.value = false
+    }
+  }
+
+  async function openConversation(id: string): Promise<void> {
+    selectedId.value = id
+    const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${id}/messages?limit=50`)
+    if (selectedId.value !== id) return
+    messages.value[id] = out.messages
+  }
+
+  async function createDirectConversation(recipientEmail: string): Promise<ChatConversation> {
+    const conversation = await api<ChatConversation>('/chat/direct-conversations', {
+      method: 'POST',
+      body: JSON.stringify({ recipientEmail }),
+    })
+    conversations.value = [conversation, ...conversations.value.filter((item) => item.id !== conversation.id)]
+    await openConversation(conversation.id)
+    return conversation
+  }
+
+  async function sendMessage(
+    body: string,
+    clientMessageId = crypto.randomUUID(),
+    conversationId = selectedId.value,
+  ): Promise<ChatMessage> {
+    if (!conversationId) throw new Error('No conversation selected')
+    const message = await api<ChatMessage>(`/chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body, clientMessageId }),
+    })
+    messages.value[conversationId] = reconcileMessage(messages.value[conversationId] ?? [], message)
+    return message
+  }
+
+  function reconcileMessage(current: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+    const index = current.findIndex(
+      (message) =>
+        message.id === incoming.id ||
+        (incoming.clientMessageId && message.clientMessageId === incoming.clientMessageId),
+    )
+    if (index < 0) return [...current, incoming]
+    const next = [...current]
+    next[index] = incoming
+    return next
+  }
+
+  function applyEvent(event: ChatEvent): void {
+    try {
+      const payload = JSON.parse(event.payload) as { aggregateId?: string }
+      if (selectedId.value && payload.aggregateId) {
+        const current = messages.value[selectedId.value] ?? []
+        if (event.type === 'message.removed') {
+          messages.value[selectedId.value] = current.map((message) =>
+            message.id === payload.aggregateId
+              ? { ...message, body: '', removedAt: new Date().toISOString() }
+              : message,
+          )
+        }
+        if (event.type === 'message.created' || event.type === 'message.edited') {
+          void openConversation(selectedId.value)
+        }
+      }
+    } catch {
+      // The durable event is still acknowledged by its sequence cursor.
+    }
+  }
+
+  function stopEvents(): void {
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    eventController?.abort()
+    eventController = null
+    seenEventIds.clear()
+    connectionState.value = 'idle'
+  }
+
+  function markOffline(): void {
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    eventController?.abort()
+    eventController = null
+    connectionState.value = 'offline'
+  }
+
+  function markOnline(): void {
+    if (connectionState.value === 'offline') connectEvents()
+  }
+
+  function scheduleReconnect(): void {
+    if (reconnectTimer !== null) return
+    connectionState.value = navigator.onLine ? 'reconnecting' : 'offline'
+    reconnectTimer = window.setTimeout(() => {
+      reconnectTimer = null
+      connectEvents()
+    }, 1000 + Math.round(Math.random() * 2000))
+  }
+
+  function connectEvents(): void {
+    eventController?.abort()
+    eventController = null
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    const token = getAccessToken()
+    if (!token) {
+      connectionState.value = 'offline'
+      return
+    }
+    connectionState.value = 'connecting'
+    const controller = new AbortController()
+    eventController = controller
+    void readEvents(token, controller.signal)
+  }
+
+  async function readEvents(token: string, signal: AbortSignal): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE}/chat/events?after=${lastEventId.value}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
+        signal,
+      })
+          if (response.status === 401 && !signal.aborted && (await refreshAccessToken())) {
+            connectEvents()
+            return
+          }
+          if (!response.ok || !response.body) throw new Error(`SSE failed (${response.status})`)
+      connectionState.value = 'connected'
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (!signal.aborted) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const frames = buffer.split('\n\n')
+        buffer = frames.pop() ?? ''
+        for (const frame of frames) {
+          const id = frame.match(/^id:\s*(\d+)$/m)?.[1]
+          const sequence = id ? Number(id) : 0
+          if (sequence > 0 && (seenEventIds.has(sequence) || sequence <= lastEventId.value)) continue
+          if (sequence > 0) {
+            seenEventIds.add(sequence)
+            lastEventId.value = sequence
+            if (seenEventIds.size > 1000) {
+              const oldest = seenEventIds.values().next().value
+              if (typeof oldest === 'number') seenEventIds.delete(oldest)
+            }
+          }
+          const type = frame.match(/^event:\s*(.+)$/m)?.[1]
+          const data = frame.match(/^data:\s*(.+)$/m)?.[1]
+          if (type && data) applyEvent({ type, payload: data })
+          if (type) {
+            void loadConversations()
+            if (selectedId.value) void openConversation(selectedId.value)
+          }
+        }
+      }
+      if (!signal.aborted) scheduleReconnect()
+    } catch {
+      if (!signal.aborted) scheduleReconnect()
+    }
+  }
+
+  return {
+    conversations,
+    messages,
+    selectedId,
+    selectedConversation,
+    connectionState,
+    loadConversations,
+    openConversation,
+    createDirectConversation,
+    sendMessage,
+    applyEvent,
+    connectEvents,
+    stopEvents,
+    markOffline,
+    markOnline,
+  }
+})

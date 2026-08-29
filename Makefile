@@ -5,7 +5,7 @@ DSN ?= postgres://filvault:$(FILVAULT_POSTGRES_PASSWORD)@127.0.0.1:5435/filvault
 export PATH := $(HOME)/.local/go/bin:$(PATH)
 export FILVAULT_POSTGRES_PASSWORD
 
-.PHONY: compose-up compose-down up down migrate migrate-down seed test run-api dev-api dev-web \
+.PHONY: compose-up compose-down up down prod-up migrate migrate-down seed test run-api dev-api dev-web \
 	lint-api typecheck-api lint-web typecheck-web ci-api ci-web cli-build cli-test
 
 compose-up:
@@ -25,6 +25,9 @@ compose-down:
 
 up:
 	$(COMPOSE) up -d --build
+
+prod-up:
+	$(COMPOSE) up -d --build migrate api worker web
 
 down:
 	$(COMPOSE) down

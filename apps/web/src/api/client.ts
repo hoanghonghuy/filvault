@@ -1,6 +1,6 @@
 import type { ApiErrorBody, Session } from './types'
 
-const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
 
 const ACCESS_KEY = 'filvault.accessToken'
 const REFRESH_KEY = 'filvault.refreshToken'
@@ -50,7 +50,7 @@ async function refreshAccess(): Promise<boolean> {
   if (!refreshToken) {
     return false
   }
-  const res = await fetch(`${BASE}/auth/refresh`, {
+  const res = await fetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
@@ -62,6 +62,10 @@ async function refreshAccess(): Promise<boolean> {
   const session = (await res.json()) as Session
   setTokens(session.accessToken, session.refreshToken)
   return true
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
+  return refreshAccess()
 }
 
 export async function api<T>(
@@ -79,7 +83,7 @@ export async function api<T>(
     headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
-  const res = await fetch(`${BASE}${path}`, { ...init, headers })
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
   if (res.status === 401 && auth && retry && (await refreshAccess())) {
     return api<T>(path, init, { auth, retry: false })
   }
@@ -97,24 +101,39 @@ export function uploadToPresigned(
   file: File,
   contentType: string,
   onProgress?: (ratio: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
+    const abort = () => xhr.abort()
+    signal?.addEventListener('abort', abort, { once: true })
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
         onProgress(event.loaded / event.total)
       }
     }
     xhr.onload = () => {
+      signal?.removeEventListener('abort', abort)
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve()
         return
       }
       reject(new ApiError('UPLOAD_FAILED', `Upload failed (${xhr.status})`, xhr.status))
     }
-    xhr.onerror = () => reject(new ApiError('UPLOAD_FAILED', 'Upload network error', 0))
+    xhr.onerror = () => {
+      signal?.removeEventListener('abort', abort)
+      reject(new ApiError('UPLOAD_FAILED', 'Upload network error', 0))
+    }
+    xhr.onabort = () => {
+      signal?.removeEventListener('abort', abort)
+      reject(new ApiError('UPLOAD_CANCELED', 'Upload canceled', 0))
+    }
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Type', contentType)
+    if (signal?.aborted) {
+      xhr.abort()
+      return
+    }
     xhr.send(file)
   })
 }

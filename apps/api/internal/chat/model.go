@@ -9,11 +9,16 @@ const (
 )
 
 type Conversation struct {
-	ID        string
-	OwnerID   string
-	Title     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	OwnerID     string
+	Title       string
+	Type        string
+	PeerID      string
+	PeerName    string
+	PeerEmail   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	LastMessage time.Time
 }
 
 type ConversationPreview struct {
@@ -24,12 +29,31 @@ type ConversationPreview struct {
 }
 
 type Message struct {
+	ID              string
+	ConversationID  string
+	OwnerID         string
+	SenderID        string
+	ClientMessageID string
+	Body            string
+	CreatedAt       time.Time
+	EditedAt        *time.Time
+	RemovedAt       *time.Time
+	Idempotent      bool
+	Attachments     []Attachment
+}
+
+type Event struct {
 	ID             string
+	Sequence       int64
 	ConversationID string
-	OwnerID        string
-	Body           string
+	Type           string
+	AggregateID    string
+	Payload        []byte
 	CreatedAt      time.Time
-	Attachments    []Attachment
+}
+
+type EventCursor struct {
+	Sequence int64
 }
 
 type Attachment struct {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,6 +47,38 @@ func TestHealthz_ReturnsOKWhenDatabaseIsReachable(t *testing.T) {
 	}
 	if body.Status != "ok" {
 		t.Fatalf("status field=%q", body.Status)
+	}
+}
+
+func TestMetrics_ReturnsPrometheusCounters(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	t.Cleanup(cancel)
+	pool := openPool(t, ctx)
+	t.Cleanup(pool.Close)
+	engine := app.NewWithDeps(config.Config{}, pool, mailer.NewMemory(), objectstore.NewMemory())
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	engine.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "filvault_http_requests_total") {
+		t.Fatalf("metrics status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestReadyz_ReturnsReadyWhenMigrationsExist(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	t.Cleanup(cancel)
+	pool := openPool(t, ctx)
+	t.Cleanup(pool.Close)
+	if err := postgres.Migrate(ctx, pool); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	engine := app.NewWithDeps(config.Config{}, pool, mailer.NewMemory(), objectstore.NewMemory())
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"ready"`) {
+		t.Fatalf("readyz status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

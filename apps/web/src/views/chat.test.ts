@@ -101,4 +101,27 @@ describe('chat surface contract', () => {
     expect(types).toMatch(/export interface ChatMessage/)
     expect(types).toMatch(/export interface ChatAttachment/)
   })
+
+  it('supports reliable message mutations and failed-send recovery', () => {
+    expect(chat).toMatch(/function editMessage|editMessage\(/)
+    expect(chat).toMatch(/function removeMessage|removeMessage\(/)
+    expect(chat).toMatch(/Retry/)
+    expect(chat).toMatch(/Discard/)
+    expect(chat).toMatch(/clientMessageId/)
+  })
+
+  it('captures attachment work against its original conversation', () => {
+    expect(chat).toMatch(/attachmentQueue/)
+    expect(chat).toMatch(/conversationId/)
+    expect(chat).toMatch(/Cancel upload|cancelUpload|AbortController/)
+    expect(chat).toMatch(/retryUpload|Retry upload/)
+  })
+
+  it('reconnects realtime events with a durable cursor and deduplicates messages', () => {
+    const store = readSrc('../stores/chat.ts')
+    expect(store).toMatch(/lastEventId/)
+    expect(store).toMatch(/AbortController/)
+    expect(store).toMatch(/reconcileMessage/)
+    expect(store).toMatch(/message\.created|message\.edited|message\.removed/)
+  })
 })

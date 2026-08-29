@@ -10,15 +10,19 @@ import (
 	"filvault/internal/file"
 	"filvault/internal/platform/config"
 	"filvault/internal/platform/objectstore"
+	"filvault/internal/user"
 
 	"github.com/oklog/ulid/v2"
 )
 
 type Repository interface {
 	CreateConversation(ctx context.Context, c Conversation) error
+	CreateOrGetDirectConversation(ctx context.Context, ownerID, recipientID string) (Conversation, error)
 	ListConversations(ctx context.Context, ownerID string) ([]Conversation, error)
 	GetConversation(ctx context.Context, ownerID, id string) (*Conversation, error)
-	CreateMessage(ctx context.Context, m Message) error
+	CreateMessage(ctx context.Context, m Message) (Message, error)
+	UpdateMessage(ctx context.Context, userID, conversationID, messageID, body string, now time.Time) (Message, error)
+	RemoveMessage(ctx context.Context, userID, conversationID, messageID string, now time.Time) error
 	CreateMessageWithAttachments(ctx context.Context, m Message, fileIDs []string) (Message, error)
 	ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]Message, error)
 	ListMessagesBefore(ctx context.Context, ownerID, conversationID, before string, limit int) ([]Message, error)
@@ -26,7 +30,13 @@ type Repository interface {
 	SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]Message, error)
 	CreateAttachment(ctx context.Context, a Attachment) error
 	ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error)
+	GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error)
+	ListEventsAfter(ctx context.Context, userID string, after int64, limit int) ([]Event, error)
 	CompleteAttachment(ctx context.Context, ownerID, conversationID string, f file.File, stat objectstore.ObjectStat, body string, now time.Time) (Message, error)
+}
+
+type UserDirectory interface {
+	GetUserByEmail(ctx context.Context, email string) (*user.User, error)
 }
 
 type MessagePage struct {
@@ -42,14 +52,15 @@ type ConversationView struct {
 
 type Service struct {
 	repo    Repository
+	users   UserDirectory
 	files   file.Repository
 	quota   file.QuotaStore
 	objects objectstore.ObjectStore
 	now     func() time.Time
 }
 
-func NewService(repo Repository, files file.Repository, quota file.QuotaStore, objects objectstore.ObjectStore) *Service {
-	return &Service{repo: repo, files: files, quota: quota, objects: objects, now: time.Now}
+func NewService(repo Repository, users UserDirectory, files file.Repository, quota file.QuotaStore, objects objectstore.ObjectStore) *Service {
+	return &Service{repo: repo, users: users, files: files, quota: quota, objects: objects, now: time.Now}
 }
 
 func (s *Service) CreateConversation(ctx context.Context, ownerID, title string) (Conversation, error) {
@@ -66,7 +77,53 @@ func (s *Service) ListConversations(ctx context.Context, ownerID string) ([]Conv
 	return s.repo.ListConversations(ctx, ownerID)
 }
 
-func (s *Service) CreateMessage(ctx context.Context, ownerID, conversationID, body string, fileIDs []string) (Message, error) {
+func (s *Service) CreateDirectConversation(ctx context.Context, ownerID, recipientEmail string) (Conversation, error) {
+	recipientEmail = strings.TrimSpace(strings.ToLower(recipientEmail))
+	if recipientEmail == "" || !strings.Contains(recipientEmail, "@") || s.users == nil {
+		return Conversation{}, apperr.Validation
+	}
+	recipient, err := s.users.GetUserByEmail(ctx, recipientEmail)
+	if err != nil {
+		return Conversation{}, err
+	}
+	if recipient == nil || !recipient.EmailVerified() || recipient.ID == ownerID {
+		return Conversation{}, apperr.NotFound
+	}
+	return s.repo.CreateOrGetDirectConversation(ctx, ownerID, recipient.ID)
+}
+
+func (s *Service) EditMessage(ctx context.Context, userID, conversationID, messageID, body string) (Message, error) {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return Message{}, apperr.Validation
+	}
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return Message{}, err
+	}
+	return s.repo.UpdateMessage(ctx, userID, conversationID, messageID, body, s.now().UTC())
+}
+
+func (s *Service) RemoveMessage(ctx context.Context, userID, conversationID, messageID string) error {
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return err
+	}
+	return s.repo.RemoveMessage(ctx, userID, conversationID, messageID, s.now().UTC())
+}
+
+func (s *Service) DownloadAttachment(ctx context.Context, userID, conversationID, attachmentID string) (objectstore.PresignedURL, error) {
+	key, err := s.repo.GetAttachmentObjectKey(ctx, userID, conversationID, attachmentID)
+	if err != nil {
+		return objectstore.PresignedURL{}, err
+	}
+	if s.objects == nil {
+		return objectstore.PresignedURL{}, apperr.InvalidState
+	}
+	return s.objects.CreateDownloadURL(ctx, key, objectstore.DownloadOptions{
+		Expires: config.DownloadPresignTTL,
+	})
+}
+
+func (s *Service) CreateMessage(ctx context.Context, ownerID, conversationID, body string, fileIDs []string, clientMessageID string) (Message, error) {
 	body = strings.TrimSpace(body)
 	if body == "" && len(fileIDs) == 0 {
 		return Message{}, apperr.Validation
@@ -75,14 +132,18 @@ func (s *Service) CreateMessage(ctx context.Context, ownerID, conversationID, bo
 		return Message{}, err
 	}
 	now := s.now().UTC()
-	m := Message{ID: ulid.Make().String(), ConversationID: conversationID, OwnerID: ownerID, Body: body, CreatedAt: now}
+	m := Message{
+		ID: ulid.Make().String(), ConversationID: conversationID, OwnerID: ownerID,
+		SenderID: ownerID, Body: body, ClientMessageID: strings.TrimSpace(clientMessageID), CreatedAt: now,
+	}
 	if len(fileIDs) > 0 {
 		return s.repo.CreateMessageWithAttachments(ctx, m, fileIDs)
 	}
-	if err := s.repo.CreateMessage(ctx, m); err != nil {
+	created, err := s.repo.CreateMessage(ctx, m)
+	if err != nil {
 		return Message{}, err
 	}
-	return m, nil
+	return created, nil
 }
 
 func (s *Service) ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]Message, error) {
@@ -107,9 +168,13 @@ func (s *Service) ListMessagePage(ctx context.Context, ownerID, conversationID, 
 			return MessagePage{}, apperr.Validation
 		}
 	}
-	messages, err := s.repo.ListMessagesBefore(ctx, ownerID, conversationID, before, limit)
+	messages, err := s.repo.ListMessagesBefore(ctx, ownerID, conversationID, before, limit+1)
 	if err != nil {
 		return MessagePage{}, err
+	}
+	hasMore := len(messages) > limit
+	if hasMore {
+		messages = messages[len(messages)-limit:]
 	}
 	for i := range messages {
 		for j := range messages[i].Attachments {
@@ -118,7 +183,7 @@ func (s *Service) ListMessagePage(ctx context.Context, ownerID, conversationID, 
 			}
 		}
 	}
-	page := MessagePage{Messages: messages, HasMore: len(messages) == limit}
+	page := MessagePage{Messages: messages, HasMore: hasMore}
 	if page.HasMore && len(messages) > 0 {
 		page.NextBefore = messages[0].ID
 	}
@@ -268,12 +333,18 @@ func (s *Service) CompleteAttachment(ctx context.Context, ownerID, conversationI
 	if f == nil {
 		return Message{}, apperr.NotFound
 	}
+	if f.Source != "chat" || f.SourceRefID == nil || *f.SourceRefID != conversationID {
+		return Message{}, apperr.NotFound
+	}
 	now := s.now().UTC()
 	if f.Status == file.StatusPending && f.UploadExpiresAt != nil && !now.Before(*f.UploadExpiresAt) {
 		return Message{}, apperr.UploadExpired
 	}
 	var stat objectstore.ObjectStat
 	if f.Status == file.StatusPending {
+		if s.objects == nil {
+			return Message{}, apperr.InvalidState
+		}
 		stat, err = s.objects.Head(ctx, f.ObjectKey)
 		if err != nil {
 			if errors.Is(err, objectstore.ErrObjectNotFound) {

@@ -114,6 +114,9 @@ func TestMigrate_DownRemovesPhase1Tables(t *testing.T) {
 		t.Fatalf("MigrateDown: %v", err)
 	}
 	for _, name := range []string{
+		"production direct chat",
+		"pending upload cleanup",
+		"pending upload cleanup job retention",
 		"chat attachment lifecycle",
 		"file name uniqueness",
 		"file versions",

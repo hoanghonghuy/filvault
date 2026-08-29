@@ -76,6 +76,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
     healthcheck:
@@ -83,6 +85,44 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  migrate:
+    container_name: filvault-migrate
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    entrypoint: ["migrate"]
+    environment:
+      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}@postgres:5432/filvault?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  worker:
+    container_name: filvault-worker
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    entrypoint: ["worker"]
+    environment:
+      FILVAULT_METADATA_STORE: postgres
+      FILVAULT_OBJECT_STORE: s3
+      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}@postgres:5432/filvault?sslmode=disable
+      FILVAULT_S3_ENDPOINT: http://minio:9000
+      FILVAULT_S3_BUCKET: filvault
+      FILVAULT_S3_REGION: us-east-1
+      FILVAULT_S3_ACCESS_KEY: filvault
+      FILVAULT_S3_SECRET_KEY: filvaultsecret
+      FILVAULT_JWT_SECRET: ${FILVAULT_JWT_SECRET:?Set FILVAULT_JWT_SECRET for local compose}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   web:

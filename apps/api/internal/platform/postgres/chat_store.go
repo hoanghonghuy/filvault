@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"filvault/internal/apperr"
+	"filvault/internal/auth"
 	"filvault/internal/chat"
 	"filvault/internal/file"
 	"filvault/internal/platform/objectstore"
@@ -16,19 +17,113 @@ import (
 )
 
 func (s *Store) CreateConversation(ctx context.Context, c chat.Conversation) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO conversations (id, owner_id, title, created_at, updated_at, archived_at)
-		VALUES ($1, $2, $3, $4, $5, NULL)
-	`, c.ID, c.OwnerID, c.Title, c.CreatedAt, c.UpdatedAt)
-	return err
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO conversations
+			(id, owner_id, title, created_at, updated_at, archived_at,
+			 conversation_type, created_by_user_id, last_message_at)
+		VALUES ($1, $2, $3, $4, $5, NULL, 'legacy', $2, $5)
+	`, c.ID, c.OwnerID, c.Title, c.CreatedAt, c.UpdatedAt); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO conversation_members (conversation_id, user_id, joined_at)
+		VALUES ($1, $2, $3)
+	`, c.ID, c.OwnerID, c.CreatedAt); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *Store) CreateOrGetDirectConversation(ctx context.Context, ownerID, recipientID string) (chat.Conversation, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return chat.Conversation{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	ids := []string{ownerID, recipientID}
+	if ids[0] > ids[1] {
+		ids[0], ids[1] = ids[1], ids[0]
+	}
+	directKey := ids[0] + ":" + ids[1]
+	var c chat.Conversation
+	err = tx.QueryRow(ctx, `
+		SELECT id, owner_id, COALESCE(title, ''), conversation_type,
+			created_at, updated_at, COALESCE(last_message_at, updated_at)
+		FROM conversations
+		WHERE direct_key = $1
+		FOR UPDATE
+	`, directKey).Scan(
+		&c.ID, &c.OwnerID, &c.Title, &c.Type,
+		&c.CreatedAt, &c.UpdatedAt, &c.LastMessage,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		now := time.Now().UTC()
+		c = chat.Conversation{
+			ID: auth.NewID(), OwnerID: ownerID, Type: "direct",
+			CreatedAt: now, UpdatedAt: now, LastMessage: now,
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO conversations
+				(id, owner_id, title, created_at, updated_at, archived_at,
+				 conversation_type, direct_key, created_by_user_id, last_message_at)
+			VALUES ($1, $2, NULL, $3, $3, NULL, 'direct', $4, $2, $3)
+		`, c.ID, ownerID, now, directKey); err != nil {
+			if isUniqueViolation(err) {
+				_ = tx.Rollback(ctx)
+				return s.CreateOrGetDirectConversation(ctx, ownerID, recipientID)
+			}
+			return chat.Conversation{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO conversation_members (conversation_id, user_id, joined_at)
+			VALUES ($1, $2, $3), ($1, $4, $3)
+		`, c.ID, ownerID, now, recipientID); err != nil {
+			return chat.Conversation{}, err
+		}
+	} else if err != nil {
+		return chat.Conversation{}, err
+	} else {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO conversation_members (conversation_id, user_id, joined_at)
+			VALUES ($1, $2, $3), ($1, $4, $3)
+			ON CONFLICT (conversation_id, user_id) DO UPDATE SET archived_at = NULL
+		`, c.ID, ownerID, c.CreatedAt, recipientID); err != nil {
+			return chat.Conversation{}, err
+		}
+	}
+	_ = tx.QueryRow(ctx, `
+		SELECT u.id, u.display_name, u.email
+		FROM conversation_members cm
+		JOIN users u ON u.id = cm.user_id
+		WHERE cm.conversation_id = $1 AND cm.user_id <> $2
+	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail)
+	if err := tx.Commit(ctx); err != nil {
+		return chat.Conversation{}, err
+	}
+	return c, nil
 }
 
 func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.Conversation, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, owner_id, COALESCE(title, ''), created_at, updated_at
-		FROM conversations
-		WHERE owner_id = $1 AND archived_at IS NULL
-		ORDER BY updated_at DESC
+		SELECT c.id, c.owner_id, COALESCE(c.title, ''), c.created_at, c.updated_at,
+			COALESCE(c.conversation_type, 'legacy'),
+			COALESCE(peer.id, ''), COALESCE(peer.display_name, ''), COALESCE(peer.email, ''),
+			COALESCE(c.last_message_at, c.updated_at)
+		FROM conversations c
+		LEFT JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id <> $1
+		LEFT JOIN users peer ON peer.id = cm.user_id
+		WHERE c.archived_at IS NULL
+			AND EXISTS (
+				SELECT 1 FROM conversation_members member
+				WHERE member.conversation_id = c.id AND member.user_id = $1 AND member.archived_at IS NULL
+			)
+		ORDER BY COALESCE(c.last_message_at, c.updated_at) DESC, c.id DESC
 	`, ownerID)
 	if err != nil {
 		return nil, err
@@ -37,7 +132,8 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 	var out []chat.Conversation
 	for rows.Next() {
 		var c chat.Conversation
-		if err := rows.Scan(&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
+			&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.LastMessage); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -48,10 +144,22 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.Conversation, error) {
 	var c chat.Conversation
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, owner_id, COALESCE(title, ''), created_at, updated_at
-		FROM conversations
-		WHERE owner_id = $1 AND id = $2 AND archived_at IS NULL
-	`, ownerID, id).Scan(&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt)
+		SELECT c.id, c.owner_id, COALESCE(c.title, ''), c.created_at, c.updated_at,
+			COALESCE(c.conversation_type, 'legacy'),
+			COALESCE(peer.id, ''), COALESCE(peer.display_name, ''), COALESCE(peer.email, ''),
+			COALESCE(c.last_message_at, c.updated_at)
+		FROM conversations c
+		LEFT JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id <> $1
+		LEFT JOIN users peer ON peer.id = cm.user_id
+		WHERE c.id = $2 AND c.archived_at IS NULL
+			AND EXISTS (
+				SELECT 1 FROM conversation_members member
+				WHERE member.conversation_id = c.id AND member.user_id = $1 AND member.archived_at IS NULL
+			)
+	`, ownerID, id).Scan(
+		&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
+		&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.LastMessage,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -61,19 +169,134 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 	return &c, nil
 }
 
-func (s *Store) CreateMessage(ctx context.Context, m chat.Message) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO messages (id, conversation_id, owner_id, body, created_at, deleted_at)
-		VALUES ($1, $2, $3, $4, $5, NULL)
-	`, m.ID, m.ConversationID, m.OwnerID, m.Body, m.CreatedAt)
+func (s *Store) CreateMessage(ctx context.Context, m chat.Message) (chat.Message, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return chat.Message{}, err
+	}
+	defer tx.Rollback(ctx)
+	if m.ClientMessageID != "" {
+		var existing chat.Message
+		err = tx.QueryRow(ctx, `
+			SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, ''),
+				body, created_at, edited_at, removed_at
+			FROM messages
+			WHERE conversation_id = $1 AND sender_id = $2 AND client_message_id = $3
+		`, m.ConversationID, m.SenderID, m.ClientMessageID).Scan(
+			&existing.ID, &existing.ConversationID, &existing.OwnerID, &existing.SenderID,
+			&existing.ClientMessageID, &existing.Body, &existing.CreatedAt,
+			&existing.EditedAt, &existing.RemovedAt,
+		)
+		if err == nil {
+			if existing.Body != m.Body {
+				return chat.Message{}, apperr.Conflict
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return chat.Message{}, err
+			}
+			existing.Attachments, err = s.listMessageAttachments(ctx, existing.ID)
+			existing.Idempotent = true
+			return existing, err
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return chat.Message{}, err
+		}
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO messages
+			(id, conversation_id, owner_id, sender_id, client_message_id, body, created_at, deleted_at)
+		VALUES ($1, $2, $3, $3, NULLIF($4::text, ''), $5, $6, NULL)
+	`, m.ID, m.ConversationID, m.OwnerID, m.ClientMessageID, m.Body, m.CreatedAt)
+	if err != nil {
+		if isUniqueViolation(err) && m.ClientMessageID != "" {
+			_ = tx.Rollback(ctx)
+			return s.CreateMessage(ctx, m)
+		}
+		return chat.Message{}, err
+	}
+	if _, err = tx.Exec(ctx, `
+		UPDATE conversations SET updated_at = $2, last_message_at = $2
+		WHERE id = $1
+	`, m.ConversationID, m.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	if err := insertChatEvent(ctx, tx, m.ConversationID, "message.created", m.ID, m.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return chat.Message{}, err
+	}
+	return m, nil
+}
+
+func (s *Store) UpdateMessage(ctx context.Context, userID, conversationID, messageID, body string, now time.Time) (chat.Message, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return chat.Message{}, err
+	}
+	defer tx.Rollback(ctx)
+	var m chat.Message
+	err = tx.QueryRow(ctx, `
+		UPDATE messages
+		SET body = $4, edited_at = $5
+		WHERE id = $1 AND conversation_id = $2 AND sender_id = $3
+			AND removed_at IS NULL AND created_at >= $5::timestamptz - INTERVAL '15 minutes'
+		RETURNING id, conversation_id, owner_id, sender_id, client_message_id,
+			body, created_at, edited_at, removed_at
+	`, messageID, conversationID, userID, body, now).Scan(
+		&m.ID, &m.ConversationID, &m.OwnerID, &m.SenderID, &m.ClientMessageID,
+		&m.Body, &m.CreatedAt, &m.EditedAt, &m.RemovedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return chat.Message{}, apperr.Forbidden
+	}
+	if err != nil {
+		return chat.Message{}, err
+	}
+	if err := insertChatEvent(ctx, tx, conversationID, "message.edited", m.ID, now); err != nil {
+		return chat.Message{}, err
+	}
+	m.Attachments, err = s.listMessageAttachmentsFrom(ctx, tx, m.ID)
+	if err != nil {
+		return chat.Message{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return chat.Message{}, err
+	}
+	return m, err
+}
+
+func (s *Store) RemoveMessage(ctx context.Context, userID, conversationID, messageID string, now time.Time) error {
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `
-		UPDATE conversations SET updated_at = $3
-		WHERE id = $1 AND owner_id = $2
-	`, m.ConversationID, m.OwnerID, m.CreatedAt)
-	return err
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `
+		UPDATE messages
+		SET removed_at = $4, removed_by_user_id = $3, body = ''
+		WHERE id = $1 AND conversation_id = $2 AND sender_id = $3
+			AND removed_at IS NULL AND created_at >= $4::timestamptz - INTERVAL '15 minutes'
+	`, messageID, conversationID, userID, now)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.Forbidden
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE chat_shared_album_items
+		SET hidden_at = $2
+		WHERE attachment_id IN (
+			SELECT id FROM message_attachments WHERE message_id = $1
+		) AND hidden_at IS NULL
+	`, messageID, now); err != nil {
+		return err
+	}
+	if err := insertChatEvent(ctx, tx, conversationID, "message.removed", messageID, now); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) CreateMessageWithAttachments(ctx context.Context, m chat.Message, fileIDs []string) (chat.Message, error) {
@@ -83,10 +306,46 @@ func (s *Store) CreateMessageWithAttachments(ctx context.Context, m chat.Message
 	}
 	defer tx.Rollback(ctx)
 
+	if m.ClientMessageID != "" {
+		var existing chat.Message
+		err = tx.QueryRow(ctx, `
+			SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, ''),
+				body, created_at, edited_at, removed_at
+			FROM messages
+			WHERE conversation_id = $1 AND sender_id = $2 AND client_message_id = $3
+		`, m.ConversationID, m.SenderID, m.ClientMessageID).Scan(
+			&existing.ID, &existing.ConversationID, &existing.OwnerID, &existing.SenderID,
+			&existing.ClientMessageID, &existing.Body, &existing.CreatedAt,
+			&existing.EditedAt, &existing.RemovedAt,
+		)
+		if err == nil {
+			if existing.Body != m.Body {
+				return chat.Message{}, apperr.Conflict
+			}
+			existing.Attachments, err = s.listMessageAttachmentsFrom(ctx, tx, existing.ID)
+			if err != nil {
+				return chat.Message{}, err
+			}
+			existing.Idempotent = true
+			if err := tx.Commit(ctx); err != nil {
+				return chat.Message{}, err
+			}
+			return existing, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return chat.Message{}, err
+		}
+	}
+
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO messages (id, conversation_id, owner_id, body, created_at, deleted_at)
-		VALUES ($1, $2, $3, $4, $5, NULL)
-	`, m.ID, m.ConversationID, m.OwnerID, m.Body, m.CreatedAt); err != nil {
+		INSERT INTO messages
+			(id, conversation_id, owner_id, sender_id, client_message_id, body, created_at, deleted_at)
+		VALUES ($1, $2, $3, $3, NULLIF($4::text, ''), $5, $6, NULL)
+	`, m.ID, m.ConversationID, m.OwnerID, m.ClientMessageID, m.Body, m.CreatedAt); err != nil {
+		if isUniqueViolation(err) && m.ClientMessageID != "" {
+			_ = tx.Rollback(ctx)
+			return s.CreateMessageWithAttachments(ctx, m, fileIDs)
+		}
 		return chat.Message{}, err
 	}
 	seen := make(map[string]struct{}, len(fileIDs))
@@ -131,18 +390,43 @@ func (s *Store) CreateMessageWithAttachments(ctx context.Context, m chat.Message
 		`, a.ID, a.MessageID, a.FileID, a.OriginalName, a.Name, a.MimeType, a.SizeBytes, a.CreatedAt); err != nil {
 			return chat.Message{}, err
 		}
+		albumID, err := ensureChatSharedAlbum(ctx, tx, m.ConversationID, m.CreatedAt)
+		if err != nil {
+			return chat.Message{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO chat_shared_album_items (album_id, attachment_id, added_at)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (attachment_id) DO NOTHING
+		`, albumID, a.ID, a.CreatedAt); err != nil {
+			return chat.Message{}, err
+		}
 		m.Attachments = append(m.Attachments, a)
 	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE conversations SET updated_at = $3
-		WHERE id = $1 AND owner_id = $2
-	`, m.ConversationID, m.OwnerID, m.CreatedAt); err != nil {
+		UPDATE conversations SET updated_at = $2, last_message_at = $2
+		WHERE id = $1
+		`, m.ConversationID, m.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	if err := insertChatEvent(ctx, tx, m.ConversationID, "message.created", m.ID, m.CreatedAt); err != nil {
 		return chat.Message{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return chat.Message{}, err
 	}
 	return m, nil
+}
+
+func ensureChatSharedAlbum(ctx context.Context, tx pgx.Tx, conversationID string, now time.Time) (string, error) {
+	albumID := auth.NewID()
+	err := tx.QueryRow(ctx, `
+		INSERT INTO chat_shared_albums (id, conversation_id, name, created_at, updated_at)
+		VALUES ($1, $2, 'Shared media', $3, $3)
+		ON CONFLICT (conversation_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+		RETURNING id
+	`, albumID, conversationID, now).Scan(&albumID)
+	return albumID, err
 }
 
 func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID string, pending file.File, stat objectstore.ObjectStat, body string, now time.Time) (chat.Message, error) {
@@ -170,16 +454,21 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 	if status == file.StatusReady && completedMessageID != nil {
 		var m chat.Message
 		err := tx.QueryRow(ctx, `
-			SELECT id, conversation_id, owner_id, body, created_at
+			SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, ''),
+				body, created_at, edited_at, removed_at
 			FROM messages
 			WHERE id = $1 AND owner_id = $2
-		`, *completedMessageID, ownerID).Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt)
+		`, *completedMessageID, ownerID).Scan(
+			&m.ID, &m.ConversationID, &m.OwnerID, &m.SenderID, &m.ClientMessageID,
+			&m.Body, &m.CreatedAt, &m.EditedAt, &m.RemovedAt,
+		)
 		if err != nil {
 			return chat.Message{}, err
 		}
 		if m.ConversationID != conversationID {
 			return chat.Message{}, apperr.NotFound
 		}
+		m.Idempotent = true
 		m.Attachments, err = s.listMessageAttachmentsFrom(ctx, tx, m.ID)
 		if err != nil {
 			return chat.Message{}, err
@@ -198,7 +487,13 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 
 	var conversationOwner string
 	if err := tx.QueryRow(ctx, `
-		SELECT owner_id FROM conversations WHERE id = $1 AND owner_id = $2 AND archived_at IS NULL FOR UPDATE
+		SELECT owner_id FROM conversations
+		WHERE id = $1 AND archived_at IS NULL
+			AND EXISTS (
+				SELECT 1 FROM conversation_members
+				WHERE conversation_id = $1 AND user_id = $2 AND archived_at IS NULL
+			)
+		FOR UPDATE
 	`, conversationID, ownerID).Scan(&conversationOwner); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return chat.Message{}, apperr.NotFound
@@ -209,6 +504,7 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 		ID:             ulid.Make().String(),
 		ConversationID: conversationID,
 		OwnerID:        ownerID,
+		SenderID:       ownerID,
 		Body:           strings.TrimSpace(body),
 		CreatedAt:      now,
 	}
@@ -238,9 +534,10 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 		return chat.Message{}, err
 	}
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO messages (id, conversation_id, owner_id, body, created_at, deleted_at)
-		VALUES ($1, $2, $3, $4, $5, NULL)
-	`, m.ID, m.ConversationID, m.OwnerID, m.Body, m.CreatedAt); err != nil {
+		INSERT INTO messages
+			(id, conversation_id, owner_id, sender_id, client_message_id, body, created_at, deleted_at)
+		VALUES ($1, $2, $3, $3, NULLIF($4::text, ''), $5, $6, NULL)
+	`, m.ID, m.ConversationID, m.OwnerID, m.ClientMessageID, m.Body, m.CreatedAt); err != nil {
 		return chat.Message{}, err
 	}
 	fileID := pending.ID
@@ -256,9 +553,23 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 	`, a.ID, a.MessageID, a.FileID, a.OriginalName, a.Name, a.MimeType, a.SizeBytes, a.CreatedAt); err != nil {
 		return chat.Message{}, err
 	}
+	albumID, err := ensureChatSharedAlbum(ctx, tx, conversationID, now)
+	if err != nil {
+		return chat.Message{}, err
+	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE conversations SET updated_at = $3 WHERE id = $1 AND owner_id = $2
-	`, conversationID, ownerID, now); err != nil {
+		INSERT INTO chat_shared_album_items (album_id, attachment_id, added_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (attachment_id) DO UPDATE SET hidden_at = NULL
+	`, albumID, a.ID, a.CreatedAt); err != nil {
+		return chat.Message{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE conversations SET updated_at = $2, last_message_at = $2 WHERE id = $1
+	`, conversationID, now); err != nil {
+		return chat.Message{}, err
+	}
+	if err := insertChatEvent(ctx, tx, conversationID, "message.created", m.ID, now); err != nil {
 		return chat.Message{}, err
 	}
 	m.Attachments = []chat.Attachment{a}
@@ -266,6 +577,14 @@ func (s *Store) CompleteAttachment(ctx context.Context, ownerID, conversationID 
 		return chat.Message{}, err
 	}
 	return m, nil
+}
+
+func insertChatEvent(ctx context.Context, tx pgx.Tx, conversationID, eventType, aggregateID string, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO chat_events (id, conversation_id, event_type, aggregate_id, payload, created_at)
+		VALUES ($1, $2, $3, $4::char(26), jsonb_build_object('aggregateId', $4::text), $5)
+	`, auth.NewID(), conversationID, eventType, aggregateID, now)
+	return err
 }
 
 func (s *Store) CreateAttachment(ctx context.Context, a chat.Attachment) error {
@@ -282,18 +601,29 @@ func (s *Store) CreateAttachment(ctx context.Context, a chat.Attachment) error {
 
 func (s *Store) ListMessagesBefore(ctx context.Context, ownerID, conversationID, before string, limit int) ([]chat.Message, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, conversation_id, owner_id, body, created_at
+		SELECT latest.id, latest.conversation_id, latest.owner_id, latest.sender_id,
+			latest.client_message_id, latest.body, latest.created_at, latest.edited_at, latest.removed_at
 		FROM (
-			SELECT id, conversation_id, owner_id, body, created_at
+			SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, '') AS client_message_id, body, created_at, edited_at, removed_at
 			FROM messages
-			WHERE owner_id = $1
-				AND conversation_id = $2
+			WHERE conversation_id = $2
+				AND EXISTS (
+					SELECT 1 FROM conversation_members
+					WHERE conversation_id = $2 AND user_id = $1 AND archived_at IS NULL
+				)
 				AND deleted_at IS NULL
-				AND ($3::char(26) IS NULL OR id < $3::char(26))
+				AND (
+					$3::char(26) IS NULL OR
+					(created_at, id) < (
+						SELECT created_at, id
+						FROM messages
+						WHERE id = $3::char(26) AND conversation_id = $2
+					)
+				)
 			ORDER BY created_at DESC, id DESC
 			LIMIT $4
 		) latest
-		ORDER BY created_at ASC, id ASC
+		ORDER BY latest.created_at ASC, latest.id ASC
 	`, ownerID, conversationID, nullableCursor(before), limit)
 	if err != nil {
 		return nil, err
@@ -302,7 +632,7 @@ func (s *Store) ListMessagesBefore(ctx context.Context, ownerID, conversationID,
 	var out []chat.Message
 	for rows.Next() {
 		var m chat.Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.EditedAt, &m.RemovedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -323,12 +653,17 @@ func (s *Store) ListMessagesBefore(ctx context.Context, ownerID, conversationID,
 func (s *Store) LastMessageForConversation(ctx context.Context, ownerID, conversationID string) (*chat.Message, error) {
 	var m chat.Message
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, conversation_id, owner_id, body, created_at
+			SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, ''), body, created_at, edited_at, removed_at
 		FROM messages
-		WHERE owner_id = $1 AND conversation_id = $2 AND deleted_at IS NULL
-		ORDER BY created_at DESC
+		WHERE conversation_id = $2
+			AND EXISTS (
+				SELECT 1 FROM conversation_members
+				WHERE conversation_id = $2 AND user_id = $1 AND archived_at IS NULL
+			)
+			AND deleted_at IS NULL
+		ORDER BY created_at DESC, id DESC
 		LIMIT 1
-	`, ownerID, conversationID).Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt)
+	`, ownerID, conversationID).Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.EditedAt, &m.RemovedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -351,10 +686,15 @@ func nullableCursor(before string) any {
 
 func (s *Store) ListMessages(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Message, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, conversation_id, owner_id, body, created_at
+		SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, ''), body, created_at, edited_at, removed_at
 		FROM messages
-		WHERE owner_id = $1 AND conversation_id = $2 AND deleted_at IS NULL
-		ORDER BY created_at ASC
+		WHERE conversation_id = $2
+			AND EXISTS (
+				SELECT 1 FROM conversation_members
+				WHERE conversation_id = $2 AND user_id = $1 AND archived_at IS NULL
+			)
+			AND deleted_at IS NULL
+		ORDER BY created_at ASC, id ASC
 		LIMIT $3
 	`, ownerID, conversationID, limit)
 	if err != nil {
@@ -364,7 +704,7 @@ func (s *Store) ListMessages(ctx context.Context, ownerID, conversationID string
 	var out []chat.Message
 	for rows.Next() {
 		var m chat.Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.EditedAt, &m.RemovedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -384,10 +724,13 @@ func (s *Store) ListMessages(ctx context.Context, ownerID, conversationID string
 
 func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]chat.Message, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, conversation_id, owner_id, body, created_at
+		SELECT id, conversation_id, owner_id, sender_id, COALESCE(client_message_id, ''), body, created_at, edited_at, removed_at
 		FROM messages
-		WHERE owner_id = $1
-			AND conversation_id = $2
+		WHERE conversation_id = $2
+			AND EXISTS (
+				SELECT 1 FROM conversation_members
+				WHERE conversation_id = $2 AND user_id = $1 AND archived_at IS NULL
+			)
 			AND deleted_at IS NULL
 			AND body ILIKE '%' || $3 || '%'
 		ORDER BY created_at DESC
@@ -400,7 +743,7 @@ func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, que
 	var out []chat.Message
 	for rows.Next() {
 		var m chat.Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.Body, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.OwnerID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.EditedAt, &m.RemovedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -421,16 +764,23 @@ func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, que
 func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT a.id, a.message_id, a.file_id, a.original_name, a.display_name, a.mime_type, a.size_bytes, a.created_at,
-			'available'
+			CASE
+				WHEN a.file_id IS NULL THEN 'purged'
+				WHEN f.deleted_at IS NOT NULL THEN 'trashed'
+				WHEN f.status = 'READY' THEN 'available'
+				ELSE 'purged'
+			END
 		FROM message_attachments a
 		JOIN messages m ON m.id = a.message_id
-		JOIN files f ON f.id = a.file_id
-		WHERE m.owner_id = $1
-			AND m.conversation_id = $2
+		JOIN chat_shared_album_items sai ON sai.attachment_id = a.id AND sai.hidden_at IS NULL
+		LEFT JOIN files f ON f.id = a.file_id
+		WHERE m.conversation_id = $2
+			AND EXISTS (
+				SELECT 1 FROM conversation_members
+				WHERE conversation_id = $2 AND user_id = $1 AND archived_at IS NULL
+			)
 			AND m.deleted_at IS NULL
-			AND f.deleted_at IS NULL
-			AND f.status = 'READY'
-			AND (f.mime_type LIKE 'image/%' OR f.mime_type LIKE 'video/%')
+			AND (a.mime_type LIKE 'image/%' OR a.mime_type LIKE 'video/%')
 		ORDER BY a.created_at DESC
 		LIMIT $3
 	`, ownerID, conversationID, limit)
@@ -447,6 +797,56 @@ func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, l
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error) {
+	var key string
+	err := s.pool.QueryRow(ctx, `
+		SELECT f.object_key
+		FROM message_attachments a
+		JOIN messages m ON m.id = a.message_id
+		JOIN files f ON f.id = a.file_id
+		WHERE a.id = $1
+			AND m.conversation_id = $2
+			AND f.deleted_at IS NULL
+			AND f.status = 'READY'
+			AND EXISTS (
+				SELECT 1 FROM conversation_members
+				WHERE conversation_id = $2 AND user_id = $3 AND archived_at IS NULL
+			)
+	`, attachmentID, conversationID, userID).Scan(&key)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", apperr.NotFound
+	}
+	return key, err
+}
+
+func (s *Store) ListChatEventsAfter(ctx context.Context, userID string, after int64, limit int) ([]chat.Event, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT e.id, e.sequence, e.conversation_id, e.event_type, e.aggregate_id, e.payload, e.created_at
+		FROM chat_events e
+		WHERE e.sequence > $1
+			AND EXISTS (
+				SELECT 1 FROM conversation_members cm
+				WHERE cm.conversation_id = e.conversation_id
+					AND cm.user_id = $2 AND cm.archived_at IS NULL
+			)
+		ORDER BY e.sequence ASC
+		LIMIT $3
+	`, after, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []chat.Event
+	for rows.Next() {
+		var event chat.Event
+		if err := rows.Scan(&event.ID, &event.Sequence, &event.ConversationID, &event.Type, &event.AggregateID, &event.Payload, &event.CreatedAt); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
 }
 
 func (s *Store) listMessageAttachments(ctx context.Context, messageID string) ([]chat.Attachment, error) {
@@ -496,6 +896,10 @@ func (r chatRepo) CreateConversation(ctx context.Context, c chat.Conversation) e
 	return r.store.CreateConversation(ctx, c)
 }
 
+func (r chatRepo) CreateOrGetDirectConversation(ctx context.Context, ownerID, recipientID string) (chat.Conversation, error) {
+	return r.store.CreateOrGetDirectConversation(ctx, ownerID, recipientID)
+}
+
 func (r chatRepo) ListConversations(ctx context.Context, ownerID string) ([]chat.Conversation, error) {
 	return r.store.ListConversations(ctx, ownerID)
 }
@@ -504,8 +908,16 @@ func (r chatRepo) GetConversation(ctx context.Context, ownerID, id string) (*cha
 	return r.store.GetConversation(ctx, ownerID, id)
 }
 
-func (r chatRepo) CreateMessage(ctx context.Context, m chat.Message) error {
+func (r chatRepo) CreateMessage(ctx context.Context, m chat.Message) (chat.Message, error) {
 	return r.store.CreateMessage(ctx, m)
+}
+
+func (r chatRepo) UpdateMessage(ctx context.Context, userID, conversationID, messageID, body string, now time.Time) (chat.Message, error) {
+	return r.store.UpdateMessage(ctx, userID, conversationID, messageID, body, now)
+}
+
+func (r chatRepo) RemoveMessage(ctx context.Context, userID, conversationID, messageID string, now time.Time) error {
+	return r.store.RemoveMessage(ctx, userID, conversationID, messageID, now)
 }
 
 func (r chatRepo) CreateMessageWithAttachments(ctx context.Context, m chat.Message, fileIDs []string) (chat.Message, error) {
@@ -534,6 +946,14 @@ func (r chatRepo) CreateAttachment(ctx context.Context, a chat.Attachment) error
 
 func (r chatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
 	return r.store.ListMedia(ctx, ownerID, conversationID, limit)
+}
+
+func (r chatRepo) GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error) {
+	return r.store.GetAttachmentObjectKey(ctx, userID, conversationID, attachmentID)
+}
+
+func (r chatRepo) ListEventsAfter(ctx context.Context, userID string, after int64, limit int) ([]chat.Event, error) {
+	return r.store.ListChatEventsAfter(ctx, userID, after, limit)
 }
 
 func (r chatRepo) CompleteAttachment(ctx context.Context, ownerID, conversationID string, f file.File, stat objectstore.ObjectStat, body string, now time.Time) (chat.Message, error) {

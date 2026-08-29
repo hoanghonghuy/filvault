@@ -1,6 +1,7 @@
 package chat_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -132,6 +133,39 @@ func TestChat_MessagePaginationAndPreview(t *testing.T) {
 	}
 	if code, body := getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?before=not-a-ulid", token); code != http.StatusBadRequest {
 		t.Fatalf("bad cursor status=%d body=%s", code, body)
+	}
+}
+
+func TestChat_MessagePaginationExactLimitHasNoMore(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Exact paging"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	for _, text := range []string{"first", "second"} {
+		code, body := postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token, map[string]any{"body": text})
+		if code != http.StatusCreated {
+			t.Fatalf("send %s status=%d body=%s", text, code, body)
+		}
+	}
+
+	code, body := getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=2", token)
+	if code != http.StatusOK {
+		t.Fatalf("exact page status=%d body=%s", code, body)
+	}
+	var page struct {
+		Messages []struct {
+			Body string `json:"body"`
+		} `json:"messages"`
+		HasMore bool `json:"hasMore"`
+	}
+	decodeJSON(t, body, &page)
+	if len(page.Messages) != 2 || page.HasMore {
+		t.Fatalf("exact page should not have more: %+v body=%s", page, body)
 	}
 }
 
@@ -378,7 +412,7 @@ func TestChat_CompleteAttachmentIsIdempotent(t *testing.T) {
 		"conversationId": conv.ID,
 		"body":           "retry me",
 	})
-	if code != http.StatusCreated {
+	if code != http.StatusOK {
 		t.Fatalf("retry complete status=%d body=%s", code, body)
 	}
 	var second struct {
@@ -442,9 +476,13 @@ func TestChat_ConcurrentCompleteCreatesOneMessage(t *testing.T) {
 	close(results)
 
 	var messageID string
+	createdCount := 0
 	for result := range results {
-		if result.code != http.StatusCreated {
+		if result.code != http.StatusCreated && result.code != http.StatusOK {
 			t.Fatalf("concurrent complete status=%d body=%s", result.code, result.body)
+		}
+		if result.code == http.StatusCreated {
+			createdCount++
 		}
 		var message struct {
 			ID string `json:"id"`
@@ -455,6 +493,9 @@ func TestChat_ConcurrentCompleteCreatesOneMessage(t *testing.T) {
 		} else if message.ID != messageID {
 			t.Fatalf("concurrent complete created different messages: %s and %s", messageID, message.ID)
 		}
+	}
+	if createdCount != 1 {
+		t.Fatalf("concurrent complete should create exactly one message: created=%d", createdCount)
 	}
 
 	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages?limit=50", token)
@@ -503,6 +544,357 @@ func TestChat_CompleteUsesObjectStorageSize(t *testing.T) {
 	decodeJSON(t, body, &message)
 	if len(message.Attachments) != 1 || message.Attachments[0].SizeBytes != 0 {
 		t.Fatalf("attachment size should come from object storage: %+v", message.Attachments)
+	}
+}
+
+func TestChat_DirectConversationSupportsBothMembers(t *testing.T) {
+	engine, memA, _ := newEngine(t)
+	tokenA := registerVerified(t, engine, memA, uniqueEmail())
+	tokenB := registerVerified(t, engine, memA, uniqueEmail())
+
+	var recipient struct {
+		Email string `json:"email"`
+	}
+	code, body := getAuth(t, engine, "/api/v1/users/me", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("recipient profile status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &recipient)
+
+	code, body = postAuth(t, engine, "/api/v1/chat/direct-conversations", tokenA, map[string]any{
+		"recipientEmail": recipient.Email,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("create direct conversation status=%d body=%s", code, body)
+	}
+	var conversation struct {
+		ID   string `json:"id"`
+		Peer struct {
+			ID string `json:"id"`
+		} `json:"peer"`
+	}
+	decodeJSON(t, body, &conversation)
+	if conversation.ID == "" || conversation.Peer.ID == "" {
+		t.Fatalf("direct conversation payload incomplete: %s", body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations", tokenB)
+	if code != http.StatusOK || !strings.Contains(body, conversation.ID) {
+		t.Fatalf("recipient should see direct conversation: status=%d body=%s", code, body)
+	}
+
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/messages", tokenA, map[string]any{
+		"clientMessageId": "01KCHATMESSAGEID0000000000001",
+		"body":            "hello recipient",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("send direct message status=%d body=%s", code, body)
+	}
+	if !strings.Contains(body, `"senderId"`) {
+		t.Fatalf("message should expose senderId: %s", body)
+	}
+
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/messages", tokenA, map[string]any{
+		"clientMessageId": "01KCHATMESSAGEID0000000000001",
+		"body":            "hello recipient",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("idempotent retry status=%d body=%s", code, body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/messages", tokenB)
+	if code != http.StatusOK || strings.Count(body, "hello recipient") != 1 {
+		t.Fatalf("recipient should read one message: status=%d body=%s", code, body)
+	}
+}
+
+func TestChat_ConcurrentDirectConversationCreateIsCanonical(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	tokenA := registerVerified(t, engine, mem, uniqueEmail())
+	tokenB := registerVerified(t, engine, mem, uniqueEmail())
+
+	var recipient struct {
+		Email string `json:"email"`
+	}
+	code, body := getAuth(t, engine, "/api/v1/users/me", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("recipient profile status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &recipient)
+
+	type result struct {
+		code int
+		body string
+	}
+	results := make(chan result, 2)
+	for _, token := range []string{tokenA, tokenA} {
+		go func(token string) {
+			code, body := postAuth(t, engine, "/api/v1/chat/direct-conversations", token, map[string]any{
+				"recipientEmail": recipient.Email,
+			})
+			results <- result{code: code, body: body}
+		}(token)
+	}
+
+	var conversationIDs []string
+	for range 2 {
+		select {
+		case result := <-results:
+			if result.code != http.StatusOK {
+				t.Fatalf("concurrent direct conversation status=%d body=%s", result.code, result.body)
+			}
+			var conversation struct {
+				ID string `json:"id"`
+			}
+			decodeJSON(t, result.body, &conversation)
+			conversationIDs = append(conversationIDs, conversation.ID)
+		case <-time.After(5 * time.Second):
+			t.Fatal("concurrent direct conversation creation timed out")
+		}
+	}
+	if len(conversationIDs) != 2 || conversationIDs[0] == "" || conversationIDs[0] != conversationIDs[1] {
+		t.Fatalf("direct conversation IDs are not canonical: %v", conversationIDs)
+	}
+}
+
+func TestChat_DirectMessageEditRemoveAndScopedDownload(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	tokenA := registerVerified(t, engine, mem, uniqueEmail())
+	tokenB := registerVerified(t, engine, mem, uniqueEmail())
+
+	var recipient struct {
+		Email string `json:"email"`
+	}
+	code, body := getAuth(t, engine, "/api/v1/users/me", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("recipient profile status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &recipient)
+	code, body = postAuth(t, engine, "/api/v1/chat/direct-conversations", tokenA, map[string]any{
+		"recipientEmail": recipient.Email,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("create direct conversation status=%d body=%s", code, body)
+	}
+	var conversation struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conversation)
+
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/messages", tokenA, map[string]any{
+		"clientMessageId": "01KCHATMESSAGEID0000000000002",
+		"body":            "before edit",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("send message status=%d body=%s", code, body)
+	}
+	var message struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &message)
+
+	code, body = doJSON(t, engine, http.MethodPatch, "/api/v1/chat/conversations/"+conversation.ID+"/messages/"+message.ID, tokenA, map[string]any{
+		"body": "after edit",
+	})
+	if code != http.StatusOK || !strings.Contains(body, `"editedAt"`) || !strings.Contains(body, "after edit") {
+		t.Fatalf("edit message status=%d body=%s", code, body)
+	}
+
+	code, body = doJSON(t, engine, http.MethodDelete, "/api/v1/chat/conversations/"+conversation.ID+"/messages/"+message.ID, tokenB, nil)
+	if code != http.StatusForbidden {
+		t.Fatalf("recipient must not remove sender message: status=%d body=%s", code, body)
+	}
+	code, body = doJSON(t, engine, http.MethodDelete, "/api/v1/chat/conversations/"+conversation.ID+"/messages/"+message.ID, tokenA, nil)
+	if code != http.StatusNoContent {
+		t.Fatalf("sender remove status=%d body=%s", code, body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/messages", tokenB)
+	if code != http.StatusOK || !strings.Contains(body, `"removedAt"`) || strings.Contains(body, "after edit") {
+		t.Fatalf("removed tombstone should hide body: status=%d body=%s", code, body)
+	}
+	_ = objs
+}
+
+func TestChat_DirectConversationCreatesSharedAlbumForAttachment(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Album"})
+	var conversation struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conversation)
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conversation.ID, "name": "shared.jpg", "size": 12, "contentType": "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 12, ContentType: "image/jpeg"})
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conversation.ID, "body": "album item",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+	var message struct {
+		ID          string `json:"id"`
+		Attachments []struct {
+			ID string `json:"id"`
+		} `json:"attachments"`
+	}
+	decodeJSON(t, body, &message)
+	if len(message.Attachments) != 1 {
+		t.Fatalf("attachment missing from message: %s", body)
+	}
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/messages", token)
+	if code != http.StatusOK || !strings.Contains(body, message.Attachments[0].ID) {
+		t.Fatalf("message attachment missing from history: status=%d body=%s", code, body)
+	}
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/attachments/"+message.Attachments[0].ID+"/download", token)
+	if code != http.StatusOK || !strings.Contains(body, "downloadUrl") {
+		t.Fatalf("scoped attachment download status=%d body=%s", code, body)
+	}
+}
+
+func TestChat_AttachmentMessageWritesRealtimeEvent(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	tokenA := registerVerified(t, engine, mem, uniqueEmail())
+	tokenB := registerVerified(t, engine, mem, uniqueEmail())
+
+	var recipient struct {
+		Email string `json:"email"`
+	}
+	code, body := getAuth(t, engine, "/api/v1/users/me", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("recipient profile status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &recipient)
+	code, body = postAuth(t, engine, "/api/v1/chat/direct-conversations", tokenA, map[string]any{
+		"recipientEmail": recipient.Email,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("create direct conversation status=%d body=%s", code, body)
+	}
+	var conversation struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conversation)
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", tokenA, map[string]any{
+		"conversationId": conversation.ID, "name": "event.jpg", "size": 12, "contentType": "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, tokenA)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 12, ContentType: "image/jpeg"})
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", tokenA, map[string]any{
+		"conversationId": conversation.ID,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+
+	server := httptest.NewServer(engine)
+	t.Cleanup(server.Close)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/api/v1/chat/events?after=0", nil)
+	if err != nil {
+		t.Fatalf("events request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+tokenB)
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("events response: %v", err)
+	}
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("events status=%d", resp.StatusCode)
+	}
+	scanner := bufio.NewScanner(resp.Body)
+	foundEvent := false
+	for scanner.Scan() {
+		if scanner.Text() == "event: message.created" {
+			foundEvent = true
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("read events: %v", err)
+	}
+	if !foundEvent {
+		t.Fatal("attachment message should publish chat event")
+	}
+}
+
+func TestChat_MediaKeepsTrashedAttachmentUnavailable(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Unavailable media"})
+	var conversation struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conversation)
+
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conversation.ID, "name": "unavailable.jpg", "size": 12, "contentType": "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objs.PutObject(file.ObjectKey(userID, session.FileID), objectstore.ObjectStat{Size: 12, ContentType: "image/jpeg"})
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conversation.ID,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+	var message struct {
+		Attachments []struct {
+			ID string `json:"id"`
+		} `json:"attachments"`
+	}
+	decodeJSON(t, body, &message)
+	if len(message.Attachments) != 1 {
+		t.Fatalf("attachment missing from message: %s", body)
+	}
+
+	if code, body := deleteAuth(t, engine, "/api/v1/files/"+session.FileID, token); code != http.StatusNoContent {
+		t.Fatalf("trash status=%d body=%s", code, body)
+	}
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/media", token)
+	if code != http.StatusOK {
+		t.Fatalf("media status=%d body=%s", code, body)
+	}
+	var mediaResp struct {
+		Media []struct {
+			Availability string `json:"availability"`
+		} `json:"media"`
+	}
+	decodeJSON(t, body, &mediaResp)
+	if len(mediaResp.Media) != 1 || mediaResp.Media[0].Availability != "trashed" {
+		t.Fatalf("trashed attachment should remain unavailable in shared media: %s", body)
+	}
+
+	code, _ = getAuth(t, engine, "/api/v1/chat/conversations/"+conversation.ID+"/attachments/"+message.Attachments[0].ID+"/download", token)
+	if code != http.StatusNotFound {
+		t.Fatalf("trashed attachment download status=%d", code)
 	}
 }
 
@@ -627,4 +1019,8 @@ func postAuth(t *testing.T, engine http.Handler, path, token string, payload map
 
 func getAuth(t *testing.T, engine http.Handler, path, token string) (int, string) {
 	return doJSON(t, engine, http.MethodGet, path, token, nil)
+}
+
+func deleteAuth(t *testing.T, engine http.Handler, path, token string) (int, string) {
+	return doJSON(t, engine, http.MethodDelete, path, token, nil)
 }

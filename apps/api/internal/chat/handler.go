@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,8 +25,13 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFunc) {
 	g.GET("/chat/conversations", append(middleware, h.listConversations)...)
 	g.POST("/chat/conversations", append(middleware, h.createConversation)...)
+	g.POST("/chat/direct-conversations", append(middleware, h.createDirectConversation)...)
 	g.GET("/chat/conversations/:id/messages", append(middleware, h.listMessages)...)
 	g.POST("/chat/conversations/:id/messages", append(middleware, h.createMessage)...)
+	g.PATCH("/chat/conversations/:id/messages/:messageId", append(middleware, h.editMessage)...)
+	g.DELETE("/chat/conversations/:id/messages/:messageId", append(middleware, h.removeMessage)...)
+	g.GET("/chat/conversations/:id/attachments/:attachmentId/download", append(middleware, h.downloadAttachment)...)
+	g.GET("/chat/events", append(middleware, h.events)...)
 	g.GET("/chat/conversations/:id/messages/search", append(middleware, h.searchMessages)...)
 	g.GET("/chat/conversations/:id/media", append(middleware, h.listMedia)...)
 	g.POST("/chat/attachments/upload-sessions", append(middleware, h.createAttachmentSession)...)
@@ -43,6 +49,29 @@ func userIDFrom(c *gin.Context) (string, bool) {
 
 type createConversationReq struct {
 	Title string `json:"title"`
+}
+
+type createDirectConversationReq struct {
+	RecipientEmail string `json:"recipientEmail"`
+}
+
+func (h *Handler) createDirectConversation(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	var req createDirectConversationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	out, err := h.svc.CreateDirectConversation(c.Request.Context(), userID, req.RecipientEmail)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, publicConversation(out))
 }
 
 func (h *Handler) createConversation(c *gin.Context) {
@@ -96,8 +125,9 @@ func (h *Handler) listConversations(c *gin.Context) {
 }
 
 type createMessageReq struct {
-	Body    string   `json:"body"`
-	FileIDs []string `json:"fileIds"`
+	Body            string   `json:"body"`
+	FileIDs         []string `json:"fileIds"`
+	ClientMessageID string   `json:"clientMessageId"`
 }
 
 func (h *Handler) createMessage(c *gin.Context) {
@@ -115,12 +145,154 @@ func (h *Handler) createMessage(c *gin.Context) {
 		httpx.Validation(c)
 		return
 	}
-	out, err := h.svc.CreateMessage(c.Request.Context(), userID, conversationID, req.Body, req.FileIDs)
+	out, err := h.svc.CreateMessage(c.Request.Context(), userID, conversationID, req.Body, req.FileIDs, req.ClientMessageID)
 	if err != nil {
 		httpx.Error(c, err)
 		return
 	}
+	if out.Idempotent {
+		c.JSON(http.StatusOK, publicMessage(out))
+		return
+	}
 	c.JSON(http.StatusCreated, publicMessage(out))
+}
+
+type editMessageReq struct {
+	Body string `json:"body"`
+}
+
+func (h *Handler) editMessage(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	messageID, ok := httpx.ParamULID(c, "messageId")
+	if !ok {
+		return
+	}
+	var req editMessageReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	out, err := h.svc.EditMessage(c.Request.Context(), userID, conversationID, messageID, req.Body)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, publicMessage(out))
+}
+
+func (h *Handler) removeMessage(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	messageID, ok := httpx.ParamULID(c, "messageId")
+	if !ok {
+		return
+	}
+	if err := h.svc.RemoveMessage(c.Request.Context(), userID, conversationID, messageID); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) downloadAttachment(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	attachmentID, ok := httpx.ParamULID(c, "attachmentId")
+	if !ok {
+		return
+	}
+	url, err := h.svc.DownloadAttachment(c.Request.Context(), userID, conversationID, attachmentID)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"downloadUrl": url.URL,
+		"expiresAt":   url.ExpiresAt.UTC().Format(time.RFC3339Nano),
+	})
+}
+
+func (h *Handler) events(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	after, err := strconv.ParseInt(c.Query("after"), 10, 64)
+	if err != nil || after < 0 {
+		after = 0
+	}
+	if raw := c.GetHeader("Last-Event-ID"); raw != "" {
+		if headerAfter, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil && headerAfter > after {
+			after = headerAfter
+		}
+	}
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Header("Access-Control-Allow-Headers", "Authorization, Last-Event-ID")
+	c.Status(http.StatusOK)
+	heartbeat := time.NewTicker(20 * time.Second)
+	poll := time.NewTicker(time.Second)
+	defer heartbeat.Stop()
+	defer poll.Stop()
+	writeEvents := func() error {
+		events, err := h.svc.repo.ListEventsAfter(c.Request.Context(), userID, after, 100)
+		if err != nil {
+			return err
+		}
+		for _, event := range events {
+			if _, err := fmt.Fprintf(c.Writer, "id: %d\nevent: %s\ndata: %s\n\n", event.Sequence, event.Type, event.Payload); err != nil {
+				return err
+			}
+			after = event.Sequence
+		}
+		if len(events) > 0 {
+			c.Writer.Flush()
+		}
+		return nil
+	}
+	if err := writeEvents(); err != nil {
+		return
+	}
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-heartbeat.C:
+			if _, err := fmt.Fprint(c.Writer, ": heartbeat\n\n"); err != nil {
+				return
+			}
+			c.Writer.Flush()
+		case <-poll.C:
+			if err := writeEvents(); err != nil {
+				return
+			}
+		}
+	}
 }
 
 func (h *Handler) listMessages(c *gin.Context) {
@@ -273,16 +445,26 @@ func (h *Handler) completeAttachment(c *gin.Context) {
 		httpx.Error(c, err)
 		return
 	}
+	if out.Idempotent {
+		c.JSON(http.StatusOK, publicMessage(out))
+		return
+	}
 	c.JSON(http.StatusCreated, publicMessage(out))
 }
 
 func publicConversation(c Conversation) gin.H {
-	return gin.H{
-		"id":        c.ID,
-		"title":     c.Title,
-		"createdAt": c.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"updatedAt": c.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	out := gin.H{
+		"id":            c.ID,
+		"title":         c.Title,
+		"type":          c.Type,
+		"createdAt":     c.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updatedAt":     c.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		"lastMessageAt": c.LastMessage.UTC().Format(time.RFC3339Nano),
 	}
+	if c.PeerID != "" {
+		out["peer"] = gin.H{"id": c.PeerID, "name": c.PeerName, "email": c.PeerEmail}
+	}
+	return out
 }
 
 func publicConversationView(view ConversationView) gin.H {
@@ -294,7 +476,6 @@ func publicConversationView(view ConversationView) gin.H {
 			"createdAt":   view.Preview.CreatedAt.UTC().Format(time.RFC3339Nano),
 			"attachments": view.Preview.AttachmentIDs,
 		}
-		out["lastMessageAt"] = out["updatedAt"]
 	}
 	return out
 }
@@ -304,13 +485,23 @@ func publicMessage(m Message) gin.H {
 	for _, a := range m.Attachments {
 		attachments = append(attachments, publicAttachment(a))
 	}
-	return gin.H{
-		"id":             m.ID,
-		"conversationId": m.ConversationID,
-		"body":           m.Body,
-		"createdAt":      m.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"attachments":    attachments,
+	out := gin.H{
+		"id":              m.ID,
+		"conversationId":  m.ConversationID,
+		"body":            m.Body,
+		"senderId":        m.SenderID,
+		"clientMessageId": m.ClientMessageID,
+		"createdAt":       m.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"attachments":     attachments,
 	}
+	if m.EditedAt != nil {
+		out["editedAt"] = m.EditedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if m.RemovedAt != nil {
+		out["removedAt"] = m.RemovedAt.UTC().Format(time.RFC3339Nano)
+		out["body"] = ""
+	}
+	return out
 }
 
 func publicAttachment(a Attachment) gin.H {
