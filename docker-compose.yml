@@ -6,7 +6,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: filvault
-      POSTGRES_PASSWORD: ${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}
+      POSTGRES_PASSWORD: ${FILVAULT_POSTGRES_PASSWORD:-filvault}
       POSTGRES_DB: filvault
     ports:
       - "5435:5432"
@@ -25,7 +25,7 @@ services:
     environment:
       MINIO_ROOT_USER: filvault
       MINIO_ROOT_PASSWORD: filvaultsecret
-      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:5173,http://127.0.0.1:5173,http://${FILVAULT_HOST:-localhost}:5173
     ports:
       - "9002:9000"
       - "9003:9001"
@@ -55,9 +55,9 @@ services:
     environment:
       FILVAULT_METADATA_STORE: postgres
       FILVAULT_OBJECT_STORE: s3
-      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}@postgres:5432/filvault?sslmode=disable
+      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:-filvault}@postgres:5432/filvault?sslmode=disable
       FILVAULT_S3_ENDPOINT: http://minio:9000
-      FILVAULT_S3_PUBLIC_ENDPOINT: http://localhost:9002
+      FILVAULT_S3_PUBLIC_ENDPOINT: http://${FILVAULT_HOST:-localhost}:9002
       FILVAULT_S3_BUCKET: filvault
       FILVAULT_S3_REGION: us-east-1
       FILVAULT_S3_ACCESS_KEY: filvault
@@ -70,7 +70,7 @@ services:
       FILVAULT_JWT_SECRET: dev-jwt-secret
       FILVAULT_HTTP_ADDR: ":8080"
       FILVAULT_MAILER: console
-      FILVAULT_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      FILVAULT_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://${FILVAULT_HOST:-localhost}:5173
       FILVAULT_DEFAULT_TRASH_AUTO_DELETE: "false"
       FILVAULT_DEFAULT_TRASH_RETENTION_DAYS: "30"
     depends_on:
@@ -94,7 +94,7 @@ services:
       dockerfile: Dockerfile
     entrypoint: ["migrate"]
     environment:
-      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}@postgres:5432/filvault?sslmode=disable
+      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:-filvault}@postgres:5432/filvault?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,13 +109,13 @@ services:
     environment:
       FILVAULT_METADATA_STORE: postgres
       FILVAULT_OBJECT_STORE: s3
-      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:?Set FILVAULT_POSTGRES_PASSWORD for local compose}@postgres:5432/filvault?sslmode=disable
+      FILVAULT_DATABASE_URL: postgres://filvault:${FILVAULT_POSTGRES_PASSWORD:-filvault}@postgres:5432/filvault?sslmode=disable
       FILVAULT_S3_ENDPOINT: http://minio:9000
       FILVAULT_S3_BUCKET: filvault
       FILVAULT_S3_REGION: us-east-1
       FILVAULT_S3_ACCESS_KEY: filvault
       FILVAULT_S3_SECRET_KEY: filvaultsecret
-      FILVAULT_JWT_SECRET: ${FILVAULT_JWT_SECRET:?Set FILVAULT_JWT_SECRET for local compose}
+      FILVAULT_JWT_SECRET: ${FILVAULT_JWT_SECRET:-dev-jwt-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,7 +131,7 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: http://localhost:8080/api/v1
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     ports:
       - "5173:80"
     depends_on:

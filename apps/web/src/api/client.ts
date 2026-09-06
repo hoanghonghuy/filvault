@@ -1,6 +1,10 @@
 import type { ApiErrorBody, Session } from './types'
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location
+    ? `${window.location.protocol}//${window.location.hostname}:8080/api/v1`
+    : 'http://localhost:8080/api/v1')
 
 const ACCESS_KEY = 'filvault.accessToken'
 const REFRESH_KEY = 'filvault.refreshToken'
