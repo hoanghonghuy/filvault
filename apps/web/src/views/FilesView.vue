@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, formatBytes, uploadToPresigned } from '@/api/client'
 import { formatApiError } from '@/api/errors'
@@ -13,6 +13,10 @@ import FolderPickerSheet from '@/components/FolderPickerSheet.vue'
 import ShareSheet from '@/components/ShareSheet.vue'
 import ShareUserSheet from '@/components/ShareUserSheet.vue'
 import LoadingSkeletonFiles from '@/components/LoadingSkeletonFiles.vue'
+import BatchActionBar from '@/components/BatchActionBar.vue'
+import MediaLightbox from '@/components/MediaLightbox.vue'
+import { usePullToRefresh } from '@/lib/usePullToRefresh'
+import { useLongPress } from '@/lib/useLongPress'
 import { mimeIcon, mimeLabel, resolveContentType } from '@/lib/mimeIcon'
 import type {
   Browser,
@@ -49,6 +53,80 @@ const isDragging = computed(() => dragDepth.value > 0)
 const segment = ref<'all' | 'favorites'>(route.query.view === 'favorites' ? 'favorites' : 'all')
 const favorites = ref<FavoriteFile[] | null>(null)
 const favoritesLoading = ref(false)
+
+const filesPageRef = ref<HTMLElement | null>(null)
+const { pullDistance, isRefreshing, attachListeners } = usePullToRefresh(filesPageRef, {
+  onRefresh: loadBrowser,
+})
+
+// Multi-select state
+const isSelecting = ref(false)
+const selectedFileIds = ref<Set<string>>(new Set())
+const selectedFolderIds = ref<Set<string>>(new Set())
+const totalSelectedCount = computed(() => selectedFileIds.value.size + selectedFolderIds.value.size)
+const totalItemsCount = computed(() => (browser.value?.folders.length ?? 0) + (browser.value?.files.length ?? 0))
+
+function startSelection(type: 'file' | 'folder', id: string) {
+  isSelecting.value = true
+  if (type === 'file') selectedFileIds.value.add(id)
+  else selectedFolderIds.value.add(id)
+}
+
+function toggleSelectItem(type: 'file' | 'folder', id: string) {
+  const set = type === 'file' ? selectedFileIds.value : selectedFolderIds.value
+  if (set.has(id)) {
+    set.delete(id)
+    if (totalSelectedCount.value === 0) {
+      isSelecting.value = false
+    }
+  } else {
+    set.add(id)
+  }
+}
+
+function selectAllItems() {
+  if (browser.value) {
+    selectedFileIds.value = new Set(browser.value.files.map((f) => f.id))
+    selectedFolderIds.value = new Set(browser.value.folders.map((f) => f.id))
+  }
+}
+
+function clearSelection() {
+  selectedFileIds.value.clear()
+  selectedFolderIds.value.clear()
+  isSelecting.value = false
+}
+
+// Long-press detection
+const { start: startLongPress, move: moveLongPress, end: endLongPress, cancel: cancelLongPress, shouldIgnoreClick } = useLongPress({
+  onLongPress: (payload) => {
+    if (payload && typeof payload === 'object' && 'type' in payload && 'id' in payload) {
+      const p = payload as { type: 'file' | 'folder'; id: string }
+      startSelection(p.type, p.id)
+    }
+  },
+})
+
+// Mobile breadcrumb sheet
+const breadcrumbSheetOpen = ref(false)
+
+// In-app preview
+const previewOpen = ref(false)
+const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
+
+async function previewMediaFile(file: { id: string; name: string; mimeType: string }) {
+  try {
+    const out = await api<DownloadURL>(`/files/${file.id}/download`)
+    previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
+    previewOpen.value = true
+  } catch (e) {
+    error.value = formatApiError(e, 'Could not preview file')
+  }
+}
+
+onMounted(() => {
+  if (filesPageRef.value) attachListeners(filesPageRef.value)
+})
 
 function onDragEnter(event: DragEvent) {
   if (!event.dataTransfer?.types.includes('Files')) return
@@ -182,6 +260,10 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 watch(searchQuery, () => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(runSearch, 300)
+})
+
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
 })
 
 watch(filters, runSearch)
@@ -397,6 +479,25 @@ async function onPickerSelect(targetFolderId: string | null) {
 
   error.value = ''
   try {
+    if (id === 'batch') {
+      for (const fId of selectedFileIds.value) {
+        await api(`/files/${fId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ folderId: targetFolderId }),
+        })
+      }
+      for (const dId of selectedFolderIds.value) {
+        await api(`/folders/${dId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ parentId: targetFolderId }),
+        })
+      }
+      ui.showToast(`Moved ${totalSelectedCount.value} items`)
+      clearSelection()
+      await loadBrowser()
+      return
+    }
+
     if (mode === 'file') {
       await api(`/files/${id}`, {
         method: 'PATCH',
@@ -414,6 +515,70 @@ async function onPickerSelect(targetFolderId: string | null) {
   } catch (e) {
     error.value = formatApiError(e, 'Move failed')
   }
+}
+
+async function batchDelete() {
+  const count = totalSelectedCount.value
+  if (count === 0) return
+  const ok = await ui.confirm({
+    title: `Move ${count} items to trash?`,
+    message: 'You can restore them from Trash later.',
+    confirmLabel: 'Move to trash',
+    danger: true,
+  })
+  if (!ok) return
+  error.value = ''
+  try {
+    for (const id of selectedFileIds.value) {
+      removeOptimistic(id)
+      await api(`/files/${id}`, { method: 'DELETE' })
+    }
+    for (const id of selectedFolderIds.value) {
+      removeOptimistic(id)
+      await api(`/folders/${id}`, { method: 'DELETE' })
+    }
+    ui.showToast(`Moved ${count} items to trash`)
+    clearSelection()
+    await loadBrowser()
+    await reloadStorage?.()
+  } catch (e) {
+    error.value = formatApiError(e, 'Delete failed')
+    await loadBrowser()
+  }
+}
+
+async function batchFavorite() {
+  const fileIds = Array.from(selectedFileIds.value)
+  if (fileIds.length === 0) {
+    ui.showToast('No files selected to favorite', 'info')
+    return
+  }
+  error.value = ''
+  try {
+    for (const id of fileIds) {
+      await api(`/files/${id}/favorite`, { method: 'PUT' })
+    }
+    ui.showToast(`Added ${fileIds.length} files to favorites`)
+    clearSelection()
+    await loadFavorites()
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to favorite items')
+  }
+}
+
+function batchMove() {
+  if (totalSelectedCount.value === 0) return
+  pickerTargetId.value = 'batch'
+  pickerMode.value = 'file'
+  pickerTitle.value = `Move ${totalSelectedCount.value} items`
+  pickerOpen.value = true
+}
+
+async function batchDownload() {
+  for (const id of selectedFileIds.value) {
+    await downloadFile(id)
+  }
+  clearSelection()
 }
 
 /** Optimistic UI: drop the row immediately so TransitionGroup animates the removal. */
@@ -526,9 +691,17 @@ async function toggleFavorite(fileId: string, name: string) {
   }
 }
 
-async function openFileActions(file: { id: string; name: string }) {
+async function openFileActions(file: { id: string; name: string; mimeType?: string }) {
   const favorited = isFavorited(file.id)
+  const canPreview = Boolean(
+    file.mimeType &&
+      (file.mimeType.startsWith('image/') ||
+        file.mimeType.startsWith('video/') ||
+        file.mimeType === 'application/pdf' ||
+        file.mimeType.startsWith('audio/')),
+  )
   const action = await ui.openActionSheet(file.name, [
+    ...(canPreview ? [{ id: 'preview', label: 'Preview', icon: 'eye' }] : []),
     { id: 'download', label: 'Download', icon: 'download' },
     {
       id: 'favorite',
@@ -541,6 +714,7 @@ async function openFileActions(file: { id: string; name: string }) {
     { id: 'move', label: 'Move', icon: 'move' },
     { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
   ])
+  if (action === 'preview') await previewMediaFile({ id: file.id, name: file.name, mimeType: file.mimeType ?? '' })
   if (action === 'download') await downloadFile(file.id)
   if (action === 'favorite') await toggleFavorite(file.id, file.name)
   if (action === 'share') {
@@ -670,12 +844,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
 <template>
   <div
+    ref="filesPageRef"
     class="files-page"
     @dragenter="onDragEnter"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
+    <div v-if="pullDistance > 0 || isRefreshing" class="pull-refresh-bar" :style="{ height: `${pullDistance}px` }">
+      <span class="pull-icon" :class="{ spin: isRefreshing }">{{ isRefreshing ? '↻' : '↓' }}</span>
+    </div>
     <Transition name="page">
       <div v-if="isDragging" class="drop-overlay" aria-hidden="true">
         <div class="drop-card">
@@ -729,8 +907,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <span class="current">{{ browser.folder.name }}</span>
         </template>
       </span>
-      <span v-if="browser?.folder" class="mobile-current">{{ browser.folder.name }}</span>
-      <span v-else-if="!folderId" class="mobile-current">Root</span>
+      <button
+        type="button"
+        class="mobile-folder-btn mobile-only"
+        aria-label="View folder hierarchy"
+        @click="breadcrumbSheetOpen = true"
+      >
+        <span v-if="browser?.folder" class="mobile-current">{{ browser.folder.name }}</span>
+        <span v-else-if="!folderId" class="mobile-current">Root</span>
+        <Icon name="more" :size="14" class="mobile-breadcrumb-more" />
+      </button>
     </nav>
 
     <div v-if="segment === 'all'" class="toolbar toolbar-sticky">
@@ -830,10 +1016,19 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-for="folder in browser?.folders ?? []"
         :key="folder.id"
         class="row tappable"
-        @click="openFolder(folder.id)"
+        :class="{ selected: selectedFolderIds.has(folder.id) }"
+        @touchstart.passive="startLongPress($event, { type: 'folder', id: folder.id })"
+        @touchmove.passive="moveLongPress"
+        @touchend="endLongPress"
+        @touchcancel="cancelLongPress"
+        @click="shouldIgnoreClick ? undefined : (isSelecting ? toggleSelectItem('folder', folder.id) : openFolder(folder.id))"
       >
+        <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFolderIds.has(folder.id) }">
+          <Icon v-if="selectedFolderIds.has(folder.id)" name="check" :size="14" />
+        </span>
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
         <button
+          v-if="!isSelecting"
           class="btn icon-only"
           type="button"
           aria-label="Folder actions"
@@ -842,7 +1037,20 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <Icon name="more" :size="18" />
         </button>
       </div>
-      <div v-for="file in browser?.files ?? []" :key="file.id" class="row tappable" @click="openFileActions(file)">
+      <div
+        v-for="file in browser?.files ?? []"
+        :key="file.id"
+        class="row tappable"
+        :class="{ selected: selectedFileIds.has(file.id) }"
+        @touchstart.passive="startLongPress($event, { type: 'file', id: file.id })"
+        @touchmove.passive="moveLongPress"
+        @touchend="endLongPress"
+        @touchcancel="cancelLongPress"
+        @click="shouldIgnoreClick ? undefined : (isSelecting ? toggleSelectItem('file', file.id) : openFileActions(file))"
+      >
+        <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFileIds.has(file.id) }">
+          <Icon v-if="selectedFileIds.has(file.id)" name="check" :size="14" />
+        </span>
         <span class="name">
           <Icon
             :name="isFavorited(file.id) ? 'star-filled' : mimeIcon(file.mimeType)"
@@ -851,7 +1059,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           />{{ file.name }}
         </span>
         <span class="meta desktop-only">{{ mimeLabel(file.mimeType) }} · {{ formatBytes(file.sizeBytes) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+        <button
+          v-if="!isSelecting"
+          class="btn icon-only"
+          type="button"
+          aria-label="File actions"
+          @click.stop="openFileActions(file)"
+        >
           <Icon name="more" :size="18" />
         </button>
       </div>
@@ -897,10 +1111,23 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <input ref="folderInputRef" type="file" class="sr-only" webkitdirectory @change="onFolderUploadChange" />
 
     <UploadFab
-      v-if="segment === 'all'"
+      v-if="segment === 'all' && !isSelecting"
       label="Upload file"
       :disabled="uploadProgress !== null"
       @click="triggerUpload"
+    />
+
+    <BatchActionBar
+      v-if="isSelecting"
+      :selected-count="totalSelectedCount"
+      :total-count="totalItemsCount"
+      @close="clearSelection"
+      @select-all="selectAllItems"
+      @clear-selection="clearSelection"
+      @delete="batchDelete"
+      @move="batchMove"
+      @favorite="batchFavorite"
+      @download="batchDownload"
     />
 
     <BottomSheet :open="folderSheetOpen" title="New folder" @close="folderSheetOpen = false">
@@ -909,6 +1136,34 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <input v-model="newFolderName" type="text" @keyup.enter="createFolder" />
       </label>
       <button type="button" class="btn block ink" @click="createFolder">Create folder</button>
+    </BottomSheet>
+
+    <BottomSheet :open="breadcrumbSheetOpen" title="Location" @close="breadcrumbSheetOpen = false">
+      <div class="breadcrumb-sheet-list">
+        <button
+          type="button"
+          class="breadcrumb-sheet-item"
+          :class="{ active: !folderId }"
+          @click="openFolder(null); breadcrumbSheetOpen = false"
+        >
+          <Icon name="folder" :size="20" />
+          <span>Root</span>
+        </button>
+        <button
+          v-for="item in browser?.breadcrumb ?? []"
+          :key="item.id"
+          type="button"
+          class="breadcrumb-sheet-item"
+          @click="openFolder(item.id); breadcrumbSheetOpen = false"
+        >
+          <Icon name="folder" :size="20" />
+          <span>{{ item.name }}</span>
+        </button>
+        <div v-if="browser?.folder" class="breadcrumb-sheet-item current">
+          <Icon name="folder" :size="20" />
+          <span><strong>{{ browser.folder.name }}</strong> (current)</span>
+        </div>
+      </div>
     </BottomSheet>
 
     <FolderPickerSheet
@@ -942,6 +1197,15 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       :name="shareUserFileName"
       @share="shareWithUser"
       @close="shareUserOpen = false"
+    />
+
+    <MediaLightbox
+      :open="previewOpen"
+      :name="previewFile?.name ?? ''"
+      :mime-type="previewFile?.mimeType ?? ''"
+      :url="previewFile?.url ?? ''"
+      @download="previewFile ? downloadFile(previewFile.id) : undefined"
+      @close="previewOpen = false"
     />
   </div>
 </template>
@@ -1161,5 +1425,102 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     background: transparent;
     padding-top: 0;
   }
+}
+
+.pull-refresh-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--accent);
+  transition: height var(--duration-short) var(--ease-standard);
+}
+
+.pull-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform var(--duration-short) var(--ease-standard);
+}
+
+.pull-icon.spin {
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.row.selected {
+  background: var(--accent-soft);
+}
+
+.checkbox-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--space-xs);
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  flex-shrink: 0;
+  color: #fff;
+  transition: background var(--duration-short) var(--ease-standard), border-color var(--duration-short) var(--ease-standard);
+}
+
+.checkbox-indicator.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mobile-folder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xxs) var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 200px;
+}
+
+.mobile-breadcrumb-more {
+  color: var(--muted);
+}
+
+.breadcrumb-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) 0;
+}
+
+.breadcrumb-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.breadcrumb-sheet-item:hover {
+  background: var(--surface-soft);
+}
+
+.breadcrumb-sheet-item.active,
+.breadcrumb-sheet-item.current {
+  color: var(--accent);
+  font-weight: 600;
 }
 </style>

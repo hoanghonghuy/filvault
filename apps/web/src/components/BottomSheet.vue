@@ -25,6 +25,55 @@ const sheetId = sheetCounter++
 let previousFocus: HTMLElement | null = null
 let released = true
 
+const dragOffset = ref(0)
+const isDragging = ref(false)
+let touchStartY = 0
+let touchStartTime = 0
+let canDrag = false
+
+function onTouchStart(event: TouchEvent) {
+  if (!panelRef.value) return
+  const touch = event.touches[0]
+  if (!touch) return
+  const target = event.target as HTMLElement | null
+  const isHandle = target?.closest('.sheet-handle') !== null
+  const isTop = panelRef.value.scrollTop <= 0
+  if (isHandle || isTop) {
+    canDrag = true
+    touchStartY = touch.clientY
+    touchStartTime = Date.now()
+    isDragging.value = true
+  } else {
+    canDrag = false
+  }
+}
+
+function onTouchMove(event: TouchEvent) {
+  if (!canDrag) return
+  const touch = event.touches[0]
+  if (!touch) return
+  const deltaY = touch.clientY - touchStartY
+  if (deltaY > 0) {
+    dragOffset.value = deltaY
+    if (event.cancelable) event.preventDefault()
+  } else {
+    dragOffset.value = 0
+  }
+}
+
+function onTouchEnd() {
+  if (!canDrag) return
+  isDragging.value = false
+  canDrag = false
+  const elapsed = Date.now() - touchStartTime
+  const velocity = dragOffset.value / Math.max(elapsed, 1)
+  if (dragOffset.value > 90 || (dragOffset.value > 40 && velocity > 0.5)) {
+    emit('close')
+  } else {
+    dragOffset.value = 0
+  }
+}
+
 function onBackdropClick() {
   emit('close')
 }
@@ -69,7 +118,9 @@ function trapFocus(event: KeyboardEvent) {
 }
 
 function lockPage() {
-  if (!released) return
+  if (!released) {
+    unlockPage()
+  }
   released = false
   openSheets.push(sheetId)
   if (lockedCount === 0) document.body.style.overflow = 'hidden'
@@ -94,6 +145,8 @@ function unlockPage() {
 }
 
 function onAfterLeave() {
+  dragOffset.value = 0
+  isDragging.value = false
   unlockPage()
   emit('after-leave')
 }
@@ -101,6 +154,8 @@ function onAfterLeave() {
 watch(
   () => props.open,
   async (open) => {
+    dragOffset.value = 0
+    isDragging.value = false
     if (open) {
       lockPage()
       await nextTick()
@@ -121,11 +176,20 @@ onUnmounted(unlockPage)
         <div
           ref="panelRef"
           class="sheet-panel"
+          :class="{ 'sheet-dragging': isDragging }"
+          :style="{
+            transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
+            transition: isDragging ? 'none' : undefined,
+          }"
           role="dialog"
           aria-modal="true"
           tabindex="-1"
           :aria-labelledby="title ? titleId : undefined"
           :aria-label="title ? undefined : 'Dialog'"
+          @touchstart="onTouchStart"
+          @touchmove="onTouchMove"
+          @touchend="onTouchEnd"
+          @touchcancel="onTouchEnd"
         >
           <div class="sheet-handle" aria-hidden="true" />
           <h2 v-if="title" :id="titleId" class="sheet-title">{{ title }}</h2>
@@ -152,31 +216,7 @@ onUnmounted(unlockPage)
   background: var(--overlay);
 }
 
-.sheet-enter-active {
-  transition: opacity var(--duration-long) var(--ease-standard);
-}
 
-.sheet-enter-active .sheet-panel {
-  transition: transform var(--duration-long) var(--ease-emphasized-decelerate);
-}
-
-.sheet-leave-active {
-  transition: opacity var(--duration-medium) var(--ease-emphasized-accelerate);
-}
-
-.sheet-leave-active .sheet-panel {
-  transition: transform var(--duration-medium) var(--ease-emphasized-accelerate);
-}
-
-.sheet-enter-from,
-.sheet-leave-to {
-  opacity: 0;
-}
-
-.sheet-enter-from .sheet-panel,
-.sheet-leave-to .sheet-panel {
-  transform: translateY(100%);
-}
 
 .sheet-panel {
   position: relative;
@@ -215,15 +255,29 @@ onUnmounted(unlockPage)
   width: 32px;
   height: 4px;
   margin: 0 auto var(--space-sm);
-  background: var(--hairline);
+  background: var(--muted-soft);
   border-radius: var(--radius-pill);
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet-panel.sheet-dragging {
+  user-select: none;
 }
 
 .sheet-title {
   margin: 0 0 var(--space-md);
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--ink);
+}
+
+.sheet-enter-active {
+  transition: opacity var(--duration-long) var(--ease-standard);
+}
+
+.sheet-leave-active {
+  transition: opacity var(--duration-medium) var(--ease-emphasized-accelerate);
 }
 
 .sheet-enter-active .sheet-backdrop {

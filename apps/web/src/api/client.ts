@@ -46,22 +46,36 @@ async function parseError(res: Response): Promise<ApiError> {
   }
 }
 
+let refreshPromise: Promise<boolean> | null = null
+
 async function refreshAccess(): Promise<boolean> {
   if (!refreshToken) {
     return false
   }
-  const res = await fetch(`${API_BASE}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  })
-  if (!res.ok) {
-    clearTokens()
-    return false
+  if (refreshPromise) {
+    return refreshPromise
   }
-  const session = (await res.json()) as Session
-  setTokens(session.accessToken, session.refreshToken)
-  return true
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      if (!res.ok) {
+        clearTokens()
+        return false
+      }
+      const session = (await res.json()) as Session
+      setTokens(session.accessToken, session.refreshToken)
+      return true
+    } catch {
+      return false
+    } finally {
+      refreshPromise = null
+    }
+  })()
+  return refreshPromise
 }
 
 export async function refreshAccessToken(): Promise<boolean> {
@@ -96,6 +110,48 @@ export async function api<T>(
   return (await res.json()) as T
 }
 
+let wakeLockSentinel: { release: () => Promise<void>; released?: boolean } | null = null
+let activeUploadCount = 0
+let isAcquiringWakeLock = false
+
+async function acquireWakeLock(): Promise<void> {
+  activeUploadCount++
+  if (activeUploadCount !== 1 || isAcquiringWakeLock || wakeLockSentinel) return
+  if (!('wakeLock' in navigator)) return
+  isAcquiringWakeLock = true
+  try {
+    const sentinel = await (navigator as unknown as { wakeLock: { request: (type: string) => Promise<{ release: () => Promise<void>; released?: boolean }> } }).wakeLock.request('screen')
+    // All uploads may have finished while we were awaiting
+    if ((activeUploadCount as number) === 0) {
+      void sentinel.release().catch(() => {})
+    } else {
+      wakeLockSentinel = sentinel
+    }
+  } catch {
+    // Wake lock not supported or not allowed, fail-open
+  } finally {
+    isAcquiringWakeLock = false
+  }
+}
+
+function releaseWakeLock(): void {
+  activeUploadCount = Math.max(0, activeUploadCount - 1)
+  if (activeUploadCount === 0 && wakeLockSentinel) {
+    const sentinel = wakeLockSentinel
+    wakeLockSentinel = null
+    void sentinel.release().catch(() => {})
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && activeUploadCount > 0 && (!wakeLockSentinel || wakeLockSentinel.released)) {
+      wakeLockSentinel = null
+      void acquireWakeLock()
+    }
+  })
+}
+
 export function uploadToPresigned(
   url: string,
   file: File,
@@ -103,17 +159,34 @@ export function uploadToPresigned(
   onProgress?: (ratio: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  // Handle pre-aborted signal immediately
+  if (signal?.aborted) {
+    return Promise.reject(new ApiError('UPLOAD_CANCELED', 'Upload canceled', 0))
+  }
+
+  void acquireWakeLock()
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    const abort = () => xhr.abort()
-    signal?.addEventListener('abort', abort, { once: true })
+    let settled = false
+
+    const cleanup = () => {
+      if (settled) return
+      settled = true
+      releaseWakeLock()
+      signal?.removeEventListener('abort', handleAbort)
+    }
+
+    const handleAbort = () => xhr.abort()
+    signal?.addEventListener('abort', handleAbort, { once: true })
+
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
+      if (event.lengthComputable && onProgress && event.total > 0) {
         onProgress(event.loaded / event.total)
       }
     }
     xhr.onload = () => {
-      signal?.removeEventListener('abort', abort)
+      cleanup()
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve()
         return
@@ -121,20 +194,22 @@ export function uploadToPresigned(
       reject(new ApiError('UPLOAD_FAILED', `Upload failed (${xhr.status})`, xhr.status))
     }
     xhr.onerror = () => {
-      signal?.removeEventListener('abort', abort)
+      cleanup()
       reject(new ApiError('UPLOAD_FAILED', 'Upload network error', 0))
     }
     xhr.onabort = () => {
-      signal?.removeEventListener('abort', abort)
+      cleanup()
       reject(new ApiError('UPLOAD_CANCELED', 'Upload canceled', 0))
     }
-    xhr.open('PUT', url)
-    xhr.setRequestHeader('Content-Type', contentType)
-    if (signal?.aborted) {
-      xhr.abort()
-      return
+
+    try {
+      xhr.open('PUT', url)
+      xhr.setRequestHeader('Content-Type', contentType)
+      xhr.send(file)
+    } catch (err) {
+      cleanup()
+      reject(err instanceof ApiError ? err : new ApiError('UPLOAD_FAILED', 'Upload initialization failed', 0))
     }
-    xhr.send(file)
   })
 }
 

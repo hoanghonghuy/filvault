@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
+import { usePullToRefresh } from '@/lib/usePullToRefresh'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import PhotoMediaSheet from '@/components/PhotoMediaSheet.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -15,6 +16,7 @@ import type { Album, DownloadURL, Timeline, TimelineItem } from '@/api/types'
 
 const router = useRouter()
 const ui = useUiStore()
+const photosPageRef = ref<HTMLElement | null>(null)
 
 const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
@@ -60,7 +62,16 @@ async function loadMore() {
   error.value = ''
   try {
     const data = await loadTimeline(nextBefore.value)
-    groups.value = [...groups.value, ...data.groups]
+    const merged = [...groups.value]
+    for (const newGroup of data.groups) {
+      const existing = merged.find((g) => g.date === newGroup.date)
+      if (existing) {
+        existing.items.push(...newGroup.items)
+      } else {
+        merged.push(newGroup)
+      }
+    }
+    groups.value = merged
     nextBefore.value = data.nextBefore
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load more')
@@ -174,7 +185,6 @@ async function viewMedia() {
 async function openLightbox(item: TimelineItem) {
   error.value = ''
   mediaItem.value = item
-  error.value = ''
   try {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
     lightboxUrl.value = out.downloadUrl
@@ -190,6 +200,27 @@ async function handleSheetAfterLeave() {
   if (!action || !mediaItem.value) return
   if (action === 'view') await openLightbox(mediaItem.value)
   if (action === 'download') await downloadMedia()
+}
+
+const allTimelineItems = computed(() => groups.value.flatMap((g) => g.items))
+const currentLightboxIndex = computed(() =>
+  mediaItem.value ? allTimelineItems.value.findIndex((i) => i.id === mediaItem.value?.id) : -1,
+)
+const hasNextMedia = computed(
+  () => currentLightboxIndex.value !== -1 && currentLightboxIndex.value < allTimelineItems.value.length - 1,
+)
+const hasPrevMedia = computed(() => currentLightboxIndex.value > 0)
+
+async function nextMedia() {
+  if (!hasNextMedia.value) return
+  const nextItem = allTimelineItems.value[currentLightboxIndex.value + 1]
+  if (nextItem) await openLightbox(nextItem)
+}
+
+async function prevMedia() {
+  if (!hasPrevMedia.value) return
+  const prevItem = allTimelineItems.value[currentLightboxIndex.value - 1]
+  if (prevItem) await openLightbox(prevItem)
 }
 
 async function downloadMedia() {
@@ -208,7 +239,14 @@ async function downloadMedia() {
   }
 }
 
-onMounted(load)
+const { pullDistance, isRefreshing, attachListeners } = usePullToRefresh(photosPageRef, {
+  onRefresh: load,
+})
+
+onMounted(() => {
+  void load()
+  if (photosPageRef.value) attachListeners(photosPageRef.value)
+})
 
 onBeforeUnmount(() => {
   mediaOpen.value = false
@@ -217,7 +255,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="photos-page">
+  <div ref="photosPageRef" class="photos-page">
+    <div v-if="pullDistance > 0 || isRefreshing" class="pull-refresh-bar" :style="{ height: `${pullDistance}px` }">
+      <span class="pull-icon" :class="{ spin: isRefreshing }">{{ isRefreshing ? '↻' : '↓' }}</span>
+    </div>
     <h1 class="page-title desktop-only">Photos</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
@@ -308,6 +349,10 @@ onBeforeUnmount(() => {
         :name="mediaItem?.name ?? ''"
         :mime-type="mediaItem?.mimeType ?? ''"
         :url="lightboxUrl"
+        :has-next="hasNextMedia"
+        :has-prev="hasPrevMedia"
+        @next="nextMedia"
+        @prev="prevMedia"
         @download="downloadMedia"
         @close="lightboxOpen = false"
       />
@@ -316,6 +361,30 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.pull-refresh-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--accent);
+  transition: height var(--duration-short) var(--ease-standard);
+}
+
+.pull-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform var(--duration-short) var(--ease-standard);
+}
+
+.pull-icon.spin {
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .section {
   margin-bottom: var(--space-lg);
 }

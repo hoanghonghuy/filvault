@@ -25,7 +25,7 @@ const mediaItem = ref<TimelineItem | null>(null)
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
 
-const albumId = computed(() => String(route.params.id))
+const albumId = computed(() => (Array.isArray(route.params.id) ? route.params.id[0] : (route.params.id ?? '')))
 const itemIds = computed(() => album.value?.items.map((i) => i.id) ?? [])
 
 async function load() {
@@ -177,7 +177,6 @@ async function removeItem(fileId: string, name: string) {
 async function openLightbox(item: TimelineItem) {
   error.value = ''
   mediaItem.value = item
-  error.value = ''
   try {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
     lightboxUrl.value = out.downloadUrl
@@ -185,6 +184,27 @@ async function openLightbox(item: TimelineItem) {
   } catch (e) {
     error.value = formatApiError(e, 'View failed')
   }
+}
+
+const allAlbumItems = computed(() => album.value?.items ?? [])
+const currentLightboxIndex = computed(() =>
+  mediaItem.value ? allAlbumItems.value.findIndex((i) => i.id === mediaItem.value?.id) : -1,
+)
+const hasNextMedia = computed(
+  () => currentLightboxIndex.value !== -1 && currentLightboxIndex.value < allAlbumItems.value.length - 1,
+)
+const hasPrevMedia = computed(() => currentLightboxIndex.value > 0)
+
+async function nextMedia() {
+  if (!hasNextMedia.value) return
+  const nextItem = allAlbumItems.value[currentLightboxIndex.value + 1]
+  if (nextItem) await openLightbox(nextItem)
+}
+
+async function prevMedia() {
+  if (!hasPrevMedia.value) return
+  const prevItem = allAlbumItems.value[currentLightboxIndex.value - 1]
+  if (prevItem) await openLightbox(prevItem)
 }
 
 async function downloadMedia() {
@@ -250,6 +270,10 @@ onBeforeUnmount(() => {
       :name="mediaItem?.name ?? ''"
       :mime-type="mediaItem?.mimeType ?? ''"
       :url="lightboxUrl"
+      :has-next="hasNextMedia"
+      :has-prev="hasPrevMedia"
+      @next="nextMedia"
+      @prev="prevMedia"
       @download="downloadMedia"
       @close="lightboxOpen = false"
     />

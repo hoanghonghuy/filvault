@@ -375,6 +375,7 @@ async function sendText() {
   pendingMessage.value = optimistic
   pendingMessageError.value = ''
   draft.value = ''
+  await nextTick()
   autoGrow()
   error.value = ''
   sending.value = true
@@ -486,12 +487,10 @@ function cancelUpload(id: string) {
   attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
 }
 
-async function openAttachment(fileId: string | null) {
-  if (!fileId || !selectedId.value) return
+async function openAttachment(attachmentId: string) {
+  if (!selectedId.value) return
   try {
-    const attachment = messages.value.flatMap((message) => message.attachments).find((item) => item.fileId === fileId)
-    if (attachment && attachment.availability !== 'available') return
-    const out = await api<DownloadURL>(`/chat/conversations/${selectedId.value}/attachments/${attachment?.id ?? fileId}/download`)
+    const out = await api<DownloadURL>(`/chat/conversations/${selectedId.value}/attachments/${attachmentId}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
     error.value = formatApiError(e, 'Download failed')
@@ -505,7 +504,7 @@ async function openInlineImage(attachment: ChatAttachment) {
     const out = await api<DownloadURL>(
       `/chat/conversations/${selectedId.value}/attachments/${attachment.id}/download`,
     )
-    lightboxFileId.value = attachment.fileId
+    lightboxFileId.value = attachment.id
     lightboxName.value = attachment.name
     lightboxMime.value = attachment.mimeType
     lightboxUrl.value = out.downloadUrl
@@ -524,11 +523,24 @@ function focusComposer() {
   void nextTick(() => composerRef.value?.focus())
 }
 
+function onVisualViewportResize() {
+  if (!isMobile.value) return
+  if (inThread.value) {
+    void nextTick(() => {
+      scrollToLatest()
+    })
+  }
+}
+
 onMounted(() => {
   updateViewport()
   window.addEventListener('resize', updateViewport)
   window.addEventListener('offline', chatStore.markOffline)
   window.addEventListener('online', chatStore.markOnline)
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', onVisualViewportResize)
+    window.visualViewport.addEventListener('scroll', onVisualViewportResize)
+  }
   void loadConversations()
   chatStore.connectEvents()
 })
@@ -537,6 +549,10 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateViewport)
   window.removeEventListener('offline', chatStore.markOffline)
   window.removeEventListener('online', chatStore.markOnline)
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', onVisualViewportResize)
+    window.visualViewport.removeEventListener('scroll', onVisualViewportResize)
+  }
   chatStore.stopEvents()
 })
 
@@ -553,7 +569,9 @@ watch(visibleMessages, () => {
 watch(
   () => chatStore.messages[selectedId.value ?? ''],
   (nextMessages) => {
-    if (nextMessages && selectedId.value) {
+    // Only sync from store on initial load (when local messages are empty)
+    // Avoid overwriting older messages loaded via pagination
+    if (nextMessages && selectedId.value && messages.value.length === 0) {
       messages.value = [...nextMessages]
     }
   },
@@ -680,7 +698,7 @@ watch(
                       type="button"
                       class="attachment-card"
                       :disabled="attachment.availability !== 'available' || !attachment.fileId"
-                      @click="attachment.fileId && openAttachment(attachment.fileId)"
+                      @click="openAttachment(attachment.id)"
                     >
                       <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
                       <span class="attachment-name">{{ attachment.name }}</span>
@@ -766,7 +784,7 @@ watch(
         type="button"
         class="media-card"
         :disabled="!item.fileId"
-          @click="item.fileId && openAttachment(item.fileId)"
+          @click="openAttachment(item.id)"
       >
         <img
           v-if="item.thumbnailUrl"
@@ -1314,6 +1332,7 @@ watch(
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
   font: inherit;
+  font-size: 16px;
 }
 
 .chat-composer textarea:focus-visible {
