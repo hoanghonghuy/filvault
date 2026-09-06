@@ -35,6 +35,7 @@ function toggleDarkMode() {
   localStorage.setItem('filvault.theme', 'light')
 }
 
+// Persisted in localStorage under filvault.locale
 function chooseLocale(next: Locale) {
   setLocale(next)
 }
@@ -273,7 +274,7 @@ onMounted(() => {
           {{ t.english }}
         </button>
       </div>
-      <p class="field-hint">filvault.locale · {{ t.languageHint }}</p>
+      <p class="field-hint">{{ t.languageHint }}</p>
     </section>
 
     <section class="card section">

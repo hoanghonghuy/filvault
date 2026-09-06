@@ -21,7 +21,19 @@ provide('reloadStorage', async () => {
   await storageBarRef.value?.reload()
 })
 
-const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
+const pageTitle = computed(() =>
+  pageTitleForRoute(route.path, route.name, {
+    overview: t.value.navOverview,
+    files: t.value.navFiles,
+    photos: t.value.navPhotos,
+    trash: t.value.navTrash,
+    settings: t.value.navSettings,
+    profile: t.value.profile,
+    album: t.value.album,
+    chat: t.value.chat,
+    shared: t.value.sharedWithMe,
+  }),
+)
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified && !route.meta.bare)
 const storageVisible = computed(() => showStorageBar(route.path))
 const avatarInitials = computed(() =>

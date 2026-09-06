@@ -12,10 +12,12 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 import { cellDelay } from '@/lib/motion'
+import { useI18n } from '@/lib/i18n'
 import type { Album, DownloadURL, Timeline, TimelineItem } from '@/api/types'
 
 const router = useRouter()
 const ui = useUiStore()
+const { t } = useI18n()
 const photosPageRef = ref<HTMLElement | null>(null)
 
 const groups = ref<Timeline['groups']>([])
@@ -109,7 +111,7 @@ async function openAlbumActions(album: Album) {
 }
 
 async function renameAlbum(album: Album) {
-  const name = await ui.prompt({ title: 'Rename album', label: 'Name', initialValue: album.name })
+  const name = await ui.prompt({ title: t.value.renameAlbum, label: t.value.displayName, initialValue: album.name })
   if (!name || name === album.name) return
   error.value = ''
   try {
@@ -117,7 +119,7 @@ async function renameAlbum(album: Album) {
       method: 'PATCH',
       body: JSON.stringify({ name }),
     })
-    ui.showToast('Album renamed')
+    ui.showToast(t.value.renameAlbum)
     await load()
   } catch (e) {
     error.value = formatApiError(e, 'Rename failed')
@@ -126,9 +128,9 @@ async function renameAlbum(album: Album) {
 
 async function deleteAlbum(id: string, name: string) {
   const ok = await ui.confirm({
-    title: 'Delete album?',
-    message: `"${name}" will be removed. Your files stay in My Files.`,
-    confirmLabel: 'Delete album',
+    title: `${t.value.deleteAlbum}?`,
+    message: `"${name}" ${t.value.deleteAlbumConfirm}`,
+    confirmLabel: t.value.deleteAlbum,
     danger: true,
   })
   if (!ok) return
@@ -259,18 +261,18 @@ onBeforeUnmount(() => {
     <div v-if="pullDistance > 0 || isRefreshing" class="pull-refresh-bar" :style="{ height: `${pullDistance}px` }">
       <span class="pull-icon" :class="{ spin: isRefreshing }">{{ isRefreshing ? '↻' : '↓' }}</span>
     </div>
-    <h1 class="page-title desktop-only">Photos</h1>
+    <h1 class="page-title desktop-only">{{ t.photosTitle }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
     <div v-else>
       <section class="section" aria-labelledby="albums-heading">
-        <h2 id="albums-heading" class="section-title">Albums</h2>
+        <h2 id="albums-heading" class="section-title">{{ t.albums }}</h2>
         <form class="album-form" @submit.prevent="createAlbum">
           <label class="field album-field">
-            <span class="sr-only">New album name</span>
-            <input v-model="newAlbumName" type="text" placeholder="New album name" autocomplete="off" />
+            <span class="sr-only">{{ t.newAlbumName }}</span>
+            <input v-model="newAlbumName" type="text" :placeholder="t.newAlbumName" autocomplete="off" />
           </label>
-          <button class="btn ink" type="submit" :disabled="!newAlbumName.trim()">Create</button>
+          <button class="btn ink" type="submit" :disabled="!newAlbumName.trim()">{{ t.create }}</button>
         </form>
         <div v-if="albums.length" class="list">
           <div
@@ -289,7 +291,7 @@ onBeforeUnmount(() => {
               {{ album.name }}
             </button>
             <span class="meta album-count">{{ album.itemCount }}</span>
-            <button class="btn icon-only" type="button" aria-label="Album actions" @click.stop="openAlbumActions(album)">
+            <button class="btn icon-only" type="button" :aria-label="t.albumMenu" @click.stop="openAlbumActions(album)">
               <Icon name="more" :size="18" />
             </button>
           </div>
@@ -297,8 +299,8 @@ onBeforeUnmount(() => {
         <EmptyState
           v-else
           compact
-          title="No albums yet"
-          description="Create an album to group photos and videos."
+          :title="t.noAlbums"
+          :description="t.noAlbumsDesc"
           icon="photos"
         />
       </section>
@@ -321,15 +323,15 @@ onBeforeUnmount(() => {
 
       <EmptyState
         v-if="groups.length === 0"
-        title="No photos yet"
-        description="Upload images or videos in My Files — they will appear here automatically."
+        :title="t.noPhotos"
+        :description="t.noPhotosDesc"
         icon="photos"
       />
 
       <div v-if="nextBefore" class="load-more">
         <LoadingSkeletonPhotos v-if="loadingMore" variant="more" />
         <button v-else type="button" class="btn block" :disabled="loadingMore" @click="loadMore">
-          {{ loadingMore ? 'Loading…' : 'Load more' }}
+          {{ loadingMore ? t.loading : t.loadMore }}
         </button>
       </div>
 

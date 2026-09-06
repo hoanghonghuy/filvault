@@ -11,12 +11,14 @@ import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
+import { useI18n } from '@/lib/i18n'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
 const ui = useUiStore()
 const chatStore = useChatStore()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>(null)
@@ -91,7 +93,7 @@ function formatRelativeDay(iso: string): string {
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
   if (date.toDateString() === today.toDateString()) return formatTime(iso)
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  if (date.toDateString() === yesterday.toDateString()) return t.value.yesterday
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })
 }
 const inThread = computed({
@@ -115,9 +117,9 @@ function updateViewport() {
 
 function promptNewConversation() {
   void ui.prompt({
-    title: 'New direct chat',
-    label: 'Verified email address',
-    confirmLabel: 'Open chat',
+    title: t.value.newChat,
+    label: t.value.verifiedEmail,
+    confirmLabel: t.value.openChat,
   }).then((email) => {
     if (!email?.trim()) return
     void createDirectConversation(email.trim())
@@ -591,27 +593,27 @@ watch(
     <aside class="chat-rail" aria-label="Conversations">
       <header class="rail-header">
         <span class="chat-mark" aria-hidden="true">F</span>
-        <h1>Chats</h1>
+        <h1>{{ t.chats }}</h1>
         <button type="button" class="icon-btn" aria-label="Back to Filvault" @click="backToVault">
           <Icon name="folder" :size="20" />
         </button>
-        <button type="button" class="compose-btn" aria-label="Create chat" @click="promptNewConversation">
+        <button type="button" class="compose-btn" :aria-label="t.newChat" @click="promptNewConversation">
           <Icon name="plus" :size="18" />
         </button>
       </header>
       <div class="rail-filter">
-        <label class="sr-only" for="rail-filter-input">Filter chats</label>
+        <label class="sr-only" for="rail-filter-input">{{ t.filterChats }}</label>
         <input
           id="rail-filter-input"
           v-model="railFilter"
           type="search"
-          placeholder="Search chats"
+          :placeholder="t.searchChats"
           autocomplete="off"
         />
       </div>
       <div v-if="error && !inThread" class="alert" role="alert">{{ error }}</div>
       <nav class="conversation-list">
-        <p v-if="!filteredConversations.length" class="rail-empty">No chats match "{{ railFilter }}".</p>
+        <p v-if="!filteredConversations.length" class="rail-empty">{{ t.noChatsMatch }} "{{ railFilter }}".</p>
     <button
           v-for="conv in filteredConversations"
           :key="conv.id"
@@ -624,7 +626,7 @@ watch(
           <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
           <span class="conversation-meta">
             <span class="conversation-title">{{ conversationTitle(conv) }}</span>
-            <span class="conversation-preview">{{ conv.preview?.body || (conv.preview?.attachments?.length ? 'Attachment' : 'No messages yet') }}</span>
+            <span class="conversation-preview">{{ conv.preview?.body || (conv.preview?.attachments?.length ? t.attachment : t.noMessagesYet) }}</span>
           </span>
           <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
         </button>
@@ -633,21 +635,22 @@ watch(
 
     <section class="message-thread" aria-live="polite">
       <p v-if="chatStore.connectionState !== 'connected'" class="connection-status" role="status">
-        {{ chatStore.connectionState === 'offline' ? 'Offline — messages will retry when connected.' : 'Reconnecting…' }}
+        {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
       </p>
       <template v-if="selectedConversation">
         <header class="thread-header">
-          <button type="button" class="icon-btn back-btn" aria-label="Back" @click="backToRail">
+          <!-- aria-label="Back" -->
+          <button type="button" class="icon-btn back-btn" :aria-label="t.back" @click="backToRail">
             <Icon name="arrow-left" :size="20" />
           </button>
           <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
           <h2>{{ conversationTitle(selectedConversation) }}</h2>
-          <button class="ghost-btn" type="button" @click="loadMessages()">Refresh</button>
+          <button class="ghost-btn" type="button" @click="loadMessages()">{{ t.refresh }}</button>
           <button
             class="icon-btn"
             type="button"
             :aria-expanded="threadSearchOpen"
-            aria-label="Search messages"
+            :aria-label="t.search"
             @click="threadSearchOpen = !threadSearchOpen"
           >
             <Icon name="search" :size="18" />
@@ -655,10 +658,10 @@ watch(
         </header>
 
         <form v-if="threadSearchOpen" class="chat-search" @submit.prevent="searchMessages">
-          <label class="sr-only" for="chat-search">Search messages</label>
-          <input id="chat-search" v-model="searchQuery" type="search" placeholder="Search in this chat" />
-          <button class="ghost-btn" type="submit" :disabled="searchQuery.trim().length < 2">Search</button>
-          <button v-if="searchResults" class="ghost-btn" type="button" @click="clearSearch">Clear</button>
+          <label class="sr-only" for="chat-search">{{ t.search }}</label>
+          <input id="chat-search" v-model="searchQuery" type="search" :placeholder="t.searchInChat" />
+          <button class="ghost-btn" type="submit" :disabled="searchQuery.trim().length < 2">{{ t.search }}</button>
+          <button v-if="searchResults" class="ghost-btn" type="button" @click="clearSearch">{{ t.clear }}</button>
         </form>
 
         <p v-if="error && inThread" class="alert" role="alert">{{ error }}</p>
@@ -706,12 +709,12 @@ watch(
                       <span v-if="attachment.availability !== 'available'" class="attachment-status">{{ attachmentLabel(attachment) }}</span>
                     </button>
                   </template>
-                  <span v-if="message.removedAt" class="message-status">Message removed</span>
-                  <span v-else-if="message.editedAt" class="message-status">Edited</span>
+                  <span v-if="message.removedAt" class="message-status">{{ t.messageRemoved }}</span>
+                  <span v-else-if="message.editedAt" class="message-status">{{ t.edited }}</span>
                   <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
                   <div v-if="canMutateMessage(message)" class="message-actions">
-                    <button type="button" class="message-action" @click="editMessage(message)">Edit</button>
-                    <button type="button" class="message-action danger-text" @click="removeMessage(message)">Remove</button>
+                    <button type="button" class="message-action" @click="editMessage(message)">{{ t.edit }}</button>
+                    <button type="button" class="message-action danger-text" @click="removeMessage(message)">{{ t.remove }}</button>
                   </div>
                 </article>
               </template>
@@ -721,13 +724,13 @@ watch(
                 <p>{{ pendingMessage.body }}</p>
                 <span v-if="pendingMessageError" class="message-status">{{ pendingMessageError }}</span>
                 <div v-if="pendingMessageError" class="message-actions">
-                  <button type="button" class="message-action" @click="retryPendingMessage">Retry</button>
-                  <button type="button" class="message-action" @click="discardPendingMessage">Discard</button>
+                  <button type="button" class="message-action" @click="retryPendingMessage">{{ t.retry }}<!-- Retry --></button>
+                  <button type="button" class="message-action" @click="discardPendingMessage">{{ t.closeSelection }}<!-- Discard --></button>
                 </div>
               </article>
             </Transition>
           </div>
-          <EmptyState v-else title="No messages yet" description="Start the conversation with a message or an image." icon="chat" />
+          <EmptyState v-else :title="t.noMessagesYet" description="" icon="chat" />
           <Transition name="msg">
             <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest">
               <Icon name="download" :size="16" />
@@ -863,6 +866,30 @@ watch(
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--ink);
+}
+
+.rail-filter {
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+
+.rail-filter input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.rail-filter input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .chat-mark {
@@ -1070,6 +1097,7 @@ watch(
   gap: var(--space-xs);
   padding: var(--space-xs) var(--space-md);
   border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
 }
 
 .chat-search input {
@@ -1079,6 +1107,8 @@ watch(
   padding: 8px 12px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--ink);
   font: inherit;
 }
 

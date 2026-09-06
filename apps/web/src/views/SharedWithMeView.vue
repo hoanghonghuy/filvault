@@ -6,6 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { useI18n } from '@/lib/i18n'
 import type {
   DownloadURL,
   IncomingShare,
@@ -13,6 +14,7 @@ import type {
 } from '@/api/types'
 
 const ui = useUiStore()
+const { t } = useI18n()
 
 const loading = ref(false)
 const error = ref('')
@@ -76,20 +78,20 @@ onMounted(load)
 
 <template>
   <div class="shared-page">
-    <h1 class="page-title desktop-only">Shared with me</h1>
+    <h1 class="page-title desktop-only">{{ t.sharedWithMe }}</h1>
 
     <Transition name="page">
       <section v-if="browsing" class="browse" aria-label="Shared folder contents">
         <button type="button" class="back-btn" @click="browsing = null">
           <Icon name="restore" :size="16" />
-          All shared items
+          {{ t.allSharedItems }}
         </button>
         <h2 class="folder-name">{{ browsing.folder?.name }}</h2>
         <ul v-if="browsing.folders.length" class="rows">
           <li v-for="f in browsing.folders" :key="'d-' + f.id" class="row static">
             <span class="row-icon"><Icon name="folder" :size="18" /></span>
             <span class="row-name">{{ f.name }}</span>
-            <span class="row-meta">Folder</span>
+            <span class="row-meta">{{ t.folder }}</span>
           </li>
         </ul>
         <ul v-if="browsing.files.length" class="rows">
@@ -102,13 +104,13 @@ onMounted(load)
           </li>
         </ul>
         <p v-if="!browsing.folders.length && !browsing.files.length" class="empty-inline">
-          This folder is empty.
+          {{ t.folderEmpty }}
         </p>
       </section>
     </Transition>
 
     <template v-if="!browsing">
-      <p v-if="error" class="error" role="alert">{{ error }} <button type="button" class="retry-btn" @click="load">Retry</button></p>
+      <p v-if="error" class="error" role="alert">{{ error }} <button type="button" class="retry-btn" @click="load">{{ t.retry }}</button></p>
 
       <div v-if="loading" class="list" aria-busy="true" aria-live="polite">
         <div v-for="i in 3" :key="i" class="skeleton sk-row" />
@@ -117,11 +119,11 @@ onMounted(load)
       <EmptyState
         v-else-if="!shares.length"
         icon="users"
-        title="Nothing shared with you yet"
-        description="Items other people share with you will show up here."
+        :title="t.nothingShared"
+        :description="t.nothingSharedDesc"
       />
 
-      <ul v-else class="rows" aria-label="Shared with me">
+      <ul v-else class="rows" :aria-label="t.sharedWithMe">
         <li v-for="share in shares" :key="share.id">
           <button type="button" class="row tappable" @click="onRowClick(share)">
             <span class="row-icon">
@@ -135,7 +137,7 @@ onMounted(load)
               <span class="row-sub">by {{ share.owner.displayName }} · {{ relativeTime(share.createdAt) }}</span>
             </span>
             <span class="row-meta">
-              {{ share.resourceType === 'folder' ? 'Open' : 'Download' }}
+              {{ share.resourceType === 'folder' ? t.open : t.download }}
             </span>
           </button>
         </li>

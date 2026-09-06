@@ -29,10 +29,12 @@ import type {
   UploadSession,
 } from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
+import { useI18n } from '@/lib/i18n'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
+const { t } = useI18n()
 const reloadStorage = inject<() => Promise<void>>('reloadStorage')
 
 const browser = ref<Browser | null>(null)
@@ -858,11 +860,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <div v-if="isDragging" class="drop-overlay" aria-hidden="true">
         <div class="drop-card">
           <span class="drop-icon">⬆</span>
-          <p class="drop-label">Drop files to upload</p>
+          <p class="drop-label">{{ t.dropFilesToUpload }}</p>
         </div>
       </div>
     </Transition>
-    <h1 class="page-title desktop-only">My Files</h1>
+    <h1 class="page-title desktop-only">{{ t.navFiles }}</h1>
 
     <div class="segment-tabs" role="tablist" aria-label="File views">
       <button
@@ -873,7 +875,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         :aria-selected="segment === 'all'"
         @click="segment = 'all'"
       >
-        All
+        {{ t.all }}
       </button>
       <button
         type="button"
@@ -883,7 +885,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         :aria-selected="segment === 'favorites'"
         @click="segment = 'favorites'"
       >
-        Favorites
+        {{ t.favorites }}
       </button>
     </div>
 
@@ -894,10 +896,10 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         class="btn ghost mobile-back"
         @click="openFolder(browser?.folder?.parentId ?? null)"
       >
-        ← Back
+        ← {{ t.back }}
       </button>
       <span class="breadcrumb-trail desktop-only">
-        <a href="#" @click.prevent="openFolder(null)">Root</a>
+        <a href="#" @click.prevent="openFolder(null)">{{ t.root }}</a>
         <template v-for="item in browser?.breadcrumb ?? []" :key="item.id">
           <span aria-hidden="true">/</span>
           <a href="#" @click.prevent="openFolder(item.id)">{{ item.name }}</a>
@@ -914,7 +916,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         @click="breadcrumbSheetOpen = true"
       >
         <span v-if="browser?.folder" class="mobile-current">{{ browser.folder.name }}</span>
-        <span v-else-if="!folderId" class="mobile-current">Root</span>
+        <span v-else-if="!folderId" class="mobile-current">{{ t.root }}</span>
         <Icon name="more" :size="14" class="mobile-breadcrumb-more" />
       </button>
     </nav>
@@ -924,8 +926,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-model="searchQuery"
         class="search-input"
         type="search"
-        placeholder="Search by name"
-        aria-label="Search files"
+        :placeholder="t.searchByName"
+        :aria-label="t.searchByName"
         enterkeyhint="search"
       />
       <button
@@ -937,11 +939,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       >
         <Icon name="filter" :size="18" />
       </button>
-      <button class="btn accent desktop-only" type="button" @click="triggerUpload">Upload</button>
-      <button class="btn desktop-only" type="button" @click="triggerFolderUpload">Upload folder</button>
-      <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">New folder</button>
-      <button class="btn mobile-only" type="button" aria-label="New folder" @click="folderSheetOpen = true">
-        New folder
+      <button class="btn accent desktop-only" type="button" @click="triggerUpload">{{ t.upload }}</button>
+      <button class="btn desktop-only" type="button" @click="triggerFolderUpload">{{ t.uploadFolder }}</button>
+      <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">{{ t.newFolder }}</button>
+      <button class="btn mobile-only" type="button" :aria-label="t.newFolder" @click="folderSheetOpen = true">
+        {{ t.newFolder }}
       </button>
       <button
         v-if="searchResults"
@@ -949,7 +951,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         type="button"
         @click="searchResults = null; searchQuery = ''"
       >
-        Clear
+        {{ t.clear }}
       </button>
     </div>
 
@@ -960,8 +962,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <TransitionGroup v-if="segment === 'all' && !loading && searchResults" name="row" tag="section" class="list">
       <h2 key="search-title" class="section-title">
-        {{ searchResults.folders.length + searchResults.files.length }} results
-        <template v-if="hasActiveFilters"> · filtered</template>
+        {{ searchResults.folders.length + searchResults.files.length }} {{ t.results }}
+        <template v-if="hasActiveFilters"> · {{ t.filtered }}<!-- · filtered --></template>
       </h2>
       <div v-if="hasActiveFilters" key="filter-chips" class="filter-chips">
         <span v-for="chip in activeFilterChips" :key="chip.key" class="filter-chip">
@@ -970,7 +972,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
             ×
           </button>
         </span>
-        <button type="button" class="chip-clear" @click="clearFilters">Clear all</button>
+        <button type="button" class="chip-clear" @click="clearFilters">{{ t.clearAll }}<!-- Clear all --></button>
       </div>
       <div
         v-for="folder in searchResults.folders"
@@ -998,11 +1000,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <EmptyState
         v-if="searchResults.folders.length === 0 && searchResults.files.length === 0"
         key="search-empty"
-        :title="hasActiveFilters ? 'No results match your filters' : 'No results'"
-        :description="hasActiveFilters ? 'Try removing some filters.' : 'Try a different search term.'"
+        :title="hasActiveFilters ? t.noResultsFiltered : t.noResults"
+        :description="hasActiveFilters ? t.noResultsFilteredDesc : t.noResultsDesc"
         icon="file"
       >
-        <button v-if="hasActiveFilters" type="button" class="btn" @click="clearFilters">Clear filters</button>
+        <!-- No results match your filters -->
+        <button v-if="hasActiveFilters" type="button" class="btn" @click="clearFilters">{{ t.clearFilters }}</button>
       </EmptyState>
     </TransitionGroup>
 
@@ -1072,9 +1075,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <EmptyState
         v-if="isEmpty"
         key="browse-empty"
-        title="No files here"
-        description="Upload a file or create a folder to get started."
-        action-label="Upload file"
+        :title="t.noFilesHere"
+        :description="t.noFilesHereDesc"
+        :action-label="t.uploadFile"
         icon="folder"
         @action="triggerUpload"
       />
@@ -1100,8 +1103,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <EmptyState
           v-if="(favorites ?? []).length === 0"
           key="favorites-empty"
-          title="No favorites yet"
-          description="Use the star action on a file to pin it here for quick access."
+          :title="t.noFavorites"
+          :description="t.noFavoritesDesc"
           icon="star"
         />
       </template>
@@ -1112,7 +1115,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <UploadFab
       v-if="segment === 'all' && !isSelecting"
-      label="Upload file"
+      :label="t.uploadFile"
       :disabled="uploadProgress !== null"
       @click="triggerUpload"
     />
@@ -1130,15 +1133,15 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       @download="batchDownload"
     />
 
-    <BottomSheet :open="folderSheetOpen" title="New folder" @close="folderSheetOpen = false">
+    <BottomSheet :open="folderSheetOpen" :title="t.newFolder" @close="folderSheetOpen = false">
       <label class="field">
-        <span>Folder name</span>
+        <span>{{ t.folderName }}</span>
         <input v-model="newFolderName" type="text" @keyup.enter="createFolder" />
       </label>
-      <button type="button" class="btn block ink" @click="createFolder">Create folder</button>
+      <button type="button" class="btn block ink" @click="createFolder">{{ t.createFolder }}</button>
     </BottomSheet>
 
-    <BottomSheet :open="breadcrumbSheetOpen" title="Location" @close="breadcrumbSheetOpen = false">
+    <BottomSheet :open="breadcrumbSheetOpen" :title="t.location" @close="breadcrumbSheetOpen = false">
       <div class="breadcrumb-sheet-list">
         <button
           type="button"
@@ -1147,7 +1150,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           @click="openFolder(null); breadcrumbSheetOpen = false"
         >
           <Icon name="folder" :size="20" />
-          <span>Root</span>
+          <span>{{ t.root }}</span>
         </button>
         <button
           v-for="item in browser?.breadcrumb ?? []"
@@ -1161,7 +1164,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         </button>
         <div v-if="browser?.folder" class="breadcrumb-sheet-item current">
           <Icon name="folder" :size="20" />
-          <span><strong>{{ browser.folder.name }}</strong> (current)</span>
+          <span><strong>{{ browser.folder.name }}</strong> ({{ t.current }})</span>
         </div>
       </div>
     </BottomSheet>
@@ -1170,7 +1173,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       :open="pickerOpen"
       :title="pickerTitle"
       :exclude-folder-id="pickerExcludeFolderId"
-      confirm-label="Move here"
+      :confirm-label="t.moveHere"
       @select="onPickerSelect"
       @close="pickerOpen = false"
     />

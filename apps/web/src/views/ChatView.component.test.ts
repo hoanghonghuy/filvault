@@ -40,7 +40,7 @@ const messages = [
 
 vi.mock('@/api/client', () => ({
   API_BASE: 'http://localhost:8080/api/v1',
-  api: vi.fn(async (path: string) => {
+  api: vi.fn<(path: string) => Promise<unknown>>(async (path: string) => {
     if (path === '/chat/conversations?includePreview=true') {
       return { conversations: [conversation] }
     }
@@ -54,7 +54,7 @@ vi.mock('@/api/client', () => ({
   }),
   formatBytes: (bytes: number) => `${bytes} B`,
   getAccessToken: () => 'test-token',
-  uploadToPresigned: vi.fn(),
+  uploadToPresigned: vi.fn<() => void>(),
 }))
 
 vi.mock('@/api/errors', () => ({
@@ -62,7 +62,7 @@ vi.mock('@/api/errors', () => ({
 }))
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn<() => void>() }),
 }))
 
 describe('ChatView', () => {
@@ -87,14 +87,19 @@ describe('ChatView', () => {
     }
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockRejectedValue(new Error('test stream is not connected')),
+      vi.fn<() => Promise<Response>>().mockRejectedValue(new Error('test stream is not connected')),
     )
     vi.stubGlobal(
       'matchMedia',
-      vi.fn(() => ({
+      vi.fn<() => MediaQueryList>(() => ({
         matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
+        media: '',
+        onchange: null,
+        addListener: vi.fn<() => void>(),
+        removeListener: vi.fn<() => void>(),
+        dispatchEvent: vi.fn<() => boolean>(),
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
       })),
     )
   })

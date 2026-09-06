@@ -11,11 +11,13 @@ import MediaPickerSheet from '@/components/MediaPickerSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingSkeletonAlbum from '@/components/LoadingSkeletonAlbum.vue'
 import { cellDelay } from '@/lib/motion'
+import { useI18n } from '@/lib/i18n'
 import type { AlbumDetail, DownloadURL, TimelineItem } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
+const { t } = useI18n()
 
 const album = ref<AlbumDetail | null>(null)
 const error = ref('')
@@ -56,8 +58,8 @@ async function openAlbumMenu() {
 async function renameAlbum() {
   if (!album.value) return
   const name = await ui.prompt({
-    title: 'Rename album',
-    label: 'Name',
+    title: t.value.renameAlbum,
+    label: t.value.displayName,
     initialValue: album.value.name,
   })
   if (!name || name === album.value.name) return
@@ -67,7 +69,7 @@ async function renameAlbum() {
       method: 'PATCH',
       body: JSON.stringify({ name }),
     })
-    ui.showToast('Album renamed')
+    ui.showToast(t.value.renameAlbum)
     await load()
   } catch (e) {
     error.value = formatApiError(e, 'Rename failed')
@@ -77,16 +79,16 @@ async function renameAlbum() {
 async function deleteAlbum() {
   if (!album.value) return
   const ok = await ui.confirm({
-    title: 'Delete album?',
-    message: `"${album.value.name}" will be removed. Your files stay in My Files.`,
-    confirmLabel: 'Delete album',
+    title: `${t.value.deleteAlbum}?`,
+    message: `"${album.value.name}" ${t.value.deleteAlbumConfirm}`,
+    confirmLabel: t.value.deleteAlbum,
     danger: true,
   })
   if (!ok) return
   error.value = ''
   try {
     await api(`/photos/albums/${albumId.value}`, { method: 'DELETE' })
-    ui.showToast('Album deleted')
+    ui.showToast(t.value.deleteAlbum)
     await router.push('/photos')
   } catch (e) {
     error.value = formatApiError(e, 'Delete failed')
@@ -101,7 +103,7 @@ async function addItem(fileId: string) {
       method: 'POST',
       body: JSON.stringify({ fileIds: [fileId] }),
     })
-    ui.showToast('Added to album')
+    ui.showToast(t.value.addPhotos)
     await load()
   } catch (e) {
     error.value = formatApiError(e, 'Failed to add item')
@@ -158,16 +160,16 @@ async function removeCover() {
 
 async function removeItem(fileId: string, name: string) {
   const ok = await ui.confirm({
-    title: 'Remove from album?',
+    title: `${t.value.removeFromAlbum}?`,
     message: `"${name}" will be removed from this album only.`,
-    confirmLabel: 'Remove',
+    confirmLabel: t.value.remove,
     danger: true,
   })
   if (!ok) return
   error.value = ''
   try {
     await api(`/photos/albums/${albumId.value}/items/${fileId}`, { method: 'DELETE' })
-    ui.showToast('Removed from album')
+    ui.showToast(t.value.removeFromAlbum)
     await load()
   } catch (e) {
     error.value = formatApiError(e, 'Remove failed')
@@ -229,10 +231,10 @@ onBeforeUnmount(() => {
   <div>
     <div class="album-header">
       <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">
-        ← Photos
+        ← {{ t.photosTitle }}
       </button>
-      <h1 class="album-title">{{ album?.name ?? 'Album' }}</h1>
-      <button type="button" class="btn icon-only" aria-label="Album menu" @click="openAlbumMenu">
+      <h1 class="album-title">{{ album?.name ?? t.album }}</h1>
+      <button type="button" class="btn icon-only" :aria-label="t.albumMenu" @click="openAlbumMenu">
         <Icon name="more" :size="18" />
       </button>
     </div>
@@ -257,9 +259,9 @@ onBeforeUnmount(() => {
 
       <EmptyState
         v-else
-        title="Album is empty"
-        description="Add photos or videos from your library."
-        action-label="Add photos"
+        :title="t.albumEmpty"
+        :description="t.albumEmptyDesc"
+        :action-label="t.addPhotos"
         icon="photos"
         @action="pickerOpen = true"
       />

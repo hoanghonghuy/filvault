@@ -9,7 +9,7 @@ import { usePullToRefresh } from './usePullToRefresh'
 describe('useLongPress', () => {
   it('triggers onLongPress callback after delay', async () => {
     vi.useFakeTimers()
-    const onLongPress = vi.fn()
+    const onLongPress = vi.fn<() => void>()
     const { start, end } = useLongPress({ delay: 300, onLongPress })
 
     const fakeEvent = { clientX: 100, clientY: 100 } as MouseEvent
@@ -25,7 +25,7 @@ describe('useLongPress', () => {
 
   it('cancels if touch moves past threshold', () => {
     vi.useFakeTimers()
-    const onLongPress = vi.fn()
+    const onLongPress = vi.fn<() => void>()
     const { start, move } = useLongPress({ delay: 300, moveThreshold: 10, onLongPress })
 
     start({ clientX: 100, clientY: 100 } as MouseEvent)
@@ -41,7 +41,7 @@ describe('usePullToRefresh', () => {
   it('tracks pullDistance on downward touch moves', () => {
     const el = document.createElement('div')
     const containerRef = ref(el)
-    const onRefresh = vi.fn().mockResolvedValue(undefined)
+    const onRefresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
 
     const { pullDistance, attachListeners } = usePullToRefresh(containerRef, {
       threshold: 50,

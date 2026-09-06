@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import Icon from '@/components/AppIcon.vue'
+import { useI18n } from '@/lib/i18n'
 
 defineProps<{
   selectedCount: number
@@ -17,6 +18,8 @@ const emit = defineEmits<{
   favorite: []
 }>()
 
+const { t } = useI18n()
+
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close')
 }
@@ -25,23 +28,22 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <Transition name="action-bar">
-    <aside
-      class="batch-bar"
-      role="toolbar"
-      aria-label="Selection actions"
-    >
+  <aside
+    class="batch-bar"
+    role="toolbar"
+    aria-label="Selection actions"
+  >
       <div class="batch-left">
         <button
           type="button"
           class="btn-icon"
-          aria-label="Close selection"
+          :aria-label="t.closeSelection"
           @click="emit('close')"
         >
           <Icon name="close" :size="20" />
         </button>
         <span class="batch-count" aria-live="polite">
-          {{ selectedCount }} selected
+          {{ selectedCount }} {{ t.selected }}
         </span>
       </div>
 
@@ -52,7 +54,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           class="btn-text"
           @click="emit('select-all')"
         >
-          Select all
+          {{ t.selectAll }}
         </button>
         <button
           v-else-if="totalCount > 0"
@@ -60,7 +62,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           class="btn-text"
           @click="emit('clear-selection')"
         >
-          Deselect all
+          {{ t.deselectAll }}
         </button>
 
         <div class="divider" aria-hidden="true" />
@@ -68,8 +70,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <button
           type="button"
           class="btn-icon"
-          title="Download selected"
-          aria-label="Download selected"
+          :title="t.downloadSelected"
+          :aria-label="t.downloadSelected"
           :disabled="selectedCount === 0"
           @click="emit('download')"
         >
@@ -79,8 +81,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <button
           type="button"
           class="btn-icon"
-          title="Add to favorites"
-          aria-label="Add to favorites"
+          :title="t.addToFavorites"
+          :aria-label="t.addToFavorites"
           :disabled="selectedCount === 0"
           @click="emit('favorite')"
         >
@@ -90,8 +92,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <button
           type="button"
           class="btn-icon"
-          title="Move selected"
-          aria-label="Move selected"
+          :title="t.moveSelected"
+          :aria-label="t.moveSelected"
           :disabled="selectedCount === 0"
           @click="emit('move')"
         >
@@ -101,8 +103,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <button
           type="button"
           class="btn-icon danger"
-          title="Move to trash"
-          aria-label="Move to trash"
+          :title="t.moveToTrash"
+          :aria-label="t.moveToTrash"
           :disabled="selectedCount === 0"
           @click="emit('delete')"
         >
@@ -110,7 +112,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         </button>
       </div>
     </aside>
-  </Transition>
 </template>
 
 <style scoped>

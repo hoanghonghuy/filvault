@@ -8,14 +8,15 @@ import Icon from '@/components/AppIcon.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import {
-  OVERVIEW_DESTINATIONS,
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
 } from '@/lib/shellNav'
+import { useI18n } from '@/lib/i18n'
 import type { Browser, BrowserFile, FavoriteFile, Timeline, TimelineGroup } from '@/api/types'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const loading = ref(false)
 const filesError = ref('')
@@ -30,8 +31,14 @@ const recentPhotos = computed(() => recentPhotosFromTimeline(groups.value))
 const storageLine = computed(() => {
   const user = auth.user
   if (!user) return ''
-  return `${formatBytes(user.storageUsed)} of ${formatBytes(user.storageQuota)} used`
+  return `${formatBytes(user.storageUsed)} / ${formatBytes(user.storageQuota)} ${t.value.usedOfQuota}`
 })
+
+const localizedDestinations = computed(() => [
+  { to: '/files', label: t.value.myFiles, hint: t.value.browseAndUpload, icon: 'folder' },
+  { to: '/photos', label: t.value.navPhotos, hint: t.value.timelineAndAlbums, icon: 'photos' },
+  { to: '/shared', label: t.value.sharedWithMe, hint: t.value.itemsSharedToYou, icon: 'users' },
+])
 
 const bothFailed = computed(() => Boolean(filesError.value && photosError.value))
 
@@ -72,15 +79,15 @@ onMounted(load)
 
 <template>
   <div class="overview">
-    <h1 class="page-title desktop-only">Overview</h1>
+    <h1 class="page-title desktop-only">{{ t.navOverview }}</h1>
     <header class="hero">
-      <p class="hero-title">{{ auth.user?.displayName ?? 'Welcome' }}</p>
+      <p class="hero-title">{{ auth.user?.displayName ?? t.welcome }}</p>
       <p v-if="storageLine" class="hero-meta">{{ storageLine }}</p>
     </header>
 
     <nav class="destinations" aria-label="Open a library">
       <RouterLink
-        v-for="item in OVERVIEW_DESTINATIONS"
+        v-for="item in localizedDestinations"
         :key="item.to"
         :to="item.to"
         class="dest-card"
@@ -114,8 +121,8 @@ onMounted(load)
         aria-labelledby="favorites-heading"
       >
         <div class="section-head">
-          <h2 id="favorites-heading" class="section-title">Favorites</h2>
-          <RouterLink class="see-all" :to="{ path: '/files', query: { view: 'favorites' } }">See all</RouterLink>
+          <h2 id="favorites-heading" class="section-title">{{ t.favorites }}</h2>
+          <RouterLink class="see-all" :to="{ path: '/files', query: { view: 'favorites' } }">{{ t.seeAll }}</RouterLink>
         </div>
         <div class="list">
           <RouterLink
@@ -135,8 +142,8 @@ onMounted(load)
 
       <section class="section" aria-labelledby="recent-files-heading">
         <div class="section-head">
-          <h2 id="recent-files-heading" class="section-title">Recent files</h2>
-          <RouterLink class="see-all" to="/files">See all</RouterLink>
+          <h2 id="recent-files-heading" class="section-title">{{ t.recentFiles }}</h2>
+          <RouterLink class="see-all" to="/files">{{ t.seeAll }}</RouterLink>
         </div>
         <p v-if="filesError" class="section-error" role="alert">{{ filesError }}</p>
         <div v-else-if="recentFiles.length" class="list">
@@ -154,15 +161,15 @@ onMounted(load)
           </RouterLink>
         </div>
         <p v-else class="empty-inline">
-          No files yet.
-          <RouterLink class="empty-link" to="/files">Open My Files</RouterLink>
+          {{ t.noFilesYet }}
+          <RouterLink class="empty-link" to="/files">{{ t.openMyFiles }}</RouterLink>
         </p>
       </section>
 
       <section class="section" aria-labelledby="recent-photos-heading">
         <div class="section-head">
-          <h2 id="recent-photos-heading" class="section-title">Recent photos</h2>
-          <RouterLink class="see-all" to="/photos">See all</RouterLink>
+          <h2 id="recent-photos-heading" class="section-title">{{ t.recentPhotos }}</h2>
+          <RouterLink class="see-all" to="/photos">{{ t.seeAll }}</RouterLink>
         </div>
         <p v-if="photosError" class="section-error" role="alert">{{ photosError }}</p>
         <div v-else-if="recentPhotos.length" class="grid photos">
@@ -176,8 +183,8 @@ onMounted(load)
           />
         </div>
         <p v-else class="empty-inline">
-          No photos yet.
-          <RouterLink class="empty-link" to="/photos">Open Photos</RouterLink>
+          {{ t.noPhotosYet }}
+          <RouterLink class="empty-link" to="/photos">{{ t.openPhotos }}</RouterLink>
         </p>
       </section>
     </template>

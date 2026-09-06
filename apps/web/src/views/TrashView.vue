@@ -7,9 +7,11 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
 import { mimeIcon, mimeLabel } from '@/lib/mimeIcon'
+import { useI18n } from '@/lib/i18n'
 import type { TrashList } from '@/api/types'
 
 const ui = useUiStore()
+const { t } = useI18n()
 const trash = ref<TrashList | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -43,7 +45,7 @@ async function restoreFile(id: string) {
   removeFromLocal(id)
   try {
     await api(`/files/${id}/restore`, { method: 'POST', body: '{}' })
-    ui.showToast('File restored')
+    ui.showToast(t.value.fileRestored)
   } catch (e) {
     error.value = formatApiError(e, 'Restore failed')
     await load()
@@ -54,7 +56,7 @@ async function restoreFolder(id: string) {
   removeFromLocal(id)
   try {
     await api(`/folders/${id}/restore`, { method: 'POST', body: '{}' })
-    ui.showToast('Folder restored')
+    ui.showToast(t.value.folderRestored)
   } catch (e) {
     error.value = formatApiError(e, 'Restore failed')
     await load()
@@ -63,16 +65,16 @@ async function restoreFolder(id: string) {
 
 async function permanentDelete(type: 'files' | 'folders', id: string, name: string) {
   const ok = await ui.confirm({
-    title: 'Delete forever?',
+    title: `${t.value.deleteForever}?`,
     message: `"${name}" will be permanently deleted. This cannot be undone.`,
-    confirmLabel: 'Delete forever',
+    confirmLabel: t.value.deleteForever,
     danger: true,
   })
   if (!ok) return
   removeFromLocal(id)
   try {
     await api(`/trash/${type}/${id}`, { method: 'DELETE' })
-    ui.showToast('Deleted permanently')
+    ui.showToast(t.value.deleteForever)
   } catch (e) {
     error.value = formatApiError(e, 'Delete failed')
     await load()
@@ -102,19 +104,19 @@ onMounted(load)
 
 <template>
   <div>
-    <h1 class="page-title desktop-only">Trash</h1>
+    <h1 class="page-title desktop-only">{{ t.trashTitle }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonTrash v-if="loading" />
     <div v-else>
       <EmptyState
         v-if="isEmpty"
-        title="Trash is empty"
-        description="Deleted files and folders will appear here."
+        :title="t.trashEmpty"
+        :description="t.trashEmptyDesc"
         icon="trash"
       />
 
       <TransitionGroup v-if="trash?.folders.length" name="row" tag="section" class="list">
-        <h2 key="folders-title" class="section-title">Folders</h2>
+        <h2 key="folders-title" class="section-title">{{ t.folders }}</h2>
         <div
           v-for="folder in trash.folders"
           :key="folder.id"
@@ -122,14 +124,14 @@ onMounted(load)
           @click="openFolderActions(folder)"
         >
           <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
-          <button class="btn icon-only" type="button" aria-label="Folder actions" @click.stop="openFolderActions(folder)">
+          <button class="btn icon-only" type="button" :aria-label="t.folder" @click.stop="openFolderActions(folder)">
             <Icon name="more" :size="18" />
           </button>
         </div>
       </TransitionGroup>
 
       <TransitionGroup v-if="trash?.files.length" name="row" tag="section" class="list files-section">
-        <h2 key="files-title" class="section-title">Files</h2>
+        <h2 key="files-title" class="section-title">{{ t.files }}</h2>
         <div
           v-for="file in trash.files"
           :key="file.id"

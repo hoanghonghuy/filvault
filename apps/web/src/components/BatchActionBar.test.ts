@@ -1,11 +1,15 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import BatchActionBar from './BatchActionBar.vue'
+import { setLocale } from '@/lib/i18n'
 
 describe('BatchActionBar', () => {
+  beforeEach(() => {
+    setLocale('en')
+  })
   it('renders selected count and emits actions', async () => {
     const wrapper = mount(BatchActionBar, {
       props: { selectedCount: 3, totalCount: 10 },

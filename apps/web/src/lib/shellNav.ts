@@ -20,16 +20,20 @@ export const OVERVIEW_DESTINATIONS = [
   { to: '/shared', label: 'Shared with me', hint: 'Items shared to you', icon: 'users' },
 ] as const
 
-export function pageTitleForRoute(path: string, routeName?: string | symbol | null): string {
-  if (path === '/' || path === '') return 'Overview'
-  if (routeName === 'album') return 'Album'
-  if (path === '/files' || path.startsWith('/files/')) return 'My Files'
-  if (path === '/photos' || path.startsWith('/photos/')) return 'Photos'
-  if (path === '/chat' || path.startsWith('/chat/')) return 'Chat'
-  if (path === '/trash') return 'Trash'
-  if (path === '/shared') return 'Shared with me'
-  if (path === '/settings') return 'Settings'
-  if (path === '/profile') return 'Profile'
+export function pageTitleForRoute(
+  path: string,
+  routeName?: string | symbol | null,
+  titles?: Partial<Record<'overview' | 'album' | 'files' | 'photos' | 'chat' | 'trash' | 'shared' | 'settings' | 'profile', string>>,
+): string {
+  if (path === '/' || path === '') return titles?.overview ?? 'Overview'
+  if (routeName === 'album') return titles?.album ?? 'Album'
+  if (path === '/files' || path.startsWith('/files/')) return titles?.files ?? 'My Files'
+  if (path === '/photos' || path.startsWith('/photos/')) return titles?.photos ?? 'Photos'
+  if (path === '/chat' || path.startsWith('/chat/')) return titles?.chat ?? 'Chat'
+  if (path === '/trash') return titles?.trash ?? 'Trash'
+  if (path === '/shared') return titles?.shared ?? 'Shared with me'
+  if (path === '/settings') return titles?.settings ?? 'Settings'
+  if (path === '/profile') return titles?.profile ?? 'Profile'
   return 'Filvault'
 }
 
