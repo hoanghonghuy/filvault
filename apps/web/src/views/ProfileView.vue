@@ -32,39 +32,122 @@ function triggerAvatarPick() {
 
 function compressImage(file: File, maxSize = 256): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image()
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      img.src = e.target?.result as string
+    let objectUrl = ''
+    try {
+      objectUrl = URL.createObjectURL(file)
+    } catch {
+      // ignore
     }
-    reader.onerror = reject
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      let width = img.width
-      let height = img.height
-      if (width > height) {
-        if (width > maxSize) {
-          height = Math.round((height * maxSize) / width)
-          width = maxSize
+
+    const cleanup = () => {
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl)
+        } catch {
+          // ignore
         }
+      }
+    }
+
+    if (typeof createImageBitmap === 'function') {
+      createImageBitmap(file)
+        .then((bitmap) => {
+          cleanup()
+          let width = bitmap.width
+          let height = bitmap.height
+          if (width > height) {
+            if (width > maxSize) {
+              height = Math.round((height * maxSize) / width)
+              width = maxSize
+            }
+          } else {
+            if (height > maxSize) {
+              width = Math.round((width * maxSize) / height)
+              height = maxSize
+            }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            bitmap.close()
+            reject(new Error('Không thể xử lý đồ họa ảnh'))
+            return
+          }
+          ctx.drawImage(bitmap, 0, 0, width, height)
+          bitmap.close()
+          try {
+            const dataUrl = canvas.toDataURL('image/webp', 0.85)
+            if (dataUrl.startsWith('data:image/webp')) {
+              resolve(dataUrl)
+              return
+            }
+          } catch {
+            // fallback to jpeg
+          }
+          resolve(canvas.toDataURL('image/jpeg', 0.85))
+        })
+        .catch(() => {
+          fallbackImage()
+        })
+      return
+    }
+
+    fallbackImage()
+
+    function fallbackImage() {
+      const img = new Image()
+      img.onload = () => {
+        cleanup()
+        let width = img.naturalWidth || img.width
+        let height = img.naturalHeight || img.height
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round((height * maxSize) / width)
+            width = maxSize
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height)
+            height = maxSize
+          }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Không thể xử lý đồ họa ảnh'))
+          return
+        }
+        ctx.drawImage(img, 0, 0, width, height)
+        try {
+          const dataUrl = canvas.toDataURL('image/webp', 0.85)
+          if (dataUrl.startsWith('data:image/webp')) {
+            resolve(dataUrl)
+            return
+          }
+        } catch {
+          // fallback to jpeg
+        }
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.onerror = () => {
+        cleanup()
+        reject(new Error('Không thể đọc định dạng ảnh này. Vui lòng chọn ảnh JPG hoặc PNG.'))
+      }
+      if (objectUrl) {
+        img.src = objectUrl
       } else {
-        if (height > maxSize) {
-          width = Math.round((width * maxSize) / height)
-          height = maxSize
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          img.src = e.target?.result as string
         }
+        reader.onerror = () => reject(new Error('Không thể đọc file ảnh'))
+        reader.readAsDataURL(file)
       }
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        resolve(img.src)
-        return
-      }
-      ctx.drawImage(img, 0, 0, width, height)
-      resolve(canvas.toDataURL('image/webp', 0.85))
     }
-    img.onerror = reject
-    reader.readAsDataURL(file)
   })
 }
 
@@ -76,10 +159,14 @@ async function handleAvatarSelected(e: Event) {
   updatingAvatar.value = true
   try {
     const dataUrl = await compressImage(file, 256)
+    if (!dataUrl) {
+      throw new Error('Không thể xử lý ảnh')
+    }
     await auth.updateAvatar(dataUrl)
     ui.showToast('Đã cập nhật ảnh đại diện', 'success')
   } catch (err) {
     error.value = formatApiError(err, 'Không thể tải ảnh lên')
+    ui.showToast(error.value, 'error')
   } finally {
     updatingAvatar.value = false
     target.value = ''
@@ -173,7 +260,7 @@ async function logout() {
           <input
             ref="avatarInputRef"
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp,image/*"
             class="sr-only"
             @change="handleAvatarSelected"
           />

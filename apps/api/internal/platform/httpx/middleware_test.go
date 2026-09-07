@@ -55,3 +55,22 @@ func TestCORS_UnknownOrigin(t *testing.T) {
 		t.Fatal("unexpected CORS header for unknown origin")
 	}
 }
+
+func TestCORS_PrivateLANOrigin(t *testing.T) {
+	engine := gin.New()
+	engine.Use(httpx.CORS([]string{"http://localhost:5173"}))
+	engine.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+
+	req := httptest.NewRequest(http.MethodOptions, "/ping", nil)
+	req.Header.Set("Origin", "http://192.168.1.50:5173")
+	req.Header.Set("Access-Control-Request-Method", "PATCH")
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://192.168.1.50:5173" {
+		t.Fatalf("allow-origin=%q", got)
+	}
+}

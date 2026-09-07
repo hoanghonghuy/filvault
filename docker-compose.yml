@@ -25,7 +25,7 @@ services:
     environment:
       MINIO_ROOT_USER: filvault
       MINIO_ROOT_PASSWORD: filvaultsecret
-      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:5173,http://127.0.0.1:5173,http://${FILVAULT_HOST:-localhost}:5173
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
     ports:
       - "9002:9000"
       - "9003:9001"
