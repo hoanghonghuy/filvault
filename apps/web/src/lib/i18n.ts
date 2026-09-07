@@ -204,6 +204,13 @@ const dictionaries = {
     seenAt: 'Đã xem lúc',
     reply: 'Trả lời',
     close: 'Đóng',
+    photosAndVideos: 'Ảnh & Video',
+    links: 'Liên kết',
+    noSharedMedia: 'Chưa có ảnh hoặc video nào.',
+    noSharedFiles: 'Chưa có file nào được chia sẻ.',
+    noSharedLinks: 'Chưa có liên kết nào được chia sẻ.',
+    noMessagesFound: 'Không tìm thấy tin nhắn nào.',
+    jumpToMessage: 'Xem tin nhắn',
   },
   en: {
     navOverview: 'Overview',
@@ -404,6 +411,13 @@ const dictionaries = {
     seenAt: 'Seen at',
     reply: 'Reply',
     close: 'Close',
+    photosAndVideos: 'Photos & Videos',
+    links: 'Links',
+    noSharedMedia: 'No photos or videos yet.',
+    noSharedFiles: 'No shared files yet.',
+    noSharedLinks: 'No shared links yet.',
+    noMessagesFound: 'No messages found.',
+    jumpToMessage: 'Jump to message',
   },
 } as const
 

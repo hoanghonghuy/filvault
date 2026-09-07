@@ -267,6 +267,24 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/reaction-capsule/)
     expect(chat).toMatch(/reaction-bottom-bar/)
   })
+
+  it('supports click-outside sticker dismiss, in-info message search, and media/file/link tabs', () => {
+    expect(chat).toMatch(/handleClickOutsideStickerPicker/)
+    expect(chat).toMatch(/document\.addEventListener\('pointerdown', handleClickOutsideStickerPicker\)/)
+    expect(chat).toMatch(/infoSearchOpen/)
+    expect(chat).toMatch(/infoSearchQuery/)
+    expect(chat).toMatch(/performInfoSearch/)
+    expect(chat).toMatch(/infoSearchResults/)
+    expect(chat).toMatch(/jumpToMessageFromInfo/)
+    expect(chat).toMatch(/activeMediaTab/)
+    expect(chat).toMatch(/sharedPhotos/)
+    expect(chat).toMatch(/sharedFiles/)
+    expect(chat).toMatch(/sharedLinks/)
+    expect(chat).toMatch(/info-tabs-header/)
+    expect(chat).toMatch(/chat-info-files-list/)
+    expect(chat).toMatch(/chat-info-links-list/)
+    expect(chat).toMatch(/media-panel-tabs/)
+  })
 })
 
 

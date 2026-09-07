@@ -57,7 +57,7 @@ func (m *mockChatRepo) SearchMessages(ctx context.Context, ownerID, conversation
 	return nil, nil
 }
 func (m *mockChatRepo) CreateAttachment(ctx context.Context, a Attachment) error { return nil }
-func (m *mockChatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error) {
+func (m *mockChatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int, mediaType string) ([]Attachment, error) {
 	return nil, nil
 }
 func (m *mockChatRepo) GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error) {

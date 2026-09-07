@@ -868,7 +868,17 @@ func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, que
 	return out, nil
 }
 
-func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
+func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, limit int, mediaType string) ([]chat.Attachment, error) {
+	var typeClause string
+	switch mediaType {
+	case "all":
+		typeClause = ""
+	case "file", "files":
+		typeClause = "AND NOT (a.mime_type LIKE 'image/%' OR a.mime_type LIKE 'video/%')"
+	default:
+		typeClause = "AND (a.mime_type LIKE 'image/%' OR a.mime_type LIKE 'video/%')"
+	}
+
 	rows, err := s.pool.Query(ctx, `
 		SELECT a.id, a.message_id, a.file_id, a.original_name, a.display_name, a.mime_type, a.size_bytes, a.created_at,
 			CASE
@@ -887,7 +897,7 @@ func (s *Store) ListMedia(ctx context.Context, ownerID, conversationID string, l
 				WHERE conversation_id = $2 AND user_id = $1 AND archived_at IS NULL
 			)
 			AND m.deleted_at IS NULL
-			AND (a.mime_type LIKE 'image/%' OR a.mime_type LIKE 'video/%')
+			`+typeClause+`
 		ORDER BY a.created_at DESC
 		LIMIT $3
 	`, ownerID, conversationID, limit)
@@ -1054,8 +1064,8 @@ func (r chatRepo) CreateAttachment(ctx context.Context, a chat.Attachment) error
 	return r.store.CreateAttachment(ctx, a)
 }
 
-func (r chatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]chat.Attachment, error) {
-	return r.store.ListMedia(ctx, ownerID, conversationID, limit)
+func (r chatRepo) ListMedia(ctx context.Context, ownerID, conversationID string, limit int, mediaType string) ([]chat.Attachment, error) {
+	return r.store.ListMedia(ctx, ownerID, conversationID, limit, mediaType)
 }
 
 func (r chatRepo) GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error) {

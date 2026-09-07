@@ -113,6 +113,205 @@ function handleInsertEmoji(emoji: string) {
     onComposerInput()
   })
 }
+
+const activeMediaTab = ref<'media' | 'file' | 'link'>('media')
+const highlightedMessageId = ref<string | null>(null)
+
+// In-thread-info search state
+const infoSearchOpen = ref(false)
+const infoSearchQuery = ref('')
+const infoSearchResults = ref<ChatMessage[]>([])
+const infoSearching = ref(false)
+const infoSearchDone = ref(false)
+const infoSearchInputRef = ref<HTMLInputElement | null>(null)
+
+interface SharedLinkItem {
+  url: string
+  domain: string
+  messageId: string
+  createdAt: string
+  senderName: string
+}
+
+const sharedPhotos = computed(() =>
+  media.value.filter(
+    (item) =>
+      item.availability === 'available' &&
+      (item.mimeType.startsWith('image/') || item.mimeType.startsWith('video/')),
+  ),
+)
+
+const sharedFiles = computed(() =>
+  media.value.filter(
+    (item) =>
+      item.availability === 'available' &&
+      !item.mimeType.startsWith('image/') &&
+      !item.mimeType.startsWith('video/'),
+  ),
+)
+
+const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`]+)/gi
+
+function messageSenderName(msg: ChatMessage): string {
+  if (msg.senderId === auth.user?.id) return 'Bạn'
+  const c = conversations.value.find((item) => item.id === msg.conversationId)
+  if (c?.peer?.name) return c.peer.name
+  if (c?.peer?.email) return c.peer.email
+  return 'Người gửi'
+}
+
+const sharedLinks = computed<SharedLinkItem[]>(() => {
+  const links: SharedLinkItem[] = []
+  const seen = new Set<string>()
+  for (const m of messages.value) {
+    if (!m.body || m.removedAt) continue
+    const matches = m.body.match(URL_REGEX)
+    if (matches) {
+      for (const rawUrl of matches) {
+        const cleanUrl = rawUrl.replace(/[.,;!?)]+$/, '')
+        const key = `${m.id}-${cleanUrl}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        let domain = cleanUrl
+        try {
+          domain = new URL(cleanUrl).hostname
+        } catch {
+          // keep cleanUrl
+        }
+        links.push({
+          url: cleanUrl,
+          domain,
+          messageId: m.id,
+          createdAt: m.createdAt,
+          senderName: messageSenderName(m),
+        })
+      }
+    }
+  }
+  return links.reverse()
+})
+
+let infoSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function onInfoSearchInput() {
+  if (infoSearchDebounceTimer) clearTimeout(infoSearchDebounceTimer)
+  infoSearchDebounceTimer = setTimeout(() => {
+    void performInfoSearch()
+  }, 300)
+}
+
+async function performInfoSearch() {
+  const q = infoSearchQuery.value.trim()
+  if (!selectedId.value || q.length < 2) {
+    infoSearchResults.value = []
+    infoSearchDone.value = false
+    return
+  }
+  infoSearching.value = true
+  infoSearchDone.value = false
+  try {
+    const encoded = encodeURIComponent(q)
+    const out = await api<{ messages: ChatMessage[] }>(
+      `/chat/conversations/${selectedId.value}/messages/search?q=${encoded}`,
+    )
+    infoSearchResults.value = out.messages
+    infoSearchDone.value = true
+  } catch (e) {
+    error.value = formatApiError(e, 'Search failed')
+  } finally {
+    infoSearching.value = false
+  }
+}
+
+function clearInfoSearch() {
+  infoSearchQuery.value = ''
+  infoSearchResults.value = []
+  infoSearchDone.value = false
+}
+
+type ChatInfoView = 'main' | 'search' | 'media'
+const chatInfoCurrentView = ref<ChatInfoView>('main')
+
+const chatInfoTitle = computed(() => {
+  if (chatInfoCurrentView.value === 'search') return 'Tìm kiếm trong cuộc trò chuyện'
+  if (chatInfoCurrentView.value === 'media') return t.value.sharedMedia || 'File phương tiện & liên kết'
+  return t.value.chatInfo || 'Thông tin đoạn chat'
+})
+
+function openInfoSearchView() {
+  chatInfoCurrentView.value = 'search'
+  infoSearchOpen.value = true
+  void nextTick(() => {
+    infoSearchInputRef.value?.focus()
+  })
+}
+
+function openMediaSubPage(tab: 'media' | 'file' | 'link' = 'media') {
+  activeMediaTab.value = tab
+  chatInfoCurrentView.value = 'media'
+}
+
+function returnToMainInfo() {
+  chatInfoCurrentView.value = 'main'
+  infoSearchOpen.value = false
+}
+
+function closeChatInfo() {
+  threadInfoOpen.value = false
+  chatInfoCurrentView.value = 'main'
+  infoSearchOpen.value = false
+}
+
+function toggleInfoSearch() {
+  if (chatInfoCurrentView.value === 'search') {
+    returnToMainInfo()
+  } else {
+    openInfoSearchView()
+  }
+}
+
+function scrollToMessage(messageId: string) {
+  const el = document.getElementById(`msg-${messageId}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    highlightedMessageId.value = messageId
+    setTimeout(() => {
+      if (highlightedMessageId.value === messageId) {
+        highlightedMessageId.value = null
+      }
+    }, 2500)
+  }
+}
+
+async function jumpToMessageFromInfo(msg: ChatMessage) {
+  closeChatInfo()
+  if (!messages.value.some((m) => m.id === msg.id)) {
+    searchResults.value = [msg]
+  }
+  await nextTick()
+  scrollToMessage(msg.id)
+}
+
+async function jumpToMessageById(messageId: string) {
+  closeChatInfo()
+  const target = messages.value.find((m) => m.id === messageId)
+  if (!target) {
+    return
+  }
+  await nextTick()
+  scrollToMessage(messageId)
+}
+
+function handleClickOutsideStickerPicker(event: MouseEvent | PointerEvent) {
+  if (!stickerPickerOpen.value) return
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  if (target.closest('.sticker-picker-drawer') || target.closest('.sticker-toggle-btn')) {
+    return
+  }
+  stickerPickerOpen.value = false
+}
+
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
 const isMobile = ref(false)
@@ -655,6 +854,11 @@ async function selectConversation(id: string) {
   searchQuery.value = ''
   searchResults.value = null
   threadSearchOpen.value = false
+  infoSearchOpen.value = false
+  infoSearchQuery.value = ''
+  infoSearchResults.value = []
+  infoSearchDone.value = false
+  chatInfoCurrentView.value = 'main'
   loadingThread.value = true
   await Promise.all([loadMessages(id), loadMedia(id)])
   if (selection !== activeSelection || selectedId.value !== id) return
@@ -843,7 +1047,7 @@ async function loadMedia(id = selectedId.value) {
   if (!id) return
   const selection = activeSelection
   try {
-    const out = await api<{ media: ChatAttachment[] }>(`/chat/conversations/${id}/media`)
+    const out = await api<{ media: ChatAttachment[] }>(`/chat/conversations/${id}/media?type=all`)
     if (selection !== activeSelection || selectedId.value !== id) return
     media.value = out.media
   } catch (e) {
@@ -1088,6 +1292,8 @@ function handleGlobalKeydown(e: KeyboardEvent) {
       messageMenuOpen.value = false
     } else if (stickerPickerOpen.value) {
       stickerPickerOpen.value = false
+    } else if (infoSearchOpen.value) {
+      infoSearchOpen.value = false
     } else if (threadSearchOpen.value) {
       threadSearchOpen.value = false
     }
@@ -1112,6 +1318,7 @@ onMounted(() => {
   window.addEventListener('online', chatStore.markOnline)
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onVisibilityChange)
+    document.addEventListener('pointerdown', handleClickOutsideStickerPicker)
   }
   window.addEventListener('focus', onWindowFocus)
   if (window.visualViewport) {
@@ -1133,6 +1340,7 @@ onUnmounted(() => {
   window.removeEventListener('online', chatStore.markOnline)
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    document.removeEventListener('pointerdown', handleClickOutsideStickerPicker)
   }
   window.removeEventListener('focus', onWindowFocus)
   if (window.visualViewport) {
@@ -1362,15 +1570,6 @@ watch(
             <button
               class="icon-btn"
               type="button"
-              :aria-expanded="threadSearchOpen"
-              :aria-label="t.search"
-              @click="threadSearchOpen = !threadSearchOpen"
-            >
-              <Icon name="search" :size="18" />
-            </button>
-            <button
-              class="icon-btn"
-              type="button"
               :aria-label="t.chatInfo"
               :title="t.chatInfo"
               @click="threadInfoOpen = true"
@@ -1404,9 +1603,11 @@ watch(
                   <span>{{ formatDayLabel(message.createdAt) }}</span>
                 </div>
                 <div
+                  :id="'msg-' + message.id"
                   class="message-row"
                   :class="{
                     outgoing: message.senderId === auth.user?.id,
+                    'msg-highlighted': highlightedMessageId === message.id,
                     'cluster-start': isFirstInCluster(index),
                     'cluster-last': isLastInCluster(index),
                     'cluster-middle': !isFirstInCluster(index) && !isLastInCluster(index),
@@ -1675,27 +1876,118 @@ watch(
     </section>
 
     <aside class="media-panel" aria-label="Shared media">
-      <h2>Media</h2>
+      <div class="media-panel-header">
+        <h2>{{ t.sharedMedia }}</h2>
+      </div>
+      <div class="media-panel-tabs" role="tablist">
         <button
-        v-for="item in media"
-        :key="item.id"
-        type="button"
-        class="media-card"
-        :disabled="!item.fileId"
-          @click="openAttachment(item.id)"
-      >
-        <img
-          v-if="item.thumbnailUrl"
-          :src="item.thumbnailUrl"
-          :alt="item.name"
-          class="media-thumb"
-          loading="lazy"
-        />
-        <Icon v-else :name="item.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
-        <span class="media-name">{{ item.name }}</span>
-        <small>{{ new Date(item.createdAt).toLocaleDateString() }}</small>
-      </button>
-      <p v-if="!media.length" class="muted-hint">No shared photos or videos yet.</p>
+          type="button"
+          class="panel-tab-btn"
+          :class="{ active: activeMediaTab === 'media' }"
+          role="tab"
+          :aria-selected="activeMediaTab === 'media'"
+          @click="activeMediaTab = 'media'"
+        >
+          <span>{{ t.photosAndVideos }}</span>
+          <span v-if="sharedPhotos.length" class="panel-tab-count">{{ sharedPhotos.length }}</span>
+        </button>
+        <button
+          type="button"
+          class="panel-tab-btn"
+          :class="{ active: activeMediaTab === 'file' }"
+          role="tab"
+          :aria-selected="activeMediaTab === 'file'"
+          @click="activeMediaTab = 'file'"
+        >
+          <span>{{ t.files }}</span>
+          <span v-if="sharedFiles.length" class="panel-tab-count">{{ sharedFiles.length }}</span>
+        </button>
+        <button
+          type="button"
+          class="panel-tab-btn"
+          :class="{ active: activeMediaTab === 'link' }"
+          role="tab"
+          :aria-selected="activeMediaTab === 'link'"
+          @click="activeMediaTab = 'link'"
+        >
+          <span>{{ t.links }}</span>
+          <span v-if="sharedLinks.length" class="panel-tab-count">{{ sharedLinks.length }}</span>
+        </button>
+      </div>
+
+      <!-- Photos & Videos -->
+      <div v-if="activeMediaTab === 'media'" class="panel-tab-body">
+        <div v-if="sharedPhotos.length" class="panel-media-grid">
+          <button
+            v-for="item in sharedPhotos"
+            :key="item.id"
+            type="button"
+            class="media-card"
+            :disabled="!item.fileId"
+            @click="openInlineImage(item)"
+          >
+            <img
+              v-if="item.thumbnailUrl"
+              :src="item.thumbnailUrl"
+              :alt="item.name"
+              class="media-thumb"
+              loading="lazy"
+            />
+            <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="18" />
+            <span class="media-name">{{ item.name }}</span>
+            <small>{{ new Date(item.createdAt).toLocaleDateString() }}</small>
+          </button>
+        </div>
+        <p v-else class="muted-hint">{{ t.noSharedMedia }}</p>
+      </div>
+
+      <!-- Files -->
+      <div v-else-if="activeMediaTab === 'file'" class="panel-tab-body">
+        <div v-if="sharedFiles.length" class="panel-files-list">
+          <button
+            v-for="item in sharedFiles"
+            :key="item.id"
+            type="button"
+            class="panel-file-row"
+            @click="openAttachment(item.id)"
+          >
+            <span class="file-row-icon"><Icon name="file" :size="18" /></span>
+            <span class="file-row-info">
+              <span class="file-row-name" :title="item.name">{{ item.name }}</span>
+              <span class="file-row-meta">{{ formatBytes(item.sizeBytes) }} · {{ new Date(item.createdAt).toLocaleDateString() }}</span>
+            </span>
+            <Icon name="download" :size="16" class="file-row-dl" />
+          </button>
+        </div>
+        <p v-else class="muted-hint">{{ t.noSharedFiles }}</p>
+      </div>
+
+      <!-- Links -->
+      <div v-else-if="activeMediaTab === 'link'" class="panel-tab-body">
+        <div v-if="sharedLinks.length" class="panel-links-list">
+          <div
+            v-for="item in sharedLinks"
+            :key="item.messageId + '-' + item.url"
+            class="panel-link-card"
+          >
+            <a :href="item.url" target="_blank" rel="noopener noreferrer" class="panel-link-anchor">
+              <span class="panel-link-icon"><Icon name="link" :size="16" /></span>
+              <span class="panel-link-text">
+                <span class="panel-link-domain">{{ item.domain }}</span>
+                <span class="panel-link-raw">{{ item.url }}</span>
+              </span>
+              <Icon name="external-link" :size="13" class="panel-link-ext" />
+            </a>
+            <div class="panel-link-bottom">
+              <span class="panel-link-sender">{{ item.senderName }} · {{ formatRelativeDay(item.createdAt) }}</span>
+              <button type="button" class="panel-link-jump" @click="jumpToMessageById(item.messageId)">
+                {{ t.jumpToMessage }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <p v-else class="muted-hint">{{ t.noSharedLinks }}</p>
+      </div>
     </aside>
 
     <MediaLightbox
@@ -2000,109 +2292,301 @@ watch(
     </BottomSheet>
 
     <!-- Thread Info / Settings -->
-    <BottomSheet :open="threadInfoOpen" :title="t.chatInfo" @close="threadInfoOpen = false">
+    <BottomSheet :open="threadInfoOpen" :title="chatInfoTitle" @close="closeChatInfo">
       <div v-if="selectedConversation" class="chat-info-content">
-        <div class="chat-info-header">
-          <img
-            v-if="selectedConversation?.peer?.avatarUrl"
-            :src="selectedConversation.peer.avatarUrl"
-            class="chat-info-avatar avatar-img"
-            alt=""
-          />
-          <span v-else class="chat-info-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
-            {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
-          </span>
-          <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
-          <span
-            v-if="isPeerOnline(selectedConversation) || formatLastSeen(selectedConversation)"
-            class="chat-info-status"
-            :class="{ online: isPeerOnline(selectedConversation) }"
-          >
-            {{ isPeerOnline(selectedConversation) ? t.activeNow : formatLastSeen(selectedConversation) }}
-          </span>
+        <!-- Sub-page Navigation Header for Search and Media -->
+        <div v-if="chatInfoCurrentView !== 'main'" class="info-subpage-nav">
+          <button type="button" class="subpage-back-btn" @click="returnToMainInfo">
+            <Icon name="arrow-left" :size="18" />
+            <span>{{ t.back }}</span>
+          </button>
+          <span class="subpage-title">{{ chatInfoTitle }}</span>
         </div>
 
-        <div class="chat-info-actions">
-          <button
-            type="button"
-            class="chat-info-action-btn"
-            @click="callStore.startCall(selectedConversation.id, { isVideo: false }); threadInfoOpen = false"
-          >
-            <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-            <span>Gọi thoại</span>
-          </button>
-          <button
-            type="button"
-            class="chat-info-action-btn"
-            @click="callStore.startCall(selectedConversation.id, { isVideo: true }); threadInfoOpen = false"
-          >
-            <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-            <span>Gọi video</span>
-          </button>
-          <button
-            type="button"
-            class="chat-info-action-btn"
-            @click="threadSearchOpen = true; threadInfoOpen = false"
-          >
-            <span class="action-icon-circle"><Icon name="search" :size="18" /></span>
-            <span>{{ t.search }}</span>
-          </button>
+        <!-- 1. MAIN INFO VIEW -->
+        <div v-if="chatInfoCurrentView === 'main'" class="info-main-view">
+          <div class="chat-info-header">
+            <img
+              v-if="selectedConversation?.peer?.avatarUrl"
+              :src="selectedConversation.peer.avatarUrl"
+              class="chat-info-avatar avatar-img"
+              alt=""
+            />
+            <span v-else class="chat-info-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
+              {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+            </span>
+            <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
+            <span
+              v-if="isPeerOnline(selectedConversation) || formatLastSeen(selectedConversation)"
+              class="chat-info-status"
+              :class="{ online: isPeerOnline(selectedConversation) }"
+            >
+              {{ isPeerOnline(selectedConversation) ? t.activeNow : formatLastSeen(selectedConversation) }}
+            </span>
+          </div>
+
+          <div class="chat-info-actions">
+            <button
+              type="button"
+              class="chat-info-action-btn"
+              @click="callStore.startCall(selectedConversation.id, { isVideo: false }); threadInfoOpen = false"
+            >
+              <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
+              <span>Gọi thoại</span>
+            </button>
+            <button
+              type="button"
+              class="chat-info-action-btn"
+              @click="callStore.startCall(selectedConversation.id, { isVideo: true }); threadInfoOpen = false"
+            >
+              <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
+              <span>Gọi video</span>
+            </button>
+            <button
+              type="button"
+              class="chat-info-action-btn"
+              @click="openInfoSearchView"
+            >
+              <span class="action-icon-circle"><Icon name="search" :size="18" /></span>
+              <span>{{ t.search }}</span>
+            </button>
+          </div>
+
+          <!-- Section 1: Chat options -->
+          <div class="menu-section">
+            <span class="menu-section-label">{{ t.chatOptions }}</span>
+            <div class="menu-items-group">
+              <div class="theme-picker-row">
+                <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
+                <span class="menu-item-text">{{ t.themeColor }}</span>
+                <div class="theme-dots">
+                  <button
+                    v-for="th in chatThemes"
+                    :key="th.id"
+                    type="button"
+                    class="theme-dot"
+                    :style="{ backgroundColor: th.color }"
+                    :class="{ active: activeTheme === th.id }"
+                    :title="th.name"
+                    :aria-label="th.name"
+                    @click="activeTheme = th.id"
+                  />
+                </div>
+              </div>
+
+              <button type="button" class="menu-row-item" @click="changeNickname">
+                <span class="menu-item-icon badge-folder"><Icon name="pencil" :size="18" /></span>
+                <span class="menu-item-text">{{ t.changeNickname }}</span>
+              </button>
+
+              <button type="button" class="menu-row-item" @click="openInfoSearchView">
+                <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
+                <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
+                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Media, Files & Links (Compact Messenger-style rows) -->
+          <div class="menu-section">
+            <span class="menu-section-label">{{ t.sharedMedia }}</span>
+            <div class="menu-items-group">
+              <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
+                <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
+                <span class="menu-item-text">{{ t.photosAndVideos }}</span>
+                <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
+                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+              </button>
+              <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
+                <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
+                <span class="menu-item-text">{{ t.files }}</span>
+                <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
+                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+              </button>
+              <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
+                <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
+                <span class="menu-item-text">{{ t.links }}</span>
+                <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
+                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 3: Privacy & Actions -->
+          <div class="menu-section">
+            <div class="menu-items-group">
+              <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
+                <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="menu-logout-wrap">
+            <button type="button" class="menu-logout-btn danger-text" @click="deleteConversation(selectedConversation.id)">
+              <Icon name="trash" :size="18" />
+              <span>{{ t.deleteChat }}</span>
+            </button>
+          </div>
         </div>
 
-        <div class="menu-section">
-          <span class="menu-section-label">{{ t.chatOptions }}</span>
-          <div class="menu-items-group">
-            <div class="theme-picker-row">
-              <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
-              <span class="menu-item-text">{{ t.themeColor }}</span>
-              <div class="theme-dots">
-                <button
-                  v-for="th in chatThemes"
-                  :key="th.id"
-                  type="button"
-                  class="theme-dot"
-                  :style="{ backgroundColor: th.color }"
-                  :class="{ active: activeTheme === th.id }"
-                  :title="th.name"
-                  :aria-label="th.name"
-                  @click="activeTheme = th.id"
-                />
+        <!-- 2. DEDICATED SEARCH SUB-PAGE (Messenger style) -->
+        <div v-else-if="chatInfoCurrentView === 'search'" class="info-search-page">
+          <div class="info-search-page-bar">
+            <Icon name="search" :size="18" class="info-search-icon" />
+            <input
+              ref="infoSearchInputRef"
+              v-model="infoSearchQuery"
+              type="search"
+              class="info-search-input"
+              :placeholder="t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện...'"
+              @input="onInfoSearchInput"
+              @keydown.enter.prevent="performInfoSearch"
+            />
+            <button
+              v-if="infoSearchQuery"
+              type="button"
+              class="info-search-clear"
+              aria-label="Clear search"
+              @click="clearInfoSearch"
+            >
+              <Icon name="close" :size="16" />
+            </button>
+          </div>
+
+          <div v-if="infoSearching" class="subpage-status">
+            Đang tìm kiếm...
+          </div>
+          <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
+            <span class="empty-hint-icon"><Icon name="search" :size="32" /></span>
+            <p>Nhập từ khóa để tìm kiếm tin nhắn trong đoạn chat này</p>
+          </div>
+          <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
+            <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
+          </div>
+          <div v-else-if="infoSearchResults.length" class="subpage-results-container">
+            <div class="subpage-results-count">Tìm thấy {{ infoSearchResults.length }} tin nhắn</div>
+            <div class="info-search-list">
+              <button
+                v-for="msg in infoSearchResults"
+                :key="msg.id"
+                type="button"
+                class="info-search-item"
+                @click="jumpToMessageFromInfo(msg)"
+              >
+                <div class="info-search-item-meta">
+                  <span class="info-search-sender">{{ messageSenderName(msg) }}</span>
+                  <span class="info-search-time">{{ formatRelativeDay(msg.createdAt) }}</span>
+                </div>
+                <div class="info-search-body">{{ msg.body }}</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. DEDICATED MEDIA SUB-PAGE (Messenger style) -->
+        <div v-else-if="chatInfoCurrentView === 'media'" class="info-media-page">
+          <div class="info-tabs-header" role="tablist">
+            <button
+              type="button"
+              class="info-tab-btn"
+              :class="{ active: activeMediaTab === 'media' }"
+              role="tab"
+              :aria-selected="activeMediaTab === 'media'"
+              @click="activeMediaTab = 'media'"
+            >
+              <span>{{ t.photosAndVideos }}</span>
+              <span v-if="sharedPhotos.length" class="tab-badge">{{ sharedPhotos.length }}</span>
+            </button>
+            <button
+              type="button"
+              class="info-tab-btn"
+              :class="{ active: activeMediaTab === 'file' }"
+              role="tab"
+              :aria-selected="activeMediaTab === 'file'"
+              @click="activeMediaTab = 'file'"
+            >
+              <span>{{ t.files }}</span>
+              <span v-if="sharedFiles.length" class="tab-badge">{{ sharedFiles.length }}</span>
+            </button>
+            <button
+              type="button"
+              class="info-tab-btn"
+              :class="{ active: activeMediaTab === 'link' }"
+              role="tab"
+              :aria-selected="activeMediaTab === 'link'"
+              @click="activeMediaTab = 'link'"
+            >
+              <span>{{ t.links }}</span>
+              <span v-if="sharedLinks.length" class="tab-badge">{{ sharedLinks.length }}</span>
+            </button>
+          </div>
+
+          <!-- Media Tab (Photos & Videos) -->
+          <div v-if="activeMediaTab === 'media'" class="tab-content">
+            <div v-if="sharedPhotos.length" class="chat-info-media-grid">
+              <button
+                v-for="item in sharedPhotos"
+                :key="item.id"
+                type="button"
+                class="chat-info-media-thumb"
+                :title="item.name"
+                @click="openInlineImage(item)"
+              >
+                <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" :alt="item.name" loading="lazy" />
+                <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="20" />
+              </button>
+            </div>
+            <p v-else class="tab-empty-hint">{{ t.noSharedMedia }}</p>
+          </div>
+
+          <!-- Files Tab -->
+          <div v-else-if="activeMediaTab === 'file'" class="tab-content">
+            <div v-if="sharedFiles.length" class="chat-info-files-list">
+              <button
+                v-for="item in sharedFiles"
+                :key="item.id"
+                type="button"
+                class="shared-file-item"
+                @click="openAttachment(item.id)"
+              >
+                <span class="file-icon-wrap"><Icon name="file" :size="20" /></span>
+                <span class="file-details">
+                  <span class="file-title" :title="item.name">{{ item.name }}</span>
+                  <span class="file-sub">{{ formatBytes(item.sizeBytes) }} · {{ formatRelativeDay(item.createdAt) }}</span>
+                </span>
+                <span class="file-action-icon"><Icon name="download" :size="16" /></span>
+              </button>
+            </div>
+            <p v-else class="tab-empty-hint">{{ t.noSharedFiles }}</p>
+          </div>
+
+          <!-- Links Tab -->
+          <div v-else-if="activeMediaTab === 'link'" class="tab-content">
+            <div v-if="sharedLinks.length" class="chat-info-links-list">
+              <div
+                v-for="item in sharedLinks"
+                :key="item.messageId + '-' + item.url"
+                class="shared-link-card"
+              >
+                <a :href="item.url" target="_blank" rel="noopener noreferrer" class="shared-link-main">
+                  <span class="link-icon-wrap"><Icon name="link" :size="18" /></span>
+                  <span class="link-details">
+                    <span class="link-domain">{{ item.domain }}</span>
+                    <span class="link-url">{{ item.url }}</span>
+                  </span>
+                  <span class="link-external"><Icon name="external-link" :size="14" /></span>
+                </a>
+                <div class="link-footer">
+                  <span class="link-meta">{{ item.senderName }} · {{ formatRelativeDay(item.createdAt) }}</span>
+                  <button type="button" class="link-jump-btn" @click="jumpToMessageById(item.messageId)">
+                    {{ t.jumpToMessage }}
+                  </button>
+                </div>
               </div>
             </div>
-
-            <button type="button" class="menu-row-item" @click="changeNickname">
-              <span class="menu-item-icon badge-folder"><Icon name="pencil" :size="18" /></span>
-              <span class="menu-item-text">{{ t.changeNickname }}</span>
-            </button>
-
-            <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
-              <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
-              <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
-            </button>
+            <p v-else class="tab-empty-hint">{{ t.noSharedLinks }}</p>
           </div>
-        </div>
-
-        <div v-if="media.length" class="menu-section">
-          <span class="menu-section-label">{{ t.sharedMedia }} ({{ media.length }})</span>
-          <div class="chat-info-media-grid">
-            <button
-              v-for="item in media.slice(0, 6)"
-              :key="item.id"
-              type="button"
-              class="chat-info-media-thumb"
-              @click="openAttachment(item.id)"
-            >
-              <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" :alt="item.name" loading="lazy" />
-              <Icon v-else :name="item.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
-            </button>
-          </div>
-        </div>
-
-        <div class="menu-logout-wrap">
-          <button type="button" class="menu-logout-btn danger-text" @click="deleteConversation(selectedConversation.id)">
-            <Icon name="trash" :size="18" />
-            <span>{{ t.deleteChat }}</span>
-          </button>
         </div>
       </div>
     </BottomSheet>
@@ -4387,4 +4871,665 @@ img.avatar-img {
   color: #f87171;
 }
 
+/* Highlighted message pulse */
+.message-row.msg-highlighted .message-bubble {
+  animation: pulse-highlight 2.4s ease;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 132, 255, 0);
+  }
+  20%, 50% {
+    box-shadow: 0 0 0 4px rgba(0, 132, 255, 0.4), 0 4px 16px rgba(0, 132, 255, 0.25);
+    transform: scale(1.02);
+  }
+}
+
+/* Sub-page Navigation inside Chat Info BottomSheet */
+.info-subpage-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--space-sm) var(--space-sm);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: var(--space-xs);
+}
+
+.subpage-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--accent, #0084ff);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px 4px 2px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+.subpage-back-btn:hover {
+  background: rgba(0, 132, 255, 0.08);
+}
+
+.subpage-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.menu-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--muted);
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.menu-item-arrow {
+  color: var(--muted);
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.menu-badge + .menu-item-arrow {
+  margin-left: 0;
+}
+
+/* Dedicated Search Sub-page */
+.info-search-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+.info-search-page-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 8px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+}
+
+.subpage-status {
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.subpage-empty-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  color: var(--muted);
+  gap: 12px;
+}
+
+.empty-hint-icon {
+  opacity: 0.35;
+  color: var(--muted);
+}
+
+.subpage-empty-hint p {
+  margin: 0;
+  font-size: 13px;
+  max-width: 240px;
+  line-height: 1.4;
+}
+
+.subpage-results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subpage-results-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+/* Dedicated Media Sub-page */
+.info-media-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+/* In-details Message Search */
+.info-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm) var(--space-xs);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.info-search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 6px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+}
+
+.info-search-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.info-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.info-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.info-search-status {
+  padding: 8px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.info-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.info-search-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.info-search-item:hover {
+  background: rgba(0, 132, 255, 0.08);
+}
+
+.info-search-item-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.info-search-sender {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.info-search-time {
+  color: var(--muted);
+}
+
+.info-search-body {
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Media Tabs Header & Content */
+.info-tabs-header {
+  display: flex;
+  gap: 4px;
+  padding: 0 var(--space-sm) var(--space-xs);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: var(--space-xs);
+}
+
+.info-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.info-tab-btn:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.info-tab-btn.active {
+  background: var(--surface-soft);
+  color: var(--accent, #0084ff);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent, #0084ff);
+}
+
+.tab-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--muted);
+}
+
+.tab-empty-hint {
+  margin: 0;
+  padding: var(--space-md);
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Shared file items in chat info */
+.chat-info-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 var(--space-sm);
+}
+
+.shared-file-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.shared-file-item:hover {
+  background: var(--surface-soft);
+}
+
+.file-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--accent, #0084ff);
+  flex-shrink: 0;
+}
+
+.file-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.file-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.file-action-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* Shared link cards in chat info */
+.chat-info-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 var(--space-sm);
+}
+
+.shared-link-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.shared-link-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.shared-link-main:hover {
+  background: rgba(0, 132, 255, 0.06);
+}
+
+.link-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--accent, #0084ff);
+  flex-shrink: 0;
+}
+
+.link-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.link-domain {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.link-url {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-external {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.link-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  border-top: 1px solid var(--hairline);
+}
+
+.link-meta {
+  color: var(--muted);
+}
+
+.link-jump-btn {
+  border: none;
+  background: transparent;
+  color: var(--accent, #0084ff);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.link-jump-btn:hover {
+  text-decoration: underline;
+}
+
+/* Desktop Media Panel tabs and lists */
+.media-panel-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 6px;
+}
+
+.panel-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.panel-tab-btn:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.panel-tab-btn.active {
+  background: var(--surface-soft);
+  color: var(--accent, #0084ff);
+  font-weight: 600;
+}
+
+.panel-tab-count {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.panel-tab-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.panel-media-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.panel-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.panel-file-row:hover {
+  background: var(--surface-soft);
+}
+
+.file-row-icon {
+  color: var(--accent, #0084ff);
+  flex-shrink: 0;
+}
+
+.file-row-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.file-row-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row-meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.file-row-dl {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.panel-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel-link-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.panel-link-anchor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  text-decoration: none;
+  color: inherit;
+  font-size: 12px;
+}
+
+.panel-link-icon {
+  color: var(--accent, #0084ff);
+  flex-shrink: 0;
+}
+
+.panel-link-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-link-domain {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.panel-link-raw {
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-link-ext {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.panel-link-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px 4px;
+  font-size: 10px;
+  border-top: 1px solid var(--hairline);
+}
+
+.panel-link-sender {
+  color: var(--muted);
+}
+
+.panel-link-jump {
+  border: none;
+  background: transparent;
+  color: var(--accent, #0084ff);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.panel-link-jump:hover {
+  text-decoration: underline;
+}
 </style>

@@ -416,7 +416,8 @@ func (h *Handler) listMedia(c *gin.Context) {
 	if !ok {
 		return
 	}
-	list, err := h.svc.ListMedia(c.Request.Context(), userID, conversationID, limit)
+	mediaType := c.DefaultQuery("type", "media")
+	list, err := h.svc.ListMedia(c.Request.Context(), userID, conversationID, limit, mediaType)
 	if err != nil {
 		httpx.Error(c, err)
 		return

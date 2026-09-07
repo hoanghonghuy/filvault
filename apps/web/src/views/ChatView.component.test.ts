@@ -59,7 +59,7 @@ vi.mock('@/api/client', () => ({
       }
       return { messages, hasMore: false }
     }
-    if (path === `/chat/conversations/${conversation.id}/media`) {
+    if (path.startsWith(`/chat/conversations/${conversation.id}/media`)) {
       return { media: [] }
     }
     throw new Error(`Unexpected API path: ${path}`)

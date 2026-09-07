@@ -30,7 +30,7 @@ type Repository interface {
 	LastMessageForConversation(ctx context.Context, ownerID, conversationID string) (*Message, error)
 	SearchMessages(ctx context.Context, ownerID, conversationID, query string, limit int) ([]Message, error)
 	CreateAttachment(ctx context.Context, a Attachment) error
-	ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error)
+	ListMedia(ctx context.Context, ownerID, conversationID string, limit int, mediaType string) ([]Attachment, error)
 	GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error)
 	ListEventsAfter(ctx context.Context, userID string, after int64, limit int) ([]Event, error)
 	CompleteAttachment(ctx context.Context, ownerID, conversationID string, f file.File, stat objectstore.ObjectStat, body string, now time.Time) (Message, error)
@@ -324,14 +324,14 @@ func (s *Service) SearchMessages(ctx context.Context, ownerID, conversationID, q
 	return s.repo.SearchMessages(ctx, ownerID, conversationID, query, limit)
 }
 
-func (s *Service) ListMedia(ctx context.Context, ownerID, conversationID string, limit int) ([]Attachment, error) {
+func (s *Service) ListMedia(ctx context.Context, ownerID, conversationID string, limit int, mediaType string) ([]Attachment, error) {
 	if err := s.ensureConversation(ctx, ownerID, conversationID); err != nil {
 		return nil, err
 	}
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	items, err := s.repo.ListMedia(ctx, ownerID, conversationID, limit)
+	items, err := s.repo.ListMedia(ctx, ownerID, conversationID, limit, mediaType)
 	if err != nil {
 		return nil, err
 	}
