@@ -7,6 +7,7 @@ export const RECENT_FILE_LIMIT = 5
 export const RECENT_PHOTO_LIMIT = 6
 
 export const SHELL_NAV = [
+  { to: '/chat', label: 'Chat', shortLabel: 'Chat', icon: 'chat' },
   { to: '/files', label: 'Files', shortLabel: 'Files', icon: 'folder' },
   { to: '/photos', label: 'Photos', shortLabel: 'Photos', icon: 'photos' },
   { to: '/trash', label: 'Trash', shortLabel: 'Trash', icon: 'trash' },

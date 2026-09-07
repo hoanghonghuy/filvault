@@ -16,7 +16,7 @@ describe('chat surface contract', () => {
     expect(router).toMatch(/path:\s*'\/chat'/)
     expect(router).toMatch(/name:\s*'chat'/)
     expect(router).toMatch(/meta:\s*\{[^}]*bare:\s*true/)
-    expect(nav).not.toMatch(/to:\s*'\/chat'/)
+    expect(nav).toMatch(/to:\s*'\/chat'/)
     expect(shell).toMatch(/meta\.bare|!isBare/)
   })
 

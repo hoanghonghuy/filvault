@@ -43,6 +43,7 @@ const profileLabel = computed(
   () => `Open profile for ${auth.user?.displayName || auth.user?.email || 'account'}`,
 )
 const navLabels = computed(() => ({
+  '/chat': t.value.chat,
   '/files': t.value.navFiles,
   '/photos': t.value.navPhotos,
   '/trash': t.value.navTrash,
@@ -91,6 +92,9 @@ const navLabels = computed(() => ({
           <p class="header-brand-name">Filvault</p>
           <h1 class="header-title">{{ pageTitle }}</h1>
         </div>
+        <RouterLink to="/chat" class="header-chat-btn" :aria-label="t.chat">
+          <Icon name="chat" :size="20" />
+        </RouterLink>
         <RouterLink :to="PROFILE_PATH" class="header-profile" :aria-label="profileLabel">
           <span class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
         </RouterLink>
@@ -198,6 +202,33 @@ const navLabels = computed(() => ({
   flex-direction: column;
   justify-content: center;
   gap: 1px;
+}
+
+.header-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: transparent;
+  text-decoration: none;
+  transition: transform var(--duration-short) var(--ease-standard),
+    background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard);
+}
+
+.header-chat-btn:hover {
+  background: rgba(0, 132, 255, 0.1);
+  color: #0084ff;
+  transform: scale(1.05);
+}
+
+.header-chat-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .header-profile {

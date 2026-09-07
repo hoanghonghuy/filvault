@@ -11,6 +11,8 @@ import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
+import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
@@ -18,7 +20,7 @@ const router = useRouter()
 const ui = useUiStore()
 const chatStore = useChatStore()
 const auth = useAuthStore()
-const { t } = useI18n()
+const { t, locale, setLocale } = useI18n()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>(null)
@@ -127,7 +129,38 @@ function promptNewConversation() {
 }
 
 function backToVault() {
-  void router.push('/')
+  void router.push('/files')
+}
+
+const appMenuOpen = ref(false)
+const isDarkMode = ref(document.documentElement.dataset.theme === 'dark')
+
+function toggleDarkMode() {
+  if (isDarkMode.value) {
+    delete document.documentElement.dataset.theme
+    localStorage.removeItem('filvault.theme')
+    isDarkMode.value = false
+  } else {
+    document.documentElement.dataset.theme = 'dark'
+    localStorage.setItem('filvault.theme', 'dark')
+    isDarkMode.value = true
+  }
+}
+
+function toggleLanguage() {
+  const next = locale.value === 'vi' ? 'en' : 'vi'
+  setLocale(next)
+}
+
+function navigateTo(path: string) {
+  appMenuOpen.value = false
+  void router.push(path)
+}
+
+async function handleLogout() {
+  appMenuOpen.value = false
+  await auth.logout()
+  void router.push('/login')
 }
 
 async function loadConversations() {
@@ -267,6 +300,43 @@ function formatDayLabel(iso: string): string {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+function conversationPreview(conv: ChatConversation): string {
+  if (conv.preview?.body) {
+    return conv.preview.body
+  }
+  if (conv.preview?.attachments?.length) {
+    return t.value.attachment
+  }
+  return t.value.noMessagesYet
+}
+
+function isFirstInCluster(index: number): boolean {
+  const list = visibleMessages.value
+  const current = list[index]
+  if (!current) return false
+  if (index === 0) return true
+  const prev = list[index - 1]
+  if (!prev) return true
+  if (shouldShowDate(index)) return true
+  return prev.senderId !== current.senderId
+}
+
+function isLastInCluster(index: number): boolean {
+  const list = visibleMessages.value
+  const current = list[index]
+  if (!current) return false
+  if (index === list.length - 1) return true
+  const next = list[index + 1]
+  if (!next) return true
+  if (shouldShowDate(index + 1)) return true
+  return next.senderId !== current.senderId
+}
+
+function sendQuickLike() {
+  draft.value = '👍'
+  void sendText()
 }
 
 function onComposerKeydown(event: KeyboardEvent) {
@@ -592,7 +662,15 @@ watch(
   <div class="chat-app" :class="{ 'in-thread': inThread }">
     <aside class="chat-rail" aria-label="Conversations">
       <header class="rail-header">
-        <span class="chat-mark" aria-hidden="true">F</span>
+        <button
+          type="button"
+          class="chat-mark-btn"
+          :aria-label="t.appMenu"
+          :title="t.appMenu"
+          @click="appMenuOpen = true"
+        >
+          <span class="chat-mark" aria-hidden="true">F</span>
+        </button>
         <h1>{{ t.chats }}</h1>
         <button type="button" class="icon-btn" aria-label="Back to Filvault" @click="backToVault">
           <Icon name="folder" :size="20" />
@@ -613,8 +691,18 @@ watch(
       </div>
       <div v-if="error && !inThread" class="alert" role="alert">{{ error }}</div>
       <nav class="conversation-list">
-        <p v-if="!filteredConversations.length" class="rail-empty">{{ t.noChatsMatch }} "{{ railFilter }}".</p>
-    <button
+        <div v-if="!filteredConversations.length" class="rail-empty">
+          <p v-if="railFilter.trim()" class="rail-empty-query">{{ t.noChatsMatch }} "{{ railFilter }}".</p>
+          <div v-else class="rail-empty-state">
+            <p class="rail-empty-title">{{ t.noConversationsYet }}</p>
+            <p class="rail-empty-hint">{{ t.startNewChatHint }}</p>
+            <button type="button" class="btn ink rail-start-btn" @click="promptNewConversation">
+              <Icon name="plus" :size="16" />
+              <span>{{ t.startNewChat }}</span>
+            </button>
+          </div>
+        </div>
+        <button
           v-for="conv in filteredConversations"
           :key="conv.id"
           type="button"
@@ -623,10 +711,13 @@ watch(
           :aria-current="conv.id === selectedId ? 'true' : undefined"
           @click="selectConversation(conv.id)"
         >
-          <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
+          <span class="avatar-wrap">
+            <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
+            <span class="online-indicator" aria-hidden="true" />
+          </span>
           <span class="conversation-meta">
             <span class="conversation-title">{{ conversationTitle(conv) }}</span>
-            <span class="conversation-preview">{{ conv.preview?.body || (conv.preview?.attachments?.length ? t.attachment : t.noMessagesYet) }}</span>
+            <span class="conversation-preview">{{ conversationPreview(conv) }}</span>
           </span>
           <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
         </button>
@@ -643,8 +734,13 @@ watch(
           <button type="button" class="icon-btn back-btn" :aria-label="t.back" @click="backToRail">
             <Icon name="arrow-left" :size="20" />
           </button>
-          <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
-          <h2>{{ conversationTitle(selectedConversation) }}</h2>
+          <div class="thread-peer-info">
+            <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
+            <div class="thread-peer-meta">
+              <h2>{{ conversationTitle(selectedConversation) }}</h2>
+              <span class="thread-status">{{ t.activeNow }}</span>
+            </div>
+          </div>
           <button class="ghost-btn" type="button" @click="loadMessages()">{{ t.refresh }}</button>
           <button
             class="icon-btn"
@@ -680,54 +776,80 @@ watch(
                 <div v-if="shouldShowDate(index)" class="day-separator">
                   <span>{{ formatDayLabel(message.createdAt) }}</span>
                 </div>
-                <article class="message-bubble" :class="{ outgoing: message.senderId === auth.user?.id }">
-                  <p v-if="message.body">{{ message.body }}</p>
-                  <template v-for="attachment in message.attachments" :key="attachment.id">
-                    <button
-                      v-if="attachment.availability === 'available' && attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
-                      type="button"
-                      class="inline-image"
-                      :aria-label="`View ${attachment.name}`"
-                      @click="openInlineImage(attachment)"
-                    >
-                      <img
-                        :src="attachment.thumbnailUrl"
-                        :alt="attachment.name"
-                        loading="lazy"
-                      />
-                    </button>
-                    <button
-                      v-else
-                      type="button"
-                      class="attachment-card"
-                      :disabled="attachment.availability !== 'available' || !attachment.fileId"
-                      @click="openAttachment(attachment.id)"
-                    >
-                      <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
-                      <span class="attachment-name">{{ attachment.name }}</span>
-                      <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
-                      <span v-if="attachment.availability !== 'available'" class="attachment-status">{{ attachmentLabel(attachment) }}</span>
-                    </button>
-                  </template>
-                  <span v-if="message.removedAt" class="message-status">{{ t.messageRemoved }}</span>
-                  <span v-else-if="message.editedAt" class="message-status">{{ t.edited }}</span>
-                  <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
-                  <div v-if="canMutateMessage(message)" class="message-actions">
-                    <button type="button" class="message-action" @click="editMessage(message)">{{ t.edit }}</button>
-                    <button type="button" class="message-action danger-text" @click="removeMessage(message)">{{ t.remove }}</button>
-                  </div>
-                </article>
+                <div
+                  class="message-row"
+                  :class="{
+                    outgoing: message.senderId === auth.user?.id,
+                    'cluster-start': isFirstInCluster(index),
+                    'cluster-last': isLastInCluster(index),
+                    'cluster-middle': !isFirstInCluster(index) && !isLastInCluster(index),
+                    'cluster-single': isFirstInCluster(index) && isLastInCluster(index),
+                  }"
+                >
+                  <span
+                    v-if="message.senderId !== auth.user?.id && isLastInCluster(index)"
+                    class="row-avatar"
+                    :class="avatarClass(conversationTitle(selectedConversation))"
+                    aria-hidden="true"
+                  >
+                    {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+                  </span>
+                  <span
+                    v-else-if="message.senderId !== auth.user?.id"
+                    class="row-avatar-spacer"
+                    aria-hidden="true"
+                  />
+                  <article class="message-bubble" :class="{ outgoing: message.senderId === auth.user?.id, 'has-like': message.body === '👍' }">
+                    <p v-if="message.body" :class="{ 'like-bubble': message.body === '👍' }">{{ message.body }}</p>
+                    <template v-for="attachment in message.attachments" :key="attachment.id">
+                      <button
+                        v-if="attachment.availability === 'available' && attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
+                        type="button"
+                        class="inline-image"
+                        :aria-label="`View ${attachment.name}`"
+                        @click="openInlineImage(attachment)"
+                      >
+                        <img
+                          :src="attachment.thumbnailUrl"
+                          :alt="attachment.name"
+                          loading="lazy"
+                        />
+                      </button>
+                      <button
+                        v-else
+                        type="button"
+                        class="attachment-card"
+                        :disabled="attachment.availability !== 'available' || !attachment.fileId"
+                        @click="openAttachment(attachment.id)"
+                      >
+                        <Icon :name="attachment.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
+                        <span class="attachment-name">{{ attachment.name }}</span>
+                        <span class="attachment-size">{{ formatBytes(attachment.sizeBytes) }}</span>
+                        <span v-if="attachment.availability !== 'available'" class="attachment-status">{{ attachmentLabel(attachment) }}</span>
+                      </button>
+                    </template>
+                    <span v-if="message.removedAt" class="message-status">{{ t.messageRemoved }}</span>
+                    <span v-else-if="message.editedAt" class="message-status">{{ t.edited }}</span>
+                    <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
+                    <div v-if="canMutateMessage(message)" class="message-actions">
+                      <button type="button" class="message-action" @click="editMessage(message)">{{ t.edit }}</button>
+                      <button type="button" class="message-action danger-text" @click="removeMessage(message)">{{ t.remove }}</button>
+                    </div>
+                  </article>
+                </div>
               </template>
             </TransitionGroup>
             <Transition name="msg">
-              <article v-if="pendingMessage" class="message-bubble pending" aria-live="polite">
-                <p>{{ pendingMessage.body }}</p>
-                <span v-if="pendingMessageError" class="message-status">{{ pendingMessageError }}</span>
-                <div v-if="pendingMessageError" class="message-actions">
-                  <button type="button" class="message-action" @click="retryPendingMessage">{{ t.retry }}<!-- Retry --></button>
-                  <button type="button" class="message-action" @click="discardPendingMessage">{{ t.closeSelection }}<!-- Discard --></button>
-                </div>
-              </article>
+              <div v-if="pendingMessage" class="message-row outgoing cluster-single">
+                <article class="message-bubble pending outgoing" :class="{ 'has-like': pendingMessage.body === '👍' }" aria-live="polite">
+                  <p :class="{ 'like-bubble': pendingMessage.body === '👍' }">{{ pendingMessage.body }}</p>
+                  <span v-if="pendingMessageError" class="message-status">{{ pendingMessageError }}</span>
+                  <div v-if="pendingMessageError" class="message-actions">
+                    <button type="button" class="message-action" @click="retryPendingMessage">{{ t.retry }}<!-- Retry --></button>
+                    <button type="button" class="message-action" @click="discardPendingMessage">{{ t.closeSelection }}<!-- Discard --></button>
+                  </div>
+                </article>
+              </div>
             </Transition>
           </div>
           <EmptyState v-else :title="t.noMessagesYet" description="" icon="chat" />
@@ -764,13 +886,24 @@ watch(
             @keydown.enter="onComposerKeydown"
           ></textarea>
           <button
+            v-if="!draft.trim()"
+            type="button"
+            class="like-btn"
+            :aria-label="t.sendLike"
+            :disabled="sending"
+            @click="sendQuickLike"
+          >
+            <Icon name="thumb-up" :size="20" />
+          </button>
+          <button
+            v-show="Boolean(draft.trim())"
             class="send-btn"
             type="submit"
             aria-label="Send"
             :class="{ active: Boolean(draft.trim()) }"
             :disabled="!draft.trim() || sending"
           >
-            <Icon name="check" :size="18" />
+            <Icon name="send" :size="18" />
           </button>
           <label class="sr-only" for="chat-attachment">Attachment</label>
           <input id="chat-attachment" ref="fileInputRef" type="file" class="sr-only" @change="onAttachmentChange" />
@@ -811,6 +944,91 @@ watch(
       @download="downloadLightbox"
       @close="lightboxOpen = false"
     />
+
+    <BottomSheet :open="appMenuOpen" :title="t.filvaultMenu" @close="appMenuOpen = false">
+      <div class="app-menu-content">
+        <!-- User Profile Card -->
+        <button type="button" class="menu-profile-card" @click="navigateTo('/profile')">
+          <span class="menu-avatar" aria-hidden="true">{{ userInitials(auth.user?.displayName ?? '', auth.user?.email ?? '') }}</span>
+          <span class="menu-profile-info">
+            <span class="menu-profile-name">{{ auth.user?.displayName || t.myAccount }}</span>
+            <span class="menu-profile-email">{{ auth.user?.email }}</span>
+            <span class="menu-status-badge">
+              <span class="status-dot" aria-hidden="true" />
+              <span>{{ t.activeStatus }}: {{ t.activeStatusOn }}</span>
+            </span>
+          </span>
+          <Icon name="arrow-right" :size="16" class="menu-profile-arrow" />
+        </button>
+
+        <!-- Section 1: Điều hướng Filvault -->
+        <div class="menu-section">
+          <span class="menu-section-label">Filvault</span>
+          <div class="menu-items-group">
+            <button type="button" class="menu-row-item" @click="navigateTo('/files')">
+              <span class="menu-item-icon badge-folder"><Icon name="folder" :size="18" /></span>
+              <span class="menu-item-text">{{ t.navFiles }}</span>
+            </button>
+            <button type="button" class="menu-row-item" @click="navigateTo('/photos')">
+              <span class="menu-item-icon badge-photos"><Icon name="photos" :size="18" /></span>
+              <span class="menu-item-text">{{ t.navPhotos }}</span>
+            </button>
+            <button type="button" class="menu-row-item" @click="navigateTo('/trash')">
+              <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
+              <span class="menu-item-text">{{ t.navTrash }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 2: Tùy chọn giao diện -->
+        <div class="menu-section">
+          <span class="menu-section-label">{{ t.appearance }} &amp; {{ t.navSettings }}</span>
+          <div class="menu-items-group">
+            <button type="button" class="menu-row-item" @click="toggleDarkMode">
+              <span class="menu-item-icon badge-theme">
+                <Icon :name="isDarkMode ? 'sun' : 'moon'" :size="18" />
+              </span>
+              <span class="menu-item-text">{{ t.darkMode }}</span>
+              <span class="menu-toggle-state">{{ isDarkMode ? 'Bật' : 'Tắt' }}</span>
+            </button>
+            <button type="button" class="menu-row-item" @click="toggleLanguage">
+              <span class="menu-item-icon badge-lang"><Icon name="chat" :size="18" /></span>
+              <span class="menu-item-text">{{ t.language }}</span>
+              <span class="menu-toggle-state">{{ locale === 'vi' ? 'Tiếng Việt' : 'English' }}</span>
+            </button>
+            <button type="button" class="menu-row-item" @click="navigateTo('/settings')">
+              <span class="menu-item-icon badge-settings"><Icon name="settings" :size="18" /></span>
+              <span class="menu-item-text">{{ t.navSettings }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 3: Messenger Features (Mở rộng dần sau này) -->
+        <div class="menu-section">
+          <span class="menu-section-label">{{ t.messengerFeatures }}</span>
+          <div class="menu-items-group">
+            <div class="menu-row-item disabled-feature">
+              <span class="menu-item-icon badge-status"><span class="status-dot" /></span>
+              <span class="menu-item-text">{{ t.activeStatus }}</span>
+              <span class="menu-badge-green">{{ t.activeStatusOn }}</span>
+            </div>
+            <div class="menu-row-item disabled-feature">
+              <span class="menu-item-icon badge-archive"><Icon name="archive" :size="18" /></span>
+              <span class="menu-item-text">{{ t.archivedChats }}</span>
+              <span class="menu-badge-muted">{{ t.noConversationsYet }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Logout -->
+        <div class="menu-logout-wrap">
+          <button type="button" class="menu-logout-btn" @click="handleLogout">
+            <Icon name="log-out" :size="18" />
+            <span>{{ t.logOut }}</span>
+          </button>
+        </div>
+      </div>
+    </BottomSheet>
   </div>
 </template>
 
@@ -892,16 +1110,259 @@ watch(
   outline-offset: -1px;
 }
 
+.chat-mark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+  transition: transform var(--duration-short) var(--ease-standard);
+}
+
+.chat-mark-btn:hover {
+  transform: scale(1.08);
+}
+
+.chat-mark-btn:active {
+  transform: scale(0.95);
+}
+
+.chat-mark-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .chat-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
+}
+
+.app-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0 var(--space-xs) var(--space-sm);
+}
+
+.menu-profile-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  background: var(--surface-card);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.menu-profile-card:hover {
+  background: var(--surface-soft);
+}
+
+.menu-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.menu-profile-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.menu-profile-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-profile-email {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: #22c55e;
+  flex-shrink: 0;
+}
+
+.menu-profile-arrow {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.menu-items-group {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+.menu-row-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.menu-row-item:last-child {
+  border-bottom: none;
+}
+
+.menu-row-item:hover:not(.disabled-feature) {
+  background: var(--surface-soft);
+}
+
+.menu-row-item.disabled-feature {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.menu-item-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.badge-folder { background: #e0f2fe; color: #0284c7; }
+.badge-photos { background: #fae8ff; color: #a21caf; }
+.badge-trash { background: #fee2e2; color: #dc2626; }
+.badge-theme { background: #fef3c7; color: #d97706; }
+.badge-lang { background: #e0e7ff; color: #4338ca; }
+.badge-settings { background: var(--surface-soft); color: var(--ink); }
+.badge-status { background: #dcfce7; color: #16a34a; }
+.badge-archive { background: var(--surface-soft); color: var(--muted); }
+
+:global([data-theme='dark']) .badge-folder { background: rgba(2, 132, 199, 0.22); color: #38bdf8; }
+:global([data-theme='dark']) .badge-photos { background: rgba(162, 28, 175, 0.22); color: #e879f9; }
+:global([data-theme='dark']) .badge-trash { background: rgba(220, 38, 38, 0.22); color: #f87171; }
+:global([data-theme='dark']) .badge-theme { background: rgba(217, 119, 6, 0.22); color: #fbbf24; }
+:global([data-theme='dark']) .badge-lang { background: rgba(67, 56, 202, 0.22); color: #818cf8; }
+:global([data-theme='dark']) .badge-status { background: rgba(22, 163, 74, 0.22); color: #4ade80; }
+
+.menu-item-text {
+  flex: 1;
+  font-weight: 500;
+}
+
+.menu-toggle-state {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.menu-badge-green {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: #dcfce7;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.menu-badge-muted {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.menu-logout-wrap {
+  margin-top: 4px;
+}
+
+.menu-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--danger, #ef4444);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.menu-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .icon-btn,
@@ -982,17 +1443,35 @@ watch(
   outline-offset: -2px;
 }
 
+.avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.online-indicator {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: #22c55e;
+  border: 2px solid var(--canvas);
+}
+
 .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
   background: var(--surface-card);
   color: var(--ink);
   font-weight: 600;
+  font-size: 16px;
 }
 
 .avatar-color-a { background: #e0e7ff; color: #3730a3; }
@@ -1002,32 +1481,49 @@ watch(
 .avatar-color-e { background: #cffafe; color: #155e75; }
 .avatar-color-f { background: #f3e8ff; color: #6b21a8; }
 
-.rail-filter {
-  padding: 0 var(--space-md) var(--space-sm);
-}
-
-.rail-filter input {
-  width: 100%;
-  min-height: 36px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
-  background: var(--surface-card);
-  color: var(--ink);
-  font-size: 13px;
-}
-
-.rail-filter input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .rail-empty {
   margin: 0;
   padding: var(--space-md);
   color: var(--muted);
   font-size: 13px;
   text-align: center;
+}
+
+.rail-empty-query {
+  margin: 0;
+}
+
+.rail-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xl) var(--space-sm);
+}
+
+.rail-empty-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rail-empty-hint {
+  margin: 0 0 var(--space-xs);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 260px;
+}
+
+.rail-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
 }
 
 .conversation-meta {
@@ -1073,19 +1569,50 @@ watch(
   border-bottom: 1px solid var(--hairline);
 }
 
-.thread-header h2 {
+.thread-peer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
+}
+
+.thread-peer-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.thread-peer-meta h2 {
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
+  line-height: 1.25;
+}
+
+.thread-status {
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 .thread-avatar {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .back-btn {
@@ -1224,23 +1751,121 @@ watch(
 .message-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 2px;
   padding: var(--space-md);
 }
 
-.message-bubble {
-  align-self: flex-end;
-  max-width: min(78%, 520px);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
-  background: var(--primary-cta, #111827);
-  color: var(--on-ink, #ffffff);
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
 }
 
-.message-bubble:not(.outgoing) {
-  align-self: flex-start;
+.message-row.outgoing {
+  justify-content: flex-end;
+}
+
+.message-row.cluster-start,
+.message-row.cluster-single {
+  margin-top: 8px;
+}
+
+.message-row:first-child {
+  margin-top: 0;
+}
+
+.row-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.row-avatar-spacer {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.message-bubble {
+  max-width: min(74%, 480px);
+  padding: 8px 14px;
+  border-radius: 18px;
   background: var(--surface-card);
   color: var(--ink);
+  font-size: 15px;
+  line-height: 1.36;
+  word-break: break-word;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.message-bubble.outgoing {
+  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
+  color: #ffffff;
+}
+
+/* Incoming bubble corners */
+.message-row:not(.outgoing).cluster-single .message-bubble {
+  border-radius: 18px;
+}
+
+.message-row:not(.outgoing).cluster-start .message-bubble {
+  border-radius: 18px 18px 18px 4px;
+}
+
+.message-row:not(.outgoing).cluster-middle .message-bubble {
+  border-radius: 4px 18px 18px 4px;
+}
+
+.message-row:not(.outgoing).cluster-last .message-bubble {
+  border-radius: 4px 18px 18px 18px;
+}
+
+/* Outgoing bubble corners */
+.message-row.outgoing.cluster-single .message-bubble {
+  border-radius: 18px;
+}
+
+.message-row.outgoing.cluster-start .message-bubble {
+  border-radius: 18px 18px 4px 18px;
+}
+
+.message-row.outgoing.cluster-middle .message-bubble {
+  border-radius: 18px 4px 4px 18px;
+}
+
+.message-row.outgoing.cluster-last .message-bubble {
+  border-radius: 18px 4px 18px 18px;
+}
+
+.message-bubble.has-like {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 2px 0 !important;
+}
+
+.message-bubble.has-like .bubble-time {
+  display: none;
+}
+
+.like-bubble {
+  font-size: 34px !important;
+  line-height: 1.1 !important;
+  display: inline-block;
+  user-select: none;
+  animation: messenger-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes messenger-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  80% { transform: scale(1.18); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .message-status {
@@ -1324,11 +1949,16 @@ watch(
   gap: var(--space-xs);
   margin-top: var(--space-xs);
   padding: var(--space-xs);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.04);
   color: inherit;
   cursor: pointer;
+}
+
+.message-bubble.outgoing .attachment-card {
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .attachment-name {
@@ -1347,33 +1977,109 @@ watch(
   display: flex;
   position: relative;
   align-items: flex-end;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md) calc(var(--space-sm) + env(safe-area-inset-bottom));
+  gap: 6px;
+  padding: 8px var(--space-md) calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--hairline);
   background: var(--canvas);
 }
 
+.attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: #0084ff;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.attach-btn:hover {
+  background: rgba(0, 132, 255, 0.08);
+}
+
+.attach-btn:focus-visible {
+  outline: 2px solid #0084ff;
+  outline-offset: 2px;
+}
+
 .chat-composer textarea {
-  min-height: 44px;
-  max-height: 140px;
+  min-height: 38px;
+  max-height: 120px;
   flex: 1;
-  padding: 10px 14px;
+  padding: 8px 14px;
   resize: none;
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
+  border-radius: 20px;
+  background: var(--surface-soft);
+  color: var(--ink);
   font: inherit;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .chat-composer textarea:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid #0084ff;
   outline-offset: -1px;
 }
 
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: #0084ff;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  transition:
+    transform var(--duration-short) var(--ease-standard),
+    background var(--duration-short) var(--ease-standard);
+}
+
+.like-btn:hover {
+  transform: scale(1.15);
+  background: rgba(0, 132, 255, 0.08);
+}
+
+.like-btn:active {
+  transform: scale(0.92);
+}
+
+.like-btn:focus-visible {
+  outline: 2px solid #0084ff;
+  outline-offset: 2px;
+}
+
 .send-btn {
-  background: var(--primary-cta, #111827);
-  color: var(--on-ink, #ffffff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: #0084ff;
+  color: #ffffff;
   opacity: 0.4;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 2px;
   transition:
     opacity var(--duration-short) var(--ease-standard),
     transform var(--duration-short) var(--ease-standard);
@@ -1381,7 +2087,7 @@ watch(
 
 .send-btn.active {
   opacity: 1;
-  transform: scale(1.04);
+  transform: scale(1.05);
 }
 
 .media-panel {
