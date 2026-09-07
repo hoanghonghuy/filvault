@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { Room, RoomEvent, type RemoteParticipant } from 'livekit-client'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -12,6 +12,7 @@ export interface CallSignalPayload {
   conversationId: string
   senderId: string
   senderName: string
+  senderAvatar?: string
   action: 'invite' | 'accept' | 'decline' | 'end'
   isVideo: boolean
   timestamp: string
@@ -21,11 +22,15 @@ export function resolveLiveKitUrl(rawUrl: string): string {
   if (typeof window === 'undefined' || !window.location?.hostname) {
     return rawUrl
   }
+  let url = rawUrl
   const currentHost = window.location.hostname
   if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-    return rawUrl.replace(/localhost|127\.0\.0\.1/, currentHost)
+    url = url.replace(/localhost|127\.0\.0\.1/, currentHost)
   }
-  return rawUrl
+  if (window.location.protocol === 'https:' && url.startsWith('ws://')) {
+    url = url.replace(/^ws:\/\//, 'wss://')
+  }
+  return url
 }
 
 export const useCallStore = defineStore('call', () => {
@@ -36,6 +41,7 @@ export const useCallStore = defineStore('call', () => {
   const isVideo = ref(false)
   const isCaller = ref(false)
   const callerName = ref('')
+  const callerAvatar = ref<string | null>(null)
   const callerId = ref('')
   const isMicEnabled = ref(true)
   const isCamEnabled = ref(true)
@@ -45,10 +51,35 @@ export const useCallStore = defineStore('call', () => {
   )
   const room = shallowRef<Room | null>(null)
   const error = ref<string | null>(null)
+  const callDuration = ref(0)
+  let callDurationTimer: number | null = null
   let incomingRingTimer: number | null = null
   let outgoingRingTimer: number | null = null
 
+  const formattedDuration = computed(() => {
+    const mins = Math.floor(callDuration.value / 60)
+    const secs = callDuration.value % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  })
+
+  function startTimer() {
+    stopTimer()
+    callDuration.value = 0
+    callDurationTimer = window.setInterval(() => {
+      callDuration.value++
+    }, 1000)
+  }
+
+  function stopTimer() {
+    if (callDurationTimer !== null) {
+      window.clearInterval(callDurationTimer)
+      callDurationTimer = null
+    }
+  }
+
   function resetState() {
+    stopTimer()
+    callDuration.value = 0
     if (incomingRingTimer !== null) {
       window.clearTimeout(incomingRingTimer)
       incomingRingTimer = null
@@ -62,6 +93,7 @@ export const useCallStore = defineStore('call', () => {
     isVideo.value = false
     isCaller.value = false
     callerName.value = ''
+    callerAvatar.value = null
     callerId.value = ''
     isMicEnabled.value = true
     isCamEnabled.value = true
@@ -132,6 +164,10 @@ export const useCallStore = defineStore('call', () => {
 
       r.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         participants.value.delete(p.identity)
+        if (state.value === 'connected' && participants.value.size === 0) {
+          ui.showToast('Đối phương đã rời cuộc gọi', 'info')
+          void endCall(false)
+        }
       })
 
       r.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
@@ -151,8 +187,6 @@ export const useCallStore = defineStore('call', () => {
       if (isVideo.value) {
         await r.localParticipant.setCameraEnabled(isCamEnabled.value)
       }
-      state.value = 'connected'
-      callAudio.stop()
     } catch (e: unknown) {
       const err = e as Error
       const msg = err?.message || 'Lỗi kết nối cuộc gọi'
@@ -162,11 +196,16 @@ export const useCallStore = defineStore('call', () => {
     }
   }
 
-  async function startCall(convId: string, options: { isVideo?: boolean } = {}) {
+  async function startCall(
+    convId: string,
+    options: { isVideo?: boolean; peerName?: string; peerAvatar?: string } = {},
+  ) {
     resetState()
     conversationId.value = convId
     isVideo.value = options.isVideo ?? false
     isCaller.value = true
+    callerName.value = options.peerName ?? ''
+    callerAvatar.value = options.peerAvatar ?? null
     state.value = 'outgoing'
     callAudio.playOutgoingRing()
 
@@ -178,7 +217,6 @@ export const useCallStore = defineStore('call', () => {
     }, 45000)
 
     await sendSignal(convId, 'invite', isVideo.value)
-    void connectToRoom(convId)
   }
 
   function handleSignal(payload: CallSignalPayload) {
@@ -187,8 +225,11 @@ export const useCallStore = defineStore('call', () => {
 
     switch (payload.action) {
       case 'invite': {
-        // If already in a call, ignore
-        if (state.value !== 'idle') return
+        // If already in a call, reject as busy
+        if (state.value !== 'idle') {
+          void sendSignal(payload.conversationId, 'decline', payload.isVideo)
+          return
+        }
 
         // Ignore stale/expired call invites
         if (!payload.timestamp) return
@@ -202,6 +243,7 @@ export const useCallStore = defineStore('call', () => {
         conversationId.value = payload.conversationId
         callerId.value = payload.senderId
         callerName.value = payload.senderName
+        callerAvatar.value = payload.senderAvatar || null
         isVideo.value = payload.isVideo
         isCaller.value = false
         state.value = 'incoming'
@@ -228,12 +270,27 @@ export const useCallStore = defineStore('call', () => {
         if (state.value === 'outgoing' && conversationId.value === payload.conversationId) {
           callAudio.stop()
           state.value = 'connected'
+          startTimer()
+          void connectToRoom(payload.conversationId)
         }
         break
 
       case 'decline':
+        if (conversationId.value === payload.conversationId) {
+          if (state.value === 'outgoing') {
+            ui.showToast('Người nhận đã từ chối cuộc gọi', 'info')
+          }
+          void endCall(false)
+        }
+        break
+
       case 'end':
         if (conversationId.value === payload.conversationId) {
+          if (state.value === 'incoming') {
+            ui.showToast('Người gọi đã hủy cuộc gọi', 'info')
+          } else if (state.value === 'connected') {
+            ui.showToast('Cuộc gọi đã kết thúc', 'info')
+          }
           void endCall(false)
         }
         break
@@ -249,6 +306,7 @@ export const useCallStore = defineStore('call', () => {
     callAudio.stop()
     const convId = conversationId.value
     state.value = 'connected'
+    startTimer()
     await sendSignal(convId, 'accept', isVideo.value)
     void connectToRoom(convId)
   }
@@ -266,6 +324,7 @@ export const useCallStore = defineStore('call', () => {
   }
 
   async function endCall(notifyRemote = true) {
+    stopTimer()
     callAudio.stop()
     callAudio.playEndCall()
     const convId = conversationId.value
@@ -299,6 +358,7 @@ export const useCallStore = defineStore('call', () => {
     isVideo,
     isCaller,
     callerName,
+    callerAvatar,
     callerId,
     isMicEnabled,
     isCamEnabled,
@@ -306,6 +366,8 @@ export const useCallStore = defineStore('call', () => {
     participants,
     room,
     error,
+    callDuration,
+    formattedDuration,
     startCall,
     handleSignal,
     acceptCall,
@@ -315,3 +377,4 @@ export const useCallStore = defineStore('call', () => {
     toggleCamera,
   }
 })
+

@@ -61,6 +61,7 @@ type CallSignal struct {
 	ConversationID string `json:"conversationId"`
 	SenderID       string `json:"senderId"`
 	SenderName     string `json:"senderName"`
+	SenderAvatar   string `json:"senderAvatar,omitempty"`
 	Action         string `json:"action"`
 	IsVideo        bool   `json:"isVideo"`
 	Timestamp      string `json:"timestamp"`
@@ -495,9 +496,11 @@ func (s *Service) SendCallSignal(ctx context.Context, userID, conversationID, ac
 		return err
 	}
 	var name string
+	var avatarURL string
 	if s.users != nil {
 		if u, err := s.users.GetUserByID(ctx, userID); err == nil && u != nil {
 			name = u.DisplayName
+			avatarURL = u.AvatarURL
 		}
 	}
 	if name == "" {
@@ -508,6 +511,7 @@ func (s *Service) SendCallSignal(ctx context.Context, userID, conversationID, ac
 		ConversationID: conversationID,
 		SenderID:       userID,
 		SenderName:     name,
+		SenderAvatar:   avatarURL,
 		Action:         action,
 		IsVideo:        isVideo,
 		Timestamp:      now.Format(time.RFC3339),

@@ -27,6 +27,7 @@ import {
 import { useI18n } from '@/lib/i18n'
 import { generateUUID } from '@/lib/uuid'
 import { useLongPress } from '@/lib/useLongPress'
+import { resolveWallpaperTheme, type WallpaperTheme } from '@/lib/wallpaperPalette'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
@@ -39,6 +40,7 @@ const { t, locale, setLocale } = useI18n()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>((route.params.id as string) || null)
+const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
 const messages = ref<ChatMessage[]>([])
 const draft = ref('')
 const searchQuery = ref('')
@@ -78,10 +80,28 @@ const chatThemes = [
 ] as const
 const activeTheme = ref<'blue' | 'purple' | 'emerald' | 'rose'>('blue')
 const currentTheme = computed(() => chatThemes.find((entry) => entry.id === activeTheme.value) ?? chatThemes[0]!)
-const threadThemeStyle = computed(() => ({
-  '--chat-bubble-outgoing': currentTheme.value.gradient,
-  '--chat-accent': currentTheme.value.color,
-}))
+const activeWallpaperTheme = ref<WallpaperTheme | null>(null)
+
+const threadThemeStyle = computed(() => {
+  const theme = activeWallpaperTheme.value
+  if (!theme) {
+    return {
+      '--chat-bubble-outgoing': currentTheme.value.gradient,
+      '--chat-accent': currentTheme.value.color,
+    }
+  }
+
+  return {
+    '--chat-bubble-outgoing': theme.gradient,
+    '--chat-accent': theme.primary,
+    '--chat-accent-secondary': theme.secondary,
+    '--chat-surface-tint': theme.surfaceTint,
+    '--chat-border-tint': theme.borderTint,
+    '--chat-header-bg': theme.headerBg,
+    '--chat-composer-bg': theme.composerBg,
+    '--chat-scrim-overlay': theme.scrimOverlay,
+  }
+})
 
 export interface ChatWallpaperPreset {
   id: string
@@ -201,16 +221,26 @@ const activePreviewStyle = computed(() => {
   }
 })
 
-function setConversationWallpaper(conversationId: string, wallpaperVal: string) {
+watch(
+  threadWallpaper,
+  async (wp) => {
+    activeWallpaperTheme.value = await resolveWallpaperTheme(wp)
+  },
+  { immediate: true },
+)
+
+async function setConversationWallpaper(conversationId: string, wallpaperVal: string) {
   if (wallpaperVal === 'none' || !wallpaperVal) {
     const next = { ...chatWallpapers.value }
     delete next[conversationId]
     chatWallpapers.value = next
     saveWallpapersToStorage(next)
+    activeWallpaperTheme.value = null
   } else {
     const next = { ...chatWallpapers.value, [conversationId]: wallpaperVal }
     chatWallpapers.value = next
     saveWallpapersToStorage(next)
+    activeWallpaperTheme.value = await resolveWallpaperTheme(wallpaperVal)
   }
 }
 
@@ -291,7 +321,6 @@ async function handleWallpaperUpload(event: Event) {
   }
 }
 
-const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
 const stickerPickerOpen = ref(false)
 const selectedStickerCategory = ref<'expressions' | 'gestures' | 'pets' | 'fun'>('expressions')
 const filteredStickers = computed(() => STICKERS.filter((s) => s.category === selectedStickerCategory.value))
@@ -1635,8 +1664,16 @@ onUnmounted(() => {
     window.visualViewport.removeEventListener('resize', onVisualViewportResize)
     window.visualViewport.removeEventListener('scroll', onVisualViewportResize)
   }
-  chatStore.stopEvents()
 })
+
+function initiateCall(isVideo: boolean) {
+  if (!selectedConversation.value) return
+  callStore.startCall(selectedConversation.value.id, {
+    isVideo,
+    peerName: conversationTitle(selectedConversation.value),
+    peerAvatar: selectedConversation.value.peer?.avatarUrl,
+  })
+}
 
 watch(visibleMessages, () => {
   void nextTick(() => {
@@ -1789,7 +1826,12 @@ watch(
       </nav>
     </aside>
 
-    <section class="message-thread" aria-live="polite" :style="threadThemeStyle">
+    <section
+      class="message-thread"
+      :class="{ 'has-wallpaper': Boolean(threadWallpaperBackground), 'is-dark': activeWallpaperTheme?.isDark }"
+      aria-live="polite"
+      :style="threadThemeStyle"
+    >
       <template v-if="selectedConversation">
         <header class="thread-header">
           <!-- aria-label="Back" -->
@@ -1833,7 +1875,7 @@ watch(
               type="button"
               aria-label="Gọi thoại"
               title="Gọi thoại"
-              @click="callStore.startCall(selectedConversation.id, { isVideo: false })"
+              @click="initiateCall(false)"
             >
               <Icon name="phone" :size="18" />
             </button>
@@ -1842,7 +1884,7 @@ watch(
               type="button"
               aria-label="Gọi video"
               title="Gọi video"
-              @click="callStore.startCall(selectedConversation.id, { isVideo: true })"
+              @click="initiateCall(true)"
             >
               <Icon name="camera" :size="18" />
             </button>
@@ -1859,30 +1901,42 @@ watch(
           </div>
         </header>
 
-        <p
-          v-if="chatStore.connectionState !== 'connected'"
-          class="connection-status"
-          role="status"
-          :title="t.retry || 'Thử lại'"
-          @click="chatStore.connectEvents()"
-        >
-          {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
-        </p>
+        <div class="thread-canvas-wrap">
+          <!-- Fixed wallpaper backdrop: scoped strictly inside canvas viewport, never bleeds into header or composer -->
+          <div
+            v-if="threadWallpaperBackground"
+            class="thread-wallpaper-backdrop"
+            :style="{ backgroundImage: threadWallpaperBackground }"
+            aria-hidden="true"
+          >
+            <div
+              class="wallpaper-scrim"
+              :class="{ 'is-dark': activeWallpaperTheme?.isDark }"
+            />
+          </div>
 
-        <form v-if="threadSearchOpen" class="chat-search" @submit.prevent="searchMessages">
-          <label class="sr-only" for="chat-search">{{ t.search }}</label>
-          <input id="chat-search" v-model="searchQuery" type="search" :placeholder="t.searchInChat" />
-          <button class="ghost-btn" type="submit" :disabled="searchQuery.trim().length < 2">{{ t.search }}</button>
-          <button v-if="searchResults" class="ghost-btn" type="button" @click="clearSearch">{{ t.clear }}</button>
-        </form>
+          <p
+            v-if="chatStore.connectionState !== 'connected'"
+            class="connection-status"
+            role="status"
+            :title="t.retry || 'Thử lại'"
+            @click="chatStore.connectEvents()"
+          >
+            {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
+          </p>
 
-        <p v-if="error && inThread" class="alert" role="alert">{{ error }}</p>
+          <form v-if="threadSearchOpen" class="chat-search" @submit.prevent="searchMessages">
+            <label class="sr-only" for="chat-search">{{ t.search }}</label>
+            <input id="chat-search" v-model="searchQuery" type="search" :placeholder="t.searchInChat" />
+            <button class="ghost-btn" type="submit" :disabled="searchQuery.trim().length < 2">{{ t.search }}</button>
+            <button v-if="searchResults" class="ghost-btn" type="button" @click="clearSearch">{{ t.clear }}</button>
+          </form>
+
+          <p v-if="error && inThread" class="alert" role="alert">{{ error }}</p>
 
         <div
           ref="threadBodyRef"
           class="message-body"
-          :class="{ 'has-wallpaper': Boolean(threadWallpaperBackground) }"
-          :style="threadWallpaperBackground ? { backgroundImage: threadWallpaperBackground } : undefined"
           :aria-busy="loadingThread"
           @scroll.passive="onThreadScroll"
         >
@@ -2093,6 +2147,7 @@ watch(
             </button>
           </Transition>
         </div>
+      </div>
 
         <UploadProgress :progress="uploadProgress" />
         <ul v-if="attachmentQueue.length" class="attachment-queue" aria-live="polite">
@@ -2355,7 +2410,7 @@ watch(
             <button
               type="button"
               class="chat-info-action-btn"
-              @click="callStore.startCall(selectedConversation.id, { isVideo: false })"
+              @click="initiateCall(false)"
             >
               <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
               <span>Gọi thoại</span>
@@ -2363,7 +2418,7 @@ watch(
             <button
               type="button"
               class="chat-info-action-btn"
-              @click="callStore.startCall(selectedConversation.id, { isVideo: true })"
+              @click="initiateCall(true)"
             >
               <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
               <span>Gọi video</span>
@@ -2688,7 +2743,10 @@ watch(
                 <span>{{ conversationTitle(selectedConversation) }}</span>
                 <p>Giao diện chat trông thế nào? ✨</p>
               </div>
-              <div class="preview-bubble outgoing" :style="{ background: currentTheme.gradient }">
+              <div
+                class="preview-bubble outgoing"
+                :style="{ background: activeWallpaperTheme ? activeWallpaperTheme.gradient : currentTheme.gradient }"
+              >
                 <p>Rất đẹp và dễ nhìn! 👍</p>
               </div>
             </div>
@@ -3085,7 +3143,7 @@ watch(
             <button
               type="button"
               class="chat-info-action-btn"
-              @click="callStore.startCall(selectedConversation.id, { isVideo: false }); threadInfoOpen = false"
+              @click="initiateCall(false); threadInfoOpen = false"
             >
               <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
               <span>Gọi thoại</span>
@@ -3093,7 +3151,7 @@ watch(
             <button
               type="button"
               class="chat-info-action-btn"
-              @click="callStore.startCall(selectedConversation.id, { isVideo: true }); threadInfoOpen = false"
+              @click="initiateCall(true); threadInfoOpen = false"
             >
               <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
               <span>Gọi video</span>
@@ -3418,7 +3476,10 @@ watch(
                 <span>{{ conversationTitle(selectedConversation) }}</span>
                 <p>Giao diện chat trông thế nào? ✨</p>
               </div>
-              <div class="preview-bubble outgoing" :style="{ background: currentTheme.gradient }">
+              <div
+                class="preview-bubble outgoing"
+                :style="{ background: activeWallpaperTheme ? activeWallpaperTheme.gradient : currentTheme.gradient }"
+              >
                 <p>Rất đẹp và dễ nhìn! 👍</p>
               </div>
             </div>
@@ -4150,12 +4211,58 @@ watch(
 }
 
 .message-thread {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--canvas);
+  overflow: hidden;
+}
+
+.thread-canvas-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+/* Fixed Wallpaper Backdrop: stays locked to canvas viewport between header and composer */
+.thread-wallpaper-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+.wallpaper-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--chat-scrim-overlay, rgba(255, 255, 255, 0.12));
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+:global([data-theme='dark']) .wallpaper-scrim,
+[data-theme='dark'] .wallpaper-scrim {
+  background: var(--chat-scrim-overlay, rgba(0, 0, 0, 0.42));
+}
+
+.wallpaper-scrim.is-dark {
+  background: var(--chat-scrim-overlay, rgba(0, 0, 0, 0.28));
+}
+
+:global([data-theme='dark']) .wallpaper-scrim.is-dark,
+[data-theme='dark'] .wallpaper-scrim.is-dark {
+  background: var(--chat-scrim-overlay, rgba(0, 0, 0, 0.50));
 }
 
 .thread-header {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
@@ -4165,6 +4272,7 @@ watch(
   padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
   border-bottom: 1px solid var(--hairline);
   background: var(--canvas);
+  transition: background var(--duration-short) var(--ease-standard), border-color var(--duration-short) var(--ease-standard);
 }
 
 .thread-peer-info {
@@ -4296,30 +4404,51 @@ watch(
   flex-direction: column;
   overflow-y: auto;
   position: relative;
+  z-index: 1;
+  background: transparent;
 }
 
-.message-body.has-wallpaper {
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: local;
+.message-thread.has-wallpaper .message-bubble:not(.outgoing) {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-.message-body.has-wallpaper .message-bubble:not(.outgoing) {
-  background: var(--surface-card);
+:global([data-theme='dark']) .message-thread.has-wallpaper .message-bubble:not(.outgoing),
+[data-theme='dark'] .message-thread.has-wallpaper .message-bubble:not(.outgoing) {
+  background: var(--surface-card, #1f2937);
+  color: var(--ink, #f9fafb);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.message-thread.has-wallpaper .message-bubble.outgoing {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.message-thread.has-wallpaper .day-separator {
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--muted);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
 }
 
-.message-body.has-wallpaper .message-bubble.outgoing {
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+:global([data-theme='dark']) .message-thread.has-wallpaper .day-separator,
+[data-theme='dark'] .message-thread.has-wallpaper .day-separator {
+  background: rgba(17, 24, 39, 0.85);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
-.message-body.has-wallpaper .day-separator {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+.message-thread.has-wallpaper .jump-latest {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .loading-older {
@@ -4687,6 +4816,7 @@ watch(
   background: var(--canvas);
   flex-shrink: 0;
   z-index: 20;
+  transition: background var(--duration-short) var(--ease-standard), border-color var(--duration-short) var(--ease-standard);
 }
 
 .attach-btn {
@@ -4700,15 +4830,18 @@ watch(
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--chat-accent, #0084ff);
+  color: var(--muted);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
-  transition: background var(--duration-short) var(--ease-standard);
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard);
 }
 
 .attach-btn:hover {
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
+  color: var(--ink);
+  background: var(--surface-soft);
 }
 
 .attach-btn:focus-visible {
@@ -4727,17 +4860,19 @@ watch(
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--chat-accent, #0084ff);
+  color: var(--muted);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
   transition:
     background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard),
     transform var(--duration-short) var(--ease-standard);
 }
 
 .sticker-toggle-btn:hover {
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
+  color: var(--ink);
+  background: var(--surface-soft);
 }
 
 .sticker-toggle-btn.active {

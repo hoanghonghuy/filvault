@@ -165,10 +165,70 @@ describe('useCallStore', () => {
 
     // When client accesses from a LAN IP e.g. 192.168.1.6
     vi.stubGlobal('window', {
-      location: { hostname: '192.168.1.6' },
+      location: { hostname: '192.168.1.6', protocol: 'http:' },
     })
     expect(resolveLiveKitUrl('ws://localhost:7880')).toBe('ws://192.168.1.6:7880')
     expect(resolveLiveKitUrl('ws://127.0.0.1:7880')).toBe('ws://192.168.1.6:7880')
     vi.unstubAllGlobals()
+  })
+
+  it('keeps caller in outgoing state when initiating call until peer accepts', async () => {
+    const store = useCallStore()
+    // Global fetch mock for signal
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 'ok' }),
+      }),
+    )
+
+    await store.startCall('conv-999', {
+      isVideo: true,
+      peerName: 'Alice',
+      peerAvatar: 'https://example.com/alice.jpg',
+    })
+
+    expect(store.state).toBe('outgoing')
+    expect(store.conversationId).toBe('conv-999')
+    expect(store.callerName).toBe('Alice')
+    expect(store.callerAvatar).toBe('https://example.com/alice.jpg')
+    expect(store.isVideo).toBe(true)
+    expect(store.isCaller).toBe(true)
+
+    // Now peer accepts
+    store.handleSignal({
+      conversationId: 'conv-999',
+      senderId: 'user-alice',
+      senderName: 'Alice',
+      action: 'accept',
+      isVideo: true,
+      timestamp: new Date().toISOString(),
+    })
+
+    expect(store.state).toBe('connected')
+    expect(store.formattedDuration).toBe('00:00')
+
+    // End call
+    await store.endCall(false)
+    expect(store.state).toBe('idle')
+    expect(store.formattedDuration).toBe('00:00')
+    vi.unstubAllGlobals()
+  })
+
+  it('correctly stores callerAvatar from incoming invite signal', () => {
+    const store = useCallStore()
+    store.handleSignal({
+      conversationId: 'conv-abc',
+      senderId: 'user-bob',
+      senderName: 'Bob',
+      senderAvatar: 'https://example.com/bob.jpg',
+      action: 'invite',
+      isVideo: false,
+      timestamp: new Date().toISOString(),
+    })
+
+    expect(store.state).toBe('incoming')
+    expect(store.callerAvatar).toBe('https://example.com/bob.jpg')
   })
 })

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, provide, ref } from 'vue'
+import { computed, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useChatStore } from '@/stores/chat'
 import StorageBar from '@/components/StorageBar.vue'
 import Icon from '@/components/AppIcon.vue'
 import ToastHost from '@/components/ToastHost.vue'
@@ -14,9 +15,26 @@ import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
 
 const auth = useAuthStore()
+const chatStore = useChatStore()
 const route = useRoute()
 const storageBarRef = ref<InstanceType<typeof StorageBar> | null>(null)
 const { t } = useI18n()
+
+watch(
+  () => auth.isAuthenticated && auth.isVerified,
+  (authed) => {
+    if (authed) {
+      chatStore.connectEvents()
+    } else {
+      chatStore.stopEvents()
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  chatStore.stopEvents()
+})
 
 provide('reloadStorage', async () => {
   await storageBarRef.value?.reload()
