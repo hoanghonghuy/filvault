@@ -28,7 +28,7 @@ import { useI18n } from '@/lib/i18n'
 import { generateUUID } from '@/lib/uuid'
 import { useLongPress } from '@/lib/useLongPress'
 import { resolveWallpaperTheme, type WallpaperTheme } from '@/lib/wallpaperPalette'
-import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
+import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, Timeline, TimelineItem, UploadSession } from '@/api/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -186,8 +186,165 @@ function saveWallpapersToStorage(data: Record<string, string>) {
   }
 }
 
+export interface ChatCustomWallpaper {
+  id: string
+  url: string
+  name: string
+  source: 'uploaded' | 'chat_media' | 'storage'
+  sourceId?: string
+  createdAt: string
+}
+
+const STORAGE_KEY_CUSTOM_WALLPAPERS = 'filvault.chat.custom_wallpapers'
+
+function loadSavedCustomWallpapers(): Record<string, ChatCustomWallpaper[]> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_WALLPAPERS)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveCustomWallpapersToStorage(data: Record<string, ChatCustomWallpaper[]>) {
+  try {
+    localStorage.setItem(STORAGE_KEY_CUSTOM_WALLPAPERS, JSON.stringify(data))
+  } catch (e) {
+    console.warn('Failed to save custom wallpapers to localStorage', e)
+  }
+}
+
 const chatWallpapers = ref<Record<string, string>>(loadSavedWallpapers())
+const chatCustomWallpapers = ref<Record<string, ChatCustomWallpaper[]>>(loadSavedCustomWallpapers())
 const wallpaperFileInputRef = ref<HTMLInputElement | null>(null)
+
+const currentConversationCustomWallpapers = computed<ChatCustomWallpaper[]>(() => {
+  if (!selectedConversation.value) return []
+  return chatCustomWallpapers.value[selectedConversation.value.id] || []
+})
+
+function addCustomWallpaperToConversation(conversationId: string, item: ChatCustomWallpaper) {
+  const current = chatCustomWallpapers.value[conversationId] || []
+  const filtered = current.filter((w) => w.url !== item.url && w.id !== item.id)
+  const nextList = [item, ...filtered].slice(0, 16)
+  const nextMap = { ...chatCustomWallpapers.value, [conversationId]: nextList }
+  chatCustomWallpapers.value = nextMap
+  saveCustomWallpapersToStorage(nextMap)
+}
+
+function removeCustomWallpaperItem(conversationId: string, wallpaperId: string) {
+  const current = chatCustomWallpapers.value[conversationId] || []
+  const target = current.find((w) => w.id === wallpaperId)
+  if (!target) return
+  const nextList = current.filter((w) => w.id !== wallpaperId)
+  const nextMap = { ...chatCustomWallpapers.value, [conversationId]: nextList }
+  chatCustomWallpapers.value = nextMap
+  saveCustomWallpapersToStorage(nextMap)
+
+  if (threadWallpaper.value === target.url) {
+    setConversationWallpaper(conversationId, '')
+  }
+  ui.showToast(t.value.wallpaperRemoved || 'Đã gỡ hình nền khỏi đoạn chat')
+}
+
+// Storage & Media Picker for Chat Wallpaper
+const storagePickerOpen = ref(false)
+const storagePickerTab = ref<'chat' | 'personal'>('chat')
+const personalPhotos = ref<TimelineItem[]>([])
+const loadingPersonalPhotos = ref(false)
+const personalPhotosError = ref('')
+const personalPhotosLoaded = ref(false)
+
+async function loadPersonalPhotos() {
+  if (loadingPersonalPhotos.value) return
+  loadingPersonalPhotos.value = true
+  personalPhotosError.value = ''
+  try {
+    const data = await api<Timeline>('/photos/timeline')
+    const allItems: TimelineItem[] = []
+    for (const group of data.groups) {
+      allItems.push(...group.items.filter((item) => item.mimeType.startsWith('image/')))
+    }
+    personalPhotos.value = allItems
+    personalPhotosLoaded.value = true
+  } catch (e) {
+    personalPhotosError.value = formatApiError(e, 'Không thể tải ảnh từ kho lưu trữ cá nhân')
+  } finally {
+    loadingPersonalPhotos.value = false
+  }
+}
+
+function openMediaStoragePicker() {
+  storagePickerOpen.value = true
+  if (storagePickerTab.value === 'personal' && !personalPhotosLoaded.value) {
+    void loadPersonalPhotos()
+  }
+}
+
+function switchStoragePickerTab(tab: 'chat' | 'personal') {
+  storagePickerTab.value = tab
+  if (tab === 'personal' && !personalPhotosLoaded.value) {
+    void loadPersonalPhotos()
+  }
+}
+
+async function selectPhotoFromChatMedia(photo: ChatAttachment) {
+  if (!selectedConversation.value) return
+  const convId = selectedConversation.value.id
+  let photoUrl = photo.thumbnailUrl
+  if (!photoUrl || photoUrl.startsWith('/api')) {
+    try {
+      const out = await api<DownloadURL>(`/chat/conversations/${convId}/attachments/${photo.id}/download`)
+      photoUrl = out.downloadUrl
+    } catch {
+      photoUrl = photo.thumbnailUrl || ''
+    }
+  }
+  if (!photoUrl) {
+    ui.showToast('Không thể lấy đường dẫn ảnh')
+    return
+  }
+  const customItem: ChatCustomWallpaper = {
+    id: generateUUID(),
+    url: photoUrl,
+    name: photo.name || photo.originalName || 'Ảnh đoạn chat',
+    source: 'chat_media',
+    sourceId: photo.id,
+    createdAt: new Date().toISOString(),
+  }
+  addCustomWallpaperToConversation(convId, customItem)
+  setConversationWallpaper(convId, photoUrl)
+  storagePickerOpen.value = false
+  ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+}
+
+async function selectPhotoFromPersonalStorage(item: TimelineItem) {
+  if (!selectedConversation.value) return
+  const convId = selectedConversation.value.id
+  let photoUrl = item.thumbnailUrl
+  try {
+    const out = await api<DownloadURL>(`/files/${item.id}/download`)
+    photoUrl = out.downloadUrl
+  } catch {
+    // fallback
+  }
+  if (!photoUrl) {
+    ui.showToast('Không thể lấy đường dẫn ảnh')
+    return
+  }
+  const customItem: ChatCustomWallpaper = {
+    id: generateUUID(),
+    url: photoUrl,
+    name: item.name || 'Ảnh kho cá nhân',
+    source: 'storage',
+    sourceId: item.id,
+    createdAt: new Date().toISOString(),
+  }
+  addCustomWallpaperToConversation(convId, customItem)
+  setConversationWallpaper(convId, photoUrl)
+  storagePickerOpen.value = false
+  ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+}
 
 const threadWallpaper = computed(() => {
   if (!selectedConversation.value) return null
@@ -310,10 +467,39 @@ async function handleWallpaperUpload(event: Event) {
     return
   }
 
+  const convId = selectedConversation.value.id
   try {
     const dataUrl = await compressImageForWallpaper(file)
-    setConversationWallpaper(selectedConversation.value.id, dataUrl)
+    const customItem: ChatCustomWallpaper = {
+      id: generateUUID(),
+      url: dataUrl,
+      name: file.name || 'Ảnh tải lên',
+      source: 'uploaded',
+      createdAt: new Date().toISOString(),
+    }
+    addCustomWallpaperToConversation(convId, customItem)
+    setConversationWallpaper(convId, dataUrl)
     ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+
+    // Asynchronously backup original image to user's Filvault personal storage
+    void (async () => {
+      try {
+        const contentType = file.type || 'image/jpeg'
+        const session = await api<UploadSession>('/files/upload-sessions', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            contentType,
+            folderId: null,
+          }),
+        })
+        await uploadToPresigned(session.uploadUrl, file, contentType)
+        await api(`/files/${session.fileId}/complete`, { method: 'POST', body: '{}' })
+      } catch (uploadErr) {
+        console.warn('Background backup of wallpaper to personal storage skipped/failed:', uploadErr)
+      }
+    })()
   } catch {
     ui.showToast('Không thể xử lý hình ảnh')
   } finally {
@@ -2752,11 +2938,15 @@ watch(
             </div>
           </div>
 
-          <!-- Custom Upload & Reset Actions -->
+          <!-- Custom Upload, Storage & Reset Actions -->
           <div class="wallpaper-actions-row">
             <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
               <Icon name="upload" :size="16" />
               <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+            </button>
+            <button type="button" class="wallpaper-action-btn storage" @click="openMediaStoragePicker">
+              <Icon name="folder" :size="16" />
+              <span>{{ t.chooseFromStorage || 'Chọn từ kho lưu trữ' }}</span>
             </button>
             <button
               v-if="threadWallpaper"
@@ -2775,6 +2965,43 @@ watch(
             class="sr-only"
             @change="handleWallpaperUpload"
           />
+
+          <!-- Custom Wallpapers of this Conversation -->
+          <div v-if="currentConversationCustomWallpapers.length" class="wallpaper-presets-section wallpaper-custom-section">
+            <div class="wallpaper-section-header">
+              <span class="wallpaper-section-title">{{ t.customWallpapers || 'Hình nền tùy chỉnh' }}</span>
+              <span class="custom-wallpaper-count">({{ currentConversationCustomWallpapers.length }})</span>
+            </div>
+            <div class="wallpaper-presets-grid">
+              <div
+                v-for="wp in currentConversationCustomWallpapers"
+                :key="wp.id"
+                class="wallpaper-preset-item custom-wallpaper-item"
+                :class="{ active: threadWallpaper === wp.url }"
+                role="button"
+                tabindex="0"
+                :title="wp.name"
+                @click="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"
+              >
+                <div class="wallpaper-preset-thumb custom-thumb" :style="{ backgroundImage: `url('${wp.url}')` }">
+                  <span v-if="threadWallpaper === wp.url" class="preset-check-badge">
+                    <Icon name="check" :size="14" />
+                  </span>
+                  <button
+                    type="button"
+                    class="delete-custom-wp-btn"
+                    :title="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    :aria-label="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    @click.stop="removeCustomWallpaperItem(selectedConversation.id, wp.id)"
+                  >
+                    <Icon name="trash" :size="12" />
+                  </button>
+                </div>
+                <span class="wallpaper-preset-name">{{ wp.name }}</span>
+              </div>
+            </div>
+          </div>
 
           <!-- Presets Grid -->
           <div class="wallpaper-presets-section">
@@ -2809,6 +3036,103 @@ watch(
       @download="downloadLightbox"
       @close="lightboxOpen = false"
     />
+
+    <!-- Media & Personal Storage Picker BottomSheet for Wallpaper -->
+    <BottomSheet
+      :open="storagePickerOpen"
+      :title="t.pickWallpaperFromStorage || 'Chọn ảnh làm hình nền'"
+      @close="storagePickerOpen = false"
+    >
+      <div class="storage-picker-content">
+        <div class="storage-picker-tabs" role="tablist">
+          <button
+            type="button"
+            class="storage-tab-btn"
+            :class="{ active: storagePickerTab === 'chat' }"
+            role="tab"
+            :aria-selected="storagePickerTab === 'chat'"
+            @click="switchStoragePickerTab('chat')"
+          >
+            <Icon name="chat" :size="15" />
+            <span>{{ t.fromThisChat || 'Trong đoạn chat' }} ({{ sharedPhotos.length }})</span>
+          </button>
+          <button
+            type="button"
+            class="storage-tab-btn"
+            :class="{ active: storagePickerTab === 'personal' }"
+            role="tab"
+            :aria-selected="storagePickerTab === 'personal'"
+            @click="switchStoragePickerTab('personal')"
+          >
+            <Icon name="folder" :size="15" />
+            <span>{{ t.fromPersonalStorage || 'Kho ảnh cá nhân' }}</span>
+          </button>
+        </div>
+
+        <!-- Tab 1: Chat shared photos -->
+        <div v-if="storagePickerTab === 'chat'" class="storage-picker-body">
+          <div v-if="sharedPhotos.length" class="storage-picker-grid">
+            <button
+              v-for="photo in sharedPhotos"
+              :key="photo.id"
+              type="button"
+              class="storage-photo-card"
+              :title="photo.name || photo.originalName"
+              @click="selectPhotoFromChatMedia(photo)"
+            >
+              <img
+                v-if="photo.thumbnailUrl"
+                :src="photo.thumbnailUrl"
+                :alt="photo.name"
+                loading="lazy"
+              />
+              <div v-else class="storage-photo-fallback">
+                <Icon name="image" :size="24" />
+              </div>
+              <span class="storage-photo-name">{{ photo.name || photo.originalName }}</span>
+            </button>
+          </div>
+          <div v-else class="storage-picker-empty">
+            <Icon name="image" :size="36" />
+            <p>{{ t.noChatPhotos || 'Chưa có ảnh nào trong đoạn chat' }}</p>
+          </div>
+        </div>
+
+        <!-- Tab 2: Personal Storage Photos -->
+        <div v-else-if="storagePickerTab === 'personal'" class="storage-picker-body">
+          <div v-if="loadingPersonalPhotos" class="storage-picker-loading">
+            <span class="spinner" />
+            <p>{{ t.loadingPhotos || 'Đang tải ảnh...' }}</p>
+          </div>
+          <p v-else-if="personalPhotosError" class="alert">{{ personalPhotosError }}</p>
+          <div v-else-if="personalPhotos.length" class="storage-picker-grid">
+            <button
+              v-for="item in personalPhotos"
+              :key="item.id"
+              type="button"
+              class="storage-photo-card"
+              :title="item.name"
+              @click="selectPhotoFromPersonalStorage(item)"
+            >
+              <img
+                v-if="item.thumbnailUrl"
+                :src="item.thumbnailUrl"
+                :alt="item.name"
+                loading="lazy"
+              />
+              <div v-else class="storage-photo-fallback">
+                <Icon name="image" :size="24" />
+              </div>
+              <span class="storage-photo-name">{{ item.name }}</span>
+            </button>
+          </div>
+          <div v-else class="storage-picker-empty">
+            <Icon name="folder" :size="36" />
+            <p>{{ t.noPersonalPhotos || 'Chưa có ảnh nào trong kho cá nhân' }}</p>
+          </div>
+        </div>
+      </div>
+    </BottomSheet>
 
     <BottomSheet :open="appMenuOpen" :title="t.filvaultMenu" @close="appMenuOpen = false">
       <div class="app-menu-content">
@@ -3485,11 +3809,15 @@ watch(
             </div>
           </div>
 
-          <!-- Custom Upload & Reset Actions -->
+          <!-- Custom Upload, Storage & Reset Actions -->
           <div class="wallpaper-actions-row">
             <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
               <Icon name="upload" :size="16" />
               <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+            </button>
+            <button type="button" class="wallpaper-action-btn storage" @click="openMediaStoragePicker">
+              <Icon name="folder" :size="16" />
+              <span>{{ t.chooseFromStorage || 'Chọn từ kho lưu trữ' }}</span>
             </button>
             <button
               v-if="threadWallpaper"
@@ -3508,6 +3836,43 @@ watch(
             class="sr-only"
             @change="handleWallpaperUpload"
           />
+
+          <!-- Custom Wallpapers of this Conversation -->
+          <div v-if="currentConversationCustomWallpapers.length" class="wallpaper-presets-section wallpaper-custom-section">
+            <div class="wallpaper-section-header">
+              <span class="wallpaper-section-title">{{ t.customWallpapers || 'Hình nền tùy chỉnh' }}</span>
+              <span class="custom-wallpaper-count">({{ currentConversationCustomWallpapers.length }})</span>
+            </div>
+            <div class="wallpaper-presets-grid">
+              <div
+                v-for="wp in currentConversationCustomWallpapers"
+                :key="wp.id"
+                class="wallpaper-preset-item custom-wallpaper-item"
+                :class="{ active: threadWallpaper === wp.url }"
+                role="button"
+                tabindex="0"
+                :title="wp.name"
+                @click="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"
+              >
+                <div class="wallpaper-preset-thumb custom-thumb" :style="{ backgroundImage: `url('${wp.url}')` }">
+                  <span v-if="threadWallpaper === wp.url" class="preset-check-badge">
+                    <Icon name="check" :size="14" />
+                  </span>
+                  <button
+                    type="button"
+                    class="delete-custom-wp-btn"
+                    :title="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    :aria-label="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    @click.stop="removeCustomWallpaperItem(selectedConversation.id, wp.id)"
+                  >
+                    <Icon name="trash" :size="12" />
+                  </button>
+                </div>
+                <span class="wallpaper-preset-name">{{ wp.name }}</span>
+              </div>
+            </div>
+          </div>
 
           <!-- Presets Grid -->
           <div class="wallpaper-presets-section">
@@ -6374,6 +6739,7 @@ img.avatar-img {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+.wallpaper-preset-name,
 .wallpaper-preset-label {
   font-size: 11px;
   color: var(--ink);
@@ -6384,6 +6750,198 @@ img.avatar-img {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.wallpaper-action-btn.storage {
+  background: var(--surface-soft);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+}
+
+.wallpaper-action-btn.storage:hover {
+  background: var(--surface-card);
+  border-color: var(--accent);
+}
+
+.wallpaper-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.custom-wallpaper-count {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.custom-thumb {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.delete-custom-wp-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  z-index: 2;
+}
+
+.delete-custom-wp-btn:hover {
+  background: var(--danger, #ef4444);
+  transform: scale(1.15);
+}
+
+/* Storage & Media Picker BottomSheet */
+.storage-picker-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0 var(--space-xs) var(--space-md);
+  min-height: 320px;
+}
+
+.storage-picker-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+}
+
+.storage-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--duration-short) var(--ease-standard);
+}
+
+.storage-tab-btn:hover {
+  color: var(--ink);
+}
+
+.storage-tab-btn.active {
+  background: var(--canvas);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.storage-picker-body {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.storage-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.storage-photo-card {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  padding: 0;
+  background: var(--surface-soft);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  outline: none;
+}
+
+.storage-photo-card:hover {
+  transform: scale(1.03);
+  border-color: var(--accent);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.storage-photo-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.storage-photo-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.storage-photo-name {
+  position: absolute;
+  bottom: 0;
+  inset-inline: 0;
+  padding: 3px 6px;
+  font-size: 10px;
+  color: #ffffff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.storage-picker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  color: var(--muted);
+  text-align: center;
+  gap: 8px;
+}
+
+.storage-picker-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.storage-picker-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  color: var(--muted);
+  gap: 12px;
+}
+
+.storage-picker-loading p {
+  margin: 0;
+  font-size: 13px;
 }
 
 /* In-details Message Search */

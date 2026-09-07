@@ -295,8 +295,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/handleWallpaperUpload/)
     expect(chat).toMatch(/openWallpaperSubPage/)
     expect(chat).toMatch(/has-wallpaper/)
-    expect(chat).toMatch(/info-wallpaper-page/)
-    expect(chat).toMatch(/wallpaper-preview-card/)
     expect(chat).toMatch(/wallpaper-presets-grid/)
   })
 
@@ -312,6 +310,19 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/search-enter-hint/)
     expect(chat).toMatch(/formatSearchSnippet/)
     expect(chat).toMatch(/shared-file-item/)
+  })
+
+  it('supports custom wallpaper collection, safe unlinking, and storage picker modal', () => {
+    expect(chat).toMatch(/chatCustomWallpapers/)
+    expect(chat).toMatch(/currentConversationCustomWallpapers/)
+    expect(chat).toMatch(/removeCustomWallpaperItem/)
+    expect(chat).toMatch(/storagePickerOpen/)
+    expect(chat).toMatch(/storagePickerTab/)
+    expect(chat).toMatch(/openMediaStoragePicker/)
+    expect(chat).toMatch(/selectPhotoFromChatMedia/)
+    expect(chat).toMatch(/selectPhotoFromPersonalStorage/)
+    expect(chat).toMatch(/wallpaper-custom-section/)
+    expect(chat).toMatch(/delete-custom-wp-btn/)
   })
 })
 
