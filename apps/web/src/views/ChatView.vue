@@ -1094,12 +1094,26 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
+function onVisibilityChange(): void {
+  if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+    chatStore.handleWakeup()
+  }
+}
+
+function onWindowFocus(): void {
+  chatStore.handleWakeup()
+}
+
 onMounted(() => {
   updateViewport()
   window.addEventListener('resize', updateViewport)
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('offline', chatStore.markOffline)
   window.addEventListener('online', chatStore.markOnline)
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
+  window.addEventListener('focus', onWindowFocus)
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', onVisualViewportResize)
     window.visualViewport.addEventListener('scroll', onVisualViewportResize)
@@ -1117,6 +1131,10 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('offline', chatStore.markOffline)
   window.removeEventListener('online', chatStore.markOnline)
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+  }
+  window.removeEventListener('focus', onWindowFocus)
   if (window.visualViewport) {
     window.visualViewport.removeEventListener('resize', onVisualViewportResize)
     window.visualViewport.removeEventListener('scroll', onVisualViewportResize)
@@ -1276,7 +1294,13 @@ watch(
     </aside>
 
     <section class="message-thread" aria-live="polite" :style="threadThemeStyle">
-      <p v-if="chatStore.connectionState !== 'connected'" class="connection-status" role="status">
+      <p
+        v-if="chatStore.connectionState !== 'connected'"
+        class="connection-status"
+        role="status"
+        :title="t.retry || 'Thử lại'"
+        @click="chatStore.connectEvents()"
+      >
         {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
       </p>
       <template v-if="selectedConversation">
@@ -3153,6 +3177,8 @@ watch(
   color: var(--muted);
   font-size: 12px;
   text-align: center;
+  cursor: pointer;
+  user-select: none;
 }
 
 .message-bubble p {

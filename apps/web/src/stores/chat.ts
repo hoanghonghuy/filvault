@@ -33,6 +33,8 @@ export const useChatStore = defineStore('chat', () => {
   const seenEventIds = new Set<number>()
   let eventController: AbortController | null = null
   let reconnectTimer: number | null = null
+  let watchdogTimer: number | null = null
+  let lastActivityAt = 0
   const typingUsers = ref<Record<string, { userId: string; userName: string; timer?: number }>>({})
   let lastTypingTime = 0
   const lastReactionUpdate = ref<{ conversationId: string; messageId: string; reactions: ChatMessageReaction[] } | null>(null)
@@ -263,11 +265,19 @@ export const useChatStore = defineStore('chat', () => {
     return res.reactions
   }
 
-  function stopEvents(): void {
+  function clearTimers(): void {
     if (reconnectTimer !== null) {
       window.clearTimeout(reconnectTimer)
       reconnectTimer = null
     }
+    if (watchdogTimer !== null) {
+      window.clearTimeout(watchdogTimer)
+      watchdogTimer = null
+    }
+  }
+
+  function stopEvents(): void {
+    clearTimers()
     eventController?.abort()
     eventController = null
     seenEventIds.clear()
@@ -275,35 +285,47 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function markOffline(): void {
-    if (reconnectTimer !== null) {
-      window.clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
+    clearTimers()
     eventController?.abort()
     eventController = null
     connectionState.value = 'offline'
   }
 
   function markOnline(): void {
-    if (connectionState.value === 'offline') connectEvents()
+    connectEvents()
+    void loadConversations()
+    if (selectedId.value) void openConversation(selectedId.value)
+  }
+
+  function handleWakeup(): void {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return
+    }
+    const isStale = Date.now() - lastActivityAt > 35000
+    const isDisconnected = connectionState.value !== 'connected'
+    if (isDisconnected || isStale) {
+      connectEvents()
+    }
+    void loadConversations()
+    if (selectedId.value) void openConversation(selectedId.value)
   }
 
   function scheduleReconnect(): void {
     if (reconnectTimer !== null) return
+    const isVisible = typeof document === 'undefined' || document.visibilityState === 'visible'
     connectionState.value = navigator.onLine ? 'reconnecting' : 'offline'
+    const delay = isVisible ? 1000 + Math.round(Math.random() * 1500) : 4000
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null
       connectEvents()
-    }, 1000 + Math.round(Math.random() * 2000))
+    }, delay)
   }
 
   function connectEvents(): void {
+    clearTimers()
     eventController?.abort()
     eventController = null
-    if (reconnectTimer !== null) {
-      window.clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
+
     const token = getAccessToken()
     if (!token) {
       connectionState.value = 'offline'
@@ -312,27 +334,64 @@ export const useChatStore = defineStore('chat', () => {
     connectionState.value = 'connecting'
     const controller = new AbortController()
     eventController = controller
-    void readEvents(token, controller.signal)
+    void readEvents(token, controller.signal, controller)
   }
 
-  async function readEvents(token: string, signal: AbortSignal): Promise<void> {
+  async function readEvents(token: string, signal: AbortSignal, controller: AbortController): Promise<void> {
+    let connectTimeout: number | null = window.setTimeout(() => {
+      connectTimeout = null
+      if (connectionState.value === 'connecting' && !signal.aborted) {
+        controller.abort()
+      }
+    }, 12000)
+
+    const resetWatchdog = () => {
+      lastActivityAt = Date.now()
+      if (watchdogTimer !== null) {
+        window.clearTimeout(watchdogTimer)
+      }
+      watchdogTimer = window.setTimeout(() => {
+        watchdogTimer = null
+        if (!signal.aborted) {
+          controller.abort()
+        }
+      }, 45000)
+    }
+
     try {
       const response = await fetch(`${API_BASE}/chat/events?after=${lastEventId.value}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
         signal,
       })
-          if (response.status === 401 && !signal.aborted && (await refreshAccessToken())) {
+
+      if (connectTimeout !== null) {
+        window.clearTimeout(connectTimeout)
+        connectTimeout = null
+      }
+
+      if (response.status === 401) {
+        if (!signal.aborted) {
+          const refreshed = await refreshAccessToken()
+          if (refreshed) {
             connectEvents()
             return
           }
-          if (!response.ok || !response.body) throw new Error(`SSE failed (${response.status})`)
+        }
+        connectionState.value = 'offline'
+        return
+      }
+
+      if (!response.ok || !response.body) throw new Error(`SSE failed (${response.status})`)
       connectionState.value = 'connected'
+      resetWatchdog()
+
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
       while (!signal.aborted) {
         const { done, value } = await reader.read()
         if (done) break
+        resetWatchdog()
         buffer += decoder.decode(value, { stream: true })
         const frames = buffer.split('\n\n')
         buffer = frames.pop() ?? ''
@@ -366,6 +425,15 @@ export const useChatStore = defineStore('chat', () => {
       if (!signal.aborted) scheduleReconnect()
     } catch {
       if (!signal.aborted) scheduleReconnect()
+    } finally {
+      if (connectTimeout !== null) {
+        window.clearTimeout(connectTimeout)
+        connectTimeout = null
+      }
+      if (watchdogTimer !== null) {
+        window.clearTimeout(watchdogTimer)
+        watchdogTimer = null
+      }
     }
   }
 
@@ -384,6 +452,7 @@ export const useChatStore = defineStore('chat', () => {
     stopEvents,
     markOffline,
     markOnline,
+    handleWakeup,
     typingUsers,
     markAsRead,
     sendTyping,
