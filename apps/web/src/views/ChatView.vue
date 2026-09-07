@@ -5445,13 +5445,19 @@ img.avatar-img {
 
 /* Seen indicator */
 .seen-indicator {
-  display: flex;
+  display: inline-flex;
+  align-self: flex-end;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 2px 4px 4px;
+  gap: 5px;
+  padding: 2px 6px;
   font-size: 11px;
+  font-weight: 500;
   color: var(--muted);
+  border-radius: var(--radius-pill);
+  margin-top: 2px;
+  margin-bottom: 2px;
+  user-select: none;
+  transition: all var(--duration-short) var(--ease-standard);
 }
 
 .seen-avatar {
@@ -5463,11 +5469,44 @@ img.avatar-img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--canvas);
 }
 
 .seen-text {
   font-size: 11px;
-  color: var(--muted);
+  font-weight: 500;
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* Adaptive Seen Indicator when wallpaper is active */
+.message-thread.has-wallpaper .seen-indicator {
+  background: color-mix(in srgb, var(--chat-accent, #0084ff) 8%, rgba(255, 255, 255, 0.92));
+  border: 1px solid color-mix(in srgb, var(--chat-accent, #0084ff) 20%, rgba(0, 0, 0, 0.08));
+  color: color-mix(in srgb, var(--chat-accent, #0084ff) 85%, #000000);
+  font-weight: 600;
+  padding: 2px 8px 2px 5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+:global([data-theme='dark']) .message-thread.has-wallpaper .seen-indicator,
+[data-theme='dark'] .message-thread.has-wallpaper .seen-indicator {
+  background: color-mix(in srgb, var(--chat-accent, #38bdf8) 12%, rgba(17, 24, 39, 0.90));
+  border: 1px solid color-mix(in srgb, var(--chat-accent, #38bdf8) 25%, rgba(255, 255, 255, 0.12));
+  color: color-mix(in srgb, var(--chat-accent, #38bdf8) 60%, #ffffff);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.40);
+}
+
+.message-thread.has-wallpaper .seen-avatar {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+}
+
+:global([data-theme='dark']) .message-thread.has-wallpaper .seen-avatar,
+[data-theme='dark'] .message-thread.has-wallpaper .seen-avatar {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.25);
 }
 
 /* Typing indicator in thread */
