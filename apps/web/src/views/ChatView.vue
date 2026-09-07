@@ -11,6 +11,7 @@ import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
+import LoadingSkeletonChatRail from '@/components/LoadingSkeletonChatRail.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { userInitials } from '@/lib/userInitials'
@@ -165,19 +166,129 @@ function backToRail() {
   }
 }
 
+const QUICK_REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'] as const
+const activeBurstMessageId = ref<string | null>(null)
+const capsulePos = ref<{ top: number; left: number; above: boolean } | null>(null)
+
+let lastTapTime = 0
+let lastTapMsgId = ''
+
+function handleMessageBubbleClick(message: ChatMessage) {
+  const now = Date.now()
+  if (lastTapMsgId === message.id && now - lastTapTime < 320) {
+    lastTapTime = 0
+    lastTapMsgId = ''
+    triggerHeartBurst(message)
+    return
+  }
+  lastTapTime = now
+  lastTapMsgId = message.id
+}
+
+function triggerHeartBurst(message: ChatMessage) {
+  activeBurstMessageId.value = message.id
+  setTimeout(() => {
+    if (activeBurstMessageId.value === message.id) {
+      activeBurstMessageId.value = null
+    }
+  }, 900)
+  void selectReaction('❤️', message)
+}
+
+async function selectReaction(emoji: string, targetMessage?: ChatMessage) {
+  const msg = targetMessage ?? activeMessage.value
+  if (!msg || !selectedId.value) return
+  messageMenuOpen.value = false
+  try {
+    const updated = await chatStore.toggleReaction(selectedId.value, msg.id, emoji)
+    msg.reactions = updated
+    const local = messages.value.find((m) => m.id === msg.id)
+    if (local) {
+      local.reactions = updated
+    }
+  } catch (err) {
+    ui.showToast(formatApiError(err, 'Không thể thả cảm xúc'), 'error')
+  }
+}
+
+function promptCustomReaction() {
+  const msg = activeMessage.value
+  messageMenuOpen.value = false
+  if (!msg) return
+  void ui.prompt({
+    title: 'Thả cảm xúc biểu tượng',
+    label: 'Nhập emoji hoặc biểu tượng',
+    confirmLabel: 'Thả cảm xúc',
+  }).then((val) => {
+    if (!val?.trim()) return
+    void selectReaction(val.trim(), msg)
+  })
+}
+
+function triggerReplyMessage() {
+  const msg = activeMessage.value
+  messageMenuOpen.value = false
+  if (!msg) return
+  const preview = msg.body ? (msg.body.length > 50 ? msg.body.slice(0, 50) + '…' : msg.body) : 'Tệp đính kèm'
+  draft.value = `> ${preview}\n`
+  focusComposer()
+}
+
+function isReactedWith(message: ChatMessage | null, emoji: string): boolean {
+  if (!message?.reactions) return false
+  const r = message.reactions.find((item) => item.reaction === emoji)
+  return Boolean(r?.reacted)
+}
+
+function hasUserReacted(message: ChatMessage): boolean {
+  return Boolean(message.reactions?.some((r) => r.reacted))
+}
+
+function totalReactionCount(message: ChatMessage): number {
+  if (!message.reactions) return 0
+  return message.reactions.reduce((sum, r) => sum + r.count, 0)
+}
+
+function reactionTooltip(message: ChatMessage): string {
+  if (!message.reactions) return ''
+  return message.reactions.map((r) => `${r.reaction} (${r.count})`).join(', ')
+}
+
 const {
-  start: onMessageTouchStart,
+  start: onMessageTouchStartRaw,
   move: onMessageTouchMove,
   end: onMessageTouchEnd,
   cancel: onMessageTouchCancel,
 } = useLongPress({
   onLongPress: (payload) => {
-    if (payload) openMessageMenu(payload as ChatMessage)
+    if (payload) {
+      const data = payload as { message: ChatMessage; el?: HTMLElement }
+      if (data.message) {
+        openMessageMenu(data.message, data.el)
+      } else {
+        openMessageMenu(payload as ChatMessage)
+      }
+    }
   },
 })
 
-function openMessageMenu(message: ChatMessage) {
+function onMessageTouch(e: TouchEvent, message: ChatMessage) {
+  onMessageTouchStartRaw(e, { message, el: e.currentTarget as HTMLElement })
+}
+
+function openMessageMenu(message: ChatMessage, el?: HTMLElement) {
   activeMessage.value = message
+  if (el) {
+    const rect = el.getBoundingClientRect()
+    const above = rect.top > 130
+    capsulePos.value = {
+      top: above ? Math.max(16, rect.top - 68) : rect.bottom + 8,
+      left: Math.min(Math.max(16, rect.left + rect.width / 2 - 160), window.innerWidth - 330),
+      above,
+    }
+  } else {
+    capsulePos.value = null
+  }
   messageMenuOpen.value = true
 }
 
@@ -1027,7 +1138,8 @@ watch(
       </div>
       <div v-if="error && !inThread" class="alert" role="alert">{{ error }}</div>
       <nav class="conversation-list">
-        <div v-if="!filteredConversations.length" class="rail-empty">
+        <LoadingSkeletonChatRail v-if="loading" />
+        <div v-else-if="!filteredConversations.length" class="rail-empty">
           <p v-if="railFilter.trim()" class="rail-empty-query">{{ t.noChatsMatch }} "{{ railFilter }}".</p>
           <div v-else class="rail-empty-state">
             <p class="rail-empty-title">{{ t.noConversationsYet }}</p>
@@ -1218,14 +1330,20 @@ watch(
                     :class="{
                       outgoing: message.senderId === auth.user?.id,
                       'has-like': message.body === '👍',
-                      'has-sticker': isStickerMessage(message.body)
+                      'has-sticker': isStickerMessage(message.body),
+                      'has-reactions': message.reactions && message.reactions.length > 0,
                     }"
-                    @touchstart.passive="onMessageTouchStart($event, message)"
+                    @touchstart.passive="onMessageTouch($event, message)"
                     @touchmove.passive="onMessageTouchMove($event)"
                     @touchend="onMessageTouchEnd"
                     @touchcancel="onMessageTouchCancel"
-                    @contextmenu.prevent="openMessageMenu(message)"
+                    @contextmenu.prevent="openMessageMenu(message, $event.currentTarget as HTMLElement)"
+                    @click="handleMessageBubbleClick(message)"
                   >
+                    <!-- Heart burst pop animation on double-tap -->
+                    <div v-if="activeBurstMessageId === message.id" class="heart-burst" aria-hidden="true">
+                      ❤️
+                    </div>
                     <p v-if="message.body && isStickerMessage(message.body)" class="sticker-bubble">{{ parseStickerSymbol(message.body) }}</p>
                     <p v-else-if="message.body" :class="{ 'like-bubble': message.body === '👍' }">{{ message.body }}</p>
                     <template v-for="attachment in message.attachments" :key="attachment.id">
@@ -1258,6 +1376,31 @@ watch(
                     <span v-if="message.removedAt" class="message-status">{{ t.messageRemoved }}</span>
                     <span v-else-if="message.editedAt" class="message-status">{{ t.edited }}</span>
                     <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
+
+                    <!-- Reaction badge pill on message bubble -->
+                    <button
+                      v-if="message.reactions && message.reactions.length > 0"
+                      type="button"
+                      class="reaction-badge-group"
+                      :class="{
+                        'reacted-by-me': hasUserReacted(message),
+                        'outgoing-badge': message.senderId === auth.user?.id
+                      }"
+                      :title="reactionTooltip(message)"
+                      @click.stop="openMessageMenu(message, $event.currentTarget as HTMLElement)"
+                    >
+                      <span
+                        v-for="r in message.reactions.slice(0, 3)"
+                        :key="r.reaction"
+                        class="rx-emoji"
+                        :class="{ 'my-rx': r.reacted }"
+                      >
+                        {{ r.reaction }}
+                      </span>
+                      <span v-if="totalReactionCount(message) > 1" class="rx-count">
+                        {{ totalReactionCount(message) }}
+                      </span>
+                    </button>
                   </article>
                 </div>
                 <div v-if="isMessageSeenByPeer(message, index)" class="seen-indicator">
@@ -1575,36 +1718,104 @@ watch(
       </div>
     </BottomSheet>
 
-    <!-- Message Long-press Menu -->
-    <BottomSheet :open="messageMenuOpen" :title="t.messageOptions" @close="messageMenuOpen = false">
-      <div v-if="activeMessage" class="sheet-action-list">
-        <div class="sheet-message-preview">
-          <p>{{ activeMessage.body }}</p>
+    <!-- Messenger Message Reaction & Quick Action Overlay -->
+    <Teleport to="body">
+      <div
+        v-if="messageMenuOpen && activeMessage"
+        class="reaction-modal-overlay"
+        @click.self="messageMenuOpen = false"
+      >
+        <!-- Floating Reaction Capsule -->
+        <div
+          class="reaction-capsule-wrap"
+          :style="capsulePos ? { top: `${capsulePos.top}px`, left: `${capsulePos.left}px` } : undefined"
+          @click.stop
+        >
+          <div class="reaction-capsule">
+            <button
+              v-for="rx in QUICK_REACTIONS"
+              :key="rx"
+              type="button"
+              class="rx-btn"
+              :class="{ 'rx-active': isReactedWith(activeMessage, rx) }"
+              :aria-label="rx"
+              @click="selectReaction(rx)"
+            >
+              <span class="rx-char">{{ rx }}</span>
+            </button>
+            <button
+              type="button"
+              class="rx-btn rx-plus-btn"
+              title="Thêm biểu tượng khác"
+              aria-label="Thêm biểu tượng khác"
+              @click="promptCustomReaction"
+            >
+              <Icon name="plus" :size="18" />
+            </button>
+          </div>
         </div>
-        <button type="button" class="sheet-action-item" @click="copyMessageText">
-          <Icon name="copy" :size="18" />
-          <span>{{ t.copyMessage }}</span>
-        </button>
-        <button
-          v-if="canMutateMessage(activeMessage)"
-          type="button"
-          class="sheet-action-item"
-          @click="triggerEditMessage"
-        >
-          <Icon name="pencil" :size="18" />
-          <span>{{ t.edit }}</span>
-        </button>
-        <button
-          v-if="canMutateMessage(activeMessage)"
-          type="button"
-          class="sheet-action-item danger-text"
-          @click="triggerRemoveMessage"
-        >
-          <Icon name="trash" :size="18" />
-          <span>{{ t.remove }}</span>
-        </button>
+
+        <!-- Active Message Bubble (elevated in focus) -->
+        <div class="reaction-active-bubble-wrap" @click="messageMenuOpen = false">
+          <div
+            class="message-bubble active-elevated"
+            :class="{
+              outgoing: activeMessage.senderId === auth.user?.id,
+              'has-like': activeMessage.body === '👍',
+              'has-sticker': isStickerMessage(activeMessage.body)
+            }"
+          >
+            <p v-if="activeMessage.body && isStickerMessage(activeMessage.body)" class="sticker-bubble">{{ parseStickerSymbol(activeMessage.body) }}</p>
+            <p v-else-if="activeMessage.body" :class="{ 'like-bubble': activeMessage.body === '👍' }">{{ activeMessage.body }}</p>
+            <span class="bubble-time">{{ formatTime(activeMessage.createdAt) }}</span>
+          </div>
+        </div>
+
+        <!-- Bottom Quick Actions Bar (Messenger style: Trả lời, Sao chép, Sửa, Xóa, Đóng) -->
+        <div class="reaction-bottom-bar" @click.stop>
+          <button type="button" class="bottom-action-btn" @click="triggerReplyMessage">
+            <div class="action-icon-circle">
+              <Icon name="reply" :size="20" />
+            </div>
+            <span>{{ t.reply || 'Trả lời' }}</span>
+          </button>
+          <button type="button" class="bottom-action-btn" @click="copyMessageText">
+            <div class="action-icon-circle">
+              <Icon name="copy" :size="20" />
+            </div>
+            <span>{{ t.copyMessage || 'Sao chép' }}</span>
+          </button>
+          <button
+            v-if="canMutateMessage(activeMessage)"
+            type="button"
+            class="bottom-action-btn"
+            @click="triggerEditMessage"
+          >
+            <div class="action-icon-circle">
+              <Icon name="pencil" :size="20" />
+            </div>
+            <span>{{ t.edit || 'Sửa' }}</span>
+          </button>
+          <button
+            v-if="canMutateMessage(activeMessage)"
+            type="button"
+            class="bottom-action-btn danger-action"
+            @click="triggerRemoveMessage"
+          >
+            <div class="action-icon-circle danger-circle">
+              <Icon name="trash" :size="20" />
+            </div>
+            <span>{{ t.remove || 'Xóa' }}</span>
+          </button>
+          <button type="button" class="bottom-action-btn" @click="messageMenuOpen = false">
+            <div class="action-icon-circle">
+              <Icon name="close" :size="20" />
+            </div>
+            <span>{{ t.close || 'Đóng' }}</span>
+          </button>
+        </div>
       </div>
-    </BottomSheet>
+    </Teleport>
 
     <!-- Conversation Long-press Menu -->
     <BottomSheet :open="convMenuOpen" :title="t.chatOptions" @close="convMenuOpen = false">
@@ -3765,6 +3976,314 @@ img.avatar-img {
   width: 100%;
   justify-content: center;
   border-radius: var(--radius-pill);
+}
+
+/* --- Messenger Reactions & Double-tap Heart System --- */
+.heart-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
+  pointer-events: none;
+  z-index: 10;
+  animation: heart-burst-pop 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes heart-burst-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(-15deg);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.35) rotate(0deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -70%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -100%) scale(0.9);
+  }
+}
+
+.message-bubble.has-reactions {
+  margin-bottom: 12px;
+}
+
+.reaction-badge-group {
+  position: absolute;
+  bottom: -11px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+}
+
+.reaction-badge-group:hover,
+.reaction-badge-group:active {
+  transform: scale(1.12);
+}
+
+.reaction-badge-group.outgoing-badge {
+  right: 8px;
+}
+
+.reaction-badge-group.reacted-by-me {
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.2);
+}
+
+.rx-emoji {
+  display: inline-block;
+  line-height: 1;
+}
+
+.rx-emoji.my-rx {
+  transform: scale(1.05);
+}
+
+.rx-count {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 1px;
+  color: var(--muted);
+}
+
+.reacted-by-me .rx-count {
+  color: var(--accent);
+}
+
+/* Modal Overlay on Long Press */
+.reaction-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  animation: rx-fade-in 0.2s ease-out;
+}
+
+@keyframes rx-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reaction-capsule-wrap {
+  position: fixed;
+  z-index: 10001;
+  animation: rx-capsule-bounce 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes rx-capsule-bounce {
+  from {
+    opacity: 0;
+    transform: scale(0.6) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.reaction-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #242526;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='light'] .reaction-capsule,
+:root:not([data-theme='dark']) .reaction-capsule {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.rx-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease;
+}
+
+.rx-btn:hover,
+.rx-btn:active {
+  transform: scale(1.35) translateY(-5px);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='light'] .rx-btn:hover,
+:root:not([data-theme='dark']) .rx-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.rx-btn.rx-active {
+  background: rgba(0, 132, 255, 0.18);
+  transform: scale(1.18);
+}
+
+.rx-char {
+  font-size: 26px;
+  line-height: 1;
+  user-select: none;
+}
+
+.rx-plus-btn {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e4e6eb;
+}
+
+[data-theme='light'] .rx-plus-btn,
+:root:not([data-theme='dark']) .rx-plus-btn {
+  background: #f0f2f5;
+  color: #050505;
+}
+
+.reaction-active-bubble-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 90%;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.message-bubble.active-elevated {
+  transform: scale(1.03);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+/* Bottom Actions Bar matching Screenshot */
+.reaction-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: #18191a;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 10001;
+  animation: rx-slide-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+[data-theme='light'] .reaction-bottom-bar,
+:root:not([data-theme='dark']) .reaction-bottom-bar {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
+}
+
+@keyframes rx-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.bottom-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #e4e6eb;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 12px;
+  transition: transform 0.15s ease, background 0.15s ease;
+  min-width: 60px;
+}
+
+[data-theme='light'] .bottom-action-btn,
+:root:not([data-theme='dark']) .bottom-action-btn {
+  color: #050505;
+}
+
+.bottom-action-btn:hover,
+.bottom-action-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+[data-theme='light'] .bottom-action-btn:hover,
+:root:not([data-theme='dark']) .bottom-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.action-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e4e6eb;
+  transition: background 0.15s ease;
+}
+
+[data-theme='light'] .action-icon-circle,
+:root:not([data-theme='dark']) .action-icon-circle {
+  background: #f0f2f5;
+  color: #050505;
+}
+
+.bottom-action-btn.danger-action {
+  color: #f87171;
+}
+
+.danger-circle {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
 }
 
 </style>

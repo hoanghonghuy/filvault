@@ -143,6 +143,13 @@ export interface ChatAttachment {
   thumbnailUrl?: string
 }
 
+export interface ChatMessageReaction {
+  reaction: string
+  count: number
+  userIds: string[]
+  reacted: boolean
+}
+
 export interface ChatMessage {
   id: string
   conversationId: string
@@ -153,6 +160,7 @@ export interface ChatMessage {
   removedAt?: string
   createdAt: string
   attachments: ChatAttachment[]
+  reactions?: ChatMessageReaction[]
 }
 
 export interface ChatConversation {

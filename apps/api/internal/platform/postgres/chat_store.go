@@ -615,6 +615,64 @@ func (s *Store) CreateAttachment(ctx context.Context, a chat.Attachment) error {
 	return err
 }
 
+func (s *Store) listMessageReactions(ctx context.Context, userID string, messageIDs []string) (map[string][]chat.MessageReaction, error) {
+	if len(messageIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT message_id, reaction, user_id
+		FROM message_reactions
+		WHERE message_id = ANY($1)
+		ORDER BY created_at ASC
+	`, messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type groupEntry struct {
+		userIDs []string
+		reacted bool
+	}
+	raw := make(map[string]map[string]*groupEntry)
+	orders := make(map[string][]string)
+	for rows.Next() {
+		var msgID, reaction, uID string
+		if err := rows.Scan(&msgID, &reaction, &uID); err != nil {
+			return nil, err
+		}
+		if raw[msgID] == nil {
+			raw[msgID] = make(map[string]*groupEntry)
+		}
+		if raw[msgID][reaction] == nil {
+			raw[msgID][reaction] = &groupEntry{}
+			orders[msgID] = append(orders[msgID], reaction)
+		}
+		entry := raw[msgID][reaction]
+		entry.userIDs = append(entry.userIDs, uID)
+		if uID == userID {
+			entry.reacted = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make(map[string][]chat.MessageReaction, len(raw))
+	for msgID, reactionsMap := range raw {
+		for _, reaction := range orders[msgID] {
+			entry := reactionsMap[reaction]
+			out[msgID] = append(out[msgID], chat.MessageReaction{
+				Reaction: reaction,
+				Count:    len(entry.userIDs),
+				UserIDs:  entry.userIDs,
+				Reacted:  entry.reacted,
+			})
+		}
+	}
+	return out, nil
+}
+
 func (s *Store) ListMessagesBefore(ctx context.Context, ownerID, conversationID, before string, limit int) ([]chat.Message, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT latest.id, latest.conversation_id, latest.owner_id, latest.sender_id,
@@ -656,12 +714,23 @@ func (s *Store) ListMessagesBefore(ctx context.Context, ownerID, conversationID,
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	msgIDs := make([]string, len(out))
+	for i := range out {
+		msgIDs[i] = out[i].ID
+	}
+	reactionsMap, err := s.listMessageReactions(ctx, ownerID, msgIDs)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
 		attachments, err := s.listMessageAttachments(ctx, out[i].ID)
 		if err != nil {
 			return nil, err
 		}
 		out[i].Attachments = attachments
+		if r, ok := reactionsMap[out[i].ID]; ok {
+			out[i].Reactions = r
+		}
 	}
 	return out, nil
 }
@@ -728,12 +797,23 @@ func (s *Store) ListMessages(ctx context.Context, ownerID, conversationID string
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	msgIDs := make([]string, len(out))
+	for i := range out {
+		msgIDs[i] = out[i].ID
+	}
+	reactionsMap, err := s.listMessageReactions(ctx, ownerID, msgIDs)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
 		attachments, err := s.listMessageAttachments(ctx, out[i].ID)
 		if err != nil {
 			return nil, err
 		}
 		out[i].Attachments = attachments
+		if r, ok := reactionsMap[out[i].ID]; ok {
+			out[i].Reactions = r
+		}
 	}
 	return out, nil
 }
@@ -749,7 +829,7 @@ func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, que
 			)
 			AND deleted_at IS NULL
 			AND body ILIKE '%' || $3 || '%'
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 		LIMIT $4
 	`, ownerID, conversationID, query, limit)
 	if err != nil {
@@ -767,12 +847,23 @@ func (s *Store) SearchMessages(ctx context.Context, ownerID, conversationID, que
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	searchMsgIDs := make([]string, len(out))
+	for i := range out {
+		searchMsgIDs[i] = out[i].ID
+	}
+	searchReactionsMap, err := s.listMessageReactions(ctx, ownerID, searchMsgIDs)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
 		attachments, err := s.listMessageAttachments(ctx, out[i].ID)
 		if err != nil {
 			return nil, err
 		}
 		out[i].Attachments = attachments
+		if r, ok := searchReactionsMap[out[i].ID]; ok {
+			out[i].Reactions = r
+		}
 	}
 	return out, nil
 }
@@ -1098,6 +1189,114 @@ func (s *Store) ListConversationIDsForUser(ctx context.Context, userID string) (
 
 func (r chatRepo) ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error) {
 	return r.store.ListConversationIDsForUser(ctx, userID)
+}
+
+func (s *Store) ToggleReaction(ctx context.Context, userID, conversationID, messageID, reaction string, now time.Time) ([]chat.MessageReaction, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var exists bool
+	err = tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM messages m
+			JOIN conversation_members cm ON cm.conversation_id = m.conversation_id
+			WHERE m.id = $1 AND m.conversation_id = $2 AND cm.user_id = $3 AND cm.archived_at IS NULL
+				AND m.deleted_at IS NULL
+		)
+	`, messageID, conversationID, userID).Scan(&exists)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, apperr.NotFound
+	}
+
+	var existingReaction string
+	err = tx.QueryRow(ctx, `
+		SELECT reaction FROM message_reactions
+		WHERE message_id = $1 AND user_id = $2
+	`, messageID, userID).Scan(&existingReaction)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	if existingReaction == reaction {
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM message_reactions
+			WHERE message_id = $1 AND user_id = $2
+		`, messageID, userID); err != nil {
+			return nil, err
+		}
+	} else {
+		id := auth.NewID()
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO message_reactions (id, message_id, user_id, reaction, created_at)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (message_id, user_id)
+			DO UPDATE SET reaction = EXCLUDED.reaction, created_at = EXCLUDED.created_at
+		`, id, messageID, userID, reaction, now); err != nil {
+			return nil, err
+		}
+	}
+
+	rows, err := tx.Query(ctx, `
+		SELECT reaction, user_id
+		FROM message_reactions
+		WHERE message_id = $1
+		ORDER BY created_at ASC
+	`, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type groupEntry struct {
+		userIDs []string
+		reacted bool
+	}
+	reactionsMap := make(map[string]*groupEntry)
+	var order []string
+	for rows.Next() {
+		var r, uID string
+		if err := rows.Scan(&r, &uID); err != nil {
+			return nil, err
+		}
+		if reactionsMap[r] == nil {
+			reactionsMap[r] = &groupEntry{}
+			order = append(order, r)
+		}
+		entry := reactionsMap[r]
+		entry.userIDs = append(entry.userIDs, uID)
+		if uID == userID {
+			entry.reacted = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var updated []chat.MessageReaction
+	for _, r := range order {
+		entry := reactionsMap[r]
+		updated = append(updated, chat.MessageReaction{
+			Reaction: r,
+			Count:    len(entry.userIDs),
+			UserIDs:  entry.userIDs,
+			Reacted:  entry.reacted,
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+func (r chatRepo) ToggleReaction(ctx context.Context, userID, conversationID, messageID, reaction string, now time.Time) ([]chat.MessageReaction, error) {
+	return r.store.ToggleReaction(ctx, userID, conversationID, messageID, reaction, now)
 }
 
 var _ chat.Repository = chatRepo{}

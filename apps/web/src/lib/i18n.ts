@@ -202,6 +202,8 @@ const dictionaries = {
     isTyping: 'đang nhập...',
     seen: 'Đã xem',
     seenAt: 'Đã xem lúc',
+    reply: 'Trả lời',
+    close: 'Đóng',
   },
   en: {
     navOverview: 'Overview',
@@ -400,6 +402,8 @@ const dictionaries = {
     isTyping: 'is typing...',
     seen: 'Seen',
     seenAt: 'Seen at',
+    reply: 'Reply',
+    close: 'Close',
   },
 } as const
 

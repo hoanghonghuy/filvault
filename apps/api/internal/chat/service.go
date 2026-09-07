@@ -39,6 +39,7 @@ type Repository interface {
 	ListConversationReadStates(ctx context.Context, userID string) (map[string]ReadState, error)
 	UpdateUserLastSeen(ctx context.Context, userID string, now time.Time) error
 	ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error)
+	ToggleReaction(ctx context.Context, userID, conversationID, messageID, reaction string, now time.Time) ([]MessageReaction, error)
 }
 
 type UserDirectory interface {
@@ -629,4 +630,39 @@ func (s *Service) HandleDisconnect(ctx context.Context, userID string, now time.
 	}
 	return nil
 }
+
+type ReactionSignal struct {
+	ConversationID string            `json:"conversationId"`
+	MessageID      string            `json:"messageId"`
+	UserID         string            `json:"userId"`
+	Reaction       string            `json:"reaction"`
+	Reactions      []MessageReaction `json:"reactions"`
+}
+
+func (s *Service) ToggleReaction(ctx context.Context, userID, conversationID, messageID, reaction string) ([]MessageReaction, error) {
+	reaction = strings.TrimSpace(reaction)
+	if reaction == "" || len(reaction) > 32 {
+		return nil, apperr.Validation
+	}
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return nil, err
+	}
+	now := s.now().UTC()
+	reactions, err := s.repo.ToggleReaction(ctx, userID, conversationID, messageID, reaction, now)
+	if err != nil {
+		return nil, err
+	}
+	signal := ReactionSignal{
+		ConversationID: conversationID,
+		MessageID:      messageID,
+		UserID:         userID,
+		Reaction:       reaction,
+		Reactions:      reactions,
+	}
+	if payload, err := json.Marshal(signal); err == nil {
+		_ = s.repo.InsertChatEvent(ctx, conversationID, "message.reaction", messageID, payload, now)
+	}
+	return reactions, nil
+}
+
 

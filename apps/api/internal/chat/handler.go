@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.POST("/chat/conversations/:id/messages", append(middleware, h.createMessage)...)
 	g.PATCH("/chat/conversations/:id/messages/:messageId", append(middleware, h.editMessage)...)
 	g.DELETE("/chat/conversations/:id/messages/:messageId", append(middleware, h.removeMessage)...)
+	g.POST("/chat/conversations/:id/messages/:messageId/reactions", append(middleware, h.toggleReaction)...)
 	g.GET("/chat/conversations/:id/attachments/:attachmentId/download", append(middleware, h.downloadAttachment)...)
 	g.GET("/chat/events", append(middleware, h.events)...)
 	g.GET("/chat/conversations/:id/messages/search", append(middleware, h.searchMessages)...)
@@ -212,6 +213,39 @@ func (h *Handler) removeMessage(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+type toggleReactionReq struct {
+	Reaction string `json:"reaction"`
+}
+
+func (h *Handler) toggleReaction(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	messageID, ok := httpx.ParamULID(c, "messageId")
+	if !ok {
+		return
+	}
+	var req toggleReactionReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	reactions, err := h.svc.ToggleReaction(c.Request.Context(), userID, conversationID, messageID, req.Reaction)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"reactions": reactions,
+	})
 }
 
 func (h *Handler) downloadAttachment(c *gin.Context) {
@@ -523,6 +557,15 @@ func publicMessage(m Message) gin.H {
 	for _, a := range m.Attachments {
 		attachments = append(attachments, publicAttachment(a))
 	}
+	reactions := make([]gin.H, 0, len(m.Reactions))
+	for _, r := range m.Reactions {
+		reactions = append(reactions, gin.H{
+			"reaction": r.Reaction,
+			"count":    r.Count,
+			"userIds":  r.UserIDs,
+			"reacted":  r.Reacted,
+		})
+	}
 	out := gin.H{
 		"id":              m.ID,
 		"conversationId":  m.ConversationID,
@@ -531,6 +574,7 @@ func publicMessage(m Message) gin.H {
 		"clientMessageId": m.ClientMessageID,
 		"createdAt":       m.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"attachments":     attachments,
+		"reactions":       reactions,
 	}
 	if m.EditedAt != nil {
 		out["editedAt"] = m.EditedAt.UTC().Format(time.RFC3339Nano)

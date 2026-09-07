@@ -89,6 +89,9 @@ func (m *mockChatRepo) UpdateUserLastSeen(ctx context.Context, userID string, no
 func (m *mockChatRepo) ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error) {
 	return nil, nil
 }
+func (m *mockChatRepo) ToggleReaction(ctx context.Context, userID, conversationID, messageID, reaction string, now time.Time) ([]MessageReaction, error) {
+	return nil, nil
+}
 
 
 type mockUserDir struct {

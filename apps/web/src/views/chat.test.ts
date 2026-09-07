@@ -250,5 +250,23 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/router\.push\(`\/chat\/\$\{convId\}`\)/)
     expect(chat).toMatch(/router\.push\('\/chat'\)/)
   })
+
+  it('supports message reactions, double-tap heart, and smooth skeleton loaders', () => {
+    const store = readSrc('../stores/chat.ts')
+    expect(types).toMatch(/export interface ChatMessageReaction/)
+    expect(types).toMatch(/reactions\?: ChatMessageReaction\[\]/)
+    expect(store).toMatch(/message\.reaction/)
+    expect(store).toMatch(/toggleReaction/)
+    expect(chat).toMatch(/LoadingSkeletonChatRail/)
+    expect(chat).toMatch(/LoadingSkeletonThread/)
+    expect(chat).toMatch(/QUICK_REACTIONS/)
+    expect(chat).toMatch(/handleMessageBubbleClick/)
+    expect(chat).toMatch(/triggerHeartBurst/)
+    expect(chat).toMatch(/heart-burst/)
+    expect(chat).toMatch(/reaction-badge-group/)
+    expect(chat).toMatch(/reaction-capsule/)
+    expect(chat).toMatch(/reaction-bottom-bar/)
+  })
 })
+
 

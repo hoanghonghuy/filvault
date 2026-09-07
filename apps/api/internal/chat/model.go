@@ -46,6 +46,13 @@ type ReadState struct {
 	UnreadCount           int
 }
 
+type MessageReaction struct {
+	Reaction string   `json:"reaction"`
+	Count    int      `json:"count"`
+	UserIDs  []string `json:"userIds"`
+	Reacted  bool     `json:"reacted"`
+}
+
 type Message struct {
 	ID              string
 	ConversationID  string
@@ -58,6 +65,7 @@ type Message struct {
 	RemovedAt       *time.Time
 	Idempotent      bool
 	Attachments     []Attachment
+	Reactions       []MessageReaction
 }
 
 type Event struct {

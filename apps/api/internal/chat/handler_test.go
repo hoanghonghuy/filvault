@@ -1329,3 +1329,95 @@ func TestChat_MutualActiveStatusPrivacy(t *testing.T) {
 	}
 }
 
+func TestChat_MessageReactionsToggleAndSync(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	userA := registerVerified(t, engine, mem, uniqueEmail())
+
+	code, body := postAuth(t, engine, "/api/v1/chat/conversations", userA, map[string]any{"title": "Reaction Test"})
+	if code != http.StatusCreated {
+		t.Fatalf("create conversation status=%d body=%s", code, body)
+	}
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", userA, map[string]any{
+		"body": "React to this message",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("create message status=%d body=%s", code, body)
+	}
+	var msg struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &msg)
+
+	// User A reacts with heart ❤️
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages/"+msg.ID+"/reactions", userA, map[string]any{
+		"reaction": "❤️",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("react status=%d body=%s", code, body)
+	}
+	var reactResp struct {
+		Reactions []struct {
+			Reaction string   `json:"reaction"`
+			Count    int      `json:"count"`
+			UserIDs  []string `json:"userIds"`
+			Reacted  bool     `json:"reacted"`
+		} `json:"reactions"`
+	}
+	decodeJSON(t, body, &reactResp)
+	if len(reactResp.Reactions) != 1 || reactResp.Reactions[0].Reaction != "❤️" || reactResp.Reactions[0].Count != 1 || !reactResp.Reactions[0].Reacted {
+		t.Fatalf("unexpected reactions after A reacted: %+v", reactResp)
+	}
+
+	// Verify list messages contains reactions
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", userA)
+	if code != http.StatusOK {
+		t.Fatalf("list messages status=%d body=%s", code, body)
+	}
+	var listResp struct {
+		Messages []struct {
+			ID        string `json:"id"`
+			Reactions []struct {
+				Reaction string `json:"reaction"`
+				Count    int    `json:"count"`
+				Reacted  bool   `json:"reacted"`
+			} `json:"reactions"`
+		} `json:"messages"`
+	}
+	decodeJSON(t, body, &listResp)
+	if len(listResp.Messages) == 0 || len(listResp.Messages[0].Reactions) != 1 || listResp.Messages[0].Reactions[0].Reaction != "❤️" {
+		t.Fatalf("unexpected reactions in list messages: %+v", listResp)
+	}
+
+	// User A changes reaction to haha 😆
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages/"+msg.ID+"/reactions", userA, map[string]any{
+		"reaction": "😆",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("change reaction status=%d body=%s", code, body)
+	}
+	reactResp.Reactions = nil
+	decodeJSON(t, body, &reactResp)
+	if len(reactResp.Reactions) != 1 || reactResp.Reactions[0].Reaction != "😆" || reactResp.Reactions[0].Count != 1 {
+		t.Fatalf("unexpected reactions after change to haha: %+v", reactResp)
+	}
+
+	// User A clicks haha again -> should toggle off (remove reaction)
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages/"+msg.ID+"/reactions", userA, map[string]any{
+		"reaction": "😆",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("toggle off reaction status=%d body=%s", code, body)
+	}
+	reactResp.Reactions = nil
+	decodeJSON(t, body, &reactResp)
+	if len(reactResp.Reactions) != 0 {
+		t.Fatalf("expected 0 reactions after toggle off, got %+v", reactResp)
+	}
+}
+
+

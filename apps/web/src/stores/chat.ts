@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { API_BASE, api, getAccessToken, refreshAccessToken } from '@/api/client'
-import type { ChatConversation, ChatMessage } from '@/api/types'
+import type { ChatConversation, ChatMessage, ChatMessageReaction } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
 import { generateUUID } from '@/lib/uuid'
@@ -156,6 +156,23 @@ export const useChatStore = defineStore('chat', () => {
       }
       return
     }
+    if (event.type === 'message.reaction') {
+      try {
+        const data =
+          typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+        const { conversationId, messageId, reactions } = data
+        const currentList = messages.value[conversationId]
+        if (currentList) {
+          const msg = currentList.find((m) => m.id === messageId)
+          if (msg) {
+            msg.reactions = reactions
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return
+    }
     try {
       const payload = JSON.parse(event.payload) as { aggregateId?: string }
       if (selectedId.value && payload.aggregateId) {
@@ -206,6 +223,28 @@ export const useChatStore = defineStore('chat', () => {
     } catch {
       // ignore
     }
+  }
+
+  async function toggleReaction(
+    conversationId: string,
+    messageId: string,
+    reaction: string,
+  ): Promise<ChatMessageReaction[]> {
+    const res = await api<{ reactions: ChatMessageReaction[] }>(
+      `/chat/conversations/${conversationId}/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reaction }),
+      },
+    )
+    const currentList = messages.value[conversationId]
+    if (currentList) {
+      const msg = currentList.find((m) => m.id === messageId)
+      if (msg) {
+        msg.reactions = res.reactions
+      }
+    }
+    return res.reactions
   }
 
   function stopEvents(): void {
@@ -326,6 +365,7 @@ export const useChatStore = defineStore('chat', () => {
     typingUsers,
     markAsRead,
     sendTyping,
+    toggleReaction,
   }
 })
 
