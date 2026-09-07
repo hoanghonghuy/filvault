@@ -98,11 +98,11 @@ func (s *Store) CreateOrGetDirectConversation(ctx context.Context, ownerID, reci
 		}
 	}
 	_ = tx.QueryRow(ctx, `
-		SELECT u.id, u.display_name, u.email
+		SELECT u.id, u.display_name, u.email, u.last_seen_at
 		FROM conversation_members cm
 		JOIN users u ON u.id = cm.user_id
 		WHERE cm.conversation_id = $1 AND cm.user_id <> $2
-	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail)
+	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt)
 	if err := tx.Commit(ctx); err != nil {
 		return chat.Conversation{}, err
 	}
@@ -114,6 +114,7 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 		SELECT c.id, c.owner_id, COALESCE(c.title, ''), c.created_at, c.updated_at,
 			COALESCE(c.conversation_type, 'legacy'),
 			COALESCE(peer.id, ''), COALESCE(peer.display_name, ''), COALESCE(peer.email, ''),
+			peer.last_seen_at,
 			COALESCE(c.last_message_at, c.updated_at)
 		FROM conversations c
 		LEFT JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id <> $1
@@ -133,7 +134,7 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 	for rows.Next() {
 		var c chat.Conversation
 		if err := rows.Scan(&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
-			&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.LastMessage); err != nil {
+			&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.LastMessage); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -147,6 +148,7 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 		SELECT c.id, c.owner_id, COALESCE(c.title, ''), c.created_at, c.updated_at,
 			COALESCE(c.conversation_type, 'legacy'),
 			COALESCE(peer.id, ''), COALESCE(peer.display_name, ''), COALESCE(peer.email, ''),
+			peer.last_seen_at,
 			COALESCE(c.last_message_at, c.updated_at)
 		FROM conversations c
 		LEFT JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id <> $1
@@ -158,7 +160,7 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 			)
 	`, ownerID, id).Scan(
 		&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
-		&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.LastMessage,
+		&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.LastMessage,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -832,6 +834,7 @@ func (s *Store) ListChatEventsAfter(ctx context.Context, userID string, after in
 					AND cm.user_id = $2 AND cm.archived_at IS NULL
 			)
 			AND NOT (e.event_type = 'typing.indicator' AND e.payload->>'userId' = $2)
+			AND NOT (e.event_type = 'presence.changed' AND e.payload->>'userId' = $2)
 		ORDER BY e.sequence ASC
 		LIMIT $3
 	`, after, userID, limit)
@@ -1047,6 +1050,40 @@ func (s *Store) ListConversationReadStates(ctx context.Context, userID string) (
 
 func (r chatRepo) ListConversationReadStates(ctx context.Context, userID string) (map[string]chat.ReadState, error) {
 	return r.store.ListConversationReadStates(ctx, userID)
+}
+
+func (s *Store) UpdateUserLastSeen(ctx context.Context, userID string, now time.Time) error {
+	_, err := s.pool.Exec(ctx, `UPDATE users SET last_seen_at = $2, updated_at = $2 WHERE id = $1`, userID, now)
+	return err
+}
+
+func (r chatRepo) UpdateUserLastSeen(ctx context.Context, userID string, now time.Time) error {
+	return r.store.UpdateUserLastSeen(ctx, userID, now)
+}
+
+func (s *Store) ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT conversation_id
+		FROM conversation_members
+		WHERE user_id = $1 AND archived_at IS NULL
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r chatRepo) ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error) {
+	return r.store.ListConversationIDsForUser(ctx, userID)
 }
 
 var _ chat.Repository = chatRepo{}

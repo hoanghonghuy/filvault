@@ -1130,3 +1130,95 @@ func TestChat_ReadReceiptAndTypingIndicator(t *testing.T) {
 	}
 }
 
+func TestChat_RealtimePresence(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	tokenA := registerVerified(t, engine, mem, uniqueEmail())
+	tokenB := registerVerified(t, engine, mem, uniqueEmail())
+
+	var recipient struct {
+		Email string `json:"email"`
+	}
+	code, body := getAuth(t, engine, "/api/v1/users/me", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("recipient profile status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &recipient)
+
+	// Create direct conversation
+	code, body = postAuth(t, engine, "/api/v1/chat/direct-conversations", tokenA, map[string]any{
+		"recipientEmail": recipient.Email,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("create direct conversation status=%d body=%s", code, body)
+	}
+
+	// Step 1: User B is not connected -> peerStatus must be offline
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list conversations status=%d body=%s", code, body)
+	}
+	var listResp struct {
+		Conversations []struct {
+			ID             string  `json:"id"`
+			PeerStatus     string  `json:"peerStatus"`
+			PeerLastSeenAt *string `json:"peerLastSeenAt"`
+		} `json:"conversations"`
+	}
+	decodeJSON(t, body, &listResp)
+	if len(listResp.Conversations) == 0 {
+		t.Fatalf("expected conversation, got 0")
+	}
+	if listResp.Conversations[0].PeerStatus != "offline" {
+		t.Fatalf("expected peerStatus offline, got %s", listResp.Conversations[0].PeerStatus)
+	}
+
+	// Step 2: Connect User B via SSE
+	server := httptest.NewServer(engine)
+	defer server.Close()
+
+	ctxB, cancelB := context.WithCancel(context.Background())
+	reqB, err := http.NewRequestWithContext(ctxB, http.MethodGet, server.URL+"/api/v1/chat/events?after=0", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	reqB.Header.Set("Authorization", "Bearer "+tokenB)
+	respB, err := server.Client().Do(reqB)
+	if err != nil {
+		t.Fatalf("do req: %v", err)
+	}
+	defer respB.Body.Close()
+
+	// Give a moment for connection handler to register
+	time.Sleep(100 * time.Millisecond)
+
+	// User A lists conversations: peerStatus should now be online
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list conversations status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &listResp)
+	if listResp.Conversations[0].PeerStatus != "online" {
+		t.Fatalf("expected peerStatus online, got %s", listResp.Conversations[0].PeerStatus)
+	}
+
+	// Step 3: Disconnect User B
+	cancelB()
+	_ = respB.Body.Close()
+
+	// Give a moment for deferred HandleDisconnect to execute
+	time.Sleep(150 * time.Millisecond)
+
+	// User A lists conversations: peerStatus should now be offline with peerLastSeenAt populated
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list conversations status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &listResp)
+	if listResp.Conversations[0].PeerStatus != "offline" {
+		t.Fatalf("expected peerStatus offline after disconnect, got %s", listResp.Conversations[0].PeerStatus)
+	}
+	if listResp.Conversations[0].PeerLastSeenAt == nil || *listResp.Conversations[0].PeerLastSeenAt == "" {
+		t.Fatalf("expected peerLastSeenAt to be set after disconnect, got nil")
+	}
+}
+

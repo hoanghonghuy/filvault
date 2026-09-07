@@ -193,5 +193,17 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/isMessageSeenByPeer/)
     expect(types).toMatch(/peerLastReadMessageId\?: string/)
   })
+
+  it('tracks real-time peer presence with dynamic status and indicator', () => {
+    const store = readSrc('../stores/chat.ts')
+    expect(store).toMatch(/presence\.changed/)
+    expect(types).toMatch(/peerStatus\?: 'online' \| 'offline'/)
+    expect(types).toMatch(/peerLastSeenAt\?: string/)
+    expect(chat).toMatch(/isPeerOnline/)
+    expect(chat).toMatch(/formatLastSeen/)
+    expect(chat).toMatch(/v-if="isPeerOnline\(conv\)"\s+class="online-indicator"/)
+    expect(chat).toMatch(/thread-status/)
+    expect(chat).toMatch(/class="chat-info-status"/)
+  })
 })
 

@@ -161,7 +161,10 @@ export interface ChatConversation {
     id: string
     name: string
     email: string
+    lastSeenAt?: string
   }
+  peerStatus?: 'online' | 'offline'
+  peerLastSeenAt?: string
   createdAt: string
   updatedAt: string
   lastMessageAt?: string

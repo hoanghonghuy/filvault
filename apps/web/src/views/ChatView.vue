@@ -278,6 +278,39 @@ function openChatFromPeek() {
   void selectConversation(id)
 }
 
+function isPeerOnline(conv?: ChatConversation | null): boolean {
+  if (!conv) return false
+  return conv.peerStatus === 'online'
+}
+
+function formatLastSeen(conv?: ChatConversation | null): string {
+  if (!conv) return ''
+  const iso = conv.peerLastSeenAt || conv.peer?.lastSeenAt
+  if (!iso) return ''
+  const then = new Date(iso).getTime()
+  if (isNaN(then)) return ''
+  const now = Date.now()
+  const diffMs = Math.max(0, now - then)
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffHour = Math.floor(diffMin / 60)
+  const diffDays = Math.floor(diffHour / 24)
+
+  if (diffMin < 1) {
+    return t.value.activeJustNow
+  }
+  if (diffMin < 60) {
+    return t.value.activeMinutesAgo.replace('{m}', String(diffMin))
+  }
+  if (diffHour < 24) {
+    return t.value.activeHoursAgo.replace('{h}', String(diffHour))
+  }
+  if (diffDays === 1 || diffHour < 48) {
+    return t.value.activeYesterday
+  }
+  return t.value.offline
+}
+
 function isConversationUnread(conv: ChatConversation): boolean {
   if (conv.id === selectedId.value) return false
   return (conv.unreadCount ?? 0) > 0
@@ -938,7 +971,7 @@ watch(
         >
           <span class="avatar-wrap">
             <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
-            <span class="online-indicator" aria-hidden="true" />
+            <span v-if="isPeerOnline(conv)" class="online-indicator" aria-hidden="true" />
           </span>
           <span class="conversation-meta">
             <span class="conversation-top">
@@ -981,7 +1014,12 @@ watch(
             <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
             <div class="thread-peer-meta">
               <h2>{{ conversationTitle(selectedConversation) }}</h2>
-              <span class="thread-status">{{ t.activeNow }}</span>
+              <span
+                class="thread-status"
+                :class="{ online: isPeerOnline(selectedConversation) }"
+              >
+                {{ isPeerOnline(selectedConversation) ? t.activeNow : (formatLastSeen(selectedConversation) || t.offline) }}
+              </span>
             </div>
           </div>
           <div class="thread-actions">
@@ -1450,7 +1488,12 @@ watch(
             {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
           </span>
           <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
-          <span class="chat-info-status">{{ t.activeNow }}</span>
+          <span
+            class="chat-info-status"
+            :class="{ online: isPeerOnline(selectedConversation) }"
+          >
+            {{ isPeerOnline(selectedConversation) ? t.activeNow : (formatLastSeen(selectedConversation) || t.offline) }}
+          </span>
         </div>
 
         <div class="chat-info-actions">
@@ -2214,12 +2257,16 @@ watch(
 
 .thread-status {
   font-size: 11px;
-  color: #22c55e;
+  color: var(--muted);
   font-weight: 500;
   line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.thread-status.online {
+  color: #22c55e;
 }
 
 .thread-avatar {
@@ -3047,8 +3094,12 @@ watch(
 
 .chat-info-status {
   font-size: 12px;
-  color: #22c55e;
+  color: var(--muted);
   font-weight: 500;
+}
+
+.chat-info-status.online {
+  color: #22c55e;
 }
 
 .chat-info-actions {

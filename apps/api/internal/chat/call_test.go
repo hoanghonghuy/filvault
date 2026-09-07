@@ -83,6 +83,12 @@ func (m *mockChatRepo) MarkAsRead(ctx context.Context, userID, conversationID, m
 func (m *mockChatRepo) ListConversationReadStates(ctx context.Context, userID string) (map[string]ReadState, error) {
 	return nil, nil
 }
+func (m *mockChatRepo) UpdateUserLastSeen(ctx context.Context, userID string, now time.Time) error {
+	return nil
+}
+func (m *mockChatRepo) ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error) {
+	return nil, nil
+}
 
 
 type mockUserDir struct {

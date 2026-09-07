@@ -13,12 +13,19 @@ type Conversation struct {
 	OwnerID     string
 	Title       string
 	Type        string
-	PeerID      string
-	PeerName    string
-	PeerEmail   string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	LastMessage time.Time
+	PeerID         string
+	PeerName       string
+	PeerEmail      string
+	PeerLastSeenAt *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LastMessage    time.Time
+}
+
+type PresenceSignal struct {
+	UserID     string     `json:"userId"`
+	Status     string     `json:"status"`
+	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
 }
 
 type ConversationPreview struct {

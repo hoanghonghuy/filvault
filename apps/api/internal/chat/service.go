@@ -37,6 +37,8 @@ type Repository interface {
 	InsertChatEvent(ctx context.Context, conversationID, eventType, aggregateID string, payload []byte, now time.Time) error
 	MarkAsRead(ctx context.Context, userID, conversationID, messageID string, now time.Time) error
 	ListConversationReadStates(ctx context.Context, userID string) (map[string]ReadState, error)
+	UpdateUserLastSeen(ctx context.Context, userID string, now time.Time) error
+	ListConversationIDsForUser(ctx context.Context, userID string) ([]string, error)
 }
 
 type UserDirectory interface {
@@ -91,6 +93,7 @@ type ConversationView struct {
 	LastReadMessageID     string               `json:"lastReadMessageId,omitempty"`
 	PeerLastReadAt        *time.Time           `json:"peerLastReadAt,omitempty"`
 	PeerLastReadMessageID string               `json:"peerLastReadMessageId,omitempty"`
+	PeerStatus            string               `json:"peerStatus,omitempty"`
 }
 
 type Service struct {
@@ -101,11 +104,24 @@ type Service struct {
 	objects    objectstore.ObjectStore
 	tokens     TokenGenerator
 	callPubURL string
+	presence   *PresenceTracker
 	now        func() time.Time
 }
 
 func NewService(repo Repository, users UserDirectory, files file.Repository, quota file.QuotaStore, objects objectstore.ObjectStore) *Service {
-	return &Service{repo: repo, users: users, files: files, quota: quota, objects: objects, now: time.Now}
+	return &Service{
+		repo:     repo,
+		users:    users,
+		files:    files,
+		quota:    quota,
+		objects:  objects,
+		presence: NewPresenceTracker(),
+		now:      time.Now,
+	}
+}
+
+func (s *Service) PresenceTracker() *PresenceTracker {
+	return s.presence
 }
 
 func (s *Service) CreateConversation(ctx context.Context, ownerID, title string) (Conversation, error) {
@@ -244,6 +260,13 @@ func (s *Service) ListConversationsWithPreview(ctx context.Context, ownerID stri
 	out := make([]ConversationView, 0, len(conversations))
 	for _, conv := range conversations {
 		view := ConversationView{Conversation: conv}
+		if conv.PeerID != "" && s.presence != nil {
+			status, lastSeen := s.presence.GetPresence(conv.PeerID)
+			view.PeerStatus = status
+			if status == "offline" && lastSeen != nil {
+				view.PeerLastSeenAt = lastSeen
+			}
+		}
 		if readStates != nil {
 			if rs, ok := readStates[conv.ID]; ok {
 				view.UnreadCount = rs.UnreadCount
@@ -535,5 +558,59 @@ func (s *Service) SendTyping(ctx context.Context, userID, conversationID string,
 		return err
 	}
 	return s.repo.InsertChatEvent(ctx, conversationID, "typing.indicator", conversationID, payload, now)
+}
+
+func (s *Service) HandleConnect(ctx context.Context, userID string, now time.Time) error {
+	if s.presence == nil {
+		return nil
+	}
+	isFirst := s.presence.Connect(userID)
+	if !isFirst {
+		return nil
+	}
+	convIDs, err := s.repo.ListConversationIDsForUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	signal := PresenceSignal{
+		UserID: userID,
+		Status: "online",
+	}
+	payload, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+	for _, convID := range convIDs {
+		_ = s.repo.InsertChatEvent(ctx, convID, "presence.changed", convID, payload, now)
+	}
+	return nil
+}
+
+func (s *Service) HandleDisconnect(ctx context.Context, userID string, now time.Time) error {
+	if s.presence == nil {
+		return nil
+	}
+	isLast := s.presence.Disconnect(userID, now)
+	if !isLast {
+		return nil
+	}
+	_ = s.repo.UpdateUserLastSeen(ctx, userID, now)
+	convIDs, err := s.repo.ListConversationIDsForUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	signal := PresenceSignal{
+		UserID:     userID,
+		Status:     "offline",
+		LastSeenAt: &now,
+	}
+	payload, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+	for _, convID := range convIDs {
+		_ = s.repo.InsertChatEvent(ctx, convID, "presence.changed", convID, payload, now)
+	}
+	return nil
 }
 

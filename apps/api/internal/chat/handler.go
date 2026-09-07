@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -259,6 +260,13 @@ func (h *Handler) events(c *gin.Context) {
 	c.Header("X-Accel-Buffering", "no")
 	c.Header("Access-Control-Allow-Headers", "Authorization, Last-Event-ID")
 	c.Status(http.StatusOK)
+	now := time.Now().UTC()
+	_ = h.svc.HandleConnect(c.Request.Context(), userID, now)
+	defer func() {
+		disconnectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = h.svc.HandleDisconnect(disconnectCtx, userID, time.Now().UTC())
+	}()
 	heartbeat := time.NewTicker(20 * time.Second)
 	poll := time.NewTicker(time.Second)
 	defer heartbeat.Stop()
@@ -466,7 +474,11 @@ func publicConversation(c Conversation) gin.H {
 		"lastMessageAt": c.LastMessage.UTC().Format(time.RFC3339Nano),
 	}
 	if c.PeerID != "" {
-		out["peer"] = gin.H{"id": c.PeerID, "name": c.PeerName, "email": c.PeerEmail}
+		peer := gin.H{"id": c.PeerID, "name": c.PeerName, "email": c.PeerEmail}
+		if c.PeerLastSeenAt != nil {
+			peer["lastSeenAt"] = c.PeerLastSeenAt.UTC().Format(time.RFC3339Nano)
+		}
+		out["peer"] = peer
 	}
 	return out
 }
@@ -474,6 +486,12 @@ func publicConversation(c Conversation) gin.H {
 func publicConversationView(view ConversationView) gin.H {
 	out := publicConversation(view.Conversation)
 	out["unreadCount"] = view.UnreadCount
+	if view.PeerStatus != "" {
+		out["peerStatus"] = view.PeerStatus
+	}
+	if view.PeerLastSeenAt != nil {
+		out["peerLastSeenAt"] = view.PeerLastSeenAt.UTC().Format(time.RFC3339Nano)
+	}
 	if view.LastReadAt != nil {
 		out["lastReadAt"] = view.LastReadAt.UTC().Format(time.RFC3339Nano)
 	}

@@ -134,6 +134,28 @@ export const useChatStore = defineStore('chat', () => {
       }
       return
     }
+    if (event.type === 'presence.changed') {
+      try {
+        const data =
+          typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+        const { userId, status, lastSeenAt } = data
+        if (!userId || userId === auth.user?.id) return
+        conversations.value.forEach((conv) => {
+          if (conv.peer?.id === userId) {
+            conv.peerStatus = status
+            if (lastSeenAt) {
+              conv.peerLastSeenAt = lastSeenAt
+              if (conv.peer) {
+                conv.peer.lastSeenAt = lastSeenAt
+              }
+            }
+          }
+        })
+      } catch {
+        // ignore
+      }
+      return
+    }
     try {
       const payload = JSON.parse(event.payload) as { aggregateId?: string }
       if (selectedId.value && payload.aggregateId) {
