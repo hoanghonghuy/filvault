@@ -101,35 +101,17 @@ func TestMigrate_DownRemovesPhase1Tables(t *testing.T) {
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
-	if err := postgres.MigrateDown(ctx, pool); err != nil {
-		t.Fatalf("MigrateDown activity events: %v", err)
-	}
-	if err := postgres.MigrateDown(ctx, pool); err != nil {
-		t.Fatalf("MigrateDown share links: %v", err)
-	}
-	if err := postgres.MigrateDown(ctx, pool); err != nil {
-		t.Fatalf("MigrateDown favorites: %v", err)
-	}
-	if err := postgres.MigrateDown(ctx, pool); err != nil {
-		t.Fatalf("MigrateDown: %v", err)
-	}
-	for _, name := range []string{
-		"production direct chat",
-		"pending upload cleanup",
-		"pending upload cleanup job retention",
-		"chat attachment lifecycle",
-		"file name uniqueness",
-		"file versions",
-		"shares",
-		"chat",
-		"thumbnails",
-	} {
-		if err := postgres.MigrateDown(ctx, pool); err != nil {
-			t.Fatalf("MigrateDown %s: %v", name, err)
+	for {
+		var count int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
+			t.Fatalf("count schema_migrations: %v", err)
 		}
-	}
-	if err := postgres.MigrateDown(ctx, pool); err != nil {
-		t.Fatalf("MigrateDown phase 1: %v", err)
+		if count == 0 {
+			break
+		}
+		if err := postgres.MigrateDown(ctx, pool); err != nil {
+			t.Fatalf("MigrateDown: %v", err)
+		}
 	}
 	assertPhase1Tables(t, ctx, pool, false)
 
