@@ -241,5 +241,14 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/sticker-bubble/)
     expect(chat).toMatch(/has-sticker/)
   })
+
+  it('supports unique conversation ID routes (/chat/:id) and seamless history navigation', () => {
+    expect(router).toMatch(/path:\s*'\/chat\/:id'/)
+    expect(router).toMatch(/name:\s*'chat-thread'/)
+    expect(chat).toMatch(/useRoute/)
+    expect(chat).toMatch(/route\.params\.id/)
+    expect(chat).toMatch(/router\.push\(`\/chat\/\$\{convId\}`\)/)
+    expect(chat).toMatch(/router\.push\('\/chat'\)/)
+  })
 })
 

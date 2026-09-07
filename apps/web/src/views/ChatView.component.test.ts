@@ -74,7 +74,8 @@ vi.mock('@/api/errors', () => ({
 }))
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn<() => void>() }),
+  useRouter: () => ({ push: vi.fn<() => void>(), replace: vi.fn<() => void>() }),
+  useRoute: () => ({ params: {}, query: {}, path: '/chat' }),
 }))
 
 describe('ChatView', () => {

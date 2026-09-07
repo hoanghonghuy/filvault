@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api, uploadToPresigned, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
@@ -28,6 +28,7 @@ import { useLongPress } from '@/lib/useLongPress'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
+const route = useRoute()
 const ui = useUiStore()
 const chatStore = useChatStore()
 const callStore = useCallStore()
@@ -35,7 +36,7 @@ const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
 
 const conversations = ref<ChatConversation[]>([])
-const selectedId = ref<string | null>(null)
+const selectedId = ref<string | null>((route.params.id as string) || null)
 const messages = ref<ChatMessage[]>([])
 const draft = ref('')
 const searchQuery = ref('')
@@ -159,6 +160,9 @@ const inThread = computed({
 
 function backToRail() {
   inThread.value = false
+  if (route.params.id) {
+    void router.push('/chat')
+  }
 }
 
 const {
@@ -220,7 +224,9 @@ function openConvMenu(conv: ChatConversation) {
 
 function handleConvRowClick(convId: string) {
   if (ignoreConvClick.value) return
+  if (selectedId.value === convId && route.params.id === convId) return
   void selectConversation(convId)
+  void router.push(`/chat/${convId}`)
 }
 
 function toggleMuteConversation(convId?: string) {
@@ -247,6 +253,9 @@ async function deleteConversation(convId?: string) {
   if (selectedId.value === id) {
     selectedId.value = null
     messages.value = []
+    if (route.params.id === id) {
+      void router.replace('/chat')
+    }
   }
   ui.showToast('Đã xóa đoạn chat')
 }
@@ -298,6 +307,7 @@ function openChatFromPeek() {
   const id = peekConv.value.id
   peekOpen.value = false
   void selectConversation(id)
+  void router.push(`/chat/${id}`)
 }
 
 function isPeerOnline(conv?: ChatConversation | null): boolean {
@@ -457,8 +467,14 @@ async function loadConversations() {
   try {
     const out = await api<{ conversations: ChatConversation[] }>('/chat/conversations?includePreview=true')
     conversations.value = out.conversations
-    if (!selectedId.value && out.conversations[0] && !isMobileViewport()) {
+    const routeId = (route.params.id as string) || null
+    if (routeId) {
+      if (selectedId.value !== routeId) {
+        await selectConversation(routeId)
+      }
+    } else if (!selectedId.value && out.conversations[0] && !isMobileViewport()) {
       await selectConversation(out.conversations[0].id)
+      void router.replace(`/chat/${out.conversations[0].id}`)
     }
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load chats')
@@ -473,6 +489,7 @@ async function createDirectConversation(email: string) {
     const conversation = await chatStore.createDirectConversation(email)
     conversations.value = [...chatStore.conversations]
     await selectConversation(conversation.id)
+    void router.push(`/chat/${conversation.id}`)
   } catch (e) {
     error.value = formatApiError(e, 'Could not open direct chat')
   }
@@ -956,6 +973,24 @@ watch(
     conversations.value = [...nextConversations]
   },
   { deep: true },
+)
+
+watch(
+  () => route.params.id,
+  async (newId) => {
+    const id = (newId as string) || null
+    if (id) {
+      if (selectedId.value !== id) {
+        await selectConversation(id)
+      }
+    } else {
+      selectedId.value = null
+      messages.value = []
+      searchQuery.value = ''
+      searchResults.value = null
+    }
+  },
+  { immediate: true },
 )
 </script>
 
