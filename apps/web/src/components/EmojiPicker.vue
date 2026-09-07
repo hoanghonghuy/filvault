@@ -164,6 +164,7 @@ function handleStickerClick(sticker: Sticker) {
   padding: 4px 4px 12px;
   width: 100%;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .picker-top-bar {
@@ -172,6 +173,7 @@ function handleStickerClick(sticker: Sticker) {
   justify-content: space-between;
   gap: 8px;
   padding: 2px 4px;
+  flex-shrink: 0;
 }
 
 .picker-type-switch {
@@ -239,6 +241,7 @@ function handleStickerClick(sticker: Sticker) {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   padding: 2px 2px 4px;
+  flex-shrink: 0;
 }
 
 .picker-categories::-webkit-scrollbar {
@@ -293,6 +296,8 @@ function handleStickerClick(sticker: Sticker) {
 .picker-grid {
   display: grid;
   gap: 6px;
+  flex: 1;
+  min-height: 0;
   max-height: 260px;
   overflow-y: auto;
   overscroll-behavior: contain;

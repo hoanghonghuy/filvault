@@ -108,7 +108,6 @@ function handleInsertEmoji(emoji: string) {
   const end = textarea.selectionEnd ?? draft.value.length
   draft.value = draft.value.slice(0, start) + emoji + draft.value.slice(end)
   void nextTick(() => {
-    textarea.focus()
     const pos = start + emoji.length
     textarea.setSelectionRange(pos, pos)
     onComposerInput()
@@ -3200,6 +3199,8 @@ watch(
   padding: 8px var(--space-md) calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--hairline);
   background: var(--canvas);
+  flex-shrink: 0;
+  z-index: 20;
 }
 
 .attach-btn {
@@ -3264,9 +3265,26 @@ watch(
   background: var(--surface);
   border-top: 1px solid var(--hairline);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-  max-height: 280px;
+  height: 280px;
+  max-height: 40vh;
+  max-height: 40dvh;
+  overflow: hidden;
+  flex-shrink: 0;
   animation: slideUpSticker 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 10;
+}
+
+.sticker-picker-drawer :deep(.emoji-picker) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sticker-picker-drawer :deep(.picker-grid) {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 @keyframes slideUpSticker {
@@ -3527,6 +3545,11 @@ img.avatar-img {
   .thread-actions .icon-btn {
     width: 34px;
     height: 34px;
+  }
+
+  .sticker-picker-drawer {
+    height: 250px;
+    max-height: 38dvh;
   }
 }
 
