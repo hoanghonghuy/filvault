@@ -124,4 +124,36 @@ describe('chat surface contract', () => {
     expect(store).toMatch(/reconcileMessage/)
     expect(store).toMatch(/message\.created|message\.edited|message\.removed/)
   })
+
+  it('renders a friendly Messenger-style empty thread with a quick wave button', () => {
+    expect(chat).toMatch(/class="thread-empty-state"/)
+    expect(chat).toMatch(/class="thread-empty-avatar"/)
+    expect(chat).toMatch(/thread-empty-wave-btn/)
+    expect(chat).toMatch(/function sendQuickWave|sendQuickWave\(\)/)
+  })
+
+  it('hides inline action buttons and triggers message options via long-press', () => {
+    expect(chat).not.toMatch(/class="message-bubble"[^>]*>[\s\S]*?<div v-if="canMutateMessage\(message\)" class="message-actions"/)
+    expect(chat).toMatch(/openMessageMenu/)
+    expect(chat).toMatch(/messageMenuOpen/)
+    expect(chat).toMatch(/copyMessageText/)
+    expect(chat).toMatch(/triggerEditMessage/)
+    expect(chat).toMatch(/triggerRemoveMessage/)
+  })
+
+  it('triggers conversation row options via long-press', () => {
+    expect(chat).toMatch(/openConvMenu/)
+    expect(chat).toMatch(/convMenuOpen/)
+    expect(chat).toMatch(/toggleMuteConversation/)
+    expect(chat).toMatch(/deleteConversation/)
+  })
+
+  it('provides a Messenger-grade chat info sheet with theme picker and nicknames', () => {
+    expect(chat).toMatch(/threadInfoOpen/)
+    expect(chat).toMatch(/class="chat-info-content"/)
+    expect(chat).toMatch(/chatThemes/)
+    expect(chat).toMatch(/threadThemeStyle/)
+    expect(chat).toMatch(/changeNickname/)
+  })
 })
+

@@ -16,6 +16,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
 import { generateUUID } from '@/lib/uuid'
+import { useLongPress } from '@/lib/useLongPress'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
@@ -50,6 +51,27 @@ const lightboxUrl = ref('')
 const lightboxFileId = ref('')
 const loadingThread = ref(true)
 
+const threadInfoOpen = ref(false)
+const messageMenuOpen = ref(false)
+const activeMessage = ref<ChatMessage | null>(null)
+const convMenuOpen = ref(false)
+const activeConv = ref<ChatConversation | null>(null)
+const mutedConversations = ref<Record<string, boolean>>({})
+const nicknames = ref<Record<string, string>>({})
+
+const chatThemes = [
+  { id: 'blue', name: 'Messenger Blue', color: '#0084ff', gradient: 'linear-gradient(135deg, #0084ff 0%, #0099ff 100%)' },
+  { id: 'purple', name: 'Hoàng hôn Tím', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' },
+  { id: 'emerald', name: 'Ngọc lục bảo', color: '#10b981', gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' },
+  { id: 'rose', name: 'Hồng ngọt ngào', color: '#f43f5e', gradient: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' },
+] as const
+const activeTheme = ref<'blue' | 'purple' | 'emerald' | 'rose'>('blue')
+const currentTheme = computed(() => chatThemes.find((entry) => entry.id === activeTheme.value) ?? chatThemes[0]!)
+const threadThemeStyle = computed(() => ({
+  '--chat-bubble-outgoing': currentTheme.value.gradient,
+  '--chat-accent': currentTheme.value.color,
+}))
+
 const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
@@ -82,6 +104,8 @@ const visibleMessages = computed(() => searchResults.value ?? messages.value)
 
 function conversationTitle(conversation: ChatConversation | null): string {
   if (!conversation) return ''
+  const nick = nicknames.value[conversation.id]
+  if (nick) return nick
   return conversation.peer?.name || conversation.peer?.email || conversation.title || 'Untitled chat'
 }
 
@@ -114,6 +138,116 @@ const inThread = computed({
 
 function backToRail() {
   inThread.value = false
+}
+
+const {
+  start: onMessageTouchStart,
+  move: onMessageTouchMove,
+  end: onMessageTouchEnd,
+  cancel: onMessageTouchCancel,
+} = useLongPress({
+  onLongPress: (payload) => {
+    if (payload) openMessageMenu(payload as ChatMessage)
+  },
+})
+
+function openMessageMenu(message: ChatMessage) {
+  activeMessage.value = message
+  messageMenuOpen.value = true
+}
+
+async function copyMessageText() {
+  if (!activeMessage.value?.body) return
+  try {
+    await navigator.clipboard.writeText(activeMessage.value.body)
+    ui.showToast(t.value.copiedMessage)
+  } catch {
+    ui.showToast('Không thể sao chép', 'error')
+  } finally {
+    messageMenuOpen.value = false
+  }
+}
+
+function triggerEditMessage() {
+  const msg = activeMessage.value
+  messageMenuOpen.value = false
+  if (msg) void editMessage(msg)
+}
+
+function triggerRemoveMessage() {
+  const msg = activeMessage.value
+  messageMenuOpen.value = false
+  if (msg) void removeMessage(msg)
+}
+
+const {
+  start: onConvTouchStart,
+  move: onConvTouchMove,
+  end: onConvTouchEnd,
+  cancel: onConvTouchCancel,
+  shouldIgnoreClick: ignoreConvClick,
+} = useLongPress({
+  onLongPress: (payload) => {
+    if (payload) openConvMenu(payload as ChatConversation)
+  },
+})
+
+function openConvMenu(conv: ChatConversation) {
+  activeConv.value = conv
+  convMenuOpen.value = true
+}
+
+function handleConvRowClick(convId: string) {
+  if (ignoreConvClick.value) return
+  void selectConversation(convId)
+}
+
+function toggleMuteConversation(convId?: string) {
+  const id = convId ?? selectedId.value
+  if (!id) return
+  mutedConversations.value[id] = !mutedConversations.value[id]
+  ui.showToast(mutedConversations.value[id] ? t.value.muteChat : t.value.unmuteChat)
+  convMenuOpen.value = false
+}
+
+async function deleteConversation(convId?: string) {
+  const id = convId ?? selectedId.value
+  if (!id) return
+  const confirmed = await ui.confirm({
+    title: t.value.deleteChat,
+    message: 'Toàn bộ tin nhắn trong cuộc trò chuyện này sẽ bị xóa khỏi danh sách của bạn.',
+    confirmLabel: t.value.remove,
+    danger: true,
+  })
+  if (!confirmed) return
+  convMenuOpen.value = false
+  threadInfoOpen.value = false
+  conversations.value = conversations.value.filter((c) => c.id !== id)
+  if (selectedId.value === id) {
+    selectedId.value = null
+    messages.value = []
+  }
+  ui.showToast('Đã xóa đoạn chat')
+}
+
+async function changeNickname() {
+  if (!selectedConversation.value) return
+  const currentNick = nicknames.value[selectedConversation.value.id] || conversationTitle(selectedConversation.value)
+  const nick = await ui.prompt({
+    title: t.value.changeNickname,
+    label: 'Biệt danh mới',
+    initialValue: currentNick,
+    confirmLabel: 'Lưu',
+  })
+  if (nick !== null) {
+    nicknames.value[selectedConversation.value.id] = nick.trim()
+    ui.showToast('Đã cập nhật biệt danh')
+  }
+}
+
+function sendQuickWave() {
+  draft.value = '👋'
+  void sendText()
 }
 
 function updateViewport() {
@@ -713,7 +847,12 @@ watch(
           class="conversation-row"
           :class="{ active: conv.id === selectedId }"
           :aria-current="conv.id === selectedId ? 'true' : undefined"
-          @click="selectConversation(conv.id)"
+          @click="handleConvRowClick(conv.id)"
+          @touchstart.passive="onConvTouchStart($event, conv)"
+          @touchmove.passive="onConvTouchMove($event)"
+          @touchend="onConvTouchEnd"
+          @touchcancel="onConvTouchCancel"
+          @contextmenu.prevent="openConvMenu(conv)"
         >
           <span class="avatar-wrap">
             <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
@@ -730,7 +869,7 @@ watch(
       </nav>
     </aside>
 
-    <section class="message-thread" aria-live="polite">
+    <section class="message-thread" aria-live="polite" :style="threadThemeStyle">
       <p v-if="chatStore.connectionState !== 'connected'" class="connection-status" role="status">
         {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
       </p>
@@ -740,7 +879,14 @@ watch(
           <button type="button" class="icon-btn back-btn" :aria-label="t.back" @click="backToRail">
             <Icon name="arrow-left" :size="20" />
           </button>
-          <div class="thread-peer-info">
+          <div
+            class="thread-peer-info clickable"
+            role="button"
+            tabindex="0"
+            :title="t.chatInfo"
+            @click="threadInfoOpen = true"
+            @keydown.enter="threadInfoOpen = true"
+          >
             <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
             <div class="thread-peer-meta">
               <h2>{{ conversationTitle(selectedConversation) }}</h2>
@@ -774,6 +920,15 @@ watch(
               @click="threadSearchOpen = !threadSearchOpen"
             >
               <Icon name="search" :size="18" />
+            </button>
+            <button
+              class="icon-btn"
+              type="button"
+              :aria-label="t.chatInfo"
+              :title="t.chatInfo"
+              @click="threadInfoOpen = true"
+            >
+              <Icon name="info" :size="18" />
             </button>
           </div>
         </header>
@@ -824,7 +979,15 @@ watch(
                     class="row-avatar-spacer"
                     aria-hidden="true"
                   />
-                  <article class="message-bubble" :class="{ outgoing: message.senderId === auth.user?.id, 'has-like': message.body === '👍' }">
+                  <article
+                    class="message-bubble"
+                    :class="{ outgoing: message.senderId === auth.user?.id, 'has-like': message.body === '👍' }"
+                    @touchstart.passive="onMessageTouchStart($event, message)"
+                    @touchmove.passive="onMessageTouchMove($event)"
+                    @touchend="onMessageTouchEnd"
+                    @touchcancel="onMessageTouchCancel"
+                    @contextmenu.prevent="openMessageMenu(message)"
+                  >
                     <p v-if="message.body" :class="{ 'like-bubble': message.body === '👍' }">{{ message.body }}</p>
                     <template v-for="attachment in message.attachments" :key="attachment.id">
                       <button
@@ -856,10 +1019,6 @@ watch(
                     <span v-if="message.removedAt" class="message-status">{{ t.messageRemoved }}</span>
                     <span v-else-if="message.editedAt" class="message-status">{{ t.edited }}</span>
                     <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
-                    <div v-if="canMutateMessage(message)" class="message-actions">
-                      <button type="button" class="message-action" @click="editMessage(message)">{{ t.edit }}</button>
-                      <button type="button" class="message-action danger-text" @click="removeMessage(message)">{{ t.remove }}</button>
-                    </div>
                   </article>
                 </div>
               </template>
@@ -877,7 +1036,17 @@ watch(
               </div>
             </Transition>
           </div>
-          <EmptyState v-else :title="t.noMessagesYet" description="" icon="chat" />
+          <div v-else class="thread-empty-state">
+            <span class="thread-empty-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
+              {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+            </span>
+            <h3 class="thread-empty-title">{{ conversationTitle(selectedConversation) }}</h3>
+            <p class="thread-empty-subtitle">{{ t.connectedOnFilvault }}</p>
+            <button type="button" class="btn ink thread-empty-wave-btn" @click="sendQuickWave">
+              <span>👋</span>
+              <span>{{ t.sayHello }}</span>
+            </button>
+          </div>
           <Transition name="msg">
             <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest">
               <Icon name="download" :size="16" />
@@ -1051,6 +1220,154 @@ watch(
           <button type="button" class="menu-logout-btn" @click="handleLogout">
             <Icon name="log-out" :size="18" />
             <span>{{ t.logOut }}</span>
+          </button>
+        </div>
+      </div>
+    </BottomSheet>
+
+    <!-- Message Long-press Menu -->
+    <BottomSheet :open="messageMenuOpen" :title="t.messageOptions" @close="messageMenuOpen = false">
+      <div v-if="activeMessage" class="sheet-action-list">
+        <div class="sheet-message-preview">
+          <p>{{ activeMessage.body }}</p>
+        </div>
+        <button type="button" class="sheet-action-item" @click="copyMessageText">
+          <Icon name="copy" :size="18" />
+          <span>{{ t.copyMessage }}</span>
+        </button>
+        <button
+          v-if="canMutateMessage(activeMessage)"
+          type="button"
+          class="sheet-action-item"
+          @click="triggerEditMessage"
+        >
+          <Icon name="pencil" :size="18" />
+          <span>{{ t.edit }}</span>
+        </button>
+        <button
+          v-if="canMutateMessage(activeMessage)"
+          type="button"
+          class="sheet-action-item danger-text"
+          @click="triggerRemoveMessage"
+        >
+          <Icon name="trash" :size="18" />
+          <span>{{ t.remove }}</span>
+        </button>
+      </div>
+    </BottomSheet>
+
+    <!-- Conversation Long-press Menu -->
+    <BottomSheet :open="convMenuOpen" :title="t.chatOptions" @close="convMenuOpen = false">
+      <div v-if="activeConv" class="sheet-action-list">
+        <div class="sheet-message-preview">
+          <strong>{{ conversationTitle(activeConv) }}</strong>
+        </div>
+        <button type="button" class="sheet-action-item" @click="selectConversation(activeConv.id); convMenuOpen = false">
+          <Icon name="chat" :size="18" />
+          <span>{{ t.openChat }}</span>
+        </button>
+        <button type="button" class="sheet-action-item" @click="toggleMuteConversation(activeConv.id)">
+          <Icon :name="mutedConversations[activeConv.id] ? 'bell' : 'bell-off'" :size="18" />
+          <span>{{ mutedConversations[activeConv.id] ? t.unmuteChat : t.muteChat }}</span>
+        </button>
+        <button type="button" class="sheet-action-item danger-text" @click="deleteConversation(activeConv.id)">
+          <Icon name="trash" :size="18" />
+          <span>{{ t.deleteChat }}</span>
+        </button>
+      </div>
+    </BottomSheet>
+
+    <!-- Thread Info / Settings -->
+    <BottomSheet :open="threadInfoOpen" :title="t.chatInfo" @close="threadInfoOpen = false">
+      <div v-if="selectedConversation" class="chat-info-content">
+        <div class="chat-info-header">
+          <span class="chat-info-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
+            {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+          </span>
+          <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
+          <span class="chat-info-status">{{ t.activeNow }}</span>
+        </div>
+
+        <div class="chat-info-actions">
+          <button
+            type="button"
+            class="chat-info-action-btn"
+            @click="callStore.startCall(selectedConversation.id, { isVideo: false }); threadInfoOpen = false"
+          >
+            <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
+            <span>Gọi thoại</span>
+          </button>
+          <button
+            type="button"
+            class="chat-info-action-btn"
+            @click="callStore.startCall(selectedConversation.id, { isVideo: true }); threadInfoOpen = false"
+          >
+            <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
+            <span>Gọi video</span>
+          </button>
+          <button
+            type="button"
+            class="chat-info-action-btn"
+            @click="threadSearchOpen = true; threadInfoOpen = false"
+          >
+            <span class="action-icon-circle"><Icon name="search" :size="18" /></span>
+            <span>{{ t.search }}</span>
+          </button>
+        </div>
+
+        <div class="menu-section">
+          <span class="menu-section-label">{{ t.chatOptions }}</span>
+          <div class="menu-items-group">
+            <div class="theme-picker-row">
+              <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
+              <span class="menu-item-text">{{ t.themeColor }}</span>
+              <div class="theme-dots">
+                <button
+                  v-for="th in chatThemes"
+                  :key="th.id"
+                  type="button"
+                  class="theme-dot"
+                  :style="{ backgroundColor: th.color }"
+                  :class="{ active: activeTheme === th.id }"
+                  :title="th.name"
+                  :aria-label="th.name"
+                  @click="activeTheme = th.id"
+                />
+              </div>
+            </div>
+
+            <button type="button" class="menu-row-item" @click="changeNickname">
+              <span class="menu-item-icon badge-folder"><Icon name="pencil" :size="18" /></span>
+              <span class="menu-item-text">{{ t.changeNickname }}</span>
+            </button>
+
+            <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
+              <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
+              <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="media.length" class="menu-section">
+          <span class="menu-section-label">{{ t.sharedMedia }} ({{ media.length }})</span>
+          <div class="chat-info-media-grid">
+            <button
+              v-for="item in media.slice(0, 6)"
+              :key="item.id"
+              type="button"
+              class="chat-info-media-thumb"
+              @click="openAttachment(item.id)"
+            >
+              <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" :alt="item.name" loading="lazy" />
+              <Icon v-else :name="item.mimeType.startsWith('image/') ? 'image' : 'file'" :size="18" />
+            </button>
+          </div>
+        </div>
+
+        <div class="menu-logout-wrap">
+          <button type="button" class="menu-logout-btn danger-text" @click="deleteConversation(selectedConversation.id)">
+            <Icon name="trash" :size="18" />
+            <span>{{ t.deleteChat }}</span>
           </button>
         </div>
       </div>
@@ -1886,10 +2203,12 @@ watch(
   line-height: 1.36;
   word-break: break-word;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  -webkit-touch-callout: none;
 }
 
 .message-bubble.outgoing {
-  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
+  background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
   color: #ffffff;
 }
 
@@ -2335,6 +2654,262 @@ watch(
     width: 34px;
     height: 34px;
   }
+}
+
+.clickable {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  padding: 2px 6px;
+  margin: -2px -6px;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.clickable:hover {
+  background: var(--surface-soft);
+}
+
+/* Messenger-grade Thread Empty State */
+.thread-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  gap: var(--space-xs);
+}
+
+.thread-empty-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  font-size: 28px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  margin-bottom: var(--space-xs);
+}
+
+.thread-empty-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.thread-empty-subtitle {
+  margin: 0 0 var(--space-md);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.thread-empty-wave-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform var(--duration-short) var(--ease-standard), background var(--duration-short) var(--ease-standard);
+}
+
+.thread-empty-wave-btn:hover {
+  transform: scale(1.04);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Action Sheet Styles */
+.sheet-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) 0;
+}
+
+.sheet-message-preview {
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: var(--space-xs);
+  color: var(--muted);
+  font-size: 13px;
+  word-break: break-word;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.sheet-action-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 12px var(--space-sm);
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.sheet-action-item:hover {
+  background: var(--surface-soft);
+}
+
+.sheet-action-item.danger-text {
+  color: #ef4444;
+}
+
+/* Chat Info Sheet */
+.chat-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-bottom: var(--space-md);
+}
+
+.chat-info-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: var(--space-sm) 0;
+}
+
+.chat-info-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  font-size: 28px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  margin-bottom: var(--space-xxs);
+}
+
+.chat-info-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chat-info-status {
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.chat-info-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+}
+
+.chat-info-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.action-icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  color: var(--ink);
+  transition: background var(--duration-short) var(--ease-standard), transform var(--duration-short) var(--ease-standard);
+}
+
+.chat-info-action-btn:hover .action-icon-circle {
+  background: var(--accent-soft);
+  color: var(--accent);
+  transform: scale(1.05);
+}
+
+.theme-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.theme-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.theme-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--duration-short) var(--ease-standard);
+}
+
+.theme-dot:hover {
+  transform: scale(1.15);
+}
+
+.theme-dot.active {
+  border-color: var(--ink);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
+.chat-info-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.chat-info-media-thumb {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  background: var(--surface-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.chat-info-media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 </style>

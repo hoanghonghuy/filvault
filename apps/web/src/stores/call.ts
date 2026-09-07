@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 import { Room, RoomEvent, type RemoteParticipant } from 'livekit-client'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import { callAudio } from '@/lib/callAudio'
 import { API_BASE, getAccessToken } from '@/api/client'
 
@@ -16,8 +17,20 @@ export interface CallSignalPayload {
   timestamp: string
 }
 
+export function resolveLiveKitUrl(rawUrl: string): string {
+  if (typeof window === 'undefined' || !window.location?.hostname) {
+    return rawUrl
+  }
+  const currentHost = window.location.hostname
+  if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+    return rawUrl.replace(/localhost|127\.0\.0\.1/, currentHost)
+  }
+  return rawUrl
+}
+
 export const useCallStore = defineStore('call', () => {
   const auth = useAuthStore()
+  const ui = useUiStore()
   const state = ref<CallState>('idle')
   const conversationId = ref<string | null>(null)
   const isVideo = ref(false)
@@ -84,6 +97,15 @@ export const useCallStore = defineStore('call', () => {
   async function connectToRoom(convId: string) {
     try {
       const { token, url } = await fetchToken(convId)
+      const connectUrl = resolveLiveKitUrl(url)
+
+      // MediaDevices require secure context (HTTPS or localhost) in modern mobile browsers
+      if (typeof navigator !== 'undefined' && !navigator.mediaDevices?.getUserMedia) {
+        throw new Error(
+          'Micro/Camera yêu cầu HTTPS hoặc localhost. Nếu dùng qua IP LAN, hãy bật cờ chrome://flags/#unsafely-treat-insecure-origin-as-secure.',
+        )
+      }
+
       const r = new Room({
         adaptiveStream: true,
         dynacast: true,
@@ -114,7 +136,7 @@ export const useCallStore = defineStore('call', () => {
         void endCall(false)
       })
 
-      await r.connect(url, token)
+      await r.connect(connectUrl, token)
       await r.localParticipant.setMicrophoneEnabled(isMicEnabled.value)
       if (isVideo.value) {
         await r.localParticipant.setCameraEnabled(isCamEnabled.value)
@@ -123,7 +145,9 @@ export const useCallStore = defineStore('call', () => {
       callAudio.stop()
     } catch (e: unknown) {
       const err = e as Error
-      error.value = err?.message || 'Lỗi kết nối cuộc gọi'
+      const msg = err?.message || 'Lỗi kết nối cuộc gọi'
+      error.value = msg
+      ui.showToast(msg, 'error')
       void endCall(false)
     }
   }

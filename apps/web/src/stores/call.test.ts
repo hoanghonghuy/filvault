@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useCallStore } from '@/stores/call'
+import { useCallStore, resolveLiveKitUrl } from '@/stores/call'
 
 // Mock livekit-client
 vi.mock('livekit-client', () => ({
@@ -128,5 +128,18 @@ describe('useCallStore', () => {
     expect(store.isCamEnabled).toBe(true)
     store.toggleCamera()
     expect(store.isCamEnabled).toBe(false)
+  })
+
+  it('resolves LiveKit URL by substituting localhost with current LAN hostname', () => {
+    // When hostname is localhost, keeps localhost
+    expect(resolveLiveKitUrl('ws://localhost:7880')).toBe('ws://localhost:7880')
+
+    // When client accesses from a LAN IP e.g. 192.168.1.6
+    vi.stubGlobal('window', {
+      location: { hostname: '192.168.1.6' },
+    })
+    expect(resolveLiveKitUrl('ws://localhost:7880')).toBe('ws://192.168.1.6:7880')
+    expect(resolveLiveKitUrl('ws://127.0.0.1:7880')).toBe('ws://192.168.1.6:7880')
+    vi.unstubAllGlobals()
   })
 })
