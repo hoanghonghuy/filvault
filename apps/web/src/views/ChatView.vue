@@ -314,6 +314,13 @@ function onComposerInput() {
   }
 }
 
+function isPeerTyping(conversationId?: string): boolean {
+  if (!conversationId) return false
+  const typing = chatStore.typingUsers[conversationId]
+  if (!typing) return false
+  return Boolean(typing.userId && typing.userId !== auth.user?.id)
+}
+
 
 function updateViewport() {
   isMobile.value = window.matchMedia('(max-width: 767px)').matches
@@ -939,7 +946,7 @@ watch(
               <span class="conversation-date" :class="{ 'unread-date': isConversationUnread(conv) }">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
             </span>
             <span class="conversation-bottom">
-              <span v-if="chatStore.typingUsers[conv.id]" class="conversation-typing">
+              <span v-if="isPeerTyping(conv.id)" class="conversation-typing">
                 <span class="typing-pulse-dot" />
                 <span>{{ t.isTyping }}</span>
               </span>
@@ -1119,7 +1126,7 @@ watch(
             </TransitionGroup>
             <!-- Typing indicator in thread -->
             <div
-              v-if="selectedConversation && chatStore.typingUsers[selectedConversation.id]"
+              v-if="selectedConversation && isPeerTyping(selectedConversation.id)"
               class="message-row typing-row"
             >
               <span

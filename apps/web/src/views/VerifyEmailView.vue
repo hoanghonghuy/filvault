@@ -10,7 +10,7 @@ const router = useRouter()
 
 onMounted(() => {
   if (auth.isAuthenticated && auth.isVerified) {
-    void router.replace('/chat')
+    void router.replace('/')
   }
 })
 

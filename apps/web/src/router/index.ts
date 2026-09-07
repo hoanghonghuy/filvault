@@ -16,8 +16,8 @@ const router = createRouter({
       component: () => import('@/views/VerifyEmailView.vue'),
       meta: { auth: true, unverifiedOnly: true },
     },
-    { path: '/', name: 'home', redirect: '/chat' },
-    { path: '/overview', name: 'overview', component: () => import('@/views/OverviewView.vue'), meta: { auth: true, verified: true } },
+    { path: '/', name: 'home', component: () => import('@/views/OverviewView.vue'), meta: { auth: true, verified: true } },
+    { path: '/overview', name: 'overview', redirect: '/' },
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
     { path: '/chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
@@ -41,7 +41,7 @@ const router = createRouter({
       name: 'public-share',
       component: () => import('@/views/PublicShareView.vue'),
     },
-    { path: '/:pathMatch(.*)*', redirect: '/chat' },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
@@ -51,13 +51,13 @@ router.beforeEach(async (to) => {
     await auth.bootstrap()
   }
   if (to.meta.guest && auth.isAuthenticated) {
-    return auth.isVerified ? '/chat' : '/verify-email'
+    return auth.isVerified ? '/' : '/verify-email'
   }
   if (to.meta.auth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if ((to.name === 'verify-email' || to.meta.unverifiedOnly) && auth.isAuthenticated && auth.isVerified) {
-    return '/chat'
+    return '/'
   }
   if (to.meta.verified && auth.isAuthenticated && !auth.isVerified) {
     return '/verify-email'

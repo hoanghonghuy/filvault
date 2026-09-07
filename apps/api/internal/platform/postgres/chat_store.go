@@ -831,6 +831,7 @@ func (s *Store) ListChatEventsAfter(ctx context.Context, userID string, after in
 				WHERE cm.conversation_id = e.conversation_id
 					AND cm.user_id = $2 AND cm.archived_at IS NULL
 			)
+			AND NOT (e.event_type = 'typing.indicator' AND e.payload->>'userId' = $2)
 		ORDER BY e.sequence ASC
 		LIMIT $3
 	`, after, userID, limit)

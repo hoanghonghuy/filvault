@@ -5,10 +5,12 @@ import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { userInitials } from '@/lib/userInitials'
+import { useI18n } from '@/lib/i18n'
 import type { User } from '@/api/types'
 
 const auth = useAuthStore()
 const ui = useUiStore()
+const { t } = useI18n()
 
 const displayName = ref(auth.user?.displayName ?? '')
 const currentPassword = ref('')
@@ -27,10 +29,10 @@ async function saveProfile() {
   try {
     await api<User>('/users/me', {
       method: 'PATCH',
-      body: JSON.stringify({ displayName: displayName.value }),
+      body: JSON.stringify({ displayName: displayName.value.trim() }),
     })
     await auth.loadMe()
-    ui.showToast('Profile saved', 'success')
+    ui.showToast(t.value.saveProfile, 'success')
   } catch (e) {
     error.value = formatApiError(e, 'Save failed')
   } finally {
@@ -53,7 +55,7 @@ async function changePassword() {
     await auth.loadMe()
     currentPassword.value = ''
     newPassword.value = ''
-    ui.showToast('Password updated', 'success')
+    ui.showToast(t.value.changePassword, 'success')
   } catch (e) {
     error.value = formatApiError(e, 'Password change failed')
   } finally {
@@ -69,7 +71,7 @@ async function logout() {
 
 <template>
   <div class="profile-page">
-    <h1 class="page-title desktop-only">Profile</h1>
+    <h1 class="page-title desktop-only">{{ t.profile }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
 
     <section class="card section identity" aria-labelledby="profile-identity-heading">
@@ -83,31 +85,31 @@ async function logout() {
         </div>
       </div>
       <label class="field">
-        <span>Display name</span>
+        <span>{{ t.displayName }}</span>
         <input v-model="displayName" autocomplete="nickname" maxlength="80" />
       </label>
       <button class="btn ink save-btn" type="button" :disabled="savingProfile" @click="saveProfile">
-        {{ savingProfile ? 'Saving…' : 'Save profile' }}
+        {{ savingProfile ? t.saving : t.saveProfile }}
       </button>
     </section>
 
     <section class="card section" aria-labelledby="profile-password-heading">
-      <h2 id="profile-password-heading" class="section-title">Password</h2>
+      <h2 id="profile-password-heading" class="section-title">{{ t.password }}</h2>
       <label class="field">
-        <span>Current password</span>
+        <span>{{ t.currentPassword }}</span>
         <input v-model="currentPassword" type="password" autocomplete="current-password" />
       </label>
       <label class="field">
-        <span>New password</span>
+        <span>{{ t.newPassword }}</span>
         <input v-model="newPassword" type="password" minlength="8" autocomplete="new-password" />
       </label>
       <button class="btn ink save-btn" type="button" :disabled="changingPassword" @click="changePassword">
-        {{ changingPassword ? 'Changing…' : 'Change password' }}
+        {{ changingPassword ? t.changing : t.changePassword }}
       </button>
     </section>
 
     <section class="card section">
-      <button class="btn danger block" type="button" @click="logout">Log out</button>
+      <button class="btn danger block" type="button" @click="logout">{{ t.logOut }}</button>
     </section>
   </div>
 </template>

@@ -20,7 +20,7 @@ describe('router navigation guards for auth and verification', () => {
     vi.unstubAllGlobals()
   })
 
-  it('redirects verified authenticated user away from /verify-email to /chat', async () => {
+  it('redirects verified authenticated user away from /verify-email to /', async () => {
     const auth = useAuthStore(pinia)
     auth.user = {
       id: 'user-1',
@@ -37,10 +37,10 @@ describe('router navigation guards for auth and verification', () => {
     }
 
     await router.push('/verify-email')
-    expect(router.currentRoute.value.path).toBe('/chat')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
-  it('redirects verified authenticated user away from /login and /register to /chat', async () => {
+  it('redirects verified authenticated user away from /login and /register to /', async () => {
     const auth = useAuthStore(pinia)
     auth.user = {
       id: 'user-1',
@@ -57,10 +57,10 @@ describe('router navigation guards for auth and verification', () => {
     }
 
     await router.push('/login')
-    expect(router.currentRoute.value.path).toBe('/chat')
+    expect(router.currentRoute.value.path).toBe('/')
 
     await router.push('/register')
-    expect(router.currentRoute.value.path).toBe('/chat')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
   it('allows unverified authenticated user to access /verify-email', async () => {

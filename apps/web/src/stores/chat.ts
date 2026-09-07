@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { API_BASE, api, getAccessToken, refreshAccessToken } from '@/api/client'
 import type { ChatConversation, ChatMessage } from '@/api/types'
+import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
 import { generateUUID } from '@/lib/uuid'
 
@@ -9,6 +10,7 @@ type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'o
 type ChatEvent = { type: string; payload: string }
 
 export const useChatStore = defineStore('chat', () => {
+  const auth = useAuthStore()
   const conversations = ref<ChatConversation[]>([])
   const messages = ref<Record<string, ChatMessage[]>>({})
   const selectedId = ref<string | null>(null)
@@ -110,6 +112,9 @@ export const useChatStore = defineStore('chat', () => {
         const data =
           typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
         const { conversationId, userId, userName, typing } = data
+        if (!conversationId || !userId || userId === auth.user?.id) {
+          return
+        }
         if (typing) {
           if (typingUsers.value[conversationId]?.timer) {
             window.clearTimeout(typingUsers.value[conversationId].timer)

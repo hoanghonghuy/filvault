@@ -172,15 +172,17 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/peek-messages-list/)
   })
 
-  it('provides real-time typing indicators in both rail and thread', () => {
+  it('provides real-time typing indicators in both rail and thread for peers only', () => {
     const store = readSrc('../stores/chat.ts')
     expect(store).toMatch(/typingUsers/)
     expect(store).toMatch(/sendTyping/)
     expect(store).toMatch(/typing\.indicator/)
+    expect(store).toMatch(/userId === auth\.user\?\.id/)
     expect(chat).toMatch(/conversation-typing/)
     expect(chat).toMatch(/typing-bubble/)
     expect(chat).toMatch(/typing-dot/)
     expect(chat).toMatch(/onComposerInput/)
+    expect(chat).toMatch(/isPeerTyping/)
   })
 
   it('displays seen receipt indicator for read messages', () => {
