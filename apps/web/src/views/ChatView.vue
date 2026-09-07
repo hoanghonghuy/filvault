@@ -23,6 +23,11 @@ import {
   formatStickerMessage,
   type Sticker,
 } from '@/lib/stickers'
+import {
+  REACTION_CATEGORIES,
+  REACTION_EMOJIS,
+  type EmojiCategory,
+} from '@/lib/emojis'
 import { useI18n } from '@/lib/i18n'
 import { generateUUID } from '@/lib/uuid'
 import { useLongPress } from '@/lib/useLongPress'
@@ -212,18 +217,24 @@ async function selectReaction(emoji: string, targetMessage?: ChatMessage) {
   }
 }
 
-function promptCustomReaction() {
+const reactionPickerOpen = ref(false)
+const reactionPickerTargetMessage = ref<ChatMessage | null>(null)
+const activeReactionCategory = ref<EmojiCategory['id']>('popular')
+const currentCategoryEmojis = computed(() => REACTION_EMOJIS[activeReactionCategory.value] ?? REACTION_EMOJIS.popular)
+
+function openReactionPicker() {
   const msg = activeMessage.value
   messageMenuOpen.value = false
   if (!msg) return
-  void ui.prompt({
-    title: 'Thả cảm xúc biểu tượng',
-    label: 'Nhập emoji hoặc biểu tượng',
-    confirmLabel: 'Thả cảm xúc',
-  }).then((val) => {
-    if (!val?.trim()) return
-    void selectReaction(val.trim(), msg)
-  })
+  reactionPickerTargetMessage.value = msg
+  reactionPickerOpen.value = true
+}
+
+function handlePickReactionEmoji(emoji: string) {
+  const msg = reactionPickerTargetMessage.value
+  reactionPickerOpen.value = false
+  if (!msg || !selectedId.value) return
+  void selectReaction(emoji, msg)
 }
 
 function triggerReplyMessage() {
@@ -1054,7 +1065,9 @@ function onVisualViewportResize() {
 
 function handleGlobalKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
-    if (messageMenuOpen.value) {
+    if (reactionPickerOpen.value) {
+      reactionPickerOpen.value = false
+    } else if (messageMenuOpen.value) {
       messageMenuOpen.value = false
     } else if (stickerPickerOpen.value) {
       stickerPickerOpen.value = false
@@ -1801,7 +1814,7 @@ watch(
               class="rx-btn rx-plus-btn"
               title="Thêm biểu tượng khác"
               aria-label="Thêm biểu tượng khác"
-              @click="promptCustomReaction"
+              @click="openReactionPicker"
             >
               <Icon name="plus" :size="18" />
             </button>
@@ -1878,6 +1891,43 @@ watch(
         </div>
       </div>
     </Teleport>
+
+    <!-- Custom Emoji Reaction Picker BottomSheet -->
+    <BottomSheet :open="reactionPickerOpen" title="Chọn biểu tượng cảm xúc" @close="reactionPickerOpen = false">
+      <div class="rx-picker-container">
+        <!-- Category Tab Bar -->
+        <div class="rx-picker-categories" role="tablist" aria-label="Phân loại biểu tượng">
+          <button
+            v-for="cat in REACTION_CATEGORIES"
+            :key="cat.id"
+            type="button"
+            class="rx-cat-btn"
+            :class="{ active: activeReactionCategory === cat.id }"
+            role="tab"
+            :aria-selected="activeReactionCategory === cat.id"
+            @click="activeReactionCategory = cat.id"
+          >
+            <span class="rx-cat-icon">{{ cat.icon }}</span>
+            <span class="rx-cat-label">{{ cat.label }}</span>
+          </button>
+        </div>
+
+        <!-- Emoji Grid -->
+        <div class="rx-picker-grid" role="list">
+          <button
+            v-for="emoji in currentCategoryEmojis"
+            :key="emoji"
+            type="button"
+            class="rx-picker-item"
+            :class="{ 'rx-item-active': isReactedWith(reactionPickerTargetMessage, emoji) }"
+            :aria-label="emoji"
+            @click="handlePickReactionEmoji(emoji)"
+          >
+            <span class="rx-picker-char">{{ emoji }}</span>
+          </button>
+        </div>
+      </div>
+    </BottomSheet>
 
     <!-- Conversation Long-press Menu -->
     <BottomSheet :open="convMenuOpen" :title="t.chatOptions" @close="convMenuOpen = false">
@@ -4421,6 +4471,128 @@ img.avatar-img {
 .danger-circle {
   background: rgba(248, 113, 113, 0.15);
   color: #f87171;
+}
+
+/* Custom Emoji Reaction Picker BottomSheet */
+.rx-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 16px);
+  padding: 4px 4px 16px;
+  max-height: 70vh;
+}
+
+.rx-picker-categories {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 6px;
+}
+
+.rx-picker-categories::-webkit-scrollbar {
+  display: none;
+}
+
+.rx-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.1));
+  background: var(--surface-card, rgba(255, 255, 255, 0.05));
+  color: var(--muted, #8a8d91);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.rx-cat-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink, #ffffff);
+}
+
+[data-theme='light'] .rx-cat-btn:hover,
+:root:not([data-theme='dark']) .rx-cat-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #050505;
+}
+
+.rx-cat-btn.active {
+  background: var(--brand, #0084ff);
+  border-color: var(--brand, #0084ff);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
+}
+
+.rx-cat-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.rx-cat-label {
+  line-height: 1;
+}
+
+.rx-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  scrollbar-width: thin;
+}
+
+.rx-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.rx-picker-char {
+  font-size: 28px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rx-picker-item:hover,
+.rx-picker-item:active {
+  transform: scale(1.22);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='light'] .rx-picker-item:hover,
+:root:not([data-theme='dark']) .rx-picker-item:hover,
+[data-theme='light'] .rx-picker-item:active,
+:root:not([data-theme='dark']) .rx-picker-item:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.rx-picker-item.rx-item-active {
+  background: rgba(0, 132, 255, 0.2);
+  box-shadow: inset 0 0 0 1.5px var(--brand, #0084ff);
 }
 
 </style>
