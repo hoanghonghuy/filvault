@@ -73,15 +73,17 @@ vi.mock('@/api/errors', () => ({
   formatApiError: (_error: unknown, fallback: string) => fallback,
 }))
 
+let mockRoute = { params: {} as Record<string, string>, query: {}, path: '/chat' }
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn<() => void>(), replace: vi.fn<() => void>() }),
-  useRoute: () => ({ params: {}, query: {}, path: '/chat' }),
+  useRoute: () => mockRoute,
 }))
 
 describe('ChatView', () => {
   let pinia: ReturnType<typeof createPinia>
 
   beforeEach(() => {
+    mockRoute = { params: {}, query: {}, path: '/chat' }
     pinia = createPinia()
     setActivePinia(pinia)
     const auth = useAuthStore(pinia)
@@ -169,6 +171,24 @@ describe('ChatView', () => {
         body: expect.stringContaining('"body":"helu"'),
       }),
     )
+
+    wrapper.unmount()
+  })
+
+  it('loads thread messages and hides skeleton when reloading directly on /chat/:id', async () => {
+    mockRoute = { params: { id: conversation.id }, query: {}, path: `/chat/${conversation.id}` }
+
+    const wrapper = mount(ChatView, {
+      global: { plugins: [pinia] },
+      attachTo: document.body,
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.sk-chat-thread').exists()).toBe(false)
+    expect(wrapper.find('.thread-empty-state').exists()).toBe(false)
+    expect(wrapper.find('.message-bubble:not(.outgoing)').exists()).toBe(true)
+    expect(wrapper.find('.message-bubble:not(.outgoing)').text()).toContain('Hello from Recipient')
 
     wrapper.unmount()
   })

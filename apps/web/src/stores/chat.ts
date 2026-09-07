@@ -22,6 +22,7 @@ export const useChatStore = defineStore('chat', () => {
   let reconnectTimer: number | null = null
   const typingUsers = ref<Record<string, { userId: string; userName: string; timer?: number }>>({})
   let lastTypingTime = 0
+  const lastReactionUpdate = ref<{ conversationId: string; messageId: string; reactions: ChatMessageReaction[] } | null>(null)
 
   const selectedConversation = computed(() =>
     conversations.value.find((conversation) => conversation.id === selectedId.value) ?? null,
@@ -168,6 +169,7 @@ export const useChatStore = defineStore('chat', () => {
             msg.reactions = reactions
           }
         }
+        lastReactionUpdate.value = { conversationId, messageId, reactions }
       } catch {
         // ignore
       }
@@ -244,6 +246,7 @@ export const useChatStore = defineStore('chat', () => {
         msg.reactions = res.reactions
       }
     }
+    lastReactionUpdate.value = { conversationId, messageId, reactions: res.reactions }
     return res.reactions
   }
 
@@ -366,6 +369,7 @@ export const useChatStore = defineStore('chat', () => {
     markAsRead,
     sendTyping,
     toggleReaction,
+    lastReactionUpdate,
   }
 })
 

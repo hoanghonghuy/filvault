@@ -59,7 +59,7 @@ const lightboxName = ref('')
 const lightboxMime = ref('')
 const lightboxUrl = ref('')
 const lightboxFileId = ref('')
-const loadingThread = ref(true)
+const loadingThread = ref(Boolean(route.params.id))
 
 const threadInfoOpen = ref(false)
 const messageMenuOpen = ref(false)
@@ -287,7 +287,11 @@ function openMessageMenu(message: ChatMessage, el?: HTMLElement) {
       above,
     }
   } else {
-    capsulePos.value = null
+    capsulePos.value = {
+      top: Math.max(60, window.innerHeight / 2 - 100),
+      left: Math.max(16, (window.innerWidth - 320) / 2),
+      above: true,
+    }
   }
   messageMenuOpen.value = true
 }
@@ -580,7 +584,7 @@ async function loadConversations() {
     conversations.value = out.conversations
     const routeId = (route.params.id as string) || null
     if (routeId) {
-      if (selectedId.value !== routeId || messages.value.length === 0) {
+      if (selectedId.value !== routeId) {
         await selectConversation(routeId)
       }
     } else if (!selectedId.value && out.conversations[0] && !isMobileViewport()) {
@@ -626,7 +630,10 @@ async function selectConversation(id: string) {
 }
 
 async function loadMessages(id = selectedId.value) {
-  if (!id) return
+  if (!id) {
+    loadingThread.value = false
+    return
+  }
   const selection = activeSelection
   error.value = ''
   loadingThread.value = true
@@ -691,7 +698,11 @@ function onThreadScroll() {
 function scrollToLatest() {
   const el = threadBodyRef.value
   if (!el) return
-  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  if (typeof el.scrollTo === 'function') {
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  } else {
+    el.scrollTop = el.scrollHeight
+  }
 }
 
 function autoGrow() {
@@ -1033,14 +1044,31 @@ function onVisualViewportResize() {
   }
 }
 
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (messageMenuOpen.value) {
+      messageMenuOpen.value = false
+    } else if (stickerPickerOpen.value) {
+      stickerPickerOpen.value = false
+    } else if (threadSearchOpen.value) {
+      threadSearchOpen.value = false
+    }
+  }
+}
+
 onMounted(() => {
   updateViewport()
   window.addEventListener('resize', updateViewport)
+  window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('offline', chatStore.markOffline)
   window.addEventListener('online', chatStore.markOnline)
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', onVisualViewportResize)
     window.visualViewport.addEventListener('scroll', onVisualViewportResize)
+  }
+  const routeId = (route.params.id as string) || null
+  if (routeId) {
+    void selectConversation(routeId)
   }
   void loadConversations()
   chatStore.connectEvents()
@@ -1048,6 +1076,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateViewport)
+  window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('offline', chatStore.markOffline)
   window.removeEventListener('online', chatStore.markOnline)
   if (window.visualViewport) {
@@ -1070,10 +1099,25 @@ watch(visibleMessages, () => {
 watch(
   () => chatStore.messages[selectedId.value ?? ''],
   (nextMessages) => {
-    // Only sync from store on initial load (when local messages are empty)
-    // Avoid overwriting older messages loaded via pagination
-    if (nextMessages && selectedId.value && messages.value.length === 0) {
+    if (!nextMessages || !selectedId.value) return
+    if (messages.value.length === 0) {
       messages.value = [...nextMessages]
+      return
+    }
+    const newOnes = nextMessages.filter((m) => !messages.value.some((cur) => cur.id === m.id))
+    if (newOnes.length > 0) {
+      messages.value = [...messages.value, ...newOnes]
+    }
+  },
+)
+
+watch(
+  () => chatStore.lastReactionUpdate,
+  (update) => {
+    if (!update || update.conversationId !== selectedId.value) return
+    const msg = messages.value.find((m) => m.id === update.messageId)
+    if (msg) {
+      msg.reactions = update.reactions
     }
   },
 )
@@ -1099,9 +1143,10 @@ watch(
       messages.value = []
       searchQuery.value = ''
       searchResults.value = null
+      threadSearchOpen.value = false
+      loadingThread.value = false
     }
   },
-  { immediate: true },
 )
 </script>
 
@@ -1290,7 +1335,7 @@ watch(
         >
           <LoadingSkeletonThread v-if="loadingThread" />
           <p v-else-if="loadingOlder" class="loading-older">Loading older…</p>
-          <div v-if="!loadingThread && visibleMessages.length" class="message-list">
+          <div v-else-if="visibleMessages.length" class="message-list">
             <TransitionGroup name="msg">
               <template v-for="(message, index) in visibleMessages" :key="message.id">
                 <div v-if="shouldShowDate(index)" class="day-separator">
