@@ -154,9 +154,9 @@ function onAfterLeave() {
 watch(
   () => props.open,
   async (open) => {
-    dragOffset.value = 0
-    isDragging.value = false
     if (open) {
+      dragOffset.value = 0
+      isDragging.value = false
       lockPage()
       await nextTick()
       panelRef.value?.focus()
@@ -259,6 +259,12 @@ onUnmounted(unlockPage)
   border-radius: var(--radius-pill);
   cursor: grab;
   touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.sheet-panel {
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sheet-panel.sheet-dragging {
@@ -298,12 +304,15 @@ onUnmounted(unlockPage)
 }
 
 .sheet-leave-active .sheet-panel {
-  transition: transform var(--motion-exit) var(--ease-exit);
+  transition: transform var(--motion-exit) var(--ease-exit) !important;
 }
 
-.sheet-enter-from .sheet-panel,
-.sheet-leave-to .sheet-panel {
+.sheet-enter-from .sheet-panel {
   transform: translateY(100%);
+}
+
+.sheet-leave-to .sheet-panel {
+  transform: translateY(100%) !important;
 }
 
 @media (min-width: 768px) {
@@ -317,12 +326,16 @@ onUnmounted(unlockPage)
   .sheet-leave-active .sheet-panel {
     transition:
       transform var(--motion-exit) var(--ease-exit),
-      opacity var(--motion-exit) var(--ease-exit);
+      opacity var(--motion-exit) var(--ease-exit) !important;
   }
 
-  .sheet-enter-from .sheet-panel,
-  .sheet-leave-to .sheet-panel {
+  .sheet-enter-from .sheet-panel {
     transform: translateY(16px);
+    opacity: 0;
+  }
+
+  .sheet-leave-to .sheet-panel {
+    transform: translateY(16px) !important;
     opacity: 0;
   }
 }

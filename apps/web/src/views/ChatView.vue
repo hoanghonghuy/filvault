@@ -1119,6 +1119,10 @@ watch(
   background: transparent;
   cursor: pointer;
   border-radius: var(--radius-pill);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+  outline: none;
   transition: transform var(--duration-short) var(--ease-standard);
 }
 
@@ -1128,6 +1132,10 @@ watch(
 
 .chat-mark-btn:active {
   transform: scale(0.95);
+}
+
+.chat-mark-btn:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .chat-mark-btn:focus-visible {
@@ -1147,6 +1155,8 @@ watch(
   font-weight: 700;
   font-size: 16px;
   box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .app-menu-content {
