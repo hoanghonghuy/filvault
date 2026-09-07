@@ -975,5 +975,79 @@ func (r chatRepo) InsertChatEvent(ctx context.Context, conversationID, eventType
 	return r.store.InsertChatEvent(ctx, conversationID, eventType, aggregateID, payload, now)
 }
 
+func (s *Store) MarkAsRead(ctx context.Context, userID, conversationID, messageID string, now time.Time) error {
+	var err error
+	if strings.TrimSpace(messageID) != "" {
+		_, err = s.pool.Exec(ctx, `
+			UPDATE conversation_members
+			SET last_read_at = $3,
+			    last_read_message_id = $4
+			WHERE conversation_id = $1 AND user_id = $2 AND archived_at IS NULL
+		`, conversationID, userID, now, messageID)
+	} else {
+		_, err = s.pool.Exec(ctx, `
+			UPDATE conversation_members
+			SET last_read_at = $3
+			WHERE conversation_id = $1 AND user_id = $2 AND archived_at IS NULL
+		`, conversationID, userID, now)
+	}
+	return err
+}
+
+func (r chatRepo) MarkAsRead(ctx context.Context, userID, conversationID, messageID string, now time.Time) error {
+	return r.store.MarkAsRead(ctx, userID, conversationID, messageID, now)
+}
+
+func (s *Store) ListConversationReadStates(ctx context.Context, userID string) (map[string]chat.ReadState, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT
+			my_cm.conversation_id,
+			my_cm.last_read_at,
+			COALESCE(my_cm.last_read_message_id, ''),
+			peer_cm.last_read_at,
+			COALESCE(peer_cm.last_read_message_id, ''),
+			(
+				SELECT count(*)
+				FROM messages m
+				WHERE m.conversation_id = my_cm.conversation_id
+				  AND m.sender_id <> $1
+				  AND m.created_at > COALESCE(my_cm.last_read_at, '1970-01-01'::timestamptz)
+				  AND m.deleted_at IS NULL
+				  AND m.removed_at IS NULL
+			) AS unread_count
+		FROM conversation_members my_cm
+		LEFT JOIN conversation_members peer_cm
+			ON peer_cm.conversation_id = my_cm.conversation_id AND peer_cm.user_id <> $1
+		WHERE my_cm.user_id = $1 AND my_cm.archived_at IS NULL
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]chat.ReadState)
+	for rows.Next() {
+		var convID string
+		var rs chat.ReadState
+		if err := rows.Scan(
+			&convID,
+			&rs.LastReadAt,
+			&rs.LastReadMessageID,
+			&rs.PeerLastReadAt,
+			&rs.PeerLastReadMessageID,
+			&rs.UnreadCount,
+		); err != nil {
+			return nil, err
+		}
+		out[convID] = rs
+	}
+	return out, rows.Err()
+}
+
+func (r chatRepo) ListConversationReadStates(ctx context.Context, userID string) (map[string]chat.ReadState, error) {
+	return r.store.ListConversationReadStates(ctx, userID)
+}
+
 var _ chat.Repository = chatRepo{}
+
 

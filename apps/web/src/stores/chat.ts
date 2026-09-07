@@ -18,6 +18,8 @@ export const useChatStore = defineStore('chat', () => {
   const seenEventIds = new Set<number>()
   let eventController: AbortController | null = null
   let reconnectTimer: number | null = null
+  const typingUsers = ref<Record<string, { userId: string; userName: string; timer?: number }>>({})
+  let lastTypingTime = 0
 
   const selectedConversation = computed(() =>
     conversations.value.find((conversation) => conversation.id === selectedId.value) ?? null,
@@ -88,6 +90,45 @@ export const useChatStore = defineStore('chat', () => {
       }
       return
     }
+    if (event.type === 'message.read') {
+      try {
+        const data =
+          typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+        const { conversationId, userId, lastReadMessageId, lastReadAt } = data
+        const conv = conversations.value.find((c) => c.id === conversationId)
+        if (conv && conv.peer?.id === userId) {
+          conv.peerLastReadMessageId = lastReadMessageId
+          conv.peerLastReadAt = lastReadAt
+        }
+      } catch {
+        // ignore
+      }
+      return
+    }
+    if (event.type === 'typing.indicator') {
+      try {
+        const data =
+          typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+        const { conversationId, userId, userName, typing } = data
+        if (typing) {
+          if (typingUsers.value[conversationId]?.timer) {
+            window.clearTimeout(typingUsers.value[conversationId].timer)
+          }
+          const timer = window.setTimeout(() => {
+            delete typingUsers.value[conversationId]
+          }, 4000)
+          typingUsers.value[conversationId] = { userId, userName, timer }
+        } else {
+          if (typingUsers.value[conversationId]?.timer) {
+            window.clearTimeout(typingUsers.value[conversationId].timer)
+          }
+          delete typingUsers.value[conversationId]
+        }
+      } catch {
+        // ignore
+      }
+      return
+    }
     try {
       const payload = JSON.parse(event.payload) as { aggregateId?: string }
       if (selectedId.value && payload.aggregateId) {
@@ -103,8 +144,40 @@ export const useChatStore = defineStore('chat', () => {
           void openConversation(selectedId.value)
         }
       }
+      if (event.type === 'message.created') {
+        void loadConversations()
+      }
     } catch {
       // The durable event is still acknowledged by its sequence cursor.
+    }
+  }
+
+  async function markAsRead(conversationId: string, messageId?: string): Promise<void> {
+    const conv = conversations.value.find((c) => c.id === conversationId)
+    if (conv) {
+      conv.unreadCount = 0
+    }
+    try {
+      await api(`/chat/conversations/${conversationId}/read`, {
+        method: 'POST',
+        body: JSON.stringify({ messageId: messageId ?? '' }),
+      })
+    } catch {
+      // ignore
+    }
+  }
+
+  async function sendTyping(conversationId: string, typing: boolean): Promise<void> {
+    const now = Date.now()
+    if (typing && now - lastTypingTime < 2000) return
+    if (typing) lastTypingTime = now
+    try {
+      await api(`/chat/conversations/${conversationId}/typing`, {
+        method: 'POST',
+        body: JSON.stringify({ typing }),
+      })
+    } catch {
+      // ignore
     }
   }
 
@@ -223,5 +296,9 @@ export const useChatStore = defineStore('chat', () => {
     stopEvents,
     markOffline,
     markOnline,
+    typingUsers,
+    markAsRead,
+    sendTyping,
   }
 })
+

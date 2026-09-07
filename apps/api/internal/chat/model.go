@@ -28,6 +28,14 @@ type ConversationPreview struct {
 	AttachmentIDs []string
 }
 
+type ReadState struct {
+	LastReadAt            *time.Time
+	LastReadMessageID     string
+	PeerLastReadAt        *time.Time
+	PeerLastReadMessageID string
+	UnreadCount           int
+}
+
 type Message struct {
 	ID              string
 	ConversationID  string

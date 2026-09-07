@@ -77,6 +77,13 @@ func (m *mockChatRepo) InsertChatEvent(ctx context.Context, conversationID, even
 	}
 	return nil
 }
+func (m *mockChatRepo) MarkAsRead(ctx context.Context, userID, conversationID, messageID string, now time.Time) error {
+	return nil
+}
+func (m *mockChatRepo) ListConversationReadStates(ctx context.Context, userID string) (map[string]ReadState, error) {
+	return nil, nil
+}
+
 
 type mockUserDir struct {
 	users map[string]*user.User

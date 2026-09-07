@@ -38,6 +38,8 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.POST("/chat/attachments/:fileId/complete", append(middleware, h.completeAttachment)...)
 	g.POST("/chat/conversations/:id/call/token", append(middleware, h.getCallToken)...)
 	g.POST("/chat/conversations/:id/call/signal", append(middleware, h.sendCallSignal)...)
+	g.POST("/chat/conversations/:id/read", append(middleware, h.markAsRead)...)
+	g.POST("/chat/conversations/:id/typing", append(middleware, h.sendTyping)...)
 }
 
 func userIDFrom(c *gin.Context) (string, bool) {
@@ -471,6 +473,19 @@ func publicConversation(c Conversation) gin.H {
 
 func publicConversationView(view ConversationView) gin.H {
 	out := publicConversation(view.Conversation)
+	out["unreadCount"] = view.UnreadCount
+	if view.LastReadAt != nil {
+		out["lastReadAt"] = view.LastReadAt.UTC().Format(time.RFC3339Nano)
+	}
+	if view.LastReadMessageID != "" {
+		out["lastReadMessageId"] = view.LastReadMessageID
+	}
+	if view.PeerLastReadAt != nil {
+		out["peerLastReadAt"] = view.PeerLastReadAt.UTC().Format(time.RFC3339Nano)
+	}
+	if view.PeerLastReadMessageID != "" {
+		out["peerLastReadMessageId"] = view.PeerLastReadMessageID
+	}
 	if view.Preview != nil {
 		out["preview"] = gin.H{
 			"messageId":   view.Preview.MessageID,
@@ -580,3 +595,53 @@ func (h *Handler) sendCallSignal(c *gin.Context) {
 	}
 	c.Status(http.StatusOK)
 }
+
+type markAsReadReq struct {
+	MessageID string `json:"messageId"`
+}
+
+func (h *Handler) markAsRead(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	var req markAsReadReq
+	_ = c.ShouldBindJSON(&req)
+	if err := h.svc.MarkAsRead(c.Request.Context(), userID, conversationID, req.MessageID); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+type sendTypingReq struct {
+	Typing bool `json:"typing"`
+}
+
+func (h *Handler) sendTyping(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	var req sendTypingReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	if err := h.svc.SendTyping(c.Request.Context(), userID, conversationID, req.Typing); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+

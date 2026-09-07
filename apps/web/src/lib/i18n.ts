@@ -188,6 +188,10 @@ const dictionaries = {
     themeColor: 'Chủ đề màu sắc',
     changeNickname: 'Chỉnh sửa biệt danh',
     sharedMedia: 'File phương tiện & liên kết',
+    peekPreview: 'Xem trước tin nhắn',
+    isTyping: 'đang nhập...',
+    seen: 'Đã xem',
+    seenAt: 'Đã xem lúc',
   },
   en: {
     navOverview: 'Overview',
@@ -372,6 +376,10 @@ const dictionaries = {
     themeColor: 'Theme color',
     changeNickname: 'Edit nicknames',
     sharedMedia: 'Media & files',
+    peekPreview: 'Preview messages',
+    isTyping: 'is typing...',
+    seen: 'Seen',
+    seenAt: 'Seen at',
   },
 } as const
 

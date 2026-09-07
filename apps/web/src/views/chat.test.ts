@@ -155,5 +155,41 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/threadThemeStyle/)
     expect(chat).toMatch(/changeNickname/)
   })
+
+  it('highlights unread conversations with bold title, preview, unread date and badge', () => {
+    expect(chat).toMatch(/isConversationUnread/)
+    expect(chat).toMatch(/class="unread-badge"/)
+    expect(chat).toMatch(/unread-date/)
+    expect(chat).toMatch(/\.conversation-row\.unread/)
+    expect(types).toMatch(/unreadCount\?: number/)
+  })
+
+  it('supports peek preview without triggering read status', () => {
+    expect(chat).toMatch(/peekOpen/)
+    expect(chat).toMatch(/openPeekPreview/)
+    expect(chat).toMatch(/openChatFromPeek/)
+    expect(chat).toMatch(/peek-preview-content/)
+    expect(chat).toMatch(/peek-messages-list/)
+  })
+
+  it('provides real-time typing indicators in both rail and thread', () => {
+    const store = readSrc('../stores/chat.ts')
+    expect(store).toMatch(/typingUsers/)
+    expect(store).toMatch(/sendTyping/)
+    expect(store).toMatch(/typing\.indicator/)
+    expect(chat).toMatch(/conversation-typing/)
+    expect(chat).toMatch(/typing-bubble/)
+    expect(chat).toMatch(/typing-dot/)
+    expect(chat).toMatch(/onComposerInput/)
+  })
+
+  it('displays seen receipt indicator for read messages', () => {
+    const store = readSrc('../stores/chat.ts')
+    expect(store).toMatch(/markAsRead/)
+    expect(store).toMatch(/message\.read/)
+    expect(chat).toMatch(/seen-indicator/)
+    expect(chat).toMatch(/isMessageSeenByPeer/)
+    expect(types).toMatch(/peerLastReadMessageId\?: string/)
+  })
 })
 

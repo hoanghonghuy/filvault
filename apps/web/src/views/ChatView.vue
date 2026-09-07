@@ -250,6 +250,71 @@ function sendQuickWave() {
   void sendText()
 }
 
+const peekOpen = ref(false)
+const peekConv = ref<ChatConversation | null>(null)
+const peekMessages = ref<ChatMessage[]>([])
+const peekLoading = ref(false)
+
+async function openPeekPreview(conv: ChatConversation) {
+  convMenuOpen.value = false
+  peekConv.value = conv
+  peekLoading.value = true
+  peekMessages.value = []
+  peekOpen.value = true
+  try {
+    const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${conv.id}/messages?limit=6`)
+    peekMessages.value = out.messages
+  } catch {
+    ui.showToast('Không thể tải tin nhắn xem trước', 'error')
+  } finally {
+    peekLoading.value = false
+  }
+}
+
+function openChatFromPeek() {
+  if (!peekConv.value) return
+  const id = peekConv.value.id
+  peekOpen.value = false
+  void selectConversation(id)
+}
+
+function isConversationUnread(conv: ChatConversation): boolean {
+  if (conv.id === selectedId.value) return false
+  return (conv.unreadCount ?? 0) > 0
+}
+
+function isMessageSeenByPeer(message: ChatMessage, index: number): boolean {
+  if (message.senderId !== auth.user?.id || !selectedConversation.value) return false
+  const list = visibleMessages.value
+  let lastOutgoingIndex = -1
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i]?.senderId === auth.user?.id) {
+      lastOutgoingIndex = i
+      break
+    }
+  }
+  if (index !== lastOutgoingIndex) return false
+  const peerReadMsgId = selectedConversation.value.peerLastReadMessageId
+  const peerReadAt = selectedConversation.value.peerLastReadAt
+  if (peerReadMsgId && peerReadMsgId === message.id) return true
+  if (peerReadAt && new Date(message.createdAt).getTime() <= new Date(peerReadAt).getTime()) return true
+  return false
+}
+
+let typingTimer: ReturnType<typeof setTimeout> | null = null
+
+function onComposerInput() {
+  autoGrow()
+  if (selectedId.value) {
+    void chatStore.sendTyping(selectedId.value, true)
+    if (typingTimer) clearTimeout(typingTimer)
+    typingTimer = setTimeout(() => {
+      if (selectedId.value) void chatStore.sendTyping(selectedId.value, false)
+    }, 2500)
+  }
+}
+
+
 function updateViewport() {
   isMobile.value = window.matchMedia('(max-width: 767px)').matches
 }
@@ -341,6 +406,8 @@ async function selectConversation(id: string) {
   await nextTick()
   scrollToLatest()
   focusComposer()
+  const latestMsg = messages.value[messages.value.length - 1]
+  void chatStore.markAsRead(id, latestMsg?.id)
 }
 
 async function loadMessages(id = selectedId.value) {
@@ -358,6 +425,9 @@ async function loadMessages(id = selectedId.value) {
     nextBefore.value = out.nextBefore ?? null
     pendingMessage.value = null
     showJump.value = false
+    if (out.messages.length > 0) {
+      void chatStore.markAsRead(id, out.messages[out.messages.length - 1]?.id)
+    }
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load messages')
   } finally {
@@ -586,6 +656,8 @@ async function sendText() {
   pendingMessageError.value = ''
   draft.value = ''
   sending.value = true
+  if (typingTimer) clearTimeout(typingTimer)
+  void chatStore.sendTyping(conversationId, false)
   await nextTick()
   autoGrow()
   error.value = ''
@@ -845,7 +917,10 @@ watch(
           :key="conv.id"
           type="button"
           class="conversation-row"
-          :class="{ active: conv.id === selectedId }"
+          :class="{
+            active: conv.id === selectedId,
+            unread: isConversationUnread(conv),
+          }"
           :aria-current="conv.id === selectedId ? 'true' : undefined"
           @click="handleConvRowClick(conv.id)"
           @touchstart.passive="onConvTouchStart($event, conv)"
@@ -861,9 +936,18 @@ watch(
           <span class="conversation-meta">
             <span class="conversation-top">
               <span class="conversation-title">{{ conversationTitle(conv) }}</span>
-              <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
+              <span class="conversation-date" :class="{ 'unread-date': isConversationUnread(conv) }">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
             </span>
-            <span class="conversation-preview">{{ conversationPreview(conv) }}</span>
+            <span class="conversation-bottom">
+              <span v-if="chatStore.typingUsers[conv.id]" class="conversation-typing">
+                <span class="typing-pulse-dot" />
+                <span>{{ t.isTyping }}</span>
+              </span>
+              <span v-else class="conversation-preview">{{ conversationPreview(conv) }}</span>
+              <span v-if="isConversationUnread(conv)" class="unread-badge">
+                {{ (conv.unreadCount ?? 0) > 1 ? conv.unreadCount : '' }}
+              </span>
+            </span>
           </span>
         </button>
       </nav>
@@ -1021,8 +1105,36 @@ watch(
                     <span class="bubble-time">{{ formatTime(message.createdAt) }}</span>
                   </article>
                 </div>
+                <div v-if="isMessageSeenByPeer(message, index)" class="seen-indicator">
+                  <span
+                    class="seen-avatar"
+                    :class="avatarClass(conversationTitle(selectedConversation))"
+                    :title="`${t.seenAt} ${formatTime(selectedConversation?.peerLastReadAt || message.createdAt)}`"
+                  >
+                    {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+                  </span>
+                  <span class="seen-text">{{ t.seen }}</span>
+                </div>
               </template>
             </TransitionGroup>
+            <!-- Typing indicator in thread -->
+            <div
+              v-if="selectedConversation && chatStore.typingUsers[selectedConversation.id]"
+              class="message-row typing-row"
+            >
+              <span
+                class="row-avatar"
+                :class="avatarClass(conversationTitle(selectedConversation))"
+                aria-hidden="true"
+              >
+                {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+              </span>
+              <div class="typing-bubble" :aria-label="`${conversationTitle(selectedConversation)} ${t.isTyping}`">
+                <span class="typing-dot" />
+                <span class="typing-dot" />
+                <span class="typing-dot" />
+              </div>
+            </div>
             <Transition name="msg">
               <div v-if="pendingMessage" class="message-row outgoing cluster-single">
                 <article class="message-bubble pending outgoing" :class="{ 'has-like': pendingMessage.body === '👍' }" aria-live="polite">
@@ -1076,7 +1188,7 @@ watch(
             rows="1"
             placeholder="Aa"
             :disabled="sending"
-            @input="autoGrow"
+            @input="onComposerInput"
             @keydown.enter="onComposerKeydown"
           ></textarea>
           <button
@@ -1262,6 +1374,10 @@ watch(
         <div class="sheet-message-preview">
           <strong>{{ conversationTitle(activeConv) }}</strong>
         </div>
+        <button type="button" class="sheet-action-item" @click="openPeekPreview(activeConv)">
+          <Icon name="eye" :size="18" />
+          <span>{{ t.peekPreview }}</span>
+        </button>
         <button type="button" class="sheet-action-item" @click="selectConversation(activeConv.id); convMenuOpen = false">
           <Icon name="chat" :size="18" />
           <span>{{ t.openChat }}</span>
@@ -1274,6 +1390,48 @@ watch(
           <Icon name="trash" :size="18" />
           <span>{{ t.deleteChat }}</span>
         </button>
+      </div>
+    </BottomSheet>
+
+    <!-- Peek Preview BottomSheet (Xem trước không dính đã xem) -->
+    <BottomSheet :open="peekOpen" :title="t.peekPreview" @close="peekOpen = false">
+      <div v-if="peekConv" class="peek-preview-content">
+        <div class="peek-preview-header">
+          <span class="peek-avatar" :class="avatarClass(conversationTitle(peekConv))" aria-hidden="true">
+            {{ conversationTitle(peekConv).slice(0, 1).toUpperCase() }}
+          </span>
+          <div class="peek-meta">
+            <h4>{{ conversationTitle(peekConv) }}</h4>
+            <span class="peek-badge">Chế độ xem trước • Chưa dính đã xem</span>
+          </div>
+        </div>
+
+        <div v-if="peekLoading" class="peek-loading">
+          <p>Đang tải tin nhắn…</p>
+        </div>
+        <div v-else-if="!peekMessages.length" class="peek-empty">
+          <p>{{ t.noMessagesYet }}</p>
+        </div>
+        <div v-else class="peek-messages-list">
+          <div
+            v-for="msg in peekMessages"
+            :key="msg.id"
+            class="peek-message-row"
+            :class="{ outgoing: msg.senderId === auth.user?.id }"
+          >
+            <div class="peek-bubble" :class="{ outgoing: msg.senderId === auth.user?.id }">
+              <p v-if="msg.body">{{ msg.body }}</p>
+              <span class="peek-time">{{ formatTime(msg.createdAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="peek-actions">
+          <button type="button" class="btn ink peek-open-btn" @click="openChatFromPeek">
+            <Icon name="chat" :size="16" />
+            <span>{{ t.openChat }}</span>
+          </button>
+        </div>
       </div>
     </BottomSheet>
 
@@ -1923,12 +2081,84 @@ watch(
   margin-left: auto;
 }
 
+.conversation-row.unread .conversation-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.conversation-row.unread .conversation-preview {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.unread-date {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+.conversation-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
 .conversation-preview {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
   font-size: 13px;
+  min-width: 0;
+  flex: 1;
+}
+
+.unread-badge {
+  min-width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.unread-badge:not(:empty) {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--accent);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typing-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  animation: pulseDot 1s infinite alternate;
+  flex-shrink: 0;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.2); opacity: 1; }
 }
 
 .message-thread {
@@ -2910,6 +3140,172 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Seen indicator */
+.seen-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 2px 4px 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.seen-avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  font-size: 8px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seen-text {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Typing indicator in thread */
+.typing-row {
+  margin-top: 4px;
+}
+
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 4px;
+  background: var(--surface-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: fit-content;
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* Peek preview BottomSheet */
+.peek-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-bottom: var(--space-md);
+}
+
+.peek-preview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.peek-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.peek-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.peek-meta h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.peek-badge {
+  font-size: 11px;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.peek-loading,
+.peek-empty {
+  padding: var(--space-lg) var(--space-sm);
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.peek-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.peek-message-row {
+  display: flex;
+  width: 100%;
+}
+
+.peek-message-row.outgoing {
+  justify-content: flex-end;
+}
+
+.peek-bubble {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--surface-card);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.peek-bubble.outgoing {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.peek-time {
+  display: block;
+  font-size: 10px;
+  opacity: 0.6;
+  text-align: right;
+  margin-top: 2px;
+}
+
+.peek-actions {
+  padding-top: var(--space-xs);
+}
+
+.peek-open-btn {
+  width: 100%;
+  justify-content: center;
+  border-radius: var(--radius-pill);
 }
 
 </style>

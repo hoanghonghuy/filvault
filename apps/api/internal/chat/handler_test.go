@@ -1024,3 +1024,109 @@ func getAuth(t *testing.T, engine http.Handler, path, token string) (int, string
 func deleteAuth(t *testing.T, engine http.Handler, path, token string) (int, string) {
 	return doJSON(t, engine, http.MethodDelete, path, token, nil)
 }
+
+func TestChat_ReadReceiptAndTypingIndicator(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	tokenA := registerVerified(t, engine, mem, uniqueEmail())
+	emailB := uniqueEmail()
+	tokenB := registerVerified(t, engine, mem, emailB)
+
+	// User A creates direct chat with User B
+	code, body := postAuth(t, engine, "/api/v1/chat/direct-conversations", tokenA, map[string]any{
+		"recipientEmail": emailB,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("create direct conversation status=%d body=%s", code, body)
+	}
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	// User A sends typing signal
+	code, _ = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/typing", tokenA, map[string]any{
+		"typing": true,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("send typing status=%d", code)
+	}
+
+	// User A sends a message
+	code, body = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", tokenA, map[string]any{
+		"body": "Hi there from A",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("send message status=%d body=%s", code, body)
+	}
+	var msg struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &msg)
+
+	// User B lists conversations: unreadCount should be 1
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("list convs B status=%d body=%s", code, body)
+	}
+	var listB struct {
+		Conversations []struct {
+			ID          string `json:"id"`
+			UnreadCount int    `json:"unreadCount"`
+		} `json:"conversations"`
+	}
+	decodeJSON(t, body, &listB)
+	if len(listB.Conversations) == 0 || listB.Conversations[0].UnreadCount != 1 {
+		t.Fatalf("expected B unreadCount=1, got %+v", listB)
+	}
+
+	// User A lists conversations: unreadCount should be 0 (A's own message)
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list convs A status=%d body=%s", code, body)
+	}
+	var listA struct {
+		Conversations []struct {
+			ID          string `json:"id"`
+			UnreadCount int    `json:"unreadCount"`
+		} `json:"conversations"`
+	}
+	decodeJSON(t, body, &listA)
+	if len(listA.Conversations) == 0 || listA.Conversations[0].UnreadCount != 0 {
+		t.Fatalf("expected A unreadCount=0, got %+v", listA)
+	}
+
+	// User B marks as read
+	code, _ = postAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/read", tokenB, map[string]any{
+		"messageId": msg.ID,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("mark as read status=%d", code)
+	}
+
+	// User B lists conversations again: unreadCount should now be 0
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("list convs B status=%d", code)
+	}
+	decodeJSON(t, body, &listB)
+	if listB.Conversations[0].UnreadCount != 0 {
+		t.Fatalf("expected B unreadCount=0 after reading, got %d", listB.Conversations[0].UnreadCount)
+	}
+
+	// User A lists conversations: peerLastReadMessageId should match msg.ID
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list convs A status=%d", code)
+	}
+	var listAAfter struct {
+		Conversations []struct {
+			ID                    string `json:"id"`
+			PeerLastReadMessageID string `json:"peerLastReadMessageId"`
+		} `json:"conversations"`
+	}
+	decodeJSON(t, body, &listAAfter)
+	if listAAfter.Conversations[0].PeerLastReadMessageID != msg.ID {
+		t.Fatalf("expected A to see peerLastReadMessageId=%s, got %s", msg.ID, listAAfter.Conversations[0].PeerLastReadMessageID)
+	}
+}
+

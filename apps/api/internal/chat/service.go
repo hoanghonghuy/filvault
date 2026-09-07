@@ -35,6 +35,8 @@ type Repository interface {
 	ListEventsAfter(ctx context.Context, userID string, after int64, limit int) ([]Event, error)
 	CompleteAttachment(ctx context.Context, ownerID, conversationID string, f file.File, stat objectstore.ObjectStat, body string, now time.Time) (Message, error)
 	InsertChatEvent(ctx context.Context, conversationID, eventType, aggregateID string, payload []byte, now time.Time) error
+	MarkAsRead(ctx context.Context, userID, conversationID, messageID string, now time.Time) error
+	ListConversationReadStates(ctx context.Context, userID string) (map[string]ReadState, error)
 }
 
 type UserDirectory interface {
@@ -61,6 +63,20 @@ type CallSignal struct {
 	Timestamp      string `json:"timestamp"`
 }
 
+type ReadSignal struct {
+	ConversationID    string `json:"conversationId"`
+	UserID            string `json:"userId"`
+	LastReadMessageID string `json:"lastReadMessageId,omitempty"`
+	LastReadAt        string `json:"lastReadAt"`
+}
+
+type TypingSignal struct {
+	ConversationID string `json:"conversationId"`
+	UserID         string `json:"userId"`
+	UserName       string `json:"userName"`
+	Typing         bool   `json:"typing"`
+}
+
 type MessagePage struct {
 	Messages   []Message
 	HasMore    bool
@@ -69,7 +85,12 @@ type MessagePage struct {
 
 type ConversationView struct {
 	Conversation
-	Preview *ConversationPreview `json:"preview,omitempty"`
+	Preview               *ConversationPreview `json:"preview,omitempty"`
+	UnreadCount           int                  `json:"unreadCount"`
+	LastReadAt            *time.Time           `json:"lastReadAt,omitempty"`
+	LastReadMessageID     string               `json:"lastReadMessageId,omitempty"`
+	PeerLastReadAt        *time.Time           `json:"peerLastReadAt,omitempty"`
+	PeerLastReadMessageID string               `json:"peerLastReadMessageId,omitempty"`
 }
 
 type Service struct {
@@ -219,9 +240,19 @@ func (s *Service) ListConversationsWithPreview(ctx context.Context, ownerID stri
 	if err != nil {
 		return nil, err
 	}
+	readStates, _ := s.repo.ListConversationReadStates(ctx, ownerID)
 	out := make([]ConversationView, 0, len(conversations))
 	for _, conv := range conversations {
 		view := ConversationView{Conversation: conv}
+		if readStates != nil {
+			if rs, ok := readStates[conv.ID]; ok {
+				view.UnreadCount = rs.UnreadCount
+				view.LastReadAt = rs.LastReadAt
+				view.LastReadMessageID = rs.LastReadMessageID
+				view.PeerLastReadAt = rs.PeerLastReadAt
+				view.PeerLastReadMessageID = rs.PeerLastReadMessageID
+			}
+		}
 		preview, err := s.repo.LastMessageForConversation(ctx, ownerID, conv.ID)
 		if err != nil {
 			return nil, err
@@ -457,3 +488,52 @@ func (s *Service) SendCallSignal(ctx context.Context, userID, conversationID, ac
 	}
 	return s.repo.InsertChatEvent(ctx, conversationID, "call.signal", conversationID, payload, now)
 }
+
+func (s *Service) MarkAsRead(ctx context.Context, userID, conversationID, messageID string) error {
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return err
+	}
+	now := s.now().UTC()
+	if err := s.repo.MarkAsRead(ctx, userID, conversationID, messageID, now); err != nil {
+		return err
+	}
+	signal := ReadSignal{
+		ConversationID:    conversationID,
+		UserID:            userID,
+		LastReadMessageID: strings.TrimSpace(messageID),
+		LastReadAt:        now.Format(time.RFC3339Nano),
+	}
+	payload, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+	return s.repo.InsertChatEvent(ctx, conversationID, "message.read", conversationID, payload, now)
+}
+
+func (s *Service) SendTyping(ctx context.Context, userID, conversationID string, typing bool) error {
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return err
+	}
+	var name string
+	if s.users != nil {
+		if u, err := s.users.GetUserByID(ctx, userID); err == nil && u != nil {
+			name = u.DisplayName
+		}
+	}
+	if name == "" {
+		name = userID
+	}
+	now := s.now().UTC()
+	signal := TypingSignal{
+		ConversationID: conversationID,
+		UserID:         userID,
+		UserName:       name,
+		Typing:         typing,
+	}
+	payload, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+	return s.repo.InsertChatEvent(ctx, conversationID, "typing.indicator", conversationID, payload, now)
+}
+

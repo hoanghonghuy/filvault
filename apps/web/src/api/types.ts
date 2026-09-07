@@ -165,6 +165,11 @@ export interface ChatConversation {
   createdAt: string
   updatedAt: string
   lastMessageAt?: string
+  unreadCount?: number
+  lastReadAt?: string
+  lastReadMessageId?: string
+  peerLastReadAt?: string
+  peerLastReadMessageId?: string
   preview?: {
     messageId: string
     body: string
