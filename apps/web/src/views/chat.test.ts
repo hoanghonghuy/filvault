@@ -285,6 +285,34 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/chat-info-links-list/)
     expect(chat).toMatch(/media-panel-tabs/)
   })
+
+  it('supports custom and preset chat wallpapers with live preview and persistent storage', () => {
+    expect(chat).toMatch(/CHAT_WALLPAPER_PRESETS/)
+    expect(chat).toMatch(/chatWallpapers/)
+    expect(chat).toMatch(/threadWallpaper/)
+    expect(chat).toMatch(/threadWallpaperBackground/)
+    expect(chat).toMatch(/setConversationWallpaper/)
+    expect(chat).toMatch(/handleWallpaperUpload/)
+    expect(chat).toMatch(/openWallpaperSubPage/)
+    expect(chat).toMatch(/has-wallpaper/)
+    expect(chat).toMatch(/info-wallpaper-page/)
+    expect(chat).toMatch(/wallpaper-preview-card/)
+    expect(chat).toMatch(/wallpaper-presets-grid/)
+  })
+
+  it('supports desktop 3-column sidebar, collapsible accordions and Messenger subpages', () => {
+    expect(chat).toMatch(/chat-info-sidebar/)
+    expect(chat).toMatch(/isDesktop/)
+    expect(chat).toMatch(/desktopInfoOpen/)
+    expect(chat).toMatch(/infoSectionsOpen/)
+    expect(chat).toMatch(/toggleInfoSection/)
+    expect(chat).toMatch(/menu-section-header-btn/)
+    expect(chat).toMatch(/info-search-results-tag/)
+    expect(chat).toMatch(/search-item-avatar/)
+    expect(chat).toMatch(/search-enter-hint/)
+    expect(chat).toMatch(/formatSearchSnippet/)
+    expect(chat).toMatch(/shared-file-item/)
+  })
 })
 
 

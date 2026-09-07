@@ -207,9 +207,8 @@ function handleStickerClick(sticker: Sticker) {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-[data-theme='dark'] .type-switch-btn.active,
-:root:not([data-theme='light']) .type-switch-btn.active {
-  background: #3a3b3c;
+:global([data-theme='dark']) .type-switch-btn.active {
+  background: var(--surface-card, #242526);
   color: #ffffff;
 }
 
@@ -267,19 +266,18 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .picker-cat-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--ink, #ffffff);
+  background: var(--surface-soft, rgba(0, 0, 0, 0.05));
+  color: var(--ink, #050505);
 }
 
-[data-theme='light'] .picker-cat-btn:hover,
-:root:not([data-theme='dark']) .picker-cat-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #050505;
+:global([data-theme='dark']) .picker-cat-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .picker-cat-btn.active {
-  background: var(--brand, #0084ff);
-  border-color: var(--brand, #0084ff);
+  background: var(--accent, #0084ff);
+  border-color: var(--accent, #0084ff);
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
 }
@@ -343,18 +341,16 @@ function handleStickerClick(sticker: Sticker) {
 .picker-item-btn:hover,
 .picker-item-btn:active {
   transform: scale(1.22);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-soft, rgba(0, 0, 0, 0.06));
 }
 
-[data-theme='light'] .picker-item-btn:hover,
-:root:not([data-theme='dark']) .picker-item-btn:hover,
-[data-theme='light'] .picker-item-btn:active,
-:root:not([data-theme='dark']) .picker-item-btn:active {
-  background: rgba(0, 0, 0, 0.06);
+:global([data-theme='dark']) .picker-item-btn:hover,
+:global([data-theme='dark']) .picker-item-btn:active {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .picker-item-btn.item-reacted {
   background: rgba(0, 132, 255, 0.2);
-  box-shadow: inset 0 0 0 1.5px var(--brand, #0084ff);
+  box-shadow: inset 0 0 0 1.5px var(--accent, #0084ff);
 }
 </style>

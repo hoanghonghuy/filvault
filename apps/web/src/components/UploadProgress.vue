@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{
   progress: number | null
+  label?: string
 }>()
 
 const percent = () => Math.round((props.progress ?? 0) * 100)
@@ -9,7 +10,7 @@ const percent = () => Math.round((props.progress ?? 0) * 100)
 <template>
   <div v-if="progress !== null" class="upload-progress" aria-live="polite">
     <div class="upload-progress-head">
-      <span>Uploading…</span>
+      <span>{{ label || 'Đang tải lên…' }}</span>
       <span>{{ percent() }}%</span>
     </div>
     <div

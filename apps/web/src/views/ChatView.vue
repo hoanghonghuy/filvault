@@ -83,6 +83,214 @@ const threadThemeStyle = computed(() => ({
   '--chat-accent': currentTheme.value.color,
 }))
 
+export interface ChatWallpaperPreset {
+  id: string
+  name: string
+  value: string
+  preview: string
+  isDark?: boolean
+}
+
+const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
+  {
+    id: 'none',
+    name: 'Mặc định',
+    value: '',
+    preview: 'var(--canvas)',
+  },
+  {
+    id: 'doodle',
+    name: 'Doodle họa tiết',
+    value: `radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 60%), radial-gradient(circle at 10% 20%, rgba(236, 72, 153, 0.08) 0%, transparent 40%), url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.09' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")`,
+    preview: 'linear-gradient(135deg, #e0e7ff 0%, #fce7f3 100%)',
+  },
+  {
+    id: 'aurora',
+    name: 'Cực quang xanh',
+    value: 'radial-gradient(ellipse at 20% 20%, rgba(16, 185, 129, 0.35) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(59, 130, 246, 0.35) 0%, transparent 50%), linear-gradient(160deg, #091a24 0%, #0d2838 50%, #07131b 100%)',
+    preview: 'linear-gradient(135deg, #0d2838 0%, #10b981 100%)',
+    isDark: true,
+  },
+  {
+    id: 'sunset',
+    name: 'Hoàng hôn',
+    value: 'radial-gradient(circle at top right, rgba(244, 63, 94, 0.3) 0%, transparent 60%), radial-gradient(circle at bottom left, rgba(251, 146, 60, 0.3) 0%, transparent 60%), linear-gradient(145deg, #1e112a 0%, #2d1b4e 50%, #140924 100%)',
+    preview: 'linear-gradient(135deg, #2d1b4e 0%, #f43f5e 100%)',
+    isDark: true,
+  },
+  {
+    id: 'cosmos',
+    name: 'Vũ trụ huyền ảo',
+    value: 'radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.35) 0%, transparent 60%), radial-gradient(circle at 80% 90%, rgba(236, 72, 153, 0.25) 0%, transparent 50%), linear-gradient(180deg, #0a0818 0%, #130e2e 50%, #070512 100%)',
+    preview: 'linear-gradient(135deg, #130e2e 0%, #8b5cf6 100%)',
+    isDark: true,
+  },
+  {
+    id: 'emerald',
+    name: 'Rừng nhiệt đới',
+    value: 'radial-gradient(circle at 20% 80%, rgba(5, 150, 105, 0.3) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(52, 211, 153, 0.2) 0%, transparent 50%), linear-gradient(150deg, #061a14 0%, #0a2f24 50%, #04100c 100%)',
+    preview: 'linear-gradient(135deg, #0a2f24 0%, #10b981 100%)',
+    isDark: true,
+  },
+  {
+    id: 'sakura',
+    name: 'Hoa anh đào',
+    value: 'radial-gradient(circle at 30% 20%, rgba(251, 113, 133, 0.25) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(192, 132, 252, 0.2) 0%, transparent 50%), linear-gradient(135deg, #fdf2f8 0%, #fae8ff 50%, #f5f3ff 100%)',
+    preview: 'linear-gradient(135deg, #fdf2f8 0%, #f43f5e 100%)',
+  },
+  {
+    id: 'cyber',
+    name: 'Đêm Neon',
+    value: 'radial-gradient(circle at top left, rgba(6, 182, 212, 0.35) 0%, transparent 55%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.35) 0%, transparent 55%), linear-gradient(135deg, #09090b 0%, #18181b 50%, #09090b 100%)',
+    preview: 'linear-gradient(135deg, #06b6d4 0%, #ec4899 100%)',
+    isDark: true,
+  },
+]
+
+const STORAGE_KEY_WALLPAPERS = 'filvault.chat.wallpapers'
+
+function loadSavedWallpapers(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_WALLPAPERS)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveWallpapersToStorage(data: Record<string, string>) {
+  try {
+    localStorage.setItem(STORAGE_KEY_WALLPAPERS, JSON.stringify(data))
+  } catch (e) {
+    console.warn('Failed to save chat wallpapers to localStorage', e)
+  }
+}
+
+const chatWallpapers = ref<Record<string, string>>(loadSavedWallpapers())
+const wallpaperFileInputRef = ref<HTMLInputElement | null>(null)
+
+const threadWallpaper = computed(() => {
+  if (!selectedConversation.value) return null
+  return chatWallpapers.value[selectedConversation.value.id] || null
+})
+
+const threadWallpaperBackground = computed(() => {
+  if (!threadWallpaper.value) return ''
+  const preset = CHAT_WALLPAPER_PRESETS.find((p) => p.id === threadWallpaper.value)
+  if (preset) return preset.value
+  return `url("${threadWallpaper.value}")`
+})
+
+const currentWallpaperPresetName = computed(() => {
+  if (!threadWallpaper.value || threadWallpaper.value === 'none') return 'Mặc định'
+  const preset = CHAT_WALLPAPER_PRESETS.find((p) => p.id === threadWallpaper.value)
+  if (preset) return preset.name
+  return 'Ảnh tùy chỉnh'
+})
+
+const activePreviewStyle = computed(() => {
+  if (!threadWallpaper.value) return { background: 'var(--canvas)' }
+  const preset = CHAT_WALLPAPER_PRESETS.find((p) => p.id === threadWallpaper.value)
+  if (preset) {
+    return preset.value ? { backgroundImage: preset.value } : { background: 'var(--canvas)' }
+  }
+  return {
+    backgroundImage: `url("${threadWallpaper.value}")`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  }
+})
+
+function setConversationWallpaper(conversationId: string, wallpaperVal: string) {
+  if (wallpaperVal === 'none' || !wallpaperVal) {
+    const next = { ...chatWallpapers.value }
+    delete next[conversationId]
+    chatWallpapers.value = next
+    saveWallpapersToStorage(next)
+  } else {
+    const next = { ...chatWallpapers.value, [conversationId]: wallpaperVal }
+    chatWallpapers.value = next
+    saveWallpapersToStorage(next)
+  }
+}
+
+function selectWallpaperPreset(presetId: string) {
+  if (!selectedConversation.value) return
+  setConversationWallpaper(selectedConversation.value.id, presetId === 'none' ? '' : presetId)
+  ui.showToast(presetId === 'none' ? (t.value.wallpaperRemoved || 'Đã đặt lại hình nền') : (t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat'))
+}
+
+function removeConversationWallpaper() {
+  if (!selectedConversation.value) return
+  setConversationWallpaper(selectedConversation.value.id, '')
+  ui.showToast(t.value.wallpaperRemoved || 'Đã xóa hình nền đoạn chat')
+}
+
+function openWallpaperSubPage() {
+  chatInfoCurrentView.value = 'wallpaper'
+}
+
+function triggerWallpaperFileInput() {
+  wallpaperFileInputRef.value?.click()
+}
+
+function compressImageForWallpaper(file: File, maxDimension = 1280, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = reject
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = reject
+      img.onload = () => {
+        let width = img.width
+        let height = img.height
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width)
+            width = maxDimension
+          } else {
+            width = Math.round((width * maxDimension) / height)
+            height = maxDimension
+          }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(reader.result as string)
+          return
+        }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleWallpaperUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file || !selectedConversation.value) return
+
+  if (!file.type.startsWith('image/')) {
+    ui.showToast('Vui lòng chọn tệp hình ảnh')
+    return
+  }
+
+  try {
+    const dataUrl = await compressImageForWallpaper(file)
+    setConversationWallpaper(selectedConversation.value.id, dataUrl)
+    ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+  } catch {
+    ui.showToast('Không thể xử lý hình ảnh')
+  } finally {
+    target.value = ''
+  }
+}
+
 const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
 const stickerPickerOpen = ref(false)
 const selectedStickerCategory = ref<'expressions' | 'gestures' | 'pets' | 'fun'>('expressions')
@@ -229,12 +437,46 @@ function clearInfoSearch() {
   infoSearchDone.value = false
 }
 
-type ChatInfoView = 'main' | 'search' | 'media'
+type ChatInfoView = 'main' | 'search' | 'media' | 'wallpaper'
 const chatInfoCurrentView = ref<ChatInfoView>('main')
 
+const infoSectionsOpen = ref<Record<string, boolean>>({
+  customization: true,
+  media: true,
+  privacy: true,
+})
+
+function toggleInfoSection(section: 'customization' | 'media' | 'privacy') {
+  infoSectionsOpen.value[section] = !infoSectionsOpen.value[section]
+}
+
+function messageSenderAvatar(msg: ChatMessage): string | null {
+  if (msg.senderId === auth.user?.id) return auth.user?.avatarUrl || null
+  const c = conversations.value.find((item) => item.id === msg.conversationId)
+  return c?.peer?.avatarUrl || null
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function formatSearchSnippet(body: string, query: string): string {
+  if (!query.trim()) return escapeHtml(body)
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedQuery})`, 'gi')
+  const escapedBody = escapeHtml(body)
+  return escapedBody.replace(regex, '<mark class="search-match">$1</mark>')
+}
+
 const chatInfoTitle = computed(() => {
-  if (chatInfoCurrentView.value === 'search') return 'Tìm kiếm trong cuộc trò chuyện'
-  if (chatInfoCurrentView.value === 'media') return t.value.sharedMedia || 'File phương tiện & liên kết'
+  if (chatInfoCurrentView.value === 'search') return 'Tìm kiếm'
+  if (chatInfoCurrentView.value === 'media') return 'File phương tiện và file'
+  if (chatInfoCurrentView.value === 'wallpaper') return t.value.chatWallpaper || 'Hình nền đoạn chat'
   return t.value.chatInfo || 'Thông tin đoạn chat'
 })
 
@@ -260,6 +502,31 @@ function closeChatInfo() {
   threadInfoOpen.value = false
   chatInfoCurrentView.value = 'main'
   infoSearchOpen.value = false
+}
+
+function openChatInfo() {
+  if (isDesktop.value) {
+    desktopInfoOpen.value = true
+  } else {
+    threadInfoOpen.value = true
+  }
+}
+
+function toggleChatInfo() {
+  if (isDesktop.value) {
+    desktopInfoOpen.value = !desktopInfoOpen.value
+  } else {
+    threadInfoOpen.value = !threadInfoOpen.value
+  }
+}
+
+function closeDesktopInfo() {
+  if (chatInfoCurrentView.value !== 'main') {
+    chatInfoCurrentView.value = 'main'
+    infoSearchOpen.value = false
+  } else {
+    desktopInfoOpen.value = false
+  }
 }
 
 function toggleInfoSearch() {
@@ -315,6 +582,20 @@ function handleClickOutsideStickerPicker(event: MouseEvent | PointerEvent) {
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
 const isMobile = ref(false)
+const isDesktop = ref(false)
+const desktopInfoOpen = ref(
+  typeof localStorage !== 'undefined'
+    ? localStorage.getItem('filvault.chat.desktopInfoOpen') !== 'false'
+    : true,
+)
+
+watch(desktopInfoOpen, (val) => {
+  try {
+    localStorage.setItem('filvault.chat.desktopInfoOpen', String(val))
+  } catch {
+    // ignore
+  }
+})
 type AttachmentUploadStatus = 'queued' | 'uploading' | 'failed' | 'canceled'
 type AttachmentUpload = {
   id: string
@@ -607,6 +888,12 @@ async function deleteConversation(convId?: string) {
       void router.replace('/chat')
     }
   }
+  if (chatWallpapers.value[id]) {
+    const next = { ...chatWallpapers.value }
+    delete next[id]
+    chatWallpapers.value = next
+    saveWallpapersToStorage(next)
+  }
   ui.showToast('Đã xóa đoạn chat')
 }
 
@@ -751,6 +1038,7 @@ function isPeerTyping(conversationId?: string): boolean {
 
 function updateViewport() {
   isMobile.value = window.matchMedia('(max-width: 767px)').matches
+  isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
 }
 
 function promptNewConversation() {
@@ -1502,15 +1790,6 @@ watch(
     </aside>
 
     <section class="message-thread" aria-live="polite" :style="threadThemeStyle">
-      <p
-        v-if="chatStore.connectionState !== 'connected'"
-        class="connection-status"
-        role="status"
-        :title="t.retry || 'Thử lại'"
-        @click="chatStore.connectEvents()"
-      >
-        {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
-      </p>
       <template v-if="selectedConversation">
         <header class="thread-header">
           <!-- aria-label="Back" -->
@@ -1522,8 +1801,8 @@ watch(
             role="button"
             tabindex="0"
             :title="t.chatInfo"
-            @click="threadInfoOpen = true"
-            @keydown.enter="threadInfoOpen = true"
+            @click="openChatInfo"
+            @keydown.enter="openChatInfo"
           >
             <img
               v-if="selectedConversation?.peer?.avatarUrl"
@@ -1568,16 +1847,27 @@ watch(
               <Icon name="camera" :size="18" />
             </button>
             <button
-              class="icon-btn"
+              class="icon-btn thread-info-btn"
+              :class="{ active: isDesktop ? desktopInfoOpen : threadInfoOpen }"
               type="button"
               :aria-label="t.chatInfo"
               :title="t.chatInfo"
-              @click="threadInfoOpen = true"
+              @click="toggleChatInfo"
             >
               <Icon name="info" :size="18" />
             </button>
           </div>
         </header>
+
+        <p
+          v-if="chatStore.connectionState !== 'connected'"
+          class="connection-status"
+          role="status"
+          :title="t.retry || 'Thử lại'"
+          @click="chatStore.connectEvents()"
+        >
+          {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
+        </p>
 
         <form v-if="threadSearchOpen" class="chat-search" @submit.prevent="searchMessages">
           <label class="sr-only" for="chat-search">{{ t.search }}</label>
@@ -1591,11 +1881,13 @@ watch(
         <div
           ref="threadBodyRef"
           class="message-body"
+          :class="{ 'has-wallpaper': Boolean(threadWallpaperBackground) }"
+          :style="threadWallpaperBackground ? { backgroundImage: threadWallpaperBackground } : undefined"
           :aria-busy="loadingThread"
           @scroll.passive="onThreadScroll"
         >
           <LoadingSkeletonThread v-if="loadingThread" />
-          <p v-else-if="loadingOlder" class="loading-older">Loading older…</p>
+          <p v-else-if="loadingOlder" class="loading-older">{{ t.loadingOlder || 'Đang tải tin nhắn cũ hơn…' }}</p>
           <div v-else-if="visibleMessages.length" class="message-list">
             <TransitionGroup name="msg">
               <template v-for="(message, index) in visibleMessages" :key="message.id">
@@ -1797,7 +2089,7 @@ watch(
           <Transition name="msg">
             <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest">
               <Icon name="download" :size="16" />
-              <span>Latest</span>
+              <span>{{ t.latest || 'Mới nhất' }}</span>
             </button>
           </Transition>
         </div>
@@ -1872,7 +2164,22 @@ watch(
           <input id="chat-attachment" ref="fileInputRef" type="file" class="sr-only" @change="onAttachmentChange" />
         </form>
       </template>
-      <EmptyState v-else title="Select a chat" description="Pick a conversation from the list or create a new one." icon="chat" />
+      <template v-else>
+        <p
+          v-if="chatStore.connectionState !== 'connected'"
+          class="connection-status"
+          role="status"
+          :title="t.retry || 'Thử lại'"
+          @click="chatStore.connectEvents()"
+        >
+          {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
+        </p>
+        <EmptyState
+          :title="t.selectChat || 'Chọn một đoạn chat'"
+          :description="t.selectChatDesc || 'Chọn một cuộc trò chuyện từ danh sách hoặc bắt đầu cuộc trò chuyện mới.'"
+          icon="chat"
+        />
+      </template>
     </section>
 
     <aside class="media-panel" aria-label="Shared media">
@@ -1987,6 +2294,452 @@ watch(
           </div>
         </div>
         <p v-else class="muted-hint">{{ t.noSharedLinks }}</p>
+      </div>
+    </aside>
+
+    <!-- Desktop 3rd Column: Chat Info Sidebar (Messenger style) -->
+    <aside
+      v-if="selectedConversation && isDesktop && desktopInfoOpen"
+      class="chat-info-sidebar"
+      aria-label="Chat details"
+    >
+      <div class="desktop-info-header">
+        <span class="desktop-info-header-title">{{ chatInfoTitle }}</span>
+        <button
+          type="button"
+          class="icon-btn desktop-info-close-btn"
+          :aria-label="t.close"
+          :title="t.close"
+          @click="closeDesktopInfo"
+        >
+          <Icon name="close" :size="18" />
+        </button>
+      </div>
+
+      <div class="chat-info-content">
+        <!-- Sub-page Navigation Header for Search, Media and Wallpaper -->
+        <div v-if="chatInfoCurrentView !== 'main'" class="info-subpage-nav">
+          <button type="button" class="subpage-back-btn" @click="returnToMainInfo">
+            <Icon name="arrow-left" :size="18" />
+            <span>{{ t.back }}</span>
+          </button>
+          <span class="subpage-title">{{ chatInfoTitle }}</span>
+          <button type="button" class="subpage-close-btn" :aria-label="t.close" @click="closeDesktopInfo">
+            <Icon name="close" :size="16" />
+          </button>
+        </div>
+
+        <!-- 1. MAIN INFO VIEW -->
+        <div v-if="chatInfoCurrentView === 'main'" class="info-main-view">
+          <div class="chat-info-header">
+            <img
+              v-if="selectedConversation?.peer?.avatarUrl"
+              :src="selectedConversation.peer.avatarUrl"
+              class="chat-info-avatar avatar-img"
+              alt=""
+            />
+            <span v-else class="chat-info-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
+              {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
+            </span>
+            <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
+            <span
+              v-if="isPeerOnline(selectedConversation) || formatLastSeen(selectedConversation)"
+              class="chat-info-status"
+              :class="{ online: isPeerOnline(selectedConversation) }"
+            >
+              {{ isPeerOnline(selectedConversation) ? t.activeNow : formatLastSeen(selectedConversation) }}
+            </span>
+          </div>
+
+          <div class="chat-info-actions">
+            <button
+              type="button"
+              class="chat-info-action-btn"
+              @click="callStore.startCall(selectedConversation.id, { isVideo: false })"
+            >
+              <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
+              <span>Gọi thoại</span>
+            </button>
+            <button
+              type="button"
+              class="chat-info-action-btn"
+              @click="callStore.startCall(selectedConversation.id, { isVideo: true })"
+            >
+              <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
+              <span>Gọi video</span>
+            </button>
+            <button
+              type="button"
+              class="chat-info-action-btn"
+              @click="openInfoSearchView"
+            >
+              <span class="action-icon-circle"><Icon name="search" :size="18" /></span>
+              <span>{{ t.search }}</span>
+            </button>
+          </div>
+
+          <!-- Section 1: Chat options -->
+          <div class="menu-section">
+            <button
+              type="button"
+              class="menu-section-header-btn"
+              @click="toggleInfoSection('customization')"
+            >
+              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <Icon
+                :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
+                :size="16"
+                class="section-chevron"
+              />
+            </button>
+            <div v-show="infoSectionsOpen.customization" class="menu-items-group">
+              <div class="theme-picker-row">
+                <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
+                <span class="menu-item-text">{{ t.themeColor }}</span>
+                <div class="theme-dots">
+                  <button
+                    v-for="th in chatThemes"
+                    :key="th.id"
+                    type="button"
+                    class="theme-dot"
+                    :style="{ backgroundColor: th.color }"
+                    :class="{ active: activeTheme === th.id }"
+                    :title="th.name"
+                    :aria-label="th.name"
+                    @click="activeTheme = th.id"
+                  />
+                </div>
+              </div>
+
+              <button type="button" class="menu-row-item" @click="openWallpaperSubPage">
+                <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
+                <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
+                <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+
+              <button type="button" class="menu-row-item" @click="changeNickname">
+                <span class="menu-item-icon badge-folder"><Icon name="pencil" :size="18" /></span>
+                <span class="menu-item-text">{{ t.changeNickname }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+
+              <button type="button" class="menu-row-item" @click="openInfoSearchView">
+                <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
+                <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Media, Files & Links -->
+          <div class="menu-section">
+            <button
+              type="button"
+              class="menu-section-header-btn"
+              @click="toggleInfoSection('media')"
+            >
+              <span class="menu-section-label">{{ t.sharedMedia || 'File phương tiện và file' }}</span>
+              <Icon
+                :name="infoSectionsOpen.media ? 'chevron-up' : 'chevron-down'"
+                :size="16"
+                class="section-chevron"
+              />
+            </button>
+            <div v-show="infoSectionsOpen.media" class="menu-items-group">
+              <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
+                <span class="menu-item-icon badge-theme"><Icon name="photos" :size="18" /></span>
+                <span class="menu-item-text">{{ t.photosAndVideos || 'File phương tiện' }}</span>
+                <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+              <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
+                <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
+                <span class="menu-item-text">{{ t.files || 'File' }}</span>
+                <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+              <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
+                <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
+                <span class="menu-item-text">{{ t.links || 'Liên kết' }}</span>
+                <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 3: Privacy & Actions -->
+          <div class="menu-section">
+            <button
+              type="button"
+              class="menu-section-header-btn"
+              @click="toggleInfoSection('privacy')"
+            >
+              <span class="menu-section-label">Quyền riêng tư và hỗ trợ</span>
+              <Icon
+                :name="infoSectionsOpen.privacy ? 'chevron-up' : 'chevron-down'"
+                :size="16"
+                class="section-chevron"
+              />
+            </button>
+            <div v-show="infoSectionsOpen.privacy" class="menu-items-group">
+              <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
+                <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : (t.muteChat || 'Tắt thông báo') }}</span>
+              </button>
+              <button type="button" class="menu-row-item danger-item" @click="deleteConversation(selectedConversation.id)">
+                <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
+                <span class="menu-item-text danger-text">{{ t.deleteChat }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. SEARCH SUB-PAGE -->
+        <div v-else-if="chatInfoCurrentView === 'search'" class="info-search-page">
+          <div class="info-search-page-bar">
+            <Icon name="search" :size="16" class="info-search-icon" />
+            <input
+              ref="infoSearchInputRef"
+              v-model="infoSearchQuery"
+              type="search"
+              class="info-search-input"
+              :placeholder="t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện...'"
+              @input="onInfoSearchInput"
+              @keydown.enter.prevent="performInfoSearch"
+            />
+            <span
+              v-if="infoSearchDone && infoSearchResults.length"
+              class="info-search-results-tag"
+            >
+              {{ infoSearchResults.length }} kết quả
+            </span>
+            <button
+              v-if="infoSearchQuery"
+              type="button"
+              class="info-search-clear"
+              aria-label="Clear search"
+              @click="clearInfoSearch"
+            >
+              <Icon name="close" :size="14" />
+            </button>
+          </div>
+
+          <div v-if="infoSearching" class="subpage-status">
+            Đang tìm kiếm...
+          </div>
+          <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
+            <p class="search-enter-hint">Nhấn "Enter" để tìm kiếm.</p>
+          </div>
+          <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
+            <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
+          </div>
+          <div v-else-if="infoSearchResults.length" class="subpage-results-container">
+            <div class="info-search-list">
+              <button
+                v-for="msg in infoSearchResults"
+                :key="msg.id"
+                type="button"
+                class="info-search-item"
+                @click="jumpToMessageFromInfo(msg)"
+              >
+                <div class="search-item-avatar">
+                  <img
+                    v-if="messageSenderAvatar(msg)"
+                    :src="messageSenderAvatar(msg)!"
+                    class="avatar-img"
+                    alt=""
+                  />
+                  <span
+                    v-else
+                    class="avatar-fallback"
+                    :class="avatarClass(messageSenderName(msg))"
+                  >
+                    {{ messageSenderName(msg).slice(0, 1).toUpperCase() }}
+                  </span>
+                </div>
+                <div class="info-search-item-content">
+                  <div class="info-search-sender-row">
+                    <span class="info-search-sender">{{ messageSenderName(msg) }}</span>
+                  </div>
+                  <div class="info-search-body info-search-body-row">
+                    <span class="info-search-snippet" v-html="formatSearchSnippet(msg.body, infoSearchQuery)" />
+                    <span class="info-search-dot">·</span>
+                    <span class="info-search-time">{{ formatRelativeDay(msg.createdAt) }}</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. MEDIA SUB-PAGE -->
+        <div v-else-if="chatInfoCurrentView === 'media'" class="info-media-page">
+          <div class="info-tabs-header" role="tablist">
+            <button
+              type="button"
+              class="info-tab-btn"
+              :class="{ active: activeMediaTab === 'media' }"
+              role="tab"
+              :aria-selected="activeMediaTab === 'media'"
+              @click="activeMediaTab = 'media'"
+            >
+              <span>{{ t.photosAndVideos }}</span>
+              <span v-if="sharedPhotos.length" class="tab-badge">{{ sharedPhotos.length }}</span>
+            </button>
+            <button
+              type="button"
+              class="info-tab-btn"
+              :class="{ active: activeMediaTab === 'file' }"
+              role="tab"
+              :aria-selected="activeMediaTab === 'file'"
+              @click="activeMediaTab = 'file'"
+            >
+              <span>{{ t.files }}</span>
+              <span v-if="sharedFiles.length" class="tab-badge">{{ sharedFiles.length }}</span>
+            </button>
+            <button
+              type="button"
+              class="info-tab-btn"
+              :class="{ active: activeMediaTab === 'link' }"
+              role="tab"
+              :aria-selected="activeMediaTab === 'link'"
+              @click="activeMediaTab = 'link'"
+            >
+              <span>{{ t.links }}</span>
+              <span v-if="sharedLinks.length" class="tab-badge">{{ sharedLinks.length }}</span>
+            </button>
+          </div>
+
+          <!-- Media Tab -->
+          <div v-if="activeMediaTab === 'media'" class="tab-content">
+            <div v-if="sharedPhotos.length" class="chat-info-media-grid">
+              <button
+                v-for="item in sharedPhotos"
+                :key="item.id"
+                type="button"
+                class="chat-info-media-thumb"
+                :title="item.name"
+                @click="openInlineImage(item)"
+              >
+                <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" :alt="item.name" loading="lazy" />
+                <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="20" />
+              </button>
+            </div>
+            <p v-else class="tab-empty-hint">{{ t.noSharedMedia }}</p>
+          </div>
+
+          <!-- Files Tab -->
+          <div v-else-if="activeMediaTab === 'file'" class="tab-content">
+            <div v-if="sharedFiles.length" class="chat-info-files-list">
+              <button
+                v-for="item in sharedFiles"
+                :key="item.id"
+                type="button"
+                class="shared-file-item"
+                @click="openAttachment(item.id)"
+              >
+                <span class="file-icon-wrap"><Icon name="file" :size="20" /></span>
+                <span class="file-details">
+                  <span class="file-title" :title="item.name">{{ item.name }}</span>
+                  <span class="file-sub">{{ formatBytes(item.sizeBytes) }} · {{ formatRelativeDay(item.createdAt) }}</span>
+                </span>
+                <span class="file-action-icon"><Icon name="download" :size="16" /></span>
+              </button>
+            </div>
+            <p v-else class="tab-empty-hint">{{ t.noSharedFiles }}</p>
+          </div>
+
+          <!-- Links Tab -->
+          <div v-else-if="activeMediaTab === 'link'" class="tab-content">
+            <div v-if="sharedLinks.length" class="chat-info-links-list">
+              <div
+                v-for="item in sharedLinks"
+                :key="item.messageId + '-' + item.url"
+                class="shared-link-card"
+              >
+                <a :href="item.url" target="_blank" rel="noopener noreferrer" class="shared-link-main">
+                  <span class="link-icon-wrap"><Icon name="link" :size="18" /></span>
+                  <span class="link-details">
+                    <span class="link-domain">{{ item.domain }}</span>
+                    <span class="link-url">{{ item.url }}</span>
+                  </span>
+                  <span class="link-external"><Icon name="external-link" :size="14" /></span>
+                </a>
+                <div class="link-footer">
+                  <span class="link-meta">{{ item.senderName }} · {{ formatRelativeDay(item.createdAt) }}</span>
+                  <button type="button" class="link-jump-btn" @click="jumpToMessageById(item.messageId)">
+                    {{ t.jumpToMessage }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-else class="tab-empty-hint">{{ t.noSharedLinks }}</p>
+          </div>
+        </div>
+
+        <!-- 4. WALLPAPER SUB-PAGE -->
+        <div v-else-if="chatInfoCurrentView === 'wallpaper'" class="info-wallpaper-page">
+          <!-- Live Preview Mockup -->
+          <div class="wallpaper-preview-card" :style="activePreviewStyle">
+            <div class="wallpaper-preview-overlay" />
+            <div class="wallpaper-preview-bubbles">
+              <div class="preview-bubble incoming">
+                <span>{{ conversationTitle(selectedConversation) }}</span>
+                <p>Giao diện chat trông thế nào? ✨</p>
+              </div>
+              <div class="preview-bubble outgoing" :style="{ background: currentTheme.gradient }">
+                <p>Rất đẹp và dễ nhìn! 👍</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Custom Upload & Reset Actions -->
+          <div class="wallpaper-actions-row">
+            <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
+              <Icon name="upload" :size="16" />
+              <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+            </button>
+            <button
+              v-if="threadWallpaper"
+              type="button"
+              class="wallpaper-action-btn secondary"
+              @click="removeConversationWallpaper"
+            >
+              <Icon name="trash" :size="16" />
+              <span>{{ t.resetWallpaper || 'Đặt lại mặc định' }}</span>
+            </button>
+          </div>
+          <input
+            ref="wallpaperFileInputRef"
+            type="file"
+            accept="image/*"
+            class="sr-only"
+            @change="handleWallpaperUpload"
+          />
+
+          <!-- Presets Grid -->
+          <div class="wallpaper-presets-section">
+            <span class="wallpaper-section-title">{{ t.chooseWallpaper || 'Hình nền có sẵn' }}</span>
+            <div class="wallpaper-presets-grid">
+              <button
+                v-for="wp in CHAT_WALLPAPER_PRESETS"
+                :key="wp.id"
+                type="button"
+                class="wallpaper-preset-item"
+                :class="{ active: (threadWallpaper === wp.id) || (!threadWallpaper && wp.id === 'none') }"
+                @click="selectWallpaperPreset(wp.id)"
+              >
+                <div class="wallpaper-preset-thumb" :style="{ background: wp.preview }">
+                  <span v-if="(threadWallpaper === wp.id) || (!threadWallpaper && wp.id === 'none')" class="preset-check-badge">
+                    <Icon name="check" :size="14" />
+                  </span>
+                </div>
+                <span class="wallpaper-preset-name">{{ wp.name }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -2291,16 +3044,19 @@ watch(
       </div>
     </BottomSheet>
 
-    <!-- Thread Info / Settings -->
-    <BottomSheet :open="threadInfoOpen" :title="chatInfoTitle" @close="closeChatInfo">
+    <!-- Thread Info / Settings (Mobile BottomSheet) -->
+    <BottomSheet v-if="!isDesktop" :open="threadInfoOpen" :title="chatInfoCurrentView === 'main' ? chatInfoTitle : undefined" @close="closeChatInfo">
       <div v-if="selectedConversation" class="chat-info-content">
-        <!-- Sub-page Navigation Header for Search and Media -->
+        <!-- Sub-page Navigation Header for Search, Media and Wallpaper -->
         <div v-if="chatInfoCurrentView !== 'main'" class="info-subpage-nav">
           <button type="button" class="subpage-back-btn" @click="returnToMainInfo">
             <Icon name="arrow-left" :size="18" />
             <span>{{ t.back }}</span>
           </button>
           <span class="subpage-title">{{ chatInfoTitle }}</span>
+          <button type="button" class="subpage-close-btn" :aria-label="t.close" @click="closeChatInfo">
+            <Icon name="close" :size="16" />
+          </button>
         </div>
 
         <!-- 1. MAIN INFO VIEW -->
@@ -2354,8 +3110,19 @@ watch(
 
           <!-- Section 1: Chat options -->
           <div class="menu-section">
-            <span class="menu-section-label">{{ t.chatOptions }}</span>
-            <div class="menu-items-group">
+            <button
+              type="button"
+              class="menu-section-header-btn"
+              @click="toggleInfoSection('customization')"
+            >
+              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <Icon
+                :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
+                :size="16"
+                class="section-chevron"
+              />
+            </button>
+            <div v-show="infoSectionsOpen.customization" class="menu-items-group">
               <div class="theme-picker-row">
                 <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
                 <span class="menu-item-text">{{ t.themeColor }}</span>
@@ -2374,66 +3141,94 @@ watch(
                 </div>
               </div>
 
+              <button type="button" class="menu-row-item" @click="openWallpaperSubPage">
+                <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
+                <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
+                <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+
               <button type="button" class="menu-row-item" @click="changeNickname">
                 <span class="menu-item-icon badge-folder"><Icon name="pencil" :size="18" /></span>
                 <span class="menu-item-text">{{ t.changeNickname }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
               <button type="button" class="menu-row-item" @click="openInfoSearchView">
                 <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
                 <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
-                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
             </div>
           </div>
 
           <!-- Section 2: Media, Files & Links (Compact Messenger-style rows) -->
           <div class="menu-section">
-            <span class="menu-section-label">{{ t.sharedMedia }}</span>
-            <div class="menu-items-group">
+            <button
+              type="button"
+              class="menu-section-header-btn"
+              @click="toggleInfoSection('media')"
+            >
+              <span class="menu-section-label">{{ t.sharedMedia || 'File phương tiện và file' }}</span>
+              <Icon
+                :name="infoSectionsOpen.media ? 'chevron-up' : 'chevron-down'"
+                :size="16"
+                class="section-chevron"
+              />
+            </button>
+            <div v-show="infoSectionsOpen.media" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
-                <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
-                <span class="menu-item-text">{{ t.photosAndVideos }}</span>
+                <span class="menu-item-icon badge-theme"><Icon name="photos" :size="18" /></span>
+                <span class="menu-item-text">{{ t.photosAndVideos || 'File phương tiện' }}</span>
                 <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
-                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
                 <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
-                <span class="menu-item-text">{{ t.files }}</span>
+                <span class="menu-item-text">{{ t.files || 'File' }}</span>
                 <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
-                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
                 <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
-                <span class="menu-item-text">{{ t.links }}</span>
+                <span class="menu-item-text">{{ t.links || 'Liên kết' }}</span>
                 <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
-                <Icon name="arrow-right" :size="16" class="menu-item-arrow" />
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
             </div>
           </div>
 
           <!-- Section 3: Privacy & Actions -->
           <div class="menu-section">
-            <div class="menu-items-group">
+            <button
+              type="button"
+              class="menu-section-header-btn"
+              @click="toggleInfoSection('privacy')"
+            >
+              <span class="menu-section-label">Quyền riêng tư và hỗ trợ</span>
+              <Icon
+                :name="infoSectionsOpen.privacy ? 'chevron-up' : 'chevron-down'"
+                :size="16"
+                class="section-chevron"
+              />
+            </button>
+            <div v-show="infoSectionsOpen.privacy" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
-                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : (t.muteChat || 'Tắt thông báo') }}</span>
+              </button>
+              <button type="button" class="menu-row-item danger-item" @click="deleteConversation(selectedConversation.id)">
+                <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
+                <span class="menu-item-text danger-text">{{ t.deleteChat }}</span>
               </button>
             </div>
-          </div>
-
-          <div class="menu-logout-wrap">
-            <button type="button" class="menu-logout-btn danger-text" @click="deleteConversation(selectedConversation.id)">
-              <Icon name="trash" :size="18" />
-              <span>{{ t.deleteChat }}</span>
-            </button>
           </div>
         </div>
 
         <!-- 2. DEDICATED SEARCH SUB-PAGE (Messenger style) -->
         <div v-else-if="chatInfoCurrentView === 'search'" class="info-search-page">
           <div class="info-search-page-bar">
-            <Icon name="search" :size="18" class="info-search-icon" />
+            <Icon name="search" :size="16" class="info-search-icon" />
             <input
               ref="infoSearchInputRef"
               v-model="infoSearchQuery"
@@ -2443,6 +3238,12 @@ watch(
               @input="onInfoSearchInput"
               @keydown.enter.prevent="performInfoSearch"
             />
+            <span
+              v-if="infoSearchDone && infoSearchResults.length"
+              class="info-search-results-tag"
+            >
+              {{ infoSearchResults.length }} kết quả
+            </span>
             <button
               v-if="infoSearchQuery"
               type="button"
@@ -2450,7 +3251,7 @@ watch(
               aria-label="Clear search"
               @click="clearInfoSearch"
             >
-              <Icon name="close" :size="16" />
+              <Icon name="close" :size="14" />
             </button>
           </div>
 
@@ -2458,14 +3259,12 @@ watch(
             Đang tìm kiếm...
           </div>
           <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
-            <span class="empty-hint-icon"><Icon name="search" :size="32" /></span>
-            <p>Nhập từ khóa để tìm kiếm tin nhắn trong đoạn chat này</p>
+            <p class="search-enter-hint">Nhấn "Enter" để tìm kiếm.</p>
           </div>
           <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
             <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
           </div>
           <div v-else-if="infoSearchResults.length" class="subpage-results-container">
-            <div class="subpage-results-count">Tìm thấy {{ infoSearchResults.length }} tin nhắn</div>
             <div class="info-search-list">
               <button
                 v-for="msg in infoSearchResults"
@@ -2474,11 +3273,31 @@ watch(
                 class="info-search-item"
                 @click="jumpToMessageFromInfo(msg)"
               >
-                <div class="info-search-item-meta">
-                  <span class="info-search-sender">{{ messageSenderName(msg) }}</span>
-                  <span class="info-search-time">{{ formatRelativeDay(msg.createdAt) }}</span>
+                <div class="search-item-avatar">
+                  <img
+                    v-if="messageSenderAvatar(msg)"
+                    :src="messageSenderAvatar(msg)!"
+                    class="avatar-img"
+                    alt=""
+                  />
+                  <span
+                    v-else
+                    class="avatar-fallback"
+                    :class="avatarClass(messageSenderName(msg))"
+                  >
+                    {{ messageSenderName(msg).slice(0, 1).toUpperCase() }}
+                  </span>
                 </div>
-                <div class="info-search-body">{{ msg.body }}</div>
+                <div class="info-search-item-content">
+                  <div class="info-search-sender-row">
+                    <span class="info-search-sender">{{ messageSenderName(msg) }}</span>
+                  </div>
+                  <div class="info-search-body info-search-body-row">
+                    <span class="info-search-snippet" v-html="formatSearchSnippet(msg.body, infoSearchQuery)" />
+                    <span class="info-search-dot">·</span>
+                    <span class="info-search-time">{{ formatRelativeDay(msg.createdAt) }}</span>
+                  </div>
+                </div>
               </button>
             </div>
           </div>
@@ -2588,6 +3407,69 @@ watch(
             <p v-else class="tab-empty-hint">{{ t.noSharedLinks }}</p>
           </div>
         </div>
+
+        <!-- 4. DEDICATED WALLPAPER SUB-PAGE -->
+        <div v-else-if="chatInfoCurrentView === 'wallpaper'" class="info-wallpaper-page">
+          <!-- Live Preview Mockup -->
+          <div class="wallpaper-preview-card" :style="activePreviewStyle">
+            <div class="wallpaper-preview-overlay" />
+            <div class="wallpaper-preview-bubbles">
+              <div class="preview-bubble incoming">
+                <span>{{ conversationTitle(selectedConversation) }}</span>
+                <p>Giao diện chat trông thế nào? ✨</p>
+              </div>
+              <div class="preview-bubble outgoing" :style="{ background: currentTheme.gradient }">
+                <p>Rất đẹp và dễ nhìn! 👍</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Custom Upload & Reset Actions -->
+          <div class="wallpaper-actions-row">
+            <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
+              <Icon name="upload" :size="16" />
+              <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+            </button>
+            <button
+              v-if="threadWallpaper"
+              type="button"
+              class="wallpaper-action-btn secondary"
+              @click="removeConversationWallpaper"
+            >
+              <Icon name="trash" :size="16" />
+              <span>{{ t.resetWallpaper || 'Đặt lại mặc định' }}</span>
+            </button>
+          </div>
+          <input
+            ref="wallpaperFileInputRef"
+            type="file"
+            accept="image/*"
+            class="sr-only"
+            @change="handleWallpaperUpload"
+          />
+
+          <!-- Presets Grid -->
+          <div class="wallpaper-presets-section">
+            <span class="wallpaper-section-title">{{ t.chooseWallpaper || 'Hình nền có sẵn' }}</span>
+            <div class="wallpaper-presets-grid">
+              <button
+                v-for="wp in CHAT_WALLPAPER_PRESETS"
+                :key="wp.id"
+                type="button"
+                class="wallpaper-preset-item"
+                :class="{ active: (threadWallpaper === wp.id) || (!threadWallpaper && wp.id === 'none') }"
+                @click="selectWallpaperPreset(wp.id)"
+              >
+                <div class="wallpaper-preset-thumb" :style="{ background: wp.preview }">
+                  <span v-if="(threadWallpaper === wp.id) || (!threadWallpaper && wp.id === 'none')" class="preset-check-badge">
+                    <Icon name="check" :size="14" />
+                  </span>
+                </div>
+                <span class="wallpaper-preset-label">{{ wp.name }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </BottomSheet>
   </div>
@@ -2633,7 +3515,9 @@ watch(
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  height: 60px;
   min-height: 60px;
+  box-sizing: border-box;
   padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
   border-bottom: 1px solid var(--hairline);
 }
@@ -2829,6 +3713,40 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.menu-section-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  transition: background var(--duration-short) var(--ease-standard);
+  text-align: left;
+}
+
+.menu-section-header-btn:hover {
+  background: var(--surface-soft);
+}
+
+.menu-section-header-btn .menu-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 0;
+  cursor: pointer;
+}
+
+.menu-section-header-btn .section-chevron {
+  color: var(--muted);
+  transition: transform var(--duration-short) var(--ease-standard);
 }
 
 .menu-section-label {
@@ -3241,7 +4159,9 @@ watch(
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  min-height: 56px;
+  height: 60px;
+  min-height: 60px;
+  box-sizing: border-box;
   padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
   border-bottom: 1px solid var(--hairline);
   background: var(--canvas);
@@ -3254,6 +4174,14 @@ watch(
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.thread-peer-info:hover {
+  background: var(--surface-soft);
 }
 
 .thread-peer-meta {
@@ -3313,13 +4241,27 @@ watch(
 .thread-actions .icon-btn {
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
-  color: #0084ff;
+  color: var(--chat-accent, #0084ff);
+  transition: background var(--duration-short) var(--ease-standard), transform var(--duration-short) var(--ease-standard);
+}
+
+.thread-actions .icon-btn:hover {
+  background: var(--surface-soft);
 }
 
 .back-btn {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 
@@ -3354,6 +4296,30 @@ watch(
   flex-direction: column;
   overflow-y: auto;
   position: relative;
+}
+
+.message-body.has-wallpaper {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: local;
+}
+
+.message-body.has-wallpaper .message-bubble:not(.outgoing) {
+  background: var(--surface-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.message-body.has-wallpaper .message-bubble.outgoing {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+.message-body.has-wallpaper .day-separator {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .loading-older {
@@ -3657,12 +4623,22 @@ watch(
 .connection-status {
   margin: 0;
   padding: 6px var(--space-md);
-  background: var(--surface-soft);
+  background: var(--surface-card);
   color: var(--muted);
   font-size: 12px;
+  font-weight: 500;
   text-align: center;
+  border-bottom: 1px solid var(--hairline);
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
+  transition: background var(--duration-short) var(--ease-standard), color var(--duration-short) var(--ease-standard);
+  z-index: 5;
+}
+
+.connection-status:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
 }
 
 .message-bubble p {
@@ -3724,7 +4700,7 @@ watch(
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: #0084ff;
+  color: var(--chat-accent, #0084ff);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
@@ -3732,11 +4708,11 @@ watch(
 }
 
 .attach-btn:hover {
-  background: rgba(0, 132, 255, 0.08);
+  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
 }
 
 .attach-btn:focus-visible {
-  outline: 2px solid #0084ff;
+  outline: 2px solid var(--chat-accent, #0084ff);
   outline-offset: 2px;
 }
 
@@ -3751,7 +4727,7 @@ watch(
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: #0084ff;
+  color: var(--chat-accent, #0084ff);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
@@ -3761,12 +4737,12 @@ watch(
 }
 
 .sticker-toggle-btn:hover {
-  background: rgba(0, 132, 255, 0.08);
+  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
 }
 
 .sticker-toggle-btn.active {
-  background: rgba(0, 132, 255, 0.15);
-  color: #0070d8;
+  background: color-mix(in srgb, var(--chat-accent, #0084ff) 18%, transparent);
+  color: var(--chat-accent, #0084ff);
 }
 
 .sticker-picker-drawer {
@@ -3830,7 +4806,7 @@ img.avatar-img {
 }
 
 .chat-composer textarea:focus-visible {
-  outline: 2px solid #0084ff;
+  outline: 2px solid var(--chat-accent, #0084ff);
   outline-offset: -1px;
 }
 
@@ -3845,7 +4821,7 @@ img.avatar-img {
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: #0084ff;
+  color: var(--chat-accent, #0084ff);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
@@ -3856,7 +4832,7 @@ img.avatar-img {
 
 .like-btn:hover {
   transform: scale(1.15);
-  background: rgba(0, 132, 255, 0.08);
+  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
 }
 
 .like-btn:active {
@@ -3864,7 +4840,7 @@ img.avatar-img {
 }
 
 .like-btn:focus-visible {
-  outline: 2px solid #0084ff;
+  outline: 2px solid var(--chat-accent, #0084ff);
   outline-offset: 2px;
 }
 
@@ -3878,7 +4854,7 @@ img.avatar-img {
   min-height: 36px;
   border: none;
   border-radius: var(--radius-pill);
-  background: #0084ff;
+  background: var(--chat-bubble-outgoing, linear-gradient(135deg, var(--chat-accent, #0084ff) 0%, #0099ff 100%));
   color: #ffffff;
   opacity: 0.4;
   cursor: pointer;
@@ -3933,16 +4909,15 @@ img.avatar-img {
 
 @media (min-width: 1200px) {
   .chat-app {
-    grid-template-columns: 300px minmax(0, 1fr) 280px;
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+
+  .chat-app:has(.chat-info-sidebar) {
+    grid-template-columns: 340px minmax(0, 1fr) 340px;
   }
 
   .media-panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-md);
-    background: var(--canvas);
-    overflow-y: auto;
+    display: none !important;
   }
 
   .media-panel h2 {
@@ -3999,6 +4974,10 @@ img.avatar-img {
 @media (min-width: 768px) and (max-width: 1199px) {
   .chat-app {
     grid-template-columns: 320px minmax(0, 1fr);
+  }
+
+  .chat-app:has(.chat-info-sidebar) {
+    grid-template-columns: 300px minmax(0, 1fr) 320px;
   }
 
   .media-panel {
@@ -4267,7 +5246,8 @@ img.avatar-img {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm);
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--hairline);
 }
 
 .theme-dots {
@@ -4300,13 +5280,13 @@ img.avatar-img {
 .chat-info-media-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
+  gap: 3px;
+  padding: 4px var(--space-sm);
 }
 
 .chat-info-media-thumb {
   aspect-ratio: 1;
-  border-radius: var(--radius-md);
+  border-radius: 4px;
   overflow: hidden;
   border: none;
   padding: 0;
@@ -4321,6 +5301,11 @@ img.avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity 0.15s ease;
+}
+
+.chat-info-media-thumb:hover img {
+  opacity: 0.88;
 }
 
 /* Seen indicator */
@@ -4921,6 +5906,28 @@ img.avatar-img {
   color: var(--ink);
 }
 
+.subpage-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  color: var(--muted);
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.subpage-close-btn:hover {
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
 .menu-badge {
   display: inline-block;
   padding: 1px 8px;
@@ -5013,6 +6020,198 @@ img.avatar-img {
   animation: fadeInDown 0.2s ease-out;
 }
 
+/* Dedicated Wallpaper Sub-page */
+.info-wallpaper-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0 var(--space-xs);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+.wallpaper-preview-card {
+  position: relative;
+  height: 150px;
+  border-radius: var(--radius-lg, 16px);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px;
+}
+
+.wallpaper-preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.wallpaper-preview-bubbles {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-bubble {
+  max-width: 80%;
+  padding: 6px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.preview-bubble p {
+  margin: 0;
+}
+
+.preview-bubble.incoming {
+  align-self: flex-start;
+  background: var(--surface-card);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.preview-bubble.incoming span {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.preview-bubble.outgoing {
+  align-self: flex-end;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.wallpaper-actions-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.wallpaper-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallpaper-action-btn.primary {
+  background: var(--accent, #0084ff);
+  color: #ffffff;
+  border: none;
+}
+
+.wallpaper-action-btn.primary:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.wallpaper-action-btn.secondary {
+  background: var(--surface-soft);
+  color: var(--muted);
+  border: 1px solid var(--hairline);
+}
+
+.wallpaper-action-btn.secondary:hover {
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.wallpaper-presets-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wallpaper-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 2px;
+}
+
+.wallpaper-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 12px;
+}
+
+.wallpaper-preset-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.wallpaper-preset-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  overflow: hidden;
+}
+
+.wallpaper-preset-item:hover .wallpaper-preset-thumb {
+  transform: scale(1.04);
+}
+
+.wallpaper-preset-item.active .wallpaper-preset-thumb {
+  border-color: var(--accent, #0084ff);
+  box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.3);
+}
+
+.preset-check-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #0084ff);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.wallpaper-preset-label {
+  font-size: 11px;
+  color: var(--ink);
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 /* In-details Message Search */
 .info-search-section {
   display: flex;
@@ -5075,58 +6274,140 @@ img.avatar-img {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 200px;
+  max-height: 480px;
   overflow-y: auto;
 }
 
 .info-search-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--surface-soft);
+  background: transparent;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease;
+  width: 100%;
 }
 
 .info-search-item:hover {
-  background: rgba(0, 132, 255, 0.08);
+  background: var(--surface-soft);
 }
 
-.info-search-item-meta {
+.search-item-avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  overflow: hidden;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-size: 11px;
+  justify-content: center;
+  background: var(--surface-soft);
+  flex-shrink: 0;
 }
 
-.info-search-sender {
-  font-weight: 600;
-  color: var(--ink);
+.search-item-avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.info-search-time {
-  color: var(--muted);
+.search-item-avatar .avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
 }
 
-.info-search-body {
+.info-search-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-search-sender-row {
   font-size: 13px;
+  font-weight: 600;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.info-search-body-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.info-search-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.info-search-snippet mark.search-match {
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.info-search-dot {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.info-search-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.info-search-body {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.info-search-results-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--surface-card);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-enter-hint {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  margin: 32px 0;
+}
+
 /* Media Tabs Header & Content */
 .info-tabs-header {
   display: flex;
-  gap: 4px;
-  padding: 0 var(--space-sm) var(--space-xs);
+  gap: 8px;
+  padding: 0 var(--space-sm);
   border-bottom: 1px solid var(--hairline);
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-sm);
 }
 
 .info-tab-btn {
@@ -5135,24 +6416,25 @@ img.avatar-img {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 10px 8px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  position: relative;
+  transition: color 0.15s ease;
 }
 
 .info-tab-btn:hover {
-  background: var(--surface-soft);
+  background: transparent;
   color: var(--ink);
 }
 
 .info-tab-btn.active {
-  background: var(--surface-soft);
+  background: transparent;
   color: var(--accent, #0084ff);
   font-weight: 600;
   box-shadow: inset 0 -2px 0 var(--accent, #0084ff);
@@ -5187,9 +6469,9 @@ img.avatar-img {
 .shared-file-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 8px 10px;
-  border: 1px solid var(--hairline);
+  border: none;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
@@ -5206,11 +6488,11 @@ img.avatar-img {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
   background: var(--surface-soft);
-  color: var(--accent, #0084ff);
+  color: var(--ink);
   flex-shrink: 0;
 }
 
@@ -5224,7 +6506,7 @@ img.avatar-img {
 
 .file-title {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5531,5 +6813,89 @@ img.avatar-img {
 
 .panel-link-jump:hover {
   text-decoration: underline;
+}
+
+/* Active state for info icon button on thread header */
+.thread-actions .icon-btn.active {
+  background: var(--accent-soft, rgba(0, 132, 255, 0.12));
+  color: var(--chat-accent, #0084ff);
+}
+
+/* Desktop Chat Info Sidebar */
+.chat-info-sidebar {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .chat-info-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    background: var(--canvas);
+    border-left: 1px solid var(--hairline);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
+.desktop-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+  flex-shrink: 0;
+}
+
+.desktop-info-header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.desktop-info-close-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: background var(--duration-short) var(--ease-standard), color var(--duration-short) var(--ease-standard);
+}
+
+.desktop-info-close-btn:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.chat-info-sidebar .chat-info-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-sm) var(--space-md) var(--space-lg);
+}
+
+.chat-info-sidebar .info-subpage-nav {
+  height: 60px;
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: var(--space-sm);
+  flex-shrink: 0;
 }
 </style>
