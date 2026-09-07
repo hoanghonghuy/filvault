@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/chat_repository.dart';
+import '../../data/chat_sse_service.dart';
 import '../../data/models/chat_model.dart';
 import 'chat_list_controller.dart';
 
@@ -43,19 +44,63 @@ class ChatRoomState {
 
 class ChatRoomController extends StateNotifier<ChatRoomState> {
   final ChatRepository _repo;
+  final ChatSseService _sse;
   final String conversationId;
   Timer? _typingDebounce;
+  Timer? _peerTypingTimer;
+  StreamSubscription<ChatSseEvent>? _subscription;
 
-  ChatRoomController(this._repo, this.conversationId)
+  ChatRoomController(this._repo, this._sse, this.conversationId)
       : super(const ChatRoomState()) {
     loadMessages();
     _markRead();
+    _subscribeSse();
   }
 
   @override
   void dispose() {
     _typingDebounce?.cancel();
+    _peerTypingTimer?.cancel();
+    _subscription?.cancel();
     super.dispose();
+  }
+
+  void _subscribeSse() {
+    _subscription = _sse.eventStream.listen((event) {
+      final data = event.data;
+      final cid = data['conversationId'] as String?;
+      if (cid != conversationId) return;
+
+      if (event.type == 'message.new') {
+        try {
+          final newMsg = ChatMessageModel.fromJson(data);
+          if (!state.messages.any((m) => m.id == newMsg.id)) {
+            state = state.copyWith(messages: [newMsg, ...state.messages]);
+            _markRead();
+          }
+        } catch (_) {}
+      } else if (event.type == 'message.remove') {
+        final mid = data['messageId'] as String?;
+        if (mid != null) {
+          state = state.copyWith(
+            messages: state.messages.where((m) => m.id != mid).toList(),
+          );
+        }
+      } else if (event.type == 'message.reaction' || event.type == 'message.edit') {
+        loadMessages();
+      } else if (event.type == 'typing') {
+        final isTyping = data['typing'] as bool? ?? false;
+        if (isTyping) {
+          state = state.copyWith(isPeerTyping: true);
+          _peerTypingTimer?.cancel();
+          _peerTypingTimer = Timer(const Duration(seconds: 4), () {
+            state = state.copyWith(isPeerTyping: false);
+          });
+        } else {
+          state = state.copyWith(isPeerTyping: false);
+        }
+      }
+    });
   }
 
   Future<void> loadMessages() async {
@@ -96,11 +141,15 @@ class ChatRoomController extends StateNotifier<ChatRoomState> {
         attachmentFileIds: attachmentFileIds,
       );
 
-      state = state.copyWith(
-        isSending: false,
-        messages: [newMsg, ...state.messages],
-        clearReply: true,
-      );
+      if (!state.messages.any((m) => m.id == newMsg.id)) {
+        state = state.copyWith(
+          isSending: false,
+          messages: [newMsg, ...state.messages],
+          clearReply: true,
+        );
+      } else {
+        state = state.copyWith(isSending: false, clearReply: true);
+      }
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -114,7 +163,6 @@ class ChatRoomController extends StateNotifier<ChatRoomState> {
   Future<void> toggleReaction(String messageId, String emoji) async {
     try {
       await _repo.toggleReaction(conversationId, messageId, emoji);
-      // Reload message list or update locally
       await loadMessages();
     } catch (e) {
       state = state.copyWith(
@@ -144,5 +192,6 @@ class ChatRoomController extends StateNotifier<ChatRoomState> {
 final chatRoomControllerProvider = StateNotifierProvider.autoDispose
     .family<ChatRoomController, ChatRoomState, String>((ref, conversationId) {
   final repo = ref.watch(chatRepositoryProvider);
-  return ChatRoomController(repo, conversationId);
+  final sse = ref.watch(chatSseServiceProvider);
+  return ChatRoomController(repo, sse, conversationId);
 });

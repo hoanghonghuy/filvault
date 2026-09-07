@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../call/presentation/screens/call_screen.dart';
 import '../../data/models/chat_model.dart';
 import '../controllers/chat_room_controller.dart';
 import '../widgets/message_bubble.dart';
@@ -96,16 +97,30 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           IconButton(
             icon: const Icon(Icons.videocam_rounded),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Tính năng gọi video đang kết nối LiveKit...')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CallScreen(
+                    conversationId: convo.id,
+                    peerName: convo.title,
+                    isVideo: true,
+                  ),
+                ),
               );
             },
           ),
           IconButton(
             icon: const Icon(Icons.call_rounded),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Tính năng gọi thoại đang kết nối LiveKit...')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CallScreen(
+                    conversationId: convo.id,
+                    peerName: convo.title,
+                    isVideo: false,
+                  ),
+                ),
               );
             },
           ),
@@ -146,6 +161,37 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                         },
                       ),
           ),
+
+          // Typing indicator banner
+          if (roomState.isPeerTyping)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: theme.brightness == Brightness.dark
+                        ? AppColors.surfaceCard
+                        : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${convo.title} đang soạn tin...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // Replying banner
           if (roomState.replyingTo != null)

@@ -1,9 +1,17 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/chat_repository.dart';
+import '../../data/chat_sse_service.dart';
 import '../../data/models/chat_model.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepositoryImpl();
+});
+
+final chatSseServiceProvider = Provider<ChatSseService>((ref) {
+  final service = ChatSseService();
+  ref.onDispose(() => service.dispose());
+  return service;
 });
 
 class ChatListState {
@@ -34,9 +42,30 @@ class ChatListState {
 
 class ChatListController extends StateNotifier<ChatListState> {
   final ChatRepository _repo;
+  final ChatSseService _sse;
+  StreamSubscription<ChatSseEvent>? _subscription;
 
-  ChatListController(this._repo) : super(const ChatListState()) {
+  ChatListController(this._repo, this._sse) : super(const ChatListState()) {
     loadConversations();
+    _subscribeSse();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeSse() {
+    _subscription = _sse.eventStream.listen((event) {
+      if (event.type == 'message.new' ||
+          event.type == 'message.edit' ||
+          event.type == 'message.remove' ||
+          event.type == 'conversation.read' ||
+          event.type == 'user.presence') {
+        loadConversations();
+      }
+    });
   }
 
   Future<void> loadConversations() async {
@@ -72,5 +101,6 @@ class ChatListController extends StateNotifier<ChatListState> {
 final chatListControllerProvider =
     StateNotifierProvider<ChatListController, ChatListState>((ref) {
   final repo = ref.watch(chatRepositoryProvider);
-  return ChatListController(repo);
+  final sse = ref.watch(chatSseServiceProvider);
+  return ChatListController(repo, sse);
 });

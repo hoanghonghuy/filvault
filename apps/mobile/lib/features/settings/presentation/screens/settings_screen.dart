@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../activity/presentation/screens/activity_screen.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../files/presentation/widgets/file_icon_helper.dart';
+import '../../../shares/presentation/screens/shares_screen.dart';
+import '../../../trash/presentation/screens/trash_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -162,6 +165,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }
             },
           ),
+
+          // Features Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Quản lý nội dung',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ),
+
+          // Trash
+          ListTile(
+            leading: const Icon(Icons.delete_outline_rounded),
+            title: const Text('Thùng rác'),
+            subtitle: const Text('Xem và khôi phục các mục đã xóa'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TrashScreen()),
+              );
+            },
+          ),
+
+          // Activity
+          ListTile(
+            leading: const Icon(Icons.history_rounded),
+            title: const Text('Nhật ký hoạt động'),
+            subtitle: const Text('Lịch sử tải lên, xóa và thao tác'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ActivityScreen()),
+              );
+            },
+          ),
+
+          // Shares
+          ListTile(
+            leading: const Icon(Icons.share_rounded),
+            title: const Text('Quản lý chia sẻ'),
+            subtitle: const Text('Mục chia sẻ nội bộ đến bạn hoặc từ bạn'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SharesScreen()),
+              );
+            },
+          ),
+
+          const Divider(height: 24),
 
           // Change Password
           ListTile(
