@@ -54,6 +54,16 @@ describe('wallpaperPalette', () => {
     expect(doodle).toBeDefined()
     expect(doodle?.primary).toBe(PRESET_THEMES.doodle.primary)
     expect(doodle?.isDark).toBe(false)
+
+    const skyBreeze = await resolveWallpaperTheme('sky_breeze')
+    expect(skyBreeze).toBeDefined()
+    expect(skyBreeze?.primary).toBe(PRESET_THEMES.sky_breeze.primary)
+    expect(skyBreeze?.isDark).toBe(false)
+
+    const amoled = await resolveWallpaperTheme('amoled_carbon')
+    expect(amoled).toBeDefined()
+    expect(amoled?.primary).toBe(PRESET_THEMES.amoled_carbon.primary)
+    expect(amoled?.isDark).toBe(true)
   })
 
   it('returns fallback theme for invalid or broken image', async () => {

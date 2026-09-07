@@ -296,6 +296,10 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/openWallpaperSubPage/)
     expect(chat).toMatch(/has-wallpaper/)
     expect(chat).toMatch(/wallpaper-presets-grid/)
+    expect(chat).toMatch(/wallpaperCategoryFilter/)
+    expect(chat).toMatch(/filteredWallpaperPresets/)
+    expect(chat).toMatch(/wallpaper-mode-tabs/)
+    expect(chat).toMatch(/wallpaper-mode-tab/)
   })
 
   it('supports desktop 3-column sidebar, collapsible accordions and Messenger subpages', () => {
