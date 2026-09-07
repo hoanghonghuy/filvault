@@ -4192,9 +4192,56 @@ img.avatar-img {
 }
 
 .message-bubble.active-elevated {
+  max-width: min(74%, 480px);
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: var(--surface-card);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.36;
+  word-break: break-word;
   transform: scale(1.03);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   pointer-events: auto;
+}
+
+.message-bubble.active-elevated.outgoing {
+  background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
+  color: #ffffff;
+}
+
+.message-bubble.active-elevated .bubble-time {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+.message-bubble.active-elevated.outgoing .bubble-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.message-bubble.active-elevated .sticker-bubble {
+  font-size: 56px;
+  line-height: 1;
+  text-align: center;
+}
+
+.message-bubble.active-elevated.has-sticker {
+  background: transparent;
+  box-shadow: none;
+}
+
+.message-bubble.active-elevated .like-bubble {
+  font-size: 56px;
+  line-height: 1;
+  text-align: center;
+}
+
+.message-bubble.active-elevated.has-like {
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Bottom Actions Bar matching Screenshot */
