@@ -232,6 +232,7 @@ async function deleteConversation(convId?: string) {
 
 async function changeNickname() {
   if (!selectedConversation.value) return
+  threadInfoOpen.value = false
   const currentNick = nicknames.value[selectedConversation.value.id] || conversationTitle(selectedConversation.value)
   const nick = await ui.prompt({
     title: t.value.changeNickname,

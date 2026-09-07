@@ -154,6 +154,7 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/chatThemes/)
     expect(chat).toMatch(/threadThemeStyle/)
     expect(chat).toMatch(/changeNickname/)
+    expect(chat).toMatch(/function changeNickname[\s\S]*?threadInfoOpen\.value = false/)
   })
 
   it('highlights unread conversations with bold title, preview, unread date and badge', () => {
