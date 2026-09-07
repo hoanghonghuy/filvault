@@ -15,7 +15,20 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<Record<string, ChatMessage[]>>({})
   const selectedId = ref<string | null>(null)
   const connectionState = ref<ConnectionState>('idle')
-  const lastEventId = ref(0)
+  function getInitialLastEventId(): number {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        const key = `filvault_chat_last_event_${auth.user?.id || 'anon'}`
+        const v = window.sessionStorage.getItem(key)
+        if (v) {
+          const n = Number(v)
+          if (!isNaN(n) && n > 0) return n
+        }
+      }
+    } catch {}
+    return 0
+  }
+  const lastEventId = ref(getInitialLastEventId())
   const isLoadingConversations = ref(false)
   const seenEventIds = new Set<number>()
   let eventController: AbortController | null = null
@@ -330,6 +343,12 @@ export const useChatStore = defineStore('chat', () => {
           if (sequence > 0) {
             seenEventIds.add(sequence)
             lastEventId.value = sequence
+            try {
+              if (typeof window !== 'undefined' && window.sessionStorage) {
+                const key = `filvault_chat_last_event_${auth.user?.id || 'anon'}`
+                window.sessionStorage.setItem(key, String(sequence))
+              }
+            } catch {}
             if (seenEventIds.size > 1000) {
               const oldest = seenEventIds.values().next().value
               if (typeof oldest === 'number') seenEventIds.delete(oldest)

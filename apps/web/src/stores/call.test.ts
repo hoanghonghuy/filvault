@@ -96,6 +96,35 @@ describe('useCallStore', () => {
     expect(store.state).toBe('idle')
   })
 
+  it('ignores stale call invites older than 45 seconds', () => {
+    const store = useCallStore()
+    const staleTime = new Date(Date.now() - 50 * 1000).toISOString()
+    store.handleSignal({
+      conversationId: 'conv-123',
+      senderId: 'user-other',
+      senderName: 'Bob',
+      action: 'invite',
+      isVideo: true,
+      timestamp: staleTime,
+    })
+
+    expect(store.state).toBe('idle')
+  })
+
+  it('ignores call invites without timestamp or invalid timestamp', () => {
+    const store = useCallStore()
+    store.handleSignal({
+      conversationId: 'conv-123',
+      senderId: 'user-other',
+      senderName: 'Bob',
+      action: 'invite',
+      isVideo: true,
+      timestamp: '',
+    })
+
+    expect(store.state).toBe('idle')
+  })
+
   it('handles decline and end signals', () => {
     const store = useCallStore()
     store.handleSignal({

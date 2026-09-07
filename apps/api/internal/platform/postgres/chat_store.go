@@ -940,6 +940,7 @@ func (s *Store) ListChatEventsAfter(ctx context.Context, userID string, after in
 			)
 			AND NOT (e.event_type = 'typing.indicator' AND e.payload->>'userId' = $2)
 			AND NOT (e.event_type = 'presence.changed' AND e.payload->>'userId' = $2)
+			AND NOT (e.event_type = 'call.signal' AND e.created_at < NOW() - INTERVAL '1 minute')
 		ORDER BY e.sequence ASC
 		LIMIT $3
 	`, after, userID, limit)

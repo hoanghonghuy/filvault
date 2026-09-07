@@ -45,8 +45,18 @@ export const useCallStore = defineStore('call', () => {
   )
   const room = shallowRef<Room | null>(null)
   const error = ref<string | null>(null)
+  let incomingRingTimer: number | null = null
+  let outgoingRingTimer: number | null = null
 
   function resetState() {
+    if (incomingRingTimer !== null) {
+      window.clearTimeout(incomingRingTimer)
+      incomingRingTimer = null
+    }
+    if (outgoingRingTimer !== null) {
+      window.clearTimeout(outgoingRingTimer)
+      outgoingRingTimer = null
+    }
     state.value = 'idle'
     conversationId.value = null
     isVideo.value = false
@@ -160,6 +170,13 @@ export const useCallStore = defineStore('call', () => {
     state.value = 'outgoing'
     callAudio.playOutgoingRing()
 
+    outgoingRingTimer = window.setTimeout(() => {
+      if (state.value === 'outgoing') {
+        ui.showToast('Người nhận không trả lời', 'info')
+        void endCall(true)
+      }
+    }, 45000)
+
     await sendSignal(convId, 'invite', isVideo.value)
     void connectToRoom(convId)
   }
@@ -169,9 +186,19 @@ export const useCallStore = defineStore('call', () => {
     if (payload.senderId === auth.user?.id) return
 
     switch (payload.action) {
-      case 'invite':
+      case 'invite': {
         // If already in a call, ignore
         if (state.value !== 'idle') return
+
+        // Ignore stale/expired call invites
+        if (!payload.timestamp) return
+        const inviteTime = new Date(payload.timestamp).getTime()
+        const now = Date.now()
+        // An invite older than 45 seconds or skewed into future is expired
+        if (isNaN(inviteTime) || now - inviteTime > 45 * 1000 || inviteTime - now > 60 * 1000) {
+          return
+        }
+
         conversationId.value = payload.conversationId
         callerId.value = payload.senderId
         callerName.value = payload.senderName
@@ -179,9 +206,25 @@ export const useCallStore = defineStore('call', () => {
         isCaller.value = false
         state.value = 'incoming'
         callAudio.playIncomingRing()
+
+        if (incomingRingTimer !== null) {
+          window.clearTimeout(incomingRingTimer)
+        }
+        const remainingMs = Math.max(5000, 45000 - (now - inviteTime))
+        incomingRingTimer = window.setTimeout(() => {
+          if (state.value === 'incoming') {
+            callAudio.stop()
+            resetState()
+          }
+        }, remainingMs)
         break
+      }
 
       case 'accept':
+        if (outgoingRingTimer !== null) {
+          window.clearTimeout(outgoingRingTimer)
+          outgoingRingTimer = null
+        }
         if (state.value === 'outgoing' && conversationId.value === payload.conversationId) {
           callAudio.stop()
           state.value = 'connected'
@@ -199,6 +242,10 @@ export const useCallStore = defineStore('call', () => {
 
   async function acceptCall() {
     if (!conversationId.value) return
+    if (incomingRingTimer !== null) {
+      window.clearTimeout(incomingRingTimer)
+      incomingRingTimer = null
+    }
     callAudio.stop()
     const convId = conversationId.value
     state.value = 'connected'
@@ -208,6 +255,10 @@ export const useCallStore = defineStore('call', () => {
 
   async function declineCall() {
     if (!conversationId.value) return
+    if (incomingRingTimer !== null) {
+      window.clearTimeout(incomingRingTimer)
+      incomingRingTimer = null
+    }
     const convId = conversationId.value
     callAudio.stop()
     await sendSignal(convId, 'decline', isVideo.value)
