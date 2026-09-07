@@ -1,5 +1,5 @@
 export interface EmojiCategory {
-  id: 'popular' | 'smileys' | 'hearts' | 'gestures' | 'fun'
+  id: 'popular' | 'smileys' | 'hearts' | 'gestures' | 'pets' | 'fun'
   label: string
   icon: string
 }
@@ -9,8 +9,11 @@ export const REACTION_CATEGORIES: EmojiCategory[] = [
   { id: 'smileys', label: 'Mặt cười', icon: '😄' },
   { id: 'hearts', label: 'Trái tim', icon: '❤️' },
   { id: 'gestures', label: 'Cử chỉ', icon: '👍' },
+  { id: 'pets', label: 'Thú cưng', icon: '🐱' },
   { id: 'fun', label: 'Đặc biệt', icon: '🎉' },
 ]
+
+export const EMOJI_CATEGORIES = REACTION_CATEGORIES
 
 export const REACTION_EMOJIS: Record<EmojiCategory['id'], string[]> = {
   popular: [
@@ -41,6 +44,11 @@ export const REACTION_EMOJIS: Record<EmojiCategory['id'], string[]> = {
     '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤙',
     '🫵', '🖕', '✍️', '🙏', '💅', '🤳', '💪', '🦾', '🦶', '🦵',
   ],
+  pets: [
+    '🐱', '😸', '😹', '😻', '😽', '😿', '😾', '🐶', '🐕', '🐩',
+    '🦊', '🐼', '🐨', '🐻', '🐰', '🐹', '🐭', '🦁', '🐯', '🐮',
+    '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦆', '🦅', '🦉', '🦄',
+  ],
   fun: [
     '🔥', '💯', '✨', '🌟', '⭐', '💥', '💢', '💨', '🎉', '🎊',
     '🎁', '🏆', '🥇', '🎯', '🚀', '💡', '💣', '☕', '🍻', '🥂',
@@ -48,3 +56,5 @@ export const REACTION_EMOJIS: Record<EmojiCategory['id'], string[]> = {
     '☀️', '🌙', '👑', '💎', '🍿', '🎸', '⚽', '🎮', '🎲', '🔔',
   ],
 }
+
+export const EMOJIS = REACTION_EMOJIS

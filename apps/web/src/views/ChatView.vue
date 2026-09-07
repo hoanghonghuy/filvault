@@ -14,6 +14,7 @@ import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import LoadingSkeletonChatRail from '@/components/LoadingSkeletonChatRail.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 import { userInitials } from '@/lib/userInitials'
 import {
   STICKERS,
@@ -23,11 +24,6 @@ import {
   formatStickerMessage,
   type Sticker,
 } from '@/lib/stickers'
-import {
-  REACTION_CATEGORIES,
-  REACTION_EMOJIS,
-  type EmojiCategory,
-} from '@/lib/emojis'
 import { useI18n } from '@/lib/i18n'
 import { generateUUID } from '@/lib/uuid'
 import { useLongPress } from '@/lib/useLongPress'
@@ -100,6 +96,23 @@ function handleSendSticker(sticker: Sticker) {
   draft.value = formatStickerMessage(sticker)
   stickerPickerOpen.value = false
   void sendText()
+}
+
+function handleInsertEmoji(emoji: string) {
+  const textarea = composerRef.value
+  if (!textarea) {
+    draft.value += emoji
+    return
+  }
+  const start = textarea.selectionStart ?? draft.value.length
+  const end = textarea.selectionEnd ?? draft.value.length
+  draft.value = draft.value.slice(0, start) + emoji + draft.value.slice(end)
+  void nextTick(() => {
+    textarea.focus()
+    const pos = start + emoji.length
+    textarea.setSelectionRange(pos, pos)
+    onComposerInput()
+  })
 }
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
@@ -219,8 +232,13 @@ async function selectReaction(emoji: string, targetMessage?: ChatMessage) {
 
 const reactionPickerOpen = ref(false)
 const reactionPickerTargetMessage = ref<ChatMessage | null>(null)
-const activeReactionCategory = ref<EmojiCategory['id']>('popular')
-const currentCategoryEmojis = computed(() => REACTION_EMOJIS[activeReactionCategory.value] ?? REACTION_EMOJIS.popular)
+
+const targetMessageReactionList = computed(() => {
+  if (!reactionPickerTargetMessage.value?.reactions) return []
+  return reactionPickerTargetMessage.value.reactions
+    .filter((r) => r.reacted)
+    .map((r) => r.reaction)
+})
 
 function openReactionPicker() {
   const msg = activeMessage.value
@@ -1571,37 +1589,13 @@ watch(
         </ul>
         <!-- Sticker Picker Drawer -->
         <div v-if="stickerPickerOpen" class="sticker-picker-drawer">
-          <div class="sticker-picker-header">
-            <div class="sticker-categories">
-              <button
-                v-for="cat in STICKER_CATEGORIES"
-                :key="cat.id"
-                type="button"
-                class="sticker-cat-btn"
-                :class="{ active: selectedStickerCategory === cat.id }"
-                @click="selectedStickerCategory = cat.id"
-              >
-                <span>{{ cat.icon }}</span>
-                <span class="cat-label">{{ cat.label }}</span>
-              </button>
-            </div>
-            <button type="button" class="sticker-close-btn" :aria-label="t.closeSelection" @click="stickerPickerOpen = false">
-              <Icon name="close" :size="16" />
-            </button>
-          </div>
-          <div class="sticker-grid" role="list">
-            <button
-              v-for="stk in filteredStickers"
-              :key="stk.id"
-              type="button"
-              class="sticker-item-btn"
-              :title="stk.name"
-              :aria-label="stk.name"
-              @click="handleSendSticker(stk)"
-            >
-              <span class="sticker-symbol">{{ stk.symbol }}</span>
-            </button>
-          </div>
+          <EmojiPicker
+            :show-stickers="true"
+            :show-close="true"
+            @select-emoji="handleInsertEmoji"
+            @select-sticker="handleSendSticker"
+            @close="stickerPickerOpen = false"
+          />
         </div>
         <form class="chat-composer" @submit.prevent="sendText">
           <button type="button" class="icon-btn attach-btn" aria-label="Attach file" :disabled="sending" @click="triggerAttachment">
@@ -1894,39 +1888,11 @@ watch(
 
     <!-- Custom Emoji Reaction Picker BottomSheet -->
     <BottomSheet :open="reactionPickerOpen" title="Chọn biểu tượng cảm xúc" @close="reactionPickerOpen = false">
-      <div class="rx-picker-container">
-        <!-- Category Tab Bar -->
-        <div class="rx-picker-categories" role="tablist" aria-label="Phân loại biểu tượng">
-          <button
-            v-for="cat in REACTION_CATEGORIES"
-            :key="cat.id"
-            type="button"
-            class="rx-cat-btn"
-            :class="{ active: activeReactionCategory === cat.id }"
-            role="tab"
-            :aria-selected="activeReactionCategory === cat.id"
-            @click="activeReactionCategory = cat.id"
-          >
-            <span class="rx-cat-icon">{{ cat.icon }}</span>
-            <span class="rx-cat-label">{{ cat.label }}</span>
-          </button>
-        </div>
-
-        <!-- Emoji Grid -->
-        <div class="rx-picker-grid" role="list">
-          <button
-            v-for="emoji in currentCategoryEmojis"
-            :key="emoji"
-            type="button"
-            class="rx-picker-item"
-            :class="{ 'rx-item-active': isReactedWith(reactionPickerTargetMessage, emoji) }"
-            :aria-label="emoji"
-            @click="handlePickReactionEmoji(emoji)"
-          >
-            <span class="rx-picker-char">{{ emoji }}</span>
-          </button>
-        </div>
-      </div>
+      <EmojiPicker
+        :active-reactions="targetMessageReactionList"
+        @select-emoji="handlePickReactionEmoji"
+        @close="reactionPickerOpen = false"
+      />
     </BottomSheet>
 
     <!-- Conversation Long-press Menu -->
@@ -3314,107 +3280,6 @@ watch(
   }
 }
 
-.sticker-picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.sticker-categories {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.sticker-categories::-webkit-scrollbar {
-  display: none;
-}
-
-.sticker-cat-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--surface-soft);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--duration-short) var(--ease-standard);
-  white-space: nowrap;
-}
-
-.sticker-cat-btn:hover {
-  background: var(--hairline);
-}
-
-.sticker-cat-btn.active {
-  background: #0084ff;
-  color: #ffffff;
-}
-
-.sticker-close-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background var(--duration-short) var(--ease-standard);
-}
-
-.sticker-close-btn:hover {
-  background: var(--hairline);
-  color: var(--ink);
-}
-
-.sticker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
-  gap: 6px;
-  padding: 10px;
-  overflow-y: auto;
-  max-height: 220px;
-}
-
-.sticker-item-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 52px;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  transition:
-    transform var(--duration-short) var(--ease-standard),
-    background var(--duration-short) var(--ease-standard);
-  user-select: none;
-}
-
-.sticker-item-btn:hover {
-  background: var(--surface-soft);
-  transform: scale(1.2);
-}
-
-.sticker-item-btn:active {
-  transform: scale(0.92);
-}
-
-.sticker-symbol {
-  font-size: 34px;
-  line-height: 1;
-}
-
 img.avatar-img {
   object-fit: cover;
   border-radius: 50%;
@@ -4471,128 +4336,6 @@ img.avatar-img {
 .danger-circle {
   background: rgba(248, 113, 113, 0.15);
   color: #f87171;
-}
-
-/* Custom Emoji Reaction Picker BottomSheet */
-.rx-picker-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md, 16px);
-  padding: 4px 4px 16px;
-  max-height: 70vh;
-}
-
-.rx-picker-categories {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding: 2px 2px 6px;
-}
-
-.rx-picker-categories::-webkit-scrollbar {
-  display: none;
-}
-
-.rx-cat-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.1));
-  background: var(--surface-card, rgba(255, 255, 255, 0.05));
-  color: var(--muted, #8a8d91);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.18s ease;
-  user-select: none;
-  touch-action: manipulation;
-}
-
-.rx-cat-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--ink, #ffffff);
-}
-
-[data-theme='light'] .rx-cat-btn:hover,
-:root:not([data-theme='dark']) .rx-cat-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #050505;
-}
-
-.rx-cat-btn.active {
-  background: var(--brand, #0084ff);
-  border-color: var(--brand, #0084ff);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
-}
-
-.rx-cat-icon {
-  font-size: 15px;
-  line-height: 1;
-}
-
-.rx-cat-label {
-  line-height: 1;
-}
-
-.rx-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
-  gap: 6px;
-  max-height: 300px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 4px;
-  scrollbar-width: thin;
-}
-
-.rx-picker-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1;
-  min-height: 44px;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease;
-  user-select: none;
-  touch-action: manipulation;
-}
-
-.rx-picker-char {
-  font-size: 28px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.rx-picker-item:hover,
-.rx-picker-item:active {
-  transform: scale(1.22);
-  background: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme='light'] .rx-picker-item:hover,
-:root:not([data-theme='dark']) .rx-picker-item:hover,
-[data-theme='light'] .rx-picker-item:active,
-:root:not([data-theme='dark']) .rx-picker-item:active {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.rx-picker-item.rx-item-active {
-  background: rgba(0, 132, 255, 0.2);
-  box-shadow: inset 0 0 0 1.5px var(--brand, #0084ff);
 }
 
 </style>
