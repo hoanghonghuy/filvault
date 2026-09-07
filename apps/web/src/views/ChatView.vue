@@ -169,6 +169,7 @@ function backToRail() {
 const QUICK_REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'] as const
 const activeBurstMessageId = ref<string | null>(null)
 const capsulePos = ref<{ top: number; left: number; above: boolean } | null>(null)
+const activeBubbleRect = ref<{ top: number; left: number; width: number; height: number } | null>(null)
 
 let lastTapTime = 0
 let lastTapMsgId = ''
@@ -280,13 +281,20 @@ function openMessageMenu(message: ChatMessage, el?: HTMLElement) {
   activeMessage.value = message
   if (el) {
     const rect = el.getBoundingClientRect()
-    const above = rect.top > 130
+    activeBubbleRect.value = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    }
+    const above = rect.top > 120
     capsulePos.value = {
-      top: above ? Math.max(16, rect.top - 68) : rect.bottom + 8,
-      left: Math.min(Math.max(16, rect.left + rect.width / 2 - 160), window.innerWidth - 330),
+      top: above ? Math.max(12, rect.top - 62) : rect.bottom + 10,
+      left: Math.min(Math.max(12, rect.left + rect.width / 2 - 160), window.innerWidth - 332),
       above,
     }
   } else {
+    activeBubbleRect.value = null
     capsulePos.value = {
       top: Math.max(60, window.innerHeight / 2 - 100),
       left: Math.max(16, (window.innerWidth - 320) / 2),
@@ -1800,8 +1808,16 @@ watch(
           </div>
         </div>
 
-        <!-- Active Message Bubble (elevated in focus) -->
-        <div class="reaction-active-bubble-wrap" @click="messageMenuOpen = false">
+        <!-- Active Message Bubble (elevated in focus, precisely aligned with original bubble) -->
+        <div
+          class="reaction-active-bubble-wrap"
+          :style="activeBubbleRect ? {
+            top: `${activeBubbleRect.top}px`,
+            left: `${activeBubbleRect.left}px`,
+            width: `${activeBubbleRect.width}px`,
+          } : undefined"
+          @click="messageMenuOpen = false"
+        >
           <div
             class="message-bubble active-elevated"
             :class="{
@@ -1809,6 +1825,7 @@ watch(
               'has-like': activeMessage.body === '👍',
               'has-sticker': isStickerMessage(activeMessage.body)
             }"
+            :style="activeBubbleRect ? { width: '100%', maxWidth: '100%' } : undefined"
           >
             <p v-if="activeMessage.body && isStickerMessage(activeMessage.body)" class="sticker-bubble">{{ parseStickerSymbol(activeMessage.body) }}</p>
             <p v-else-if="activeMessage.body" :class="{ 'like-bubble': activeMessage.body === '👍' }">{{ activeMessage.body }}</p>
@@ -4228,29 +4245,51 @@ img.avatar-img {
 }
 
 .reaction-active-bubble-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  max-width: 90%;
-  margin: 0 auto;
+  position: fixed;
+  z-index: 10000;
   pointer-events: none;
+  animation: rx-bubble-pop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.reaction-modal-overlay > .reaction-active-bubble-wrap:not([style*="top"]) {
+  top: calc(50% - 40px);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: auto;
+  max-width: min(80%, 480px);
+}
+
+@keyframes rx-bubble-pop {
+  from {
+    transform: scale(0.96);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 .message-bubble.active-elevated {
-  max-width: min(74%, 480px);
+  box-sizing: border-box;
+  width: 100%;
   padding: 8px 14px;
-  border-radius: 18px;
+  border-radius: 18px 18px 18px 4px;
   background: var(--surface-card);
   color: var(--ink);
   font-size: 15px;
   line-height: 1.36;
-  word-break: break-word;
-  transform: scale(1.03);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   pointer-events: auto;
+  margin: 0;
+}
+
+.message-bubble.active-elevated p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .message-bubble.active-elevated.outgoing {
+  border-radius: 18px 18px 4px 18px;
   background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
   color: #ffffff;
 }
@@ -4261,10 +4300,11 @@ img.avatar-img {
   color: var(--muted);
   margin-top: 4px;
   opacity: 0.7;
+  white-space: nowrap;
 }
 
 .message-bubble.active-elevated.outgoing .bubble-time {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .message-bubble.active-elevated .sticker-bubble {
@@ -4274,8 +4314,8 @@ img.avatar-img {
 }
 
 .message-bubble.active-elevated.has-sticker {
-  background: transparent;
-  box-shadow: none;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .message-bubble.active-elevated .like-bubble {
@@ -4285,8 +4325,8 @@ img.avatar-img {
 }
 
 .message-bubble.active-elevated.has-like {
-  background: transparent;
-  box-shadow: none;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Bottom Actions Bar matching Screenshot */
