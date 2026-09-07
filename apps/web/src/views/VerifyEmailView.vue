@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import { formatAuthError } from '@/api/errors'
@@ -7,6 +7,12 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+onMounted(() => {
+  if (auth.isAuthenticated && auth.isVerified) {
+    void router.replace('/chat')
+  }
+})
 
 const code = ref('')
 const message = ref('')
@@ -43,7 +49,7 @@ async function submit() {
   verifying.value = true
   try {
     await auth.verifyEmail(auth.user.email, code.value)
-    await router.push('/')
+    await router.replace('/')
   } catch (e) {
     error.value = formatAuthError(e, 'Invalid or expired code. Try again.')
   } finally {

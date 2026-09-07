@@ -720,10 +720,12 @@ watch(
             <span class="online-indicator" aria-hidden="true" />
           </span>
           <span class="conversation-meta">
-            <span class="conversation-title">{{ conversationTitle(conv) }}</span>
+            <span class="conversation-top">
+              <span class="conversation-title">{{ conversationTitle(conv) }}</span>
+              <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
+            </span>
             <span class="conversation-preview">{{ conversationPreview(conv) }}</span>
           </span>
-          <span class="conversation-date">{{ formatRelativeDay(conv.preview?.createdAt ?? conv.updatedAt) }}</span>
         </button>
       </nav>
     </aside>
@@ -1573,8 +1575,17 @@ watch(
 .conversation-meta {
   display: flex;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+}
+
+.conversation-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  min-width: 0;
 }
 
 .conversation-title {
@@ -1583,6 +1594,16 @@ watch(
   white-space: nowrap;
   color: var(--ink);
   font-weight: 600;
+  min-width: 0;
+  flex: 1;
+}
+
+.conversation-date {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .conversation-preview {
@@ -1591,11 +1612,6 @@ watch(
   white-space: nowrap;
   color: var(--muted);
   font-size: 13px;
-}
-
-.conversation-date {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .message-thread {

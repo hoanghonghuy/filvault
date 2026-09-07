@@ -14,7 +14,7 @@ const router = createRouter({
       path: '/verify-email',
       name: 'verify-email',
       component: () => import('@/views/VerifyEmailView.vue'),
-      meta: { auth: true },
+      meta: { auth: true, unverifiedOnly: true },
     },
     { path: '/', name: 'home', redirect: '/chat' },
     { path: '/overview', name: 'overview', component: () => import('@/views/OverviewView.vue'), meta: { auth: true, verified: true } },
@@ -55,6 +55,9 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.auth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if ((to.name === 'verify-email' || to.meta.unverifiedOnly) && auth.isAuthenticated && auth.isVerified) {
+    return '/chat'
   }
   if (to.meta.verified && auth.isAuthenticated && !auth.isVerified) {
     return '/verify-email'
