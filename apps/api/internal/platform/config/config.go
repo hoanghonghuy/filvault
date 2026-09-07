@@ -40,4 +40,8 @@ type Config struct {
 	DefaultTrashRetentionDays int
 	PublicShareRateLimitPerMin int
 	CORSAllowedOrigins        []string
+	LiveKitURL                string
+	LiveKitPublicURL          string
+	LiveKitAPIKey             string
+	LiveKitAPISecret          string
 }

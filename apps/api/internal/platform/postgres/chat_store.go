@@ -960,4 +960,20 @@ func (r chatRepo) CompleteAttachment(ctx context.Context, ownerID, conversationI
 	return r.store.CompleteAttachment(ctx, ownerID, conversationID, f, stat, body, now)
 }
 
+func (s *Store) InsertChatEvent(ctx context.Context, conversationID, eventType, aggregateID string, payload []byte, now time.Time) error {
+	if len(payload) == 0 {
+		payload = []byte("{}")
+	}
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO chat_events (id, conversation_id, event_type, aggregate_id, payload, created_at)
+		VALUES ($1, $2, $3, $4::char(26), $5::jsonb, $6)
+	`, auth.NewID(), conversationID, eventType, aggregateID, payload, now)
+	return err
+}
+
+func (r chatRepo) InsertChatEvent(ctx context.Context, conversationID, eventType, aggregateID string, payload []byte, now time.Time) error {
+	return r.store.InsertChatEvent(ctx, conversationID, eventType, aggregateID, payload, now)
+}
+
 var _ chat.Repository = chatRepo{}
+

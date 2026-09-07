@@ -5,6 +5,7 @@ import { api, uploadToPresigned, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import { useChatStore } from '@/stores/chat'
+import { useCallStore } from '@/stores/call'
 import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -14,11 +15,13 @@ import UploadProgress from '@/components/UploadProgress.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
+import { generateUUID } from '@/lib/uuid'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, UploadSession } from '@/api/types'
 
 const router = useRouter()
 const ui = useUiStore()
 const chatStore = useChatStore()
+const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
 
@@ -431,10 +434,11 @@ function attachmentLabel(attachment: ChatAttachment): string {
 }
 
 async function sendText() {
+  if (sending.value) return
   if (!selectedId.value || !draft.value.trim()) return
   const conversationId = selectedId.value
   const body = draft.value.trim()
-  const clientMessageId = crypto.randomUUID()
+  const clientMessageId = generateUUID()
   const optimistic: ChatMessage = {
     id: `pending-${Date.now()}`,
     conversationId,
@@ -447,10 +451,10 @@ async function sendText() {
   pendingMessage.value = optimistic
   pendingMessageError.value = ''
   draft.value = ''
+  sending.value = true
   await nextTick()
   autoGrow()
   error.value = ''
-  sending.value = true
   try {
     const message = await chatStore.sendMessage(body, clientMessageId, conversationId)
     messages.value = messages.value.some((item) => item.clientMessageId === clientMessageId)
@@ -492,7 +496,7 @@ async function onAttachmentChange(event: Event) {
   input.value = ''
   if (!file || !selectedId.value) return
   const item: AttachmentUpload = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     file,
     conversationId: selectedId.value,
     body: draft.value.trim(),
@@ -741,16 +745,35 @@ watch(
               <span class="thread-status">{{ t.activeNow }}</span>
             </div>
           </div>
-          <button class="ghost-btn" type="button" @click="loadMessages()">{{ t.refresh }}</button>
-          <button
-            class="icon-btn"
-            type="button"
-            :aria-expanded="threadSearchOpen"
-            :aria-label="t.search"
-            @click="threadSearchOpen = !threadSearchOpen"
-          >
-            <Icon name="search" :size="18" />
-          </button>
+          <div class="thread-actions">
+            <button
+              class="icon-btn"
+              type="button"
+              aria-label="Gọi thoại"
+              title="Gọi thoại"
+              @click="callStore.startCall(selectedConversation.id, { isVideo: false })"
+            >
+              <Icon name="phone" :size="18" />
+            </button>
+            <button
+              class="icon-btn"
+              type="button"
+              aria-label="Gọi video"
+              title="Gọi video"
+              @click="callStore.startCall(selectedConversation.id, { isVideo: true })"
+            >
+              <Icon name="camera" :size="18" />
+            </button>
+            <button
+              class="icon-btn"
+              type="button"
+              :aria-expanded="threadSearchOpen"
+              :aria-label="t.search"
+              @click="threadSearchOpen = !threadSearchOpen"
+            >
+              <Icon name="search" :size="18" />
+            </button>
+          </div>
         </header>
 
         <form v-if="threadSearchOpen" class="chat-search" @submit.prevent="searchMessages">
@@ -902,6 +925,7 @@ watch(
             aria-label="Send"
             :class="{ active: Boolean(draft.trim()) }"
             :disabled="!draft.trim() || sending"
+            @click.prevent="sendText"
           >
             <Icon name="send" :size="18" />
           </button>
@@ -1118,7 +1142,7 @@ watch(
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   touch-action: manipulation;
@@ -1147,16 +1171,26 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
-  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
   font-weight: 700;
-  font-size: 16px;
-  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
+  font-size: 0.875rem;
+  letter-spacing: -0.02em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard);
+}
+
+.chat-mark-btn:hover .chat-mark,
+.chat-mark-btn:active .chat-mark {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .app-menu-content {
@@ -1573,10 +1607,11 @@ watch(
 .thread-header {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  min-height: 60px;
+  gap: var(--space-xs);
+  min-height: 56px;
   padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
   border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
 }
 
 .thread-peer-info {
@@ -1585,12 +1620,15 @@ watch(
   gap: 10px;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .thread-peer-meta {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .thread-peer-meta h2 {
@@ -1609,6 +1647,9 @@ watch(
   color: #22c55e;
   font-weight: 500;
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .thread-avatar {
@@ -1625,8 +1666,24 @@ watch(
   font-size: 14px;
 }
 
+.thread-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.thread-actions .icon-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  color: #0084ff;
+}
+
 .back-btn {
   display: inline-flex;
+  flex-shrink: 0;
 }
 
 .chat-search {
@@ -2228,6 +2285,39 @@ watch(
 
   .chat-app.in-thread .message-thread {
     display: flex;
+  }
+
+  .thread-header {
+    padding: calc(6px + env(safe-area-inset-top)) 10px 6px;
+    gap: 6px;
+    min-height: 52px;
+  }
+
+  .thread-peer-info {
+    gap: 8px;
+  }
+
+  .thread-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+
+  .thread-peer-meta h2 {
+    font-size: 14px;
+  }
+
+  .thread-status {
+    font-size: 10.5px;
+  }
+
+  .thread-actions {
+    gap: 2px;
+  }
+
+  .thread-actions .icon-btn {
+    width: 34px;
+    height: 34px;
   }
 }
 

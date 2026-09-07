@@ -40,11 +40,23 @@ const messages = [
 
 vi.mock('@/api/client', () => ({
   API_BASE: 'http://localhost:8080/api/v1',
-  api: vi.fn<(path: string) => Promise<unknown>>(async (path: string) => {
+  api: vi.fn<(path: string, options?: RequestInit) => Promise<unknown>>(async (path: string, options?: RequestInit) => {
     if (path === '/chat/conversations?includePreview=true') {
       return { conversations: [conversation] }
     }
     if (path.startsWith(`/chat/conversations/${conversation.id}/messages`)) {
+      if (options?.method === 'POST') {
+        const payload = JSON.parse(options.body as string)
+        return {
+          id: '01KNEWMESSAGE000000000000001',
+          conversationId: conversation.id,
+          body: payload.body,
+          senderId: '01KCHATAUTH00000000000000001',
+          clientMessageId: payload.clientMessageId,
+          createdAt: new Date().toISOString(),
+          attachments: [],
+        }
+      }
       return { messages, hasMore: false }
     }
     if (path === `/chat/conversations/${conversation.id}/media`) {
@@ -121,6 +133,41 @@ describe('ChatView', () => {
     expect(wrapper.find('.message-thread').exists()).toBe(true)
     expect(wrapper.find('.conversation-title').text()).toBe('Recipient')
     expect(wrapper.find('.message-bubble:not(.outgoing)').text()).toContain('Hello from Recipient')
+
+    wrapper.unmount()
+  })
+
+  it('sends message successfully even in insecure context where crypto.randomUUID is undefined', async () => {
+    const originalCrypto = globalThis.crypto
+    vi.stubGlobal('crypto', {
+      getRandomValues: (arr: Uint8Array) => originalCrypto.getRandomValues(arr),
+    })
+
+    const wrapper = mount(ChatView, {
+      global: { plugins: [pinia] },
+      attachTo: document.body,
+    })
+
+    await flushPromises()
+
+    const textarea = wrapper.find<HTMLTextAreaElement>('.chat-composer textarea')
+    expect(textarea.exists()).toBe(true)
+    await textarea.setValue('helu')
+
+    const sendBtn = wrapper.find('.send-btn')
+    expect(sendBtn.exists()).toBe(true)
+    await sendBtn.trigger('click')
+
+    await flushPromises()
+
+    const { api } = await import('@/api/client')
+    expect(api).toHaveBeenCalledWith(
+      `/chat/conversations/${conversation.id}/messages`,
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"body":"helu"'),
+      }),
+    )
 
     wrapper.unmount()
   })

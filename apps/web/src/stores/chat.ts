@@ -2,6 +2,8 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { API_BASE, api, getAccessToken, refreshAccessToken } from '@/api/client'
 import type { ChatConversation, ChatMessage } from '@/api/types'
+import { useCallStore } from '@/stores/call'
+import { generateUUID } from '@/lib/uuid'
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline'
 type ChatEvent = { type: string; payload: string }
@@ -51,7 +53,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function sendMessage(
     body: string,
-    clientMessageId = crypto.randomUUID(),
+    clientMessageId = generateUUID(),
     conversationId = selectedId.value,
   ): Promise<ChatMessage> {
     if (!conversationId) throw new Error('No conversation selected')
@@ -76,6 +78,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function applyEvent(event: ChatEvent): void {
+    if (event.type === 'call.signal') {
+      try {
+        const signalData =
+          typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+        useCallStore().handleSignal(signalData)
+      } catch {
+        // ignore
+      }
+      return
+    }
     try {
       const payload = JSON.parse(event.payload) as { aggregateId?: string }
       if (selectedId.value && payload.aggregateId) {

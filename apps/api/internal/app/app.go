@@ -7,6 +7,7 @@ import (
 
 	"filvault/internal/activity"
 	"filvault/internal/auth"
+	"filvault/internal/call"
 	"filvault/internal/chat"
 	"filvault/internal/file"
 	"filvault/internal/folder"
@@ -81,6 +82,10 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 
 	chatRepo := postgres.NewChatRepository(store)
 	chatSvc := chat.NewService(chatRepo, store, fileRepo, quota, obj)
+	if cfg.LiveKitAPIKey != "" && cfg.LiveKitAPISecret != "" {
+		callTokenGen := call.NewTokenGenerator(cfg.LiveKitAPIKey, cfg.LiveKitAPISecret, 6*time.Hour)
+		chatSvc.SetCallConfig(callTokenGen, cfg.LiveKitPublicURL)
+	}
 	chatHandlers := chat.NewHandler(chatSvc)
 
 	storageHandlers := storage.NewHandler(quota)

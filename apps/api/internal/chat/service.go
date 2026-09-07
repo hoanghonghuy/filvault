@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -33,10 +34,31 @@ type Repository interface {
 	GetAttachmentObjectKey(ctx context.Context, userID, conversationID, attachmentID string) (string, error)
 	ListEventsAfter(ctx context.Context, userID string, after int64, limit int) ([]Event, error)
 	CompleteAttachment(ctx context.Context, ownerID, conversationID string, f file.File, stat objectstore.ObjectStat, body string, now time.Time) (Message, error)
+	InsertChatEvent(ctx context.Context, conversationID, eventType, aggregateID string, payload []byte, now time.Time) error
 }
 
 type UserDirectory interface {
 	GetUserByEmail(ctx context.Context, email string) (*user.User, error)
+	GetUserByID(ctx context.Context, id string) (*user.User, error)
+}
+
+type TokenGenerator interface {
+	GenerateToken(room, identity, name string) (string, error)
+}
+
+type CallTokenResponse struct {
+	Token string `json:"token"`
+	URL   string `json:"url"`
+	Room  string `json:"room"`
+}
+
+type CallSignal struct {
+	ConversationID string `json:"conversationId"`
+	SenderID       string `json:"senderId"`
+	SenderName     string `json:"senderName"`
+	Action         string `json:"action"`
+	IsVideo        bool   `json:"isVideo"`
+	Timestamp      string `json:"timestamp"`
 }
 
 type MessagePage struct {
@@ -51,12 +73,14 @@ type ConversationView struct {
 }
 
 type Service struct {
-	repo    Repository
-	users   UserDirectory
-	files   file.Repository
-	quota   file.QuotaStore
-	objects objectstore.ObjectStore
-	now     func() time.Time
+	repo       Repository
+	users      UserDirectory
+	files      file.Repository
+	quota      file.QuotaStore
+	objects    objectstore.ObjectStore
+	tokens     TokenGenerator
+	callPubURL string
+	now        func() time.Time
 }
 
 func NewService(repo Repository, users UserDirectory, files file.Repository, quota file.QuotaStore, objects objectstore.ObjectStore) *Service {
@@ -365,4 +389,71 @@ func (s *Service) ensureConversation(ctx context.Context, ownerID, conversationI
 		return apperr.NotFound
 	}
 	return nil
+}
+
+func (s *Service) SetCallConfig(tokens TokenGenerator, publicURL string) {
+	s.tokens = tokens
+	s.callPubURL = publicURL
+}
+
+func (s *Service) GetCallToken(ctx context.Context, userID, conversationID string) (CallTokenResponse, error) {
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return CallTokenResponse{}, err
+	}
+	if s.tokens == nil {
+		return CallTokenResponse{}, apperr.InvalidState
+	}
+	var name string
+	if s.users != nil {
+		if u, err := s.users.GetUserByID(ctx, userID); err == nil && u != nil {
+			name = u.DisplayName
+		}
+	}
+	if name == "" {
+		name = userID
+	}
+	token, err := s.tokens.GenerateToken(conversationID, userID, name)
+	if err != nil {
+		return CallTokenResponse{}, err
+	}
+	return CallTokenResponse{
+		Token: token,
+		URL:   s.callPubURL,
+		Room:  conversationID,
+	}, nil
+}
+
+func (s *Service) SendCallSignal(ctx context.Context, userID, conversationID, action string, isVideo bool) error {
+	action = strings.TrimSpace(strings.ToLower(action))
+	switch action {
+	case "invite", "accept", "decline", "end":
+	default:
+		return apperr.Validation
+	}
+	if err := s.ensureConversation(ctx, userID, conversationID); err != nil {
+		return err
+	}
+	var name string
+	if s.users != nil {
+		if u, err := s.users.GetUserByID(ctx, userID); err == nil && u != nil {
+			name = u.DisplayName
+		}
+	}
+	if name == "" {
+		name = userID
+	}
+	now := s.now().UTC()
+	signal := CallSignal{
+		ConversationID: conversationID,
+		SenderID:       userID,
+		SenderName:     name,
+		Action:         action,
+		IsVideo:        isVideo,
+		Timestamp:      now.Format(time.RFC3339),
+	}
+	payload, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+	return s.repo.InsertChatEvent(ctx, conversationID, "call.signal", conversationID, payload, now)
 }

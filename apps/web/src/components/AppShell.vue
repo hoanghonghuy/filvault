@@ -8,6 +8,7 @@ import ToastHost from '@/components/ToastHost.vue'
 import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
+import CallModal from '@/components/CallModal.vue'
 import { HOME_PATH, PROFILE_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
@@ -56,6 +57,7 @@ const navLabels = computed(() => ({
   <GlobalConfirm />
   <GlobalPrompt />
   <GlobalActionSheet />
+  <CallModal />
 
   <div v-if="showShell" class="shell">
     <aside class="side-nav" aria-label="Main navigation">

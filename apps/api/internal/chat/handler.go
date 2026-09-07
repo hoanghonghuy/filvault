@@ -36,6 +36,8 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.GET("/chat/conversations/:id/media", append(middleware, h.listMedia)...)
 	g.POST("/chat/attachments/upload-sessions", append(middleware, h.createAttachmentSession)...)
 	g.POST("/chat/attachments/:fileId/complete", append(middleware, h.completeAttachment)...)
+	g.POST("/chat/conversations/:id/call/token", append(middleware, h.getCallToken)...)
+	g.POST("/chat/conversations/:id/call/signal", append(middleware, h.sendCallSignal)...)
 }
 
 func userIDFrom(c *gin.Context) (string, bool) {
@@ -532,4 +534,49 @@ func queryLimit(c *gin.Context) (int, bool) {
 		limit = n
 	}
 	return limit, true
+}
+
+type sendCallSignalReq struct {
+	Action  string `json:"action"`
+	IsVideo bool   `json:"isVideo"`
+}
+
+func (h *Handler) getCallToken(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	res, err := h.svc.GetCallToken(c.Request.Context(), userID, conversationID)
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (h *Handler) sendCallSignal(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	conversationID, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	var req sendCallSignalReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Validation(c)
+		return
+	}
+	if err := h.svc.SendCallSignal(c.Request.Context(), userID, conversationID, req.Action, req.IsVideo); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusOK)
 }
