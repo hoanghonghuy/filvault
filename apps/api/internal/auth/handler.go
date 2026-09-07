@@ -240,11 +240,20 @@ func (h *Handler) patchMe(c *gin.Context) {
 		}
 		videoThumbnails = &enabled
 	}
-	if autoDelete == nil && retentionDays == nil && displayName == nil && imageThumbnails == nil && videoThumbnails == nil {
+	var activeStatus *bool
+	if v, ok := raw["activeStatusEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		activeStatus = &enabled
+	}
+	if autoDelete == nil && retentionDays == nil && displayName == nil && imageThumbnails == nil && videoThumbnails == nil && activeStatus == nil {
 		httpx.Validation(c)
 		return
 	}
-	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays, imageThumbnails, videoThumbnails)
+	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays, imageThumbnails, videoThumbnails, activeStatus)
 	if err != nil {
 		httpx.Error(c, err)
 		return

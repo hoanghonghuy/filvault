@@ -98,11 +98,14 @@ func (s *Store) CreateOrGetDirectConversation(ctx context.Context, ownerID, reci
 		}
 	}
 	_ = tx.QueryRow(ctx, `
-		SELECT u.id, u.display_name, u.email, u.last_seen_at
+		SELECT u.id, u.display_name, u.email, u.last_seen_at,
+			COALESCE(u.active_status_enabled, true),
+			COALESCE(o.active_status_enabled, true)
 		FROM conversation_members cm
 		JOIN users u ON u.id = cm.user_id
+		JOIN users o ON o.id = $2
 		WHERE cm.conversation_id = $1 AND cm.user_id <> $2
-	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt)
+	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled)
 	if err := tx.Commit(ctx); err != nil {
 		return chat.Conversation{}, err
 	}
@@ -115,8 +118,11 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 			COALESCE(c.conversation_type, 'legacy'),
 			COALESCE(peer.id, ''), COALESCE(peer.display_name, ''), COALESCE(peer.email, ''),
 			peer.last_seen_at,
+			COALESCE(peer.active_status_enabled, true),
+			COALESCE(owner_user.active_status_enabled, true),
 			COALESCE(c.last_message_at, c.updated_at)
 		FROM conversations c
+		JOIN users owner_user ON owner_user.id = $1
 		LEFT JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id <> $1
 		LEFT JOIN users peer ON peer.id = cm.user_id
 		WHERE c.archived_at IS NULL
@@ -134,7 +140,8 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 	for rows.Next() {
 		var c chat.Conversation
 		if err := rows.Scan(&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
-			&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.LastMessage); err != nil {
+			&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt,
+			&c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.LastMessage); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -149,8 +156,11 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 			COALESCE(c.conversation_type, 'legacy'),
 			COALESCE(peer.id, ''), COALESCE(peer.display_name, ''), COALESCE(peer.email, ''),
 			peer.last_seen_at,
+			COALESCE(peer.active_status_enabled, true),
+			COALESCE(owner_user.active_status_enabled, true),
 			COALESCE(c.last_message_at, c.updated_at)
 		FROM conversations c
+		JOIN users owner_user ON owner_user.id = $1
 		LEFT JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id <> $1
 		LEFT JOIN users peer ON peer.id = cm.user_id
 		WHERE c.id = $2 AND c.archived_at IS NULL
@@ -160,7 +170,8 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 			)
 	`, ownerID, id).Scan(
 		&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
-		&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.LastMessage,
+		&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt,
+		&c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.LastMessage,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

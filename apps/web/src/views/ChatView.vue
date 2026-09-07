@@ -280,11 +280,13 @@ function openChatFromPeek() {
 
 function isPeerOnline(conv?: ChatConversation | null): boolean {
   if (!conv) return false
+  if (auth.user?.activeStatusEnabled === false) return false
   return conv.peerStatus === 'online'
 }
 
 function formatLastSeen(conv?: ChatConversation | null): string {
   if (!conv) return ''
+  if (auth.user?.activeStatusEnabled === false) return ''
   const iso = conv.peerLastSeenAt || conv.peer?.lastSeenAt
   if (!iso) return ''
   const then = new Date(iso).getTime()
@@ -308,7 +310,17 @@ function formatLastSeen(conv?: ChatConversation | null): string {
   if (diffDays === 1 || diffHour < 48) {
     return t.value.activeYesterday
   }
-  return t.value.offline
+  if (diffDays <= 7) {
+    return t.value.activeDaysAgo.replace('{d}', String(diffDays))
+  }
+  const thenDate = new Date(iso)
+  const nowDate = new Date()
+  const day = String(thenDate.getDate()).padStart(2, '0')
+  const month = String(thenDate.getMonth() + 1).padStart(2, '0')
+  if (thenDate.getFullYear() === nowDate.getFullYear()) {
+    return t.value.activeOnDate.replace('{date}', `${day}/${month}`)
+  }
+  return t.value.activeOnDate.replace('{date}', `${day}/${month}/${thenDate.getFullYear()}`)
 }
 
 function isConversationUnread(conv: ChatConversation): boolean {
@@ -392,6 +404,18 @@ function toggleDarkMode() {
 function toggleLanguage() {
   const next = locale.value === 'vi' ? 'en' : 'vi'
   setLocale(next)
+}
+
+async function toggleActiveStatus() {
+  const current = auth.user?.activeStatusEnabled !== false
+  const next = !current
+  try {
+    await auth.updateActiveStatus(next)
+    ui.showToast(next ? 'Đã bật trạng thái hoạt động' : 'Đã tắt trạng thái hoạt động')
+    await loadConversations()
+  } catch (e) {
+    ui.showToast(formatApiError(e, 'Không thể cập nhật trạng thái'), 'error')
+  }
 }
 
 function navigateTo(path: string) {
@@ -1015,10 +1039,11 @@ watch(
             <div class="thread-peer-meta">
               <h2>{{ conversationTitle(selectedConversation) }}</h2>
               <span
+                v-if="isPeerOnline(selectedConversation) || formatLastSeen(selectedConversation)"
                 class="thread-status"
                 :class="{ online: isPeerOnline(selectedConversation) }"
               >
-                {{ isPeerOnline(selectedConversation) ? t.activeNow : (formatLastSeen(selectedConversation) || t.offline) }}
+                {{ isPeerOnline(selectedConversation) ? t.activeNow : formatLastSeen(selectedConversation) }}
               </span>
             </div>
           </div>
@@ -1305,9 +1330,9 @@ watch(
           <span class="menu-profile-info">
             <span class="menu-profile-name">{{ auth.user?.displayName || t.myAccount }}</span>
             <span class="menu-profile-email">{{ auth.user?.email }}</span>
-            <span class="menu-status-badge">
-              <span class="status-dot" aria-hidden="true" />
-              <span>{{ t.activeStatus }}: {{ t.activeStatusOn }}</span>
+            <span class="menu-status-badge" :class="{ offline: auth.user?.activeStatusEnabled === false }">
+              <span class="status-dot" :class="{ offline: auth.user?.activeStatusEnabled === false }" aria-hidden="true" />
+              <span>{{ t.activeStatus }}: {{ auth.user?.activeStatusEnabled !== false ? t.activeStatusOn : t.activeStatusOff }}</span>
             </span>
           </span>
           <Icon name="arrow-right" :size="16" class="menu-profile-arrow" />
@@ -1359,11 +1384,19 @@ watch(
         <div class="menu-section">
           <span class="menu-section-label">{{ t.messengerFeatures }}</span>
           <div class="menu-items-group">
-            <div class="menu-row-item disabled-feature">
-              <span class="menu-item-icon badge-status"><span class="status-dot" /></span>
+            <button
+              type="button"
+              class="menu-row-item"
+              @click="toggleActiveStatus"
+            >
+              <span class="menu-item-icon badge-status" :class="{ offline: auth.user?.activeStatusEnabled === false }">
+                <span class="status-dot" :class="{ offline: auth.user?.activeStatusEnabled === false }" />
+              </span>
               <span class="menu-item-text">{{ t.activeStatus }}</span>
-              <span class="menu-badge-green">{{ t.activeStatusOn }}</span>
-            </div>
+              <span :class="auth.user?.activeStatusEnabled !== false ? 'menu-badge-green' : 'menu-badge-muted'">
+                {{ auth.user?.activeStatusEnabled !== false ? t.activeStatusOn : t.activeStatusOff }}
+              </span>
+            </button>
             <div class="menu-row-item disabled-feature">
               <span class="menu-item-icon badge-archive"><Icon name="archive" :size="18" /></span>
               <span class="menu-item-text">{{ t.archivedChats }}</span>
@@ -1489,10 +1522,11 @@ watch(
           </span>
           <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
           <span
+            v-if="isPeerOnline(selectedConversation) || formatLastSeen(selectedConversation)"
             class="chat-info-status"
             :class="{ online: isPeerOnline(selectedConversation) }"
           >
-            {{ isPeerOnline(selectedConversation) ? t.activeNow : (formatLastSeen(selectedConversation) || t.offline) }}
+            {{ isPeerOnline(selectedConversation) ? t.activeNow : formatLastSeen(selectedConversation) }}
           </span>
         </div>
 
@@ -1794,12 +1828,20 @@ watch(
   font-weight: 500;
 }
 
+.menu-status-badge.offline {
+  color: var(--muted);
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-pill);
   background: #22c55e;
   flex-shrink: 0;
+}
+
+.status-dot.offline {
+  background: var(--muted);
 }
 
 .menu-profile-arrow {
@@ -1877,6 +1919,7 @@ watch(
 .badge-lang { background: #e0e7ff; color: #4338ca; }
 .badge-settings { background: var(--surface-soft); color: var(--ink); }
 .badge-status { background: #dcfce7; color: #16a34a; }
+.badge-status.offline { background: var(--surface-soft); color: var(--muted); }
 .badge-archive { background: var(--surface-soft); color: var(--muted); }
 
 :global([data-theme='dark']) .badge-folder { background: rgba(2, 132, 199, 0.22); color: #38bdf8; }
@@ -1885,6 +1928,7 @@ watch(
 :global([data-theme='dark']) .badge-theme { background: rgba(217, 119, 6, 0.22); color: #fbbf24; }
 :global([data-theme='dark']) .badge-lang { background: rgba(67, 56, 202, 0.22); color: #818cf8; }
 :global([data-theme='dark']) .badge-status { background: rgba(22, 163, 74, 0.22); color: #4ade80; }
+:global([data-theme='dark']) .badge-status.offline { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
 
 .menu-item-text {
   flex: 1;

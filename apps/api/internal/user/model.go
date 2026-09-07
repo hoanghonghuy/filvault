@@ -16,6 +16,7 @@ type User struct {
 	VideoThumbnailsEnabled bool
 	TrashAutoDeleteEnabled bool
 	TrashRetentionDays     int
+	ActiveStatusEnabled    bool
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }

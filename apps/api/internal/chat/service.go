@@ -261,10 +261,16 @@ func (s *Service) ListConversationsWithPreview(ctx context.Context, ownerID stri
 	for _, conv := range conversations {
 		view := ConversationView{Conversation: conv}
 		if conv.PeerID != "" && s.presence != nil {
-			status, lastSeen := s.presence.GetPresence(conv.PeerID)
-			view.PeerStatus = status
-			if status == "offline" && lastSeen != nil {
-				view.PeerLastSeenAt = lastSeen
+			if conv.OwnerActiveStatusEnabled && conv.PeerActiveStatusEnabled {
+				status, lastSeen := s.presence.GetPresence(conv.PeerID)
+				view.PeerStatus = status
+				if status == "offline" && lastSeen != nil {
+					view.PeerLastSeenAt = lastSeen
+				}
+			} else {
+				view.PeerStatus = ""
+				view.PeerLastSeenAt = nil
+				view.Conversation.PeerLastSeenAt = nil
 			}
 		}
 		if readStates != nil {
@@ -568,6 +574,11 @@ func (s *Service) HandleConnect(ctx context.Context, userID string, now time.Tim
 	if !isFirst {
 		return nil
 	}
+	if s.users != nil {
+		if u, err := s.users.GetUserByID(ctx, userID); err == nil && u != nil && !u.ActiveStatusEnabled {
+			return nil
+		}
+	}
 	convIDs, err := s.repo.ListConversationIDsForUser(ctx, userID)
 	if err != nil {
 		return err
@@ -595,6 +606,11 @@ func (s *Service) HandleDisconnect(ctx context.Context, userID string, now time.
 		return nil
 	}
 	_ = s.repo.UpdateUserLastSeen(ctx, userID, now)
+	if s.users != nil {
+		if u, err := s.users.GetUserByID(ctx, userID); err == nil && u != nil && !u.ActiveStatusEnabled {
+			return nil
+		}
+	}
 	convIDs, err := s.repo.ListConversationIDsForUser(ctx, userID)
 	if err != nil {
 		return err

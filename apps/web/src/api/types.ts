@@ -16,6 +16,7 @@ export interface User {
   videoThumbnailsEnabled: boolean
   trashAutoDeleteEnabled: boolean
   trashRetentionDays: number
+  activeStatusEnabled?: boolean
   createdAt: string
 }
 

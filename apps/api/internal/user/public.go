@@ -13,6 +13,7 @@ type Public struct {
 	VideoThumbnailsEnabled bool      `json:"videoThumbnailsEnabled"`
 	TrashAutoDeleteEnabled bool      `json:"trashAutoDeleteEnabled"`
 	TrashRetentionDays     int       `json:"trashRetentionDays"`
+	ActiveStatusEnabled    bool      `json:"activeStatusEnabled"`
 	CreatedAt              time.Time `json:"createdAt"`
 }
 
@@ -28,6 +29,7 @@ func PublicFrom(u User) Public {
 		VideoThumbnailsEnabled: u.VideoThumbnailsEnabled,
 		TrashAutoDeleteEnabled: u.TrashAutoDeleteEnabled,
 		TrashRetentionDays:     u.TrashRetentionDays,
+		ActiveStatusEnabled:    u.ActiveStatusEnabled,
 		CreatedAt:              u.CreatedAt.UTC(),
 	}
 }

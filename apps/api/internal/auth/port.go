@@ -30,4 +30,5 @@ type Repository interface {
 	UpdateThumbnailSettings(ctx context.Context, userID string, imageEnabled, videoEnabled bool) error
 	UpdateDisplayName(ctx context.Context, userID, displayName string) error
 	UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error
+	UpdateActiveStatus(ctx context.Context, userID string, enabled bool) error
 }

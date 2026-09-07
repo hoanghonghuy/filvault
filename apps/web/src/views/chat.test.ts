@@ -196,11 +196,18 @@ describe('chat surface contract', () => {
 
   it('tracks real-time peer presence with dynamic status and indicator', () => {
     const store = readSrc('../stores/chat.ts')
+    const authStore = readSrc('../stores/auth.ts')
     expect(store).toMatch(/presence\.changed/)
     expect(types).toMatch(/peerStatus\?: 'online' \| 'offline'/)
     expect(types).toMatch(/peerLastSeenAt\?: string/)
+    expect(types).toMatch(/activeStatusEnabled\?: boolean/)
+    expect(authStore).toMatch(/updateActiveStatus/)
     expect(chat).toMatch(/isPeerOnline/)
     expect(chat).toMatch(/formatLastSeen/)
+    expect(chat).toMatch(/auth\.user\?\.activeStatusEnabled === false/)
+    expect(chat).toMatch(/activeDaysAgo/)
+    expect(chat).toMatch(/activeOnDate/)
+    expect(chat).toMatch(/toggleActiveStatus/)
     expect(chat).toMatch(/v-if="isPeerOnline\(conv\)"\s+class="online-indicator"/)
     expect(chat).toMatch(/thread-status/)
     expect(chat).toMatch(/class="chat-info-status"/)

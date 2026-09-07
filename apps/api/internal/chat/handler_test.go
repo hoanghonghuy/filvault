@@ -1025,6 +1025,10 @@ func deleteAuth(t *testing.T, engine http.Handler, path, token string) (int, str
 	return doJSON(t, engine, http.MethodDelete, path, token, nil)
 }
 
+func patchAuth(t *testing.T, engine http.Handler, path, token string, payload map[string]any) (int, string) {
+	return doJSON(t, engine, http.MethodPatch, path, token, payload)
+}
+
 func TestChat_ReadReceiptAndTypingIndicator(t *testing.T) {
 	engine, mem, _ := newEngine(t)
 	tokenA := registerVerified(t, engine, mem, uniqueEmail())
@@ -1219,6 +1223,109 @@ func TestChat_RealtimePresence(t *testing.T) {
 	}
 	if listResp.Conversations[0].PeerLastSeenAt == nil || *listResp.Conversations[0].PeerLastSeenAt == "" {
 		t.Fatalf("expected peerLastSeenAt to be set after disconnect, got nil")
+	}
+}
+
+func TestChat_MutualActiveStatusPrivacy(t *testing.T) {
+	engine, mem, _ := newEngine(t)
+	tokenA := registerVerified(t, engine, mem, uniqueEmail())
+	tokenB := registerVerified(t, engine, mem, uniqueEmail())
+
+	var recipient struct {
+		Email string `json:"email"`
+	}
+	code, body := getAuth(t, engine, "/api/v1/users/me", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("recipient status=%d body=%s", code, body)
+	}
+	decodeJSON(t, body, &recipient)
+
+	// User A creates direct conversation with User B
+	code, _ = postAuth(t, engine, "/api/v1/chat/direct-conversations", tokenA, map[string]any{
+		"recipientEmail": recipient.Email,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("direct conv status=%d", code)
+	}
+
+	server := httptest.NewServer(engine)
+	defer server.Close()
+
+	// Connect User B via SSE
+	ctxB, cancelB := context.WithCancel(context.Background())
+	defer cancelB()
+	reqB, _ := http.NewRequestWithContext(ctxB, http.MethodGet, server.URL+"/api/v1/chat/events?after=0", nil)
+	reqB.Header.Set("Authorization", "Bearer "+tokenB)
+	respB, err := server.Client().Do(reqB)
+	if err != nil {
+		t.Fatalf("respB: %v", err)
+	}
+	defer respB.Body.Close()
+	time.Sleep(100 * time.Millisecond)
+
+	// Step 1: Both have active status enabled (default true) -> User A sees User B online
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list convs A status=%d", code)
+	}
+	var listResp struct {
+		Conversations []struct {
+			PeerStatus     string  `json:"peerStatus"`
+			PeerLastSeenAt *string `json:"peerLastSeenAt"`
+		} `json:"conversations"`
+	}
+	decodeJSON(t, body, &listResp)
+	if len(listResp.Conversations) == 0 || listResp.Conversations[0].PeerStatus != "online" {
+		t.Fatalf("expected B online to A, got %+v", listResp)
+	}
+
+	// Step 2: User A turns active status OFF
+	code, _ = patchAuth(t, engine, "/api/v1/users/me", tokenA, map[string]any{
+		"activeStatusEnabled": false,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("patch user A status=%d", code)
+	}
+
+	// Mutual privacy: User A cannot see User B's status anymore!
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list convs A status=%d", code)
+	}
+	listResp.Conversations = nil
+	decodeJSON(t, body, &listResp)
+	if listResp.Conversations[0].PeerStatus != "" {
+		t.Fatalf("expected A to NOT see B online when A has active status off, got %s", listResp.Conversations[0].PeerStatus)
+	}
+
+	// User B also cannot see User A's status
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenB)
+	if code != http.StatusOK {
+		t.Fatalf("list convs B status=%d", code)
+	}
+	listResp.Conversations = nil
+	decodeJSON(t, body, &listResp)
+	if listResp.Conversations[0].PeerStatus != "" {
+		t.Fatalf("expected B to NOT see A online when A has active status off, got %s", listResp.Conversations[0].PeerStatus)
+	}
+
+	// Step 3: User A turns active status back ON
+	code, _ = patchAuth(t, engine, "/api/v1/users/me", tokenA, map[string]any{
+		"activeStatusEnabled": true,
+	})
+	if code != http.StatusOK {
+		t.Fatalf("patch user A back on status=%d", code)
+	}
+
+	// User A sees User B online again!
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations?includePreview=true", tokenA)
+	if code != http.StatusOK {
+		t.Fatalf("list convs A status=%d", code)
+	}
+	listResp.Conversations = nil
+	decodeJSON(t, body, &listResp)
+	if listResp.Conversations[0].PeerStatus != "online" {
+		t.Fatalf("expected A to see B online again, got %s", listResp.Conversations[0].PeerStatus)
 	}
 }
 

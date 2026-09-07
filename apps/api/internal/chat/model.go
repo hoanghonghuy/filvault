@@ -13,13 +13,15 @@ type Conversation struct {
 	OwnerID     string
 	Title       string
 	Type        string
-	PeerID         string
-	PeerName       string
-	PeerEmail      string
-	PeerLastSeenAt *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	LastMessage    time.Time
+	PeerID                   string
+	PeerName                 string
+	PeerEmail                string
+	PeerLastSeenAt           *time.Time
+	PeerActiveStatusEnabled  bool
+	OwnerActiveStatusEnabled bool
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+	LastMessage              time.Time
 }
 
 type PresenceSignal struct {

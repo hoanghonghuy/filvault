@@ -30,6 +30,7 @@ func (s *Store) CreateUser(ctx context.Context, u user.User) error {
 			storage_used, storage_quota,
 			image_thumbnails_enabled, video_thumbnails_enabled,
 			trash_auto_delete_enabled, trash_retention_days,
+			active_status_enabled,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4,
@@ -37,12 +38,14 @@ func (s *Store) CreateUser(ctx context.Context, u user.User) error {
 			$6, $7,
 			$8, $9,
 			$10, $11,
-			$12, $13
+			$12,
+			$13, $14
 		)
 	`, u.ID, u.Email, u.DisplayName, u.PasswordHash,
 		u.EmailVerifiedAt, u.StorageUsed, u.StorageQuota,
 		u.ImageThumbnailsEnabled, u.VideoThumbnailsEnabled,
 		u.TrashAutoDeleteEnabled, u.TrashRetentionDays,
+		u.ActiveStatusEnabled,
 		u.CreatedAt, u.UpdatedAt)
 	if isUniqueViolation(err) {
 		return apperr.Conflict
@@ -134,6 +137,20 @@ func (s *Store) UpdatePasswordHash(ctx context.Context, userID, passwordHash str
 	return nil
 }
 
+func (s *Store) UpdateActiveStatus(ctx context.Context, userID string, enabled bool) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE users SET active_status_enabled = $2, updated_at = now()
+		WHERE id = $1
+	`, userID, enabled)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound
+	}
+	return nil
+}
+
 func (s *Store) InsertRefreshToken(ctx context.Context, tok auth.RefreshToken) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, created_at)
@@ -189,6 +206,7 @@ const userSelect = `
 		storage_used, storage_quota,
 		image_thumbnails_enabled, video_thumbnails_enabled,
 		trash_auto_delete_enabled, trash_retention_days,
+		COALESCE(active_status_enabled, true),
 		created_at, updated_at
 	FROM users
 `
@@ -202,6 +220,7 @@ func (s *Store) scanUser(row pgx.Row) (*user.User, error) {
 		&u.StorageUsed, &u.StorageQuota,
 		&u.ImageThumbnailsEnabled, &u.VideoThumbnailsEnabled,
 		&u.TrashAutoDeleteEnabled, &u.TrashRetentionDays,
+		&u.ActiveStatusEnabled,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

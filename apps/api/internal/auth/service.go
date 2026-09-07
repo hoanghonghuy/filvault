@@ -81,6 +81,7 @@ func (s *Service) Register(ctx context.Context, email, password, displayName, in
 		VideoThumbnailsEnabled: s.cfg.DefaultVideoThumbnails,
 		TrashAutoDeleteEnabled: s.cfg.DefaultTrashAutoDelete,
 		TrashRetentionDays:     s.cfg.DefaultTrashRetentionDays,
+		ActiveStatusEnabled:    true,
 		CreatedAt:              now,
 		UpdatedAt:              now,
 	}
@@ -164,6 +165,7 @@ func (s *Service) PatchMe(
 	retentionDays *int,
 	imageThumbnails *bool,
 	videoThumbnails *bool,
+	activeStatus *bool,
 ) (user.User, error) {
 	u, err := s.Me(ctx, userID)
 	if err != nil {
@@ -204,6 +206,11 @@ func (s *Service) PatchMe(
 			videoEnabled = *videoThumbnails
 		}
 		if err := s.repo.UpdateThumbnailSettings(ctx, userID, imageEnabled, videoEnabled); err != nil {
+			return user.User{}, err
+		}
+	}
+	if activeStatus != nil {
+		if err := s.repo.UpdateActiveStatus(ctx, userID, *activeStatus); err != nil {
 			return user.User{}, err
 		}
 	}
