@@ -580,7 +580,7 @@ async function loadConversations() {
     conversations.value = out.conversations
     const routeId = (route.params.id as string) || null
     if (routeId) {
-      if (selectedId.value !== routeId) {
+      if (selectedId.value !== routeId || messages.value.length === 0) {
         await selectConversation(routeId)
       }
     } else if (!selectedId.value && out.conversations[0] && !isMobileViewport()) {

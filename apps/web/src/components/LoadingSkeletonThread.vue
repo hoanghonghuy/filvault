@@ -1,37 +1,32 @@
 <template>
   <div class="sk-thread" aria-busy="true" aria-live="polite">
-    <div class="sk-row sk-incoming">
-      <div class="sk sk-avatar" />
-      <div class="sk sk-bubble" style="width: 52%" />
+    <div class="sk-row sk-in">
+      <div class="skeleton sk-av" />
+      <div class="skeleton sk-msg" style="width: 55%" />
     </div>
-    <div class="sk-row sk-incoming sk-followup">
-      <div class="sk-spacer" />
-      <div class="sk sk-bubble" style="width: 38%" />
+    <div class="sk-row sk-in">
+      <div class="sk-av-gap" />
+      <div class="skeleton sk-msg" style="width: 40%" />
     </div>
-
-    <div class="sk-row sk-outgoing">
-      <div class="sk sk-bubble" style="width: 44%" />
+    <div class="sk-row sk-out">
+      <div class="skeleton sk-msg" style="width: 48%" />
     </div>
-    <div class="sk-row sk-outgoing">
-      <div class="sk sk-bubble" style="width: 28%" />
+    <div class="sk-row sk-out">
+      <div class="skeleton sk-msg" style="width: 30%" />
     </div>
-
-    <div class="sk-row sk-incoming">
-      <div class="sk sk-avatar" />
-      <div class="sk sk-bubble" style="width: 62%" />
+    <div class="sk-row sk-in">
+      <div class="skeleton sk-av" />
+      <div class="skeleton sk-msg" style="width: 60%" />
     </div>
-
-    <div class="sk-row sk-outgoing">
-      <div class="sk sk-bubble" style="width: 35%" />
+    <div class="sk-row sk-out">
+      <div class="skeleton sk-msg" style="width: 38%" />
     </div>
-
-    <div class="sk-row sk-incoming">
-      <div class="sk sk-avatar" />
-      <div class="sk sk-bubble sk-short" style="width: 20%" />
+    <div class="sk-row sk-in">
+      <div class="skeleton sk-av" />
+      <div class="skeleton sk-msg sk-sm" style="width: 22%" />
     </div>
-
-    <div class="sk-row sk-outgoing">
-      <div class="sk sk-bubble" style="width: 55%" />
+    <div class="sk-row sk-out">
+      <div class="skeleton sk-msg" style="width: 50%" />
     </div>
   </div>
 </template>
@@ -40,8 +35,8 @@
 .sk-thread {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 16px 14px;
   flex: 1;
 }
 
@@ -51,54 +46,66 @@
   gap: 8px;
 }
 
-.sk-row.sk-outgoing {
+.sk-row.sk-out {
   justify-content: flex-end;
 }
 
-.sk-avatar {
+.sk-av {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.sk-spacer {
+.sk-av-gap {
   width: 28px;
   flex-shrink: 0;
 }
 
-.sk-bubble {
-  height: 34px;
+.sk-msg {
+  height: 36px;
+  border-radius: 18px;
 }
 
-.sk-bubble.sk-short {
-  height: 34px;
+.sk-msg.sk-sm {
+  height: 36px;
 }
 
-.sk-outgoing .sk-bubble {
+.sk-out .sk-msg {
   border-radius: 18px 18px 4px 18px;
 }
 
-.sk-incoming .sk-bubble {
+.sk-in .sk-msg {
   border-radius: 18px 18px 18px 4px;
 }
 
-.sk-incoming:not(.sk-followup) .sk-bubble {
-  border-radius: 18px 18px 18px 4px;
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.85) 25%,
+    rgba(243, 244, 246, 1) 50%,
+    rgba(229, 231, 235, 0.85) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
 }
 
-.sk {
-  background: rgba(255, 255, 255, 0.06);
-  animation: sk-pulse 1.4s ease-in-out infinite;
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
-@keyframes sk-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.7; }
-}
-
-[data-theme='light'] .sk,
-:root:not([data-theme='dark']) .sk {
-  background: rgba(0, 0, 0, 0.08);
+[data-theme='dark'] .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(55, 65, 81, 0.35) 25%,
+    rgba(75, 85, 99, 0.45) 50%,
+    rgba(55, 65, 81, 0.35) 75%
+  );
+  background-size: 200% 100%;
 }
 </style>
