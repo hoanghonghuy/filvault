@@ -17,6 +17,7 @@ type User struct {
 	TrashAutoDeleteEnabled bool
 	TrashRetentionDays     int
 	ActiveStatusEnabled    bool
+	AvatarURL              string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }

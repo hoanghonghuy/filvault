@@ -23,12 +23,12 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
 <style scoped>
 .toast {
   position: fixed;
-  left: var(--space-md);
+  top: calc(var(--space-md) + env(safe-area-inset-top));
   right: var(--space-md);
-  bottom: calc(var(--bottom-nav-h) + var(--space-md) + env(safe-area-inset-bottom));
+  left: auto;
   z-index: 1100;
-  max-width: 420px;
-  margin: 0 auto;
+  max-width: min(calc(100vw - 32px), 380px);
+  margin: 0;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -45,22 +45,6 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
   flex-shrink: 0;
 }
 
-.toast-enter-active {
-  transition: opacity var(--duration-medium) var(--ease-emphasized-decelerate),
-    transform var(--duration-medium) var(--ease-emphasized-decelerate);
-}
-
-.toast-leave-active {
-  transition: opacity var(--duration-short) var(--ease-standard),
-    transform var(--duration-short) var(--ease-standard);
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
 .toast.error {
   background: var(--danger);
 }
@@ -71,30 +55,28 @@ const iconName = (type: string) => (type === 'error' ? 'alert' : type === 'succe
 
 @media (min-width: 768px) {
   .toast {
-    left: auto;
+    top: var(--space-lg);
     right: var(--space-lg);
-    bottom: var(--space-lg);
-    margin: 0;
-    max-width: 360px;
+    max-width: 380px;
   }
 }
 
 .toast-enter-active {
   transition:
-    opacity var(--motion-enter) var(--ease-enter),
-    transform var(--motion-enter) var(--ease-enter);
+    opacity var(--motion-enter, 0.25s) var(--ease-enter, ease-out),
+    transform var(--motion-enter, 0.25s) var(--ease-enter, ease-out);
 }
 
 .toast-leave-active {
   transition:
-    opacity var(--motion-exit) var(--ease-exit),
-    transform var(--motion-exit) var(--ease-exit);
+    opacity var(--motion-exit, 0.2s) var(--ease-exit, ease-in),
+    transform var(--motion-exit, 0.2s) var(--ease-exit, ease-in);
 }
 
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(-16px);
 }
 
 @media (prefers-reduced-motion: reduce) {

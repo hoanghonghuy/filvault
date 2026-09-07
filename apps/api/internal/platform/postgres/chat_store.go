@@ -100,12 +100,13 @@ func (s *Store) CreateOrGetDirectConversation(ctx context.Context, ownerID, reci
 	_ = tx.QueryRow(ctx, `
 		SELECT u.id, u.display_name, u.email, u.last_seen_at,
 			COALESCE(u.active_status_enabled, true),
-			COALESCE(o.active_status_enabled, true)
+			COALESCE(o.active_status_enabled, true),
+			COALESCE(u.avatar_url, '')
 		FROM conversation_members cm
 		JOIN users u ON u.id = cm.user_id
 		JOIN users o ON o.id = $2
 		WHERE cm.conversation_id = $1 AND cm.user_id <> $2
-	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled)
+	`, c.ID, ownerID).Scan(&c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt, &c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.PeerAvatarURL)
 	if err := tx.Commit(ctx); err != nil {
 		return chat.Conversation{}, err
 	}
@@ -120,6 +121,7 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 			peer.last_seen_at,
 			COALESCE(peer.active_status_enabled, true),
 			COALESCE(owner_user.active_status_enabled, true),
+			COALESCE(peer.avatar_url, ''),
 			COALESCE(c.last_message_at, c.updated_at)
 		FROM conversations c
 		JOIN users owner_user ON owner_user.id = $1
@@ -141,7 +143,7 @@ func (s *Store) ListConversations(ctx context.Context, ownerID string) ([]chat.C
 		var c chat.Conversation
 		if err := rows.Scan(&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
 			&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt,
-			&c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.LastMessage); err != nil {
+			&c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.PeerAvatarURL, &c.LastMessage); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -158,6 +160,7 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 			peer.last_seen_at,
 			COALESCE(peer.active_status_enabled, true),
 			COALESCE(owner_user.active_status_enabled, true),
+			COALESCE(peer.avatar_url, ''),
 			COALESCE(c.last_message_at, c.updated_at)
 		FROM conversations c
 		JOIN users owner_user ON owner_user.id = $1
@@ -171,7 +174,7 @@ func (s *Store) GetConversation(ctx context.Context, ownerID, id string) (*chat.
 	`, ownerID, id).Scan(
 		&c.ID, &c.OwnerID, &c.Title, &c.CreatedAt, &c.UpdatedAt,
 		&c.Type, &c.PeerID, &c.PeerName, &c.PeerEmail, &c.PeerLastSeenAt,
-		&c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.LastMessage,
+		&c.PeerActiveStatusEnabled, &c.OwnerActiveStatusEnabled, &c.PeerAvatarURL, &c.LastMessage,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

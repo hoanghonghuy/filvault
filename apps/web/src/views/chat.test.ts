@@ -213,5 +213,33 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/thread-status/)
     expect(chat).toMatch(/class="chat-info-status"/)
   })
+
+  it('supports user avatars in profile, shell and across chat surfaces', () => {
+    const authStore = readSrc('../stores/auth.ts')
+    const profile = readSrc('./ProfileView.vue')
+    expect(types).toMatch(/avatarUrl\?: string/)
+    expect(authStore).toMatch(/updateAvatar/)
+    expect(profile).toMatch(/avatar-uploader/)
+    expect(profile).toMatch(/handleAvatarSelected/)
+    expect(shell).toMatch(/auth\.user\?\.avatarUrl/)
+    expect(chat).toMatch(/conv\.peer\?\.avatarUrl/)
+    expect(chat).toMatch(/selectedConversation\?\.peer\?\.avatarUrl/)
+    expect(chat).toMatch(/img\.avatar-img/)
+  })
+
+  it('provides a full-featured sticker pack with picker drawer and bubble rendering', () => {
+    const stickersModule = readSrc('../lib/stickers.ts')
+    expect(stickersModule).toMatch(/STICKERS/)
+    expect(stickersModule).toMatch(/STICKER_CATEGORIES/)
+    expect(stickersModule).toMatch(/isStickerMessage/)
+    expect(stickersModule).toMatch(/parseStickerSymbol/)
+    expect(stickersModule).toMatch(/formatStickerMessage/)
+    expect(chat).toMatch(/stickerPickerOpen/)
+    expect(chat).toMatch(/selectedStickerCategory/)
+    expect(chat).toMatch(/sticker-picker-drawer/)
+    expect(chat).toMatch(/sticker-toggle-btn/)
+    expect(chat).toMatch(/sticker-bubble/)
+    expect(chat).toMatch(/has-sticker/)
+  })
 })
 

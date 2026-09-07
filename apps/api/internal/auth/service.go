@@ -166,6 +166,7 @@ func (s *Service) PatchMe(
 	imageThumbnails *bool,
 	videoThumbnails *bool,
 	activeStatus *bool,
+	avatarURL *string,
 ) (user.User, error) {
 	u, err := s.Me(ctx, userID)
 	if err != nil {
@@ -211,6 +212,11 @@ func (s *Service) PatchMe(
 	}
 	if activeStatus != nil {
 		if err := s.repo.UpdateActiveStatus(ctx, userID, *activeStatus); err != nil {
+			return user.User{}, err
+		}
+	}
+	if avatarURL != nil {
+		if err := s.repo.UpdateAvatar(ctx, userID, strings.TrimSpace(*avatarURL)); err != nil {
 			return user.User{}, err
 		}
 	}

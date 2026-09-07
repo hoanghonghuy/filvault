@@ -475,6 +475,9 @@ func publicConversation(c Conversation) gin.H {
 	}
 	if c.PeerID != "" {
 		peer := gin.H{"id": c.PeerID, "name": c.PeerName, "email": c.PeerEmail}
+		if c.PeerAvatarURL != "" {
+			peer["avatarUrl"] = c.PeerAvatarURL
+		}
 		if c.PeerLastSeenAt != nil {
 			peer["lastSeenAt"] = c.PeerLastSeenAt.UTC().Format(time.RFC3339Nano)
 		}

@@ -97,6 +97,14 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = updated
   }
 
+  async function updateAvatar(avatarUrl: string): Promise<void> {
+    const updated = await api<User>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ avatarUrl }),
+    })
+    user.value = updated
+  }
+
   return {
     user,
     loading,
@@ -109,6 +117,7 @@ export const useAuthStore = defineStore('auth', () => {
     resendVerification,
     verifyEmail,
     updateActiveStatus,
+    updateAvatar,
     bootstrap,
   }
 })

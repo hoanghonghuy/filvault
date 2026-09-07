@@ -79,7 +79,8 @@ const navLabels = computed(() => ({
       </nav>
       <div class="side-user">
         <RouterLink :to="PROFILE_PATH" class="side-profile" :aria-label="profileLabel">
-          <span class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
+          <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" :alt="avatarInitials" class="avatar avatar-img" />
+          <span v-else class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
           <span class="user-name">{{ auth.user?.displayName }}</span>
         </RouterLink>
       </div>
@@ -98,7 +99,8 @@ const navLabels = computed(() => ({
           <Icon name="chat" :size="20" />
         </RouterLink>
         <RouterLink :to="PROFILE_PATH" class="header-profile" :aria-label="profileLabel">
-          <span class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
+          <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" :alt="avatarInitials" class="avatar avatar-img" />
+          <span v-else class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
         </RouterLink>
       </header>
       <StorageBar v-show="storageVisible" ref="storageBarRef" />
@@ -266,6 +268,11 @@ const navLabels = computed(() => ({
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.avatar-img {
+  object-fit: cover;
+  padding: 0;
 }
 
 .header-brand-name {

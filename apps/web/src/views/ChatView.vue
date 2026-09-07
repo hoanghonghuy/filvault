@@ -14,6 +14,14 @@ import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { userInitials } from '@/lib/userInitials'
+import {
+  STICKERS,
+  STICKER_CATEGORIES,
+  isStickerMessage,
+  parseStickerSymbol,
+  formatStickerMessage,
+  type Sticker,
+} from '@/lib/stickers'
 import { useI18n } from '@/lib/i18n'
 import { generateUUID } from '@/lib/uuid'
 import { useLongPress } from '@/lib/useLongPress'
@@ -73,6 +81,19 @@ const threadThemeStyle = computed(() => ({
 }))
 
 const selectedConversation = computed(() => conversations.value.find((c) => c.id === selectedId.value) ?? null)
+const stickerPickerOpen = ref(false)
+const selectedStickerCategory = ref<'expressions' | 'gestures' | 'pets' | 'fun'>('expressions')
+const filteredStickers = computed(() => STICKERS.filter((s) => s.category === selectedStickerCategory.value))
+
+function toggleStickerPicker() {
+  stickerPickerOpen.value = !stickerPickerOpen.value
+}
+
+function handleSendSticker(sticker: Sticker) {
+  draft.value = formatStickerMessage(sticker)
+  stickerPickerOpen.value = false
+  void sendText()
+}
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
 const isMobile = ref(false)
@@ -458,6 +479,7 @@ async function createDirectConversation(email: string) {
 }
 
 async function selectConversation(id: string) {
+  stickerPickerOpen.value = false
   const selection = activeSelection + 1
   activeSelection = selection
   selectedId.value = id
@@ -576,6 +598,10 @@ function formatTime(iso: string): string {
 
 function conversationPreview(conv: ChatConversation): string {
   if (conv.preview?.body) {
+    if (isStickerMessage(conv.preview.body)) {
+      const sym = parseStickerSymbol(conv.preview.body)
+      return sym ? `[Sticker ${sym}]` : '[Sticker]'
+    }
     return conv.preview.body
   }
   if (conv.preview?.attachments?.length) {
@@ -995,7 +1021,8 @@ watch(
           @contextmenu.prevent="openConvMenu(conv)"
         >
           <span class="avatar-wrap">
-            <span class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
+            <img v-if="conv.peer?.avatarUrl" :src="conv.peer.avatarUrl" class="avatar avatar-img" alt="" />
+            <span v-else class="avatar" :class="avatarClass(conversationTitle(conv))" aria-hidden="true">{{ conversationTitle(conv).slice(0, 1).toUpperCase() }}</span>
             <span v-if="isPeerOnline(conv)" class="online-indicator" aria-hidden="true" />
           </span>
           <span class="conversation-meta">
@@ -1036,7 +1063,18 @@ watch(
             @click="threadInfoOpen = true"
             @keydown.enter="threadInfoOpen = true"
           >
-            <span class="thread-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
+            <img
+              v-if="selectedConversation?.peer?.avatarUrl"
+              :src="selectedConversation.peer.avatarUrl"
+              class="thread-avatar avatar-img"
+              alt=""
+            />
+            <span
+              v-else
+              class="thread-avatar"
+              :class="avatarClass(conversationTitle(selectedConversation))"
+              aria-hidden="true"
+            >{{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}</span>
             <div class="thread-peer-meta">
               <h2>{{ conversationTitle(selectedConversation) }}</h2>
               <span
@@ -1121,8 +1159,14 @@ watch(
                     'cluster-single': isFirstInCluster(index) && isLastInCluster(index),
                   }"
                 >
+                  <img
+                    v-if="message.senderId !== auth.user?.id && isLastInCluster(index) && selectedConversation?.peer?.avatarUrl"
+                    :src="selectedConversation.peer.avatarUrl"
+                    class="row-avatar avatar-img"
+                    alt=""
+                  />
                   <span
-                    v-if="message.senderId !== auth.user?.id && isLastInCluster(index)"
+                    v-else-if="message.senderId !== auth.user?.id && isLastInCluster(index)"
                     class="row-avatar"
                     :class="avatarClass(conversationTitle(selectedConversation))"
                     aria-hidden="true"
@@ -1136,14 +1180,19 @@ watch(
                   />
                   <article
                     class="message-bubble"
-                    :class="{ outgoing: message.senderId === auth.user?.id, 'has-like': message.body === '👍' }"
+                    :class="{
+                      outgoing: message.senderId === auth.user?.id,
+                      'has-like': message.body === '👍',
+                      'has-sticker': isStickerMessage(message.body)
+                    }"
                     @touchstart.passive="onMessageTouchStart($event, message)"
                     @touchmove.passive="onMessageTouchMove($event)"
                     @touchend="onMessageTouchEnd"
                     @touchcancel="onMessageTouchCancel"
                     @contextmenu.prevent="openMessageMenu(message)"
                   >
-                    <p v-if="message.body" :class="{ 'like-bubble': message.body === '👍' }">{{ message.body }}</p>
+                    <p v-if="message.body && isStickerMessage(message.body)" class="sticker-bubble">{{ parseStickerSymbol(message.body) }}</p>
+                    <p v-else-if="message.body" :class="{ 'like-bubble': message.body === '👍' }">{{ message.body }}</p>
                     <template v-for="attachment in message.attachments" :key="attachment.id">
                       <button
                         v-if="attachment.availability === 'available' && attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
@@ -1177,7 +1226,15 @@ watch(
                   </article>
                 </div>
                 <div v-if="isMessageSeenByPeer(message, index)" class="seen-indicator">
+                  <img
+                    v-if="selectedConversation?.peer?.avatarUrl"
+                    :src="selectedConversation.peer.avatarUrl"
+                    class="seen-avatar avatar-img"
+                    alt=""
+                    :title="`${t.seenAt} ${formatTime(selectedConversation?.peerLastReadAt || message.createdAt)}`"
+                  />
                   <span
+                    v-else
                     class="seen-avatar"
                     :class="avatarClass(conversationTitle(selectedConversation))"
                     :title="`${t.seenAt} ${formatTime(selectedConversation?.peerLastReadAt || message.createdAt)}`"
@@ -1193,7 +1250,14 @@ watch(
               v-if="selectedConversation && isPeerTyping(selectedConversation.id)"
               class="message-row typing-row"
             >
+              <img
+                v-if="selectedConversation?.peer?.avatarUrl"
+                :src="selectedConversation.peer.avatarUrl"
+                class="row-avatar avatar-img"
+                alt=""
+              />
               <span
+                v-else
                 class="row-avatar"
                 :class="avatarClass(conversationTitle(selectedConversation))"
                 aria-hidden="true"
@@ -1208,8 +1272,16 @@ watch(
             </div>
             <Transition name="msg">
               <div v-if="pendingMessage" class="message-row outgoing cluster-single">
-                <article class="message-bubble pending outgoing" :class="{ 'has-like': pendingMessage.body === '👍' }" aria-live="polite">
-                  <p :class="{ 'like-bubble': pendingMessage.body === '👍' }">{{ pendingMessage.body }}</p>
+                <article
+                  class="message-bubble pending outgoing"
+                  :class="{
+                    'has-like': pendingMessage.body === '👍',
+                    'has-sticker': isStickerMessage(pendingMessage.body)
+                  }"
+                  aria-live="polite"
+                >
+                  <p v-if="isStickerMessage(pendingMessage.body)" class="sticker-bubble">{{ parseStickerSymbol(pendingMessage.body) }}</p>
+                  <p v-else :class="{ 'like-bubble': pendingMessage.body === '👍' }">{{ pendingMessage.body }}</p>
                   <span v-if="pendingMessageError" class="message-status">{{ pendingMessageError }}</span>
                   <div v-if="pendingMessageError" class="message-actions">
                     <button type="button" class="message-action" @click="retryPendingMessage">{{ t.retry }}<!-- Retry --></button>
@@ -1220,7 +1292,13 @@ watch(
             </Transition>
           </div>
           <div v-else class="thread-empty-state">
-            <span class="thread-empty-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
+            <img
+              v-if="selectedConversation?.peer?.avatarUrl"
+              :src="selectedConversation.peer.avatarUrl"
+              class="thread-empty-avatar avatar-img"
+              alt=""
+            />
+            <span v-else class="thread-empty-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
               {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
             </span>
             <h3 class="thread-empty-title">{{ conversationTitle(selectedConversation) }}</h3>
@@ -1247,9 +1325,53 @@ watch(
             <button v-if="item.status === 'uploading' || item.status === 'queued'" type="button" class="message-action" @click="cancelUpload(item.id)">Cancel upload</button>
           </li>
         </ul>
+        <!-- Sticker Picker Drawer -->
+        <div v-if="stickerPickerOpen" class="sticker-picker-drawer">
+          <div class="sticker-picker-header">
+            <div class="sticker-categories">
+              <button
+                v-for="cat in STICKER_CATEGORIES"
+                :key="cat.id"
+                type="button"
+                class="sticker-cat-btn"
+                :class="{ active: selectedStickerCategory === cat.id }"
+                @click="selectedStickerCategory = cat.id"
+              >
+                <span>{{ cat.icon }}</span>
+                <span class="cat-label">{{ cat.label }}</span>
+              </button>
+            </div>
+            <button type="button" class="sticker-close-btn" :aria-label="t.closeSelection" @click="stickerPickerOpen = false">
+              <Icon name="close" :size="16" />
+            </button>
+          </div>
+          <div class="sticker-grid" role="list">
+            <button
+              v-for="stk in filteredStickers"
+              :key="stk.id"
+              type="button"
+              class="sticker-item-btn"
+              :title="stk.name"
+              :aria-label="stk.name"
+              @click="handleSendSticker(stk)"
+            >
+              <span class="sticker-symbol">{{ stk.symbol }}</span>
+            </button>
+          </div>
+        </div>
         <form class="chat-composer" @submit.prevent="sendText">
           <button type="button" class="icon-btn attach-btn" aria-label="Attach file" :disabled="sending" @click="triggerAttachment">
             <Icon name="plus" :size="18" />
+          </button>
+          <button
+            type="button"
+            class="icon-btn sticker-toggle-btn"
+            :class="{ active: stickerPickerOpen }"
+            :aria-label="t.chooseSticker"
+            :title="t.stickers"
+            @click="toggleStickerPicker"
+          >
+            <Icon name="sticker" :size="20" />
           </button>
           <label class="sr-only" for="chat-message">Message</label>
           <textarea
@@ -1261,6 +1383,7 @@ watch(
             :disabled="sending"
             @input="onComposerInput"
             @keydown.enter="onComposerKeydown"
+            @focus="stickerPickerOpen = false"
           ></textarea>
           <button
             v-if="!draft.trim()"
@@ -1327,7 +1450,8 @@ watch(
       <div class="app-menu-content">
         <!-- User Profile Card -->
         <button type="button" class="menu-profile-card" @click="navigateTo('/profile')">
-          <span class="menu-avatar" aria-hidden="true">{{ userInitials(auth.user?.displayName ?? '', auth.user?.email ?? '') }}</span>
+          <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" class="menu-avatar avatar-img" alt="" />
+          <span v-else class="menu-avatar" aria-hidden="true">{{ userInitials(auth.user?.displayName ?? '', auth.user?.email ?? '') }}</span>
           <span class="menu-profile-info">
             <span class="menu-profile-name">{{ auth.user?.displayName || t.myAccount }}</span>
             <span class="menu-profile-email">{{ auth.user?.email }}</span>
@@ -1476,7 +1600,13 @@ watch(
     <BottomSheet :open="peekOpen" :title="t.peekPreview" @close="peekOpen = false">
       <div v-if="peekConv" class="peek-preview-content">
         <div class="peek-preview-header">
-          <span class="peek-avatar" :class="avatarClass(conversationTitle(peekConv))" aria-hidden="true">
+          <img
+            v-if="peekConv?.peer?.avatarUrl"
+            :src="peekConv.peer.avatarUrl"
+            class="peek-avatar avatar-img"
+            alt=""
+          />
+          <span v-else class="peek-avatar" :class="avatarClass(conversationTitle(peekConv))" aria-hidden="true">
             {{ conversationTitle(peekConv).slice(0, 1).toUpperCase() }}
           </span>
           <div class="peek-meta">
@@ -1498,8 +1628,16 @@ watch(
             class="peek-message-row"
             :class="{ outgoing: msg.senderId === auth.user?.id }"
           >
-            <div class="peek-bubble" :class="{ outgoing: msg.senderId === auth.user?.id }">
-              <p v-if="msg.body">{{ msg.body }}</p>
+            <div
+              class="peek-bubble"
+              :class="{
+                outgoing: msg.senderId === auth.user?.id,
+                'has-like': msg.body === '👍',
+                'has-sticker': isStickerMessage(msg.body)
+              }"
+            >
+              <p v-if="msg.body && isStickerMessage(msg.body)" class="sticker-bubble">{{ parseStickerSymbol(msg.body) }}</p>
+              <p v-else-if="msg.body" :class="{ 'like-bubble': msg.body === '👍' }">{{ msg.body }}</p>
               <span class="peek-time">{{ formatTime(msg.createdAt) }}</span>
             </div>
           </div>
@@ -1518,7 +1656,13 @@ watch(
     <BottomSheet :open="threadInfoOpen" :title="t.chatInfo" @close="threadInfoOpen = false">
       <div v-if="selectedConversation" class="chat-info-content">
         <div class="chat-info-header">
-          <span class="chat-info-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
+          <img
+            v-if="selectedConversation?.peer?.avatarUrl"
+            :src="selectedConversation.peer.avatarUrl"
+            class="chat-info-avatar avatar-img"
+            alt=""
+          />
+          <span v-else class="chat-info-avatar" :class="avatarClass(conversationTitle(selectedConversation))" aria-hidden="true">
             {{ conversationTitle(selectedConversation).slice(0, 1).toUpperCase() }}
           </span>
           <h3 class="chat-info-name">{{ conversationTitle(selectedConversation) }}</h3>
@@ -2593,6 +2737,25 @@ watch(
   animation: messenger-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.message-bubble.has-sticker {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 4px 0 !important;
+}
+
+.message-bubble.has-sticker .bubble-time {
+  display: none;
+}
+
+.sticker-bubble {
+  font-size: 72px !important;
+  line-height: 1.1 !important;
+  display: inline-block;
+  user-select: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+  animation: messenger-pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
 @keyframes messenger-pop {
   0% { transform: scale(0.6); opacity: 0; }
   80% { transform: scale(1.18); }
@@ -2739,6 +2902,164 @@ watch(
 .attach-btn:focus-visible {
   outline: 2px solid #0084ff;
   outline-offset: 2px;
+}
+
+.sticker-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: #0084ff;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    transform var(--duration-short) var(--ease-standard);
+}
+
+.sticker-toggle-btn:hover {
+  background: rgba(0, 132, 255, 0.08);
+}
+
+.sticker-toggle-btn.active {
+  background: rgba(0, 132, 255, 0.15);
+  color: #0070d8;
+}
+
+.sticker-picker-drawer {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  max-height: 280px;
+  animation: slideUpSticker 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+}
+
+@keyframes slideUpSticker {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.sticker-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sticker-categories {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sticker-categories::-webkit-scrollbar {
+  display: none;
+}
+
+.sticker-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-short) var(--ease-standard);
+  white-space: nowrap;
+}
+
+.sticker-cat-btn:hover {
+  background: var(--hairline);
+}
+
+.sticker-cat-btn.active {
+  background: #0084ff;
+  color: #ffffff;
+}
+
+.sticker-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--duration-short) var(--ease-standard);
+}
+
+.sticker-close-btn:hover {
+  background: var(--hairline);
+  color: var(--ink);
+}
+
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 220px;
+}
+
+.sticker-item-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    transform var(--duration-short) var(--ease-standard),
+    background var(--duration-short) var(--ease-standard);
+  user-select: none;
+}
+
+.sticker-item-btn:hover {
+  background: var(--surface-soft);
+  transform: scale(1.2);
+}
+
+.sticker-item-btn:active {
+  transform: scale(0.92);
+}
+
+.sticker-symbol {
+  font-size: 34px;
+  line-height: 1;
+}
+
+img.avatar-img {
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .chat-composer textarea {

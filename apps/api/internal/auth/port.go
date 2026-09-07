@@ -31,4 +31,5 @@ type Repository interface {
 	UpdateDisplayName(ctx context.Context, userID, displayName string) error
 	UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error
 	UpdateActiveStatus(ctx context.Context, userID string, enabled bool) error
+	UpdateAvatar(ctx context.Context, userID, avatarURL string) error
 }

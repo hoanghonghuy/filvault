@@ -19,6 +19,7 @@ type Conversation struct {
 	PeerLastSeenAt           *time.Time
 	PeerActiveStatusEnabled  bool
 	OwnerActiveStatusEnabled bool
+	PeerAvatarURL            string
 	CreatedAt                time.Time
 	UpdatedAt                time.Time
 	LastMessage              time.Time

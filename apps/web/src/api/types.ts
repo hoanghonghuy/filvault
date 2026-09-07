@@ -17,6 +17,7 @@ export interface User {
   trashAutoDeleteEnabled: boolean
   trashRetentionDays: number
   activeStatusEnabled?: boolean
+  avatarUrl?: string
   createdAt: string
 }
 
@@ -162,6 +163,7 @@ export interface ChatConversation {
     id: string
     name: string
     email: string
+    avatarUrl?: string
     lastSeenAt?: string
   }
   peerStatus?: 'online' | 'offline'

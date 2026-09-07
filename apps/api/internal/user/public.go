@@ -14,6 +14,7 @@ type Public struct {
 	TrashAutoDeleteEnabled bool      `json:"trashAutoDeleteEnabled"`
 	TrashRetentionDays     int       `json:"trashRetentionDays"`
 	ActiveStatusEnabled    bool      `json:"activeStatusEnabled"`
+	AvatarURL              string    `json:"avatarUrl,omitempty"`
 	CreatedAt              time.Time `json:"createdAt"`
 }
 
@@ -30,6 +31,7 @@ func PublicFrom(u User) Public {
 		TrashAutoDeleteEnabled: u.TrashAutoDeleteEnabled,
 		TrashRetentionDays:     u.TrashRetentionDays,
 		ActiveStatusEnabled:    u.ActiveStatusEnabled,
+		AvatarURL:              u.AvatarURL,
 		CreatedAt:              u.CreatedAt.UTC(),
 	}
 }
