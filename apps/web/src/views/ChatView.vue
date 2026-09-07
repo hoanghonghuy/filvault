@@ -2913,6 +2913,7 @@ watch(
 }
 
 .message-bubble {
+  position: relative;
   max-width: min(74%, 480px);
   padding: 8px 14px;
   border-radius: 18px;
@@ -4069,6 +4070,10 @@ img.avatar-img {
   color: var(--accent);
 }
 
+</style>
+
+<!-- Non-scoped: Teleport renders outside component DOM, scoped attrs don't apply -->
+<style>
 /* Modal Overlay on Long Press */
 .reaction-modal-overlay {
   position: fixed;
