@@ -1455,10 +1455,16 @@ async function selectConversation(id: string) {
   infoSearchDone.value = false
   chatInfoCurrentView.value = 'main'
   loadingThread.value = true
+  messages.value = []
+  hasMore.value = false
+  nextBefore.value = null
   await Promise.all([loadMessages(id), loadMedia(id)])
   if (selection !== activeSelection || selectedId.value !== id) return
   await nextTick()
-  scrollToLatest()
+  scrollToLatest({ smooth: false })
+  requestAnimationFrame(() => {
+    scrollToLatest({ smooth: false })
+  })
   focusComposer()
   const latestMsg = messages.value[messages.value.length - 1]
   void chatStore.markAsRead(id, latestMsg?.id)
@@ -1530,10 +1536,10 @@ function onThreadScroll() {
   }
 }
 
-function scrollToLatest() {
+function scrollToLatest(options: { smooth?: boolean } = {}) {
   const el = threadBodyRef.value
   if (!el) return
-  if (typeof el.scrollTo === 'function') {
+  if (options.smooth && typeof el.scrollTo === 'function') {
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   } else {
     el.scrollTop = el.scrollHeight
@@ -2434,7 +2440,7 @@ watch(
             </button>
           </div>
           <Transition name="msg">
-            <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest">
+            <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest({ smooth: true })">
               <Icon name="download" :size="16" />
               <span>{{ t.latest || 'Mới nhất' }}</span>
             </button>
@@ -5088,8 +5094,13 @@ watch(
 .message-list {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
   gap: 2px;
   padding: var(--space-md);
+}
+
+.message-list > :first-child {
+  margin-top: auto;
 }
 
 .message-row {
