@@ -3,6 +3,8 @@
  * Decodes and converts HEIC images to JPEG in the browser via WebAssembly (heic-to)
  */
 
+import { normalizePresignedUrl } from './presignedUrl'
+
 const HEIC_EXT_REGEX = /\.(heic|heif)$/i
 const HEIC_MIME_SET = new Set([
   'image/heic',
@@ -156,7 +158,8 @@ export async function getHeicDisplayUrl(source: string | Blob, quality = 0.85): 
     try {
       let blob: Blob
       if (isStringSource) {
-        const response = await fetch(source)
+        const fetchUrl = normalizePresignedUrl(source)
+        const response = await fetch(fetchUrl)
         if (!response.ok) {
           throw new Error(`Failed to fetch image: ${response.status}`)
         }

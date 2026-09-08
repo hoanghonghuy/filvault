@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ChatAttachment } from '@/api/types'
 import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
+import { normalizePresignedUrl } from '@/api/client'
 
 const props = defineProps<{
   attachment: ChatAttachment
@@ -20,7 +21,7 @@ const displaySrc = computed(() => {
   if (isHeicImage.value && heicUrl.value) {
     return heicUrl.value
   }
-  return props.attachment.thumbnailUrl
+  return normalizePresignedUrl(props.attachment.thumbnailUrl || '')
 })
 
 async function resolveImage() {
@@ -28,7 +29,8 @@ async function resolveImage() {
   loading.value = true
   failed.value = false
   try {
-    const url = await getHeicDisplayUrl(props.attachment.thumbnailUrl, 0.7)
+    const sourceUrl = normalizePresignedUrl(props.attachment.thumbnailUrl)
+    const url = await getHeicDisplayUrl(sourceUrl, 0.7)
     heicUrl.value = url
   } catch {
     failed.value = true

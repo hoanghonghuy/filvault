@@ -9,8 +9,8 @@ export const API_BASE =
 const ACCESS_KEY = 'filvault.accessToken'
 const REFRESH_KEY = 'filvault.refreshToken'
 
-let accessToken: string | null = localStorage.getItem(ACCESS_KEY)
-let refreshToken: string | null = localStorage.getItem(REFRESH_KEY)
+let accessToken: string | null = typeof localStorage !== 'undefined' ? localStorage.getItem(ACCESS_KEY) : null
+let refreshToken: string | null = typeof localStorage !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null
 
 export class ApiError extends Error {
   code: string
@@ -156,6 +156,8 @@ if (typeof document !== 'undefined') {
   })
 }
 
+export { normalizePresignedUrl } from '@/lib/presignedUrl'
+
 export function uploadToPresigned(
   url: string,
   file: File,
@@ -169,6 +171,8 @@ export function uploadToPresigned(
   }
 
   void acquireWakeLock()
+
+  const targetUrl = normalizePresignedUrl(url)
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -207,7 +211,7 @@ export function uploadToPresigned(
     }
 
     try {
-      xhr.open('PUT', url)
+      xhr.open('PUT', targetUrl)
       xhr.setRequestHeader('Content-Type', contentType)
       xhr.send(file)
     } catch (err) {

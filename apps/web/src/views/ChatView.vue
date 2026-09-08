@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, uploadToPresigned, formatBytes } from '@/api/client'
+import { api, uploadToPresigned, formatBytes, normalizePresignedUrl } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import { useChatStore } from '@/stores/chat'
@@ -19,7 +19,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import ChatBubblePickerModal from '@/components/ChatBubblePickerModal.vue'
 import { resolveContentType } from '@/lib/mimeIcon'
-import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
+import { isHeic, getHeicDisplayUrl, convertHeicBlobToJpeg } from '@/lib/heic'
 import { getBubbleStyle, activeBubbleStyleId, type ChatBubbleStyle } from '@/lib/chatBubbles'
 import { userInitials } from '@/lib/userInitials'
 import {
@@ -930,8 +930,17 @@ type AttachmentUpload = {
   status: AttachmentUploadStatus
   error?: string
   controller: AbortController
+  previewUrl?: string
+  progress?: number
+  isImage?: boolean
 }
 const attachmentQueue = ref<AttachmentUpload[]>([])
+const activeAttachmentQueue = computed(() => {
+  if (!selectedId.value) return []
+  return attachmentQueue.value.filter(
+    (entry) => entry.conversationId === selectedId.value && entry.status !== 'canceled',
+  )
+})
 const pendingMessageError = ref('')
 let activeSelection = 0
 function isMobileViewport() {
@@ -1815,17 +1824,50 @@ async function onAttachmentChange(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file || !selectedId.value) return
+
+  const isImg = file.type.startsWith('image/') || isHeic(file.name, file.type)
+  const convId = selectedId.value
+  const itemId = generateUUID()
+  let previewUrl = ''
+
+  if (isImg) {
+    if (isHeic(file.name, file.type)) {
+      void (async () => {
+        try {
+          const converted = await convertHeicBlobToJpeg(file, 0.75)
+          const objUrl = URL.createObjectURL(converted)
+          const target = attachmentQueue.value.find((e) => e.id === itemId)
+          if (target) {
+            target.previewUrl = objUrl
+          }
+        } catch {
+          // ignore HEIC preview error
+        }
+      })()
+    } else {
+      try {
+        previewUrl = URL.createObjectURL(file)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const item: AttachmentUpload = {
-    id: generateUUID(),
+    id: itemId,
     file,
-    conversationId: selectedId.value,
+    conversationId: convId,
     body: draft.value.trim(),
     status: 'queued',
     controller: new AbortController(),
+    previewUrl,
+    progress: 0,
+    isImage: isImg,
   }
   attachmentQueue.value = [...attachmentQueue.value, item]
   draft.value = ''
   autoGrow()
+  scrollToLatest({ smooth: true })
   void processAttachment(item.id)
 }
 
@@ -1834,6 +1876,7 @@ async function processAttachment(id: string) {
   if (!item || item.status === 'uploading' || item.status === 'canceled') return
   item.status = 'uploading'
   item.error = undefined
+  item.progress = 0
   sending.value = true
   uploadProgress.value = 0
   try {
@@ -1849,6 +1892,7 @@ async function processAttachment(id: string) {
     })
     await uploadToPresigned(session.uploadUrl, item.file, contentType, (ratio) => {
       uploadProgress.value = ratio
+      item.progress = ratio
     }, item.controller.signal)
     const message = await api<ChatMessage>(`/chat/attachments/${session.fileId}/complete`, {
       method: 'POST',
@@ -1857,7 +1901,11 @@ async function processAttachment(id: string) {
     if (selectedId.value === item.conversationId) messages.value = [...messages.value, message]
     searchResults.value = null
     await loadMedia(item.conversationId)
+    if (item.previewUrl && item.previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(item.previewUrl)
+    }
     attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
+    scrollToLatest({ smooth: true })
     ui.showToast('Attachment sent')
   } catch (e) {
     item.status = 'failed'
@@ -1872,6 +1920,9 @@ function retryUpload(id: string) {
   const item = attachmentQueue.value.find((entry) => entry.id === id)
   if (!item) return
   item.status = 'queued'
+  item.error = undefined
+  item.progress = 0
+  item.controller = new AbortController()
   void processAttachment(id)
 }
 
@@ -1880,6 +1931,9 @@ function cancelUpload(id: string) {
   if (!item) return
   item.status = 'canceled'
   item.controller.abort()
+  if (item.previewUrl && item.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(item.previewUrl)
+  }
   attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
 }
 
@@ -1887,7 +1941,8 @@ async function openAttachment(attachmentId: string) {
   if (!selectedId.value) return
   try {
     const out = await api<DownloadURL>(`/chat/conversations/${selectedId.value}/attachments/${attachmentId}/download`)
-    window.open(out.downloadUrl, '_blank', 'noopener')
+    const targetUrl = normalizePresignedUrl(out.downloadUrl)
+    window.open(targetUrl, '_blank', 'noopener')
   } catch (e) {
     error.value = formatApiError(e, 'Download failed')
   }
@@ -1903,7 +1958,7 @@ async function openInlineImage(attachment: ChatAttachment) {
     lightboxFileId.value = attachment.id
     lightboxName.value = attachment.name
     lightboxMime.value = attachment.mimeType
-    lightboxUrl.value = out.downloadUrl
+    lightboxUrl.value = normalizePresignedUrl(out.downloadUrl)
     lightboxOpen.value = true
   } catch (e) {
     error.value = formatApiError(e, 'View failed')
@@ -2492,6 +2547,107 @@ watch(
                 </article>
               </div>
             </Transition>
+
+            <!-- Messenger-style optimistic pending attachment cards -->
+            <TransitionGroup name="msg">
+              <div
+                v-for="item in activeAttachmentQueue"
+                :key="item.id"
+                class="message-row outgoing cluster-single pending-attachment-row"
+              >
+                <article
+                  class="message-bubble pending outgoing has-pending-attachment"
+                  :style="outgoingBubbleStyle({ senderId: auth.user?.id, body: item.body } as any)"
+                  aria-live="polite"
+                >
+                  <p v-if="item.body" class="pending-attachment-body">{{ item.body }}</p>
+
+                  <!-- Image attachment: Messenger-style placeholder card -->
+                  <div v-if="item.isImage" class="pending-image-card">
+                    <img
+                      v-if="item.previewUrl"
+                      :src="item.previewUrl"
+                      class="pending-image-thumb"
+                      alt="Đang gửi ảnh..."
+                    />
+                    <div v-else class="pending-image-placeholder">
+                      <div class="pending-skeleton-pulse" />
+                      <span class="pending-heic-pill">HEIC</span>
+                    </div>
+
+                    <!-- Messenger-style central progress ring & blur overlay -->
+                    <div class="pending-image-overlay" :class="{ 'has-error': item.status === 'failed' }">
+                      <div v-if="item.status === 'uploading' || item.status === 'queued'" class="messenger-progress-ring">
+                        <svg class="ring-svg" viewBox="0 0 44 44">
+                          <circle class="ring-track" cx="22" cy="22" r="18" fill="none" stroke-width="3.5" />
+                          <circle
+                            class="ring-fill"
+                            cx="22"
+                            cy="22"
+                            r="18"
+                            fill="none"
+                            stroke-width="3.5"
+                            :stroke-dasharray="113.1"
+                            :stroke-dashoffset="113.1 * (1 - (item.progress || 0))"
+                          />
+                        </svg>
+                        <span class="ring-pct">{{ Math.round((item.progress || 0) * 100) }}%</span>
+                      </div>
+
+                      <div v-else-if="item.status === 'failed'" class="pending-failed-content">
+                        <span class="failed-badge-icon">⚠️</span>
+                        <span class="failed-msg">{{ item.error || 'Lỗi tải ảnh' }}</span>
+                        <div class="failed-actions">
+                          <button type="button" class="bubble-action-btn retry" @click="retryUpload(item.id)">
+                            {{ t.retry || 'Thử lại' }}
+                          </button>
+                          <button type="button" class="bubble-action-btn cancel" @click="cancelUpload(item.id)">
+                            Cancel upload
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Top right cancel button while uploading -->
+                    <button
+                      v-if="item.status === 'uploading' || item.status === 'queued'"
+                      type="button"
+                      class="pending-bubble-cancel"
+                      title="Cancel upload"
+                      aria-label="Cancel upload"
+                      @click="cancelUpload(item.id)"
+                    >
+                      <Icon name="x" :size="13" />
+                    </button>
+                  </div>
+
+                  <!-- Non-image generic file placeholder -->
+                  <div v-else class="pending-file-card">
+                    <div class="pending-file-icon">
+                      <Icon name="file" :size="20" />
+                    </div>
+                    <div class="pending-file-meta">
+                      <span class="pending-file-name">{{ item.file.name }}</span>
+                      <span class="pending-file-size">{{ formatBytes(item.file.size) }}</span>
+                    </div>
+                    <div v-if="item.status === 'uploading' || item.status === 'queued'" class="pending-file-actions">
+                      <span class="pending-file-pct">{{ Math.round((item.progress || 0) * 100) }}%</span>
+                      <button type="button" class="pending-file-cancel-btn" title="Cancel upload" @click="cancelUpload(item.id)">
+                        <Icon name="x" :size="14" />
+                      </button>
+                    </div>
+                    <div v-else-if="item.status === 'failed'" class="pending-file-actions">
+                      <button type="button" class="message-action" @click="retryUpload(item.id)">
+                        {{ t.retry || 'Thử lại' }}
+                      </button>
+                      <button type="button" class="message-action" @click="cancelUpload(item.id)">
+                        Cancel upload
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </TransitionGroup>
           </div>
           <div v-else class="thread-empty-state">
             <img
@@ -2519,8 +2675,8 @@ watch(
         </div>
       </div>
 
-        <UploadProgress :progress="uploadProgress" />
-        <ul v-if="attachmentQueue.length" class="attachment-queue" aria-live="polite">
+        <UploadProgress :progress="uploadProgress" class="sr-only" />
+        <ul v-if="attachmentQueue.length" class="attachment-queue sr-only" aria-live="polite">
           <li v-for="item in attachmentQueue" :key="item.id" class="queue-item">
             <span class="queue-name">{{ item.file.name }}</span>
             <span class="queue-status">{{ item.status === 'failed' ? item.error : item.status }}</span>
@@ -5129,6 +5285,268 @@ watch(
 
 .message-bubble.pending {
   opacity: 0.55;
+}
+
+.message-bubble.pending.has-pending-attachment {
+  opacity: 1;
+  padding: 4px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pending-attachment-body {
+  padding: var(--space-xs) var(--space-md);
+  margin: 0 0 6px 0;
+  border-radius: var(--radius-lg);
+  background: var(--ink, #3b82f6);
+  color: var(--on-ink, #ffffff);
+  font-size: 14px;
+}
+
+.pending-image-card {
+  position: relative;
+  width: min(260px, 100%);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface-card, rgba(0, 0, 0, 0.08));
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.12));
+  display: block;
+}
+
+.pending-image-thumb {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+
+.pending-image-placeholder {
+  width: 220px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: var(--surface-soft, rgba(0, 0, 0, 0.06));
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.pending-skeleton-pulse {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: skeletonShimmer 1.5s infinite;
+}
+
+@keyframes skeletonShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.pending-heic-pill {
+  position: relative;
+  z-index: 1;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill, 12px);
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.pending-image-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm);
+  text-align: center;
+  transition: opacity 0.2s ease;
+}
+
+.pending-image-overlay.has-error {
+  background: rgba(185, 28, 28, 0.82);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.messenger-progress-ring {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring-track {
+  stroke: rgba(255, 255, 255, 0.28);
+}
+
+.ring-fill {
+  stroke: #ffffff;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.ring-pct {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.pending-bubble-cancel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform 0.15s ease, background 0.15s ease;
+  z-index: 3;
+}
+
+.pending-bubble-cancel:hover {
+  transform: scale(1.08);
+  background: rgba(0, 0, 0, 0.88);
+}
+
+.pending-failed-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.failed-badge-icon {
+  font-size: 22px;
+}
+
+.failed-msg {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  max-width: 200px;
+  word-break: break-word;
+}
+
+.failed-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.bubble-action-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.bubble-action-btn.retry {
+  background: #ffffff;
+  color: #111827;
+}
+
+.bubble-action-btn.cancel {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.pending-file-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline);
+  min-width: 200px;
+}
+
+.pending-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+
+.pending-file-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.pending-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pending-file-size {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pending-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pending-file-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pending-file-cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pending-file-cancel-btn:hover {
+  color: var(--ink);
 }
 
 .bubble-time {
