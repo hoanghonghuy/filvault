@@ -882,7 +882,11 @@ function handleClickOutsideStickerPicker(event: MouseEvent | PointerEvent) {
 
 const threadSearchOpen = ref(false)
 const uploadProgress = ref<number | null>(null)
-const isMobile = ref(false)
+const isMobile = ref(
+  typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 767px)').matches || window.matchMedia('(pointer: coarse)').matches
+    : false,
+)
 const isDesktop = ref(false)
 const desktopInfoOpen = ref(
   typeof localStorage !== 'undefined'
@@ -1041,7 +1045,7 @@ function triggerReplyMessage() {
   if (!msg) return
   const preview = msg.body ? (msg.body.length > 50 ? msg.body.slice(0, 50) + '…' : msg.body) : 'Tệp đính kèm'
   draft.value = `> ${preview}\n`
-  focusComposer()
+  focusComposer(true)
 }
 
 function isReactedWith(message: ChatMessage | null, emoji: string): boolean {
@@ -1338,7 +1342,9 @@ function isPeerTyping(conversationId?: string): boolean {
 
 
 function updateViewport() {
-  isMobile.value = window.matchMedia('(max-width: 767px)').matches
+  isMobile.value =
+    window.matchMedia('(max-width: 767px)').matches ||
+    window.matchMedia('(pointer: coarse)').matches
   isDesktop.value = window.matchMedia('(min-width: 1024px)').matches
 }
 
@@ -1860,7 +1866,15 @@ async function downloadLightbox() {
   await openAttachment(lightboxFileId.value)
 }
 
-function focusComposer() {
+function focusComposer(force = false) {
+  if (!force) {
+    const isTouchOrMobile =
+      isMobile.value ||
+      (typeof window !== 'undefined' &&
+        (window.matchMedia('(max-width: 767px)').matches ||
+          window.matchMedia('(pointer: coarse)').matches))
+    if (isTouchOrMobile) return
+  }
   void nextTick(() => composerRef.value?.focus())
 }
 
