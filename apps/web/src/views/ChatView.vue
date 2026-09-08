@@ -1940,6 +1940,11 @@ onUnmounted(() => {
 
 function initiateCall(isVideo: boolean) {
   if (!selectedConversation.value) return
+  if (selectedConversation.value.type !== 'direct') return
+  if (callStore.state !== 'idle') {
+    ui.showToast('Bạn đang trong cuộc gọi khác', 'info')
+    return
+  }
   callStore.startCall(selectedConversation.value.id, {
     isVideo,
     peerName: conversationTitle(selectedConversation.value),
@@ -2142,24 +2147,26 @@ watch(
             </div>
           </div>
           <div class="thread-actions">
-            <button
-              class="icon-btn"
-              type="button"
-              aria-label="Gọi thoại"
-              title="Gọi thoại"
-              @click="initiateCall(false)"
-            >
-              <Icon name="phone" :size="18" />
-            </button>
-            <button
-              class="icon-btn"
-              type="button"
-              aria-label="Gọi video"
-              title="Gọi video"
-              @click="initiateCall(true)"
-            >
-              <Icon name="camera" :size="18" />
-            </button>
+            <template v-if="selectedConversation?.type === 'direct'">
+              <button
+                class="icon-btn"
+                type="button"
+                aria-label="Gọi thoại"
+                title="Gọi thoại"
+                @click="initiateCall(false)"
+              >
+                <Icon name="phone" :size="18" />
+              </button>
+              <button
+                class="icon-btn"
+                type="button"
+                aria-label="Gọi video"
+                title="Gọi video"
+                @click="initiateCall(true)"
+              >
+                <Icon name="camera" :size="18" />
+              </button>
+            </template>
             <button
               class="icon-btn thread-info-btn"
               :class="{ active: isDesktop ? desktopInfoOpen : threadInfoOpen }"
@@ -2679,22 +2686,24 @@ watch(
           </div>
 
           <div class="chat-info-actions">
-            <button
-              type="button"
-              class="chat-info-action-btn"
-              @click="initiateCall(false)"
-            >
-              <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-              <span>Gọi thoại</span>
-            </button>
-            <button
-              type="button"
-              class="chat-info-action-btn"
-              @click="initiateCall(true)"
-            >
-              <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-              <span>Gọi video</span>
-            </button>
+            <template v-if="selectedConversation?.type === 'direct'">
+              <button
+                type="button"
+                class="chat-info-action-btn"
+                @click="initiateCall(false)"
+              >
+                <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
+                <span>Gọi thoại</span>
+              </button>
+              <button
+                type="button"
+                class="chat-info-action-btn"
+                @click="initiateCall(true)"
+              >
+                <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
+                <span>Gọi video</span>
+              </button>
+            </template>
             <button
               type="button"
               class="chat-info-action-btn"
@@ -3581,22 +3590,24 @@ watch(
           </div>
 
           <div class="chat-info-actions">
-            <button
-              type="button"
-              class="chat-info-action-btn"
-              @click="initiateCall(false); threadInfoOpen = false"
-            >
-              <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-              <span>Gọi thoại</span>
-            </button>
-            <button
-              type="button"
-              class="chat-info-action-btn"
-              @click="initiateCall(true); threadInfoOpen = false"
-            >
-              <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-              <span>Gọi video</span>
-            </button>
+            <template v-if="selectedConversation?.type === 'direct'">
+              <button
+                type="button"
+                class="chat-info-action-btn"
+                @click="initiateCall(false); threadInfoOpen = false"
+              >
+                <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
+                <span>Gọi thoại</span>
+              </button>
+              <button
+                type="button"
+                class="chat-info-action-btn"
+                @click="initiateCall(true); threadInfoOpen = false"
+              >
+                <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
+                <span>Gọi video</span>
+              </button>
+            </template>
             <button
               type="button"
               class="chat-info-action-btn"

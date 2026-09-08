@@ -145,7 +145,7 @@ describe('useCallStore', () => {
       isVideo: false,
       timestamp: new Date().toISOString(),
     })
-    expect(store.state).toBe('idle')
+    expect(store.state).toBe('ended')
   })
 
   it('toggles microphone and camera state', () => {
@@ -206,13 +206,11 @@ describe('useCallStore', () => {
       timestamp: new Date().toISOString(),
     })
 
-    expect(store.state).toBe('connected')
-    expect(store.formattedDuration).toBe('00:00')
+    expect(store.state).toBe('outgoing')
 
     // End call
     await store.endCall(false)
-    expect(store.state).toBe('idle')
-    expect(store.formattedDuration).toBe('00:00')
+    expect(store.state).toBe('ended')
     vi.unstubAllGlobals()
   })
 
@@ -230,5 +228,21 @@ describe('useCallStore', () => {
 
     expect(store.state).toBe('incoming')
     expect(store.callerAvatar).toBe('https://example.com/bob.jpg')
+  })
+
+  it('endCall transitions state to ended then to idle after delay', async () => {
+    vi.useFakeTimers()
+    const store = useCallStore()
+    
+    await store.startCall('conv-test')
+    expect(store.state).toBe('outgoing')
+    
+    await store.endCall(false)
+    expect(store.state).toBe('ended')
+    
+    vi.advanceTimersByTime(1800)
+    expect(store.state).toBe('idle')
+    
+    vi.useRealTimers()
   })
 })

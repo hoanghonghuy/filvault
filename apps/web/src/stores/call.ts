@@ -79,6 +79,10 @@ export const useCallStore = defineStore('call', () => {
 
   function resetState() {
     stopTimer()
+    if (room.value) {
+      void room.value.disconnect()
+      room.value = null
+    }
     callDuration.value = 0
     if (incomingRingTimer !== null) {
       window.clearTimeout(incomingRingTimer)
@@ -139,9 +143,9 @@ export const useCallStore = defineStore('call', () => {
   async function connectToRoom(convId: string) {
     try {
       const { token, url } = await fetchToken(convId)
+      if (state.value === 'idle' || state.value === 'ended' || conversationId.value !== convId) return
       const connectUrl = resolveLiveKitUrl(url)
 
-      // MediaDevices require secure context (HTTPS or localhost) in modern mobile browsers
       if (typeof navigator !== 'undefined' && !navigator.mediaDevices?.getUserMedia) {
         throw new Error(
           'Micro/Camera yêu cầu HTTPS hoặc localhost. Nếu dùng qua IP LAN, hãy bật cờ chrome://flags/#unsafely-treat-insecure-origin-as-secure.',
@@ -160,10 +164,12 @@ export const useCallStore = defineStore('call', () => {
           name: p.name || p.identity,
           isSpeaking: false,
         })
+        participants.value = new Map(participants.value)
       })
 
       r.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         participants.value.delete(p.identity)
+        participants.value = new Map(participants.value)
         if (state.value === 'connected' && participants.value.size === 0) {
           ui.showToast('Đối phương đã rời cuộc gọi', 'info')
           void endCall(false)
@@ -183,10 +189,39 @@ export const useCallStore = defineStore('call', () => {
       })
 
       await r.connect(connectUrl, token)
-      await r.localParticipant.setMicrophoneEnabled(isMicEnabled.value)
-      if (isVideo.value) {
-        await r.localParticipant.setCameraEnabled(isCamEnabled.value)
+
+      // Bail out if call was cancelled during connection
+      if (state.value === 'idle' || state.value === 'ended' || conversationId.value !== convId) {
+        void r.disconnect()
+        room.value = null
+        return
       }
+
+      // Populate pre-existing participants (Bug L4)
+      r.remoteParticipants.forEach((p) => {
+        participants.value.set(p.identity, {
+          identity: p.identity,
+          name: p.name || p.identity,
+          isSpeaking: false,
+        })
+      })
+      participants.value = new Map(participants.value)
+
+      await r.localParticipant.setMicrophoneEnabled(isMicEnabled.value)
+
+      // Camera: graceful degradation (Bug L5)
+      if (isVideo.value) {
+        try {
+          await r.localParticipant.setCameraEnabled(isCamEnabled.value)
+        } catch {
+          isCamEnabled.value = false
+          ui.showToast('Không thể bật camera. Cuộc gọi tiếp tục bằng thoại.', 'info')
+        }
+      }
+
+      // Only NOW transition to connected state (Bug L1)
+      state.value = 'connected'
+      startTimer()
     } catch (e: unknown) {
       const err = e as Error
       const msg = err?.message || 'Lỗi kết nối cuộc gọi'
@@ -269,8 +304,6 @@ export const useCallStore = defineStore('call', () => {
         }
         if (state.value === 'outgoing' && conversationId.value === payload.conversationId) {
           callAudio.stop()
-          state.value = 'connected'
-          startTimer()
           void connectToRoom(payload.conversationId)
         }
         break
@@ -305,8 +338,6 @@ export const useCallStore = defineStore('call', () => {
     }
     callAudio.stop()
     const convId = conversationId.value
-    state.value = 'connected'
-    startTimer()
     await sendSignal(convId, 'accept', isVideo.value)
     void connectToRoom(convId)
   }
@@ -335,20 +366,35 @@ export const useCallStore = defineStore('call', () => {
     if (notifyRemote && convId) {
       void sendSignal(convId, 'end', isVideo.value)
     }
-    resetState()
+    state.value = 'ended'
+    window.setTimeout(() => resetState(), 1800)
   }
 
   async function toggleMicrophone() {
-    isMicEnabled.value = !isMicEnabled.value
+    const next = !isMicEnabled.value
     if (room.value?.localParticipant) {
-      await room.value.localParticipant.setMicrophoneEnabled(isMicEnabled.value)
+      try {
+        await room.value.localParticipant.setMicrophoneEnabled(next)
+        isMicEnabled.value = next
+      } catch {
+        ui.showToast('Không thể thay đổi micro', 'error')
+      }
+    } else {
+      isMicEnabled.value = next
     }
   }
 
   async function toggleCamera() {
-    isCamEnabled.value = !isCamEnabled.value
+    const next = !isCamEnabled.value
     if (room.value?.localParticipant) {
-      await room.value.localParticipant.setCameraEnabled(isCamEnabled.value)
+      try {
+        await room.value.localParticipant.setCameraEnabled(next)
+        isCamEnabled.value = next
+      } catch {
+        ui.showToast('Không thể thay đổi camera', 'error')
+      }
+    } else {
+      isCamEnabled.value = next
     }
   }
 

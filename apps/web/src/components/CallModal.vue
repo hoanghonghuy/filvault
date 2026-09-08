@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useCallStore } from '@/stores/call'
+import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
 import {
   Track,
@@ -12,12 +13,14 @@ import {
 } from 'livekit-client'
 
 const callStore = useCallStore()
+const auth = useAuthStore()
 
 const localVideoRef = ref<HTMLVideoElement | null>(null)
 const remoteVideoRef = ref<HTMLVideoElement | null>(null)
 const remoteAudioRef = ref<HTMLAudioElement | null>(null)
 const hasRemoteVideo = ref(false)
 const isFullscreen = ref(false)
+const avatarError = ref(false)
 
 const isOpen = computed(() => callStore.state !== 'idle')
 
@@ -41,6 +44,8 @@ const peerName = computed(() => {
 })
 
 const peerAvatar = computed(() => callStore.callerAvatar || null)
+
+watch(() => callStore.callerAvatar, () => { avatarError.value = false })
 
 function updateRemoteVideoState(activeRoom: Room) {
   let found = false
@@ -74,6 +79,14 @@ function toggleFullscreen() {
     void document.exitFullscreen?.()
     isFullscreen.value = false
   }
+}
+
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
 }
 
 // Watch for connected state & room instance
@@ -166,6 +179,7 @@ watch(
 )
 
 onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   if (isFullscreen.value && document.fullscreenElement) {
     void document.exitFullscreen?.()
   }
@@ -183,7 +197,7 @@ onUnmounted(() => {
       <div v-if="callStore.state === 'incoming'" class="call-incoming-card">
         <div class="caller-avatar-pulse">
           <div class="avatar-circle">
-            <img v-if="peerAvatar" :src="peerAvatar" :alt="peerName" class="avatar-img" />
+            <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
             <span v-else>{{ peerName.charAt(0).toUpperCase() }}</span>
           </div>
         </div>
@@ -216,7 +230,7 @@ onUnmounted(() => {
       <div v-else-if="callStore.state === 'outgoing'" class="call-outgoing-card">
         <div class="caller-avatar-pulse outgoing">
           <div class="avatar-circle">
-            <img v-if="peerAvatar" :src="peerAvatar" :alt="peerName" class="avatar-img" />
+            <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
             <span v-else>{{ peerName.charAt(0).toUpperCase() }}</span>
           </div>
         </div>
@@ -254,7 +268,7 @@ onUnmounted(() => {
             :title="isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'"
             @click="toggleFullscreen"
           >
-            <Icon :name="isFullscreen ? 'close' : 'more'" :size="20" />
+            <Icon :name="isFullscreen ? 'minimize' : 'maximize'" :size="20" />
           </button>
         </header>
 
@@ -271,8 +285,8 @@ onUnmounted(() => {
 
           <!-- Audio-only / Camera off fallback presentation -->
           <div v-if="!callStore.isVideo || !hasRemoteVideo" class="audio-caller-display">
-            <div class="avatar-circle large" :class="{ speaking: callStore.activeSpeaker }">
-              <img v-if="peerAvatar" :src="peerAvatar" :alt="peerName" class="avatar-img" />
+            <div class="avatar-circle large" :class="{ speaking: callStore.activeSpeaker && callStore.activeSpeaker !== auth.user?.id }">
+              <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
               <span v-else>{{ peerName.charAt(0).toUpperCase() }}</span>
             </div>
             <h2 class="active-peer-name">{{ peerName }}</h2>
@@ -337,6 +351,17 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+
+      <!-- 4. Call Ended Screen -->
+      <div v-else-if="callStore.state === 'ended'" class="call-ended-card">
+        <div class="avatar-circle">
+          <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
+          <span v-else>{{ peerName.charAt(0).toUpperCase() }}</span>
+        </div>
+        <h2 class="caller-name">{{ peerName }}</h2>
+        <p class="call-subtitle">Cuộc gọi đã kết thúc</p>
+        <p class="call-duration-summary">{{ callStore.formattedDuration }}</p>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -370,7 +395,8 @@ onUnmounted(() => {
 
 /* Incoming & Outgoing cards */
 .call-incoming-card,
-.call-outgoing-card {
+.call-outgoing-card,
+.call-ended-card {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -383,6 +409,14 @@ onUnmounted(() => {
   width: 100%;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.call-duration-summary {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0 0;
 }
 
 @keyframes slideUp {
@@ -533,6 +567,12 @@ onUnmounted(() => {
   background: #0b0f19;
 }
 
+.call-active-room:fullscreen {
+  max-width: 100vw;
+  max-height: 100vh;
+  border-radius: 0;
+}
+
 .call-header-bar {
   position: absolute;
   top: 16px;
@@ -626,7 +666,8 @@ onUnmounted(() => {
 .remote-video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #000;
 }
 
 .audio-caller-display {
@@ -728,9 +769,20 @@ onUnmounted(() => {
   box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
 }
 
+@media (max-width: 767px) {
+  .local-video-wrapper {
+    top: 72px;
+    bottom: auto;
+    right: 12px;
+    width: 90px;
+    height: 125px;
+  }
+}
+
 @media (min-width: 768px) {
   .call-incoming-card,
-  .call-outgoing-card {
+  .call-outgoing-card,
+  .call-ended-card {
     max-width: 400px;
     padding: 44px 36px;
   }
