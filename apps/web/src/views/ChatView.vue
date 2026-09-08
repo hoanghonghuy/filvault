@@ -10,11 +10,15 @@ import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
+import PhotoThumb from '@/components/PhotoThumb.vue'
+import ChatInlineImage from '@/components/ChatInlineImage.vue'
 import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import LoadingSkeletonChatRail from '@/components/LoadingSkeletonChatRail.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
+import { resolveContentType } from '@/lib/mimeIcon'
+import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 import { userInitials } from '@/lib/userInitials'
 import {
   STICKERS,
@@ -570,7 +574,7 @@ async function handleWallpaperUpload(event: Event) {
     // Asynchronously backup original image to user's Filvault personal storage
     void (async () => {
       try {
-        const contentType = file.type || 'image/jpeg'
+        const contentType = resolveContentType(file) || file.type || 'image/jpeg'
         const session = await api<UploadSession>('/files/upload-sessions', {
           method: 'POST',
           body: JSON.stringify({
@@ -1644,6 +1648,28 @@ function clearSearch() {
   searchQuery.value = ''
 }
 
+const heicThumbs = ref(new Map<string, string>())
+
+function getMediaThumbSrc(item: ChatAttachment): string {
+  if (isHeic(item.name, item.mimeType)) {
+    const cached = heicThumbs.value.get(item.id)
+    if (cached) return cached
+  }
+  return item.thumbnailUrl || ''
+}
+
+async function resolveMediaThumbs(items: ChatAttachment[]) {
+  for (const item of items) {
+    if (isHeic(item.name, item.mimeType) && item.thumbnailUrl && !heicThumbs.value.has(item.id)) {
+      getHeicDisplayUrl(item.thumbnailUrl, 0.4)
+        .then((url) => {
+          heicThumbs.value.set(item.id, url)
+        })
+        .catch(() => {})
+    }
+  }
+}
+
 async function loadMedia(id = selectedId.value) {
   if (!id) return
   const selection = activeSelection
@@ -1651,6 +1677,7 @@ async function loadMedia(id = selectedId.value) {
     const out = await api<{ media: ChatAttachment[] }>(`/chat/conversations/${id}/media?type=all`)
     if (selection !== activeSelection || selectedId.value !== id) return
     media.value = out.media
+    void resolveMediaThumbs(out.media)
   } catch (e) {
     error.value = formatApiError(e, 'Failed to load media')
   }
@@ -1794,7 +1821,7 @@ async function processAttachment(id: string) {
   sending.value = true
   uploadProgress.value = 0
   try {
-    const contentType = item.file.type || 'application/octet-stream'
+    const contentType = resolveContentType(item.file) || item.file.type || 'application/octet-stream'
     const session = await api<UploadSession>('/chat/attachments/upload-sessions', {
       method: 'POST',
       body: JSON.stringify({
@@ -2300,19 +2327,12 @@ watch(
                     <p v-if="message.body && isStickerMessage(message.body)" class="sticker-bubble">{{ parseStickerSymbol(message.body) }}</p>
                     <p v-else-if="message.body" :class="{ 'like-bubble': message.body === '👍' }">{{ message.body }}</p>
                     <template v-for="attachment in message.attachments" :key="attachment.id">
-                      <button
+                      <ChatInlineImage
                         v-if="attachment.availability === 'available' && attachment.thumbnailUrl && attachment.mimeType.startsWith('image/')"
-                        type="button"
                         class="inline-image"
-                        :aria-label="`View ${attachment.name}`"
-                        @click="openInlineImage(attachment)"
-                      >
-                        <img
-                          :src="attachment.thumbnailUrl"
-                          :alt="attachment.name"
-                          loading="lazy"
-                        />
-                      </button>
+                        :attachment="attachment"
+                        @click="openInlineImage"
+                      />
                       <button
                         v-else
                         type="button"
@@ -2589,7 +2609,7 @@ watch(
           >
             <img
               v-if="item.thumbnailUrl"
-              :src="item.thumbnailUrl"
+              :src="getMediaThumbSrc(item)"
               :alt="item.name"
               class="media-thumb"
               loading="lazy"
@@ -2978,7 +2998,7 @@ watch(
                 :title="item.name"
                 @click="openInlineImage(item)"
               >
-                <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" :alt="item.name" loading="lazy" />
+                <img v-if="item.thumbnailUrl" :src="getMediaThumbSrc(item)" :alt="item.name" loading="lazy" />
                 <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="20" />
               </button>
             </div>
@@ -3882,7 +3902,7 @@ watch(
                 :title="item.name"
                 @click="openInlineImage(item)"
               >
-                <img v-if="item.thumbnailUrl" :src="item.thumbnailUrl" :alt="item.name" loading="lazy" />
+                <img v-if="item.thumbnailUrl" :src="getMediaThumbSrc(item)" :alt="item.name" loading="lazy" />
                 <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="20" />
               </button>
             </div>

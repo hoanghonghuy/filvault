@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isHeic, isHeicFile } from './heic'
+import { resolveContentType, mimeFromName } from './mimeIcon'
 
 describe('heic utility', () => {
   it('correctly identifies heic/heif file names (case-insensitive)', () => {
@@ -38,5 +39,25 @@ describe('heic utility', () => {
 
     const pngFile = new File(['mock'], 'sample.png', { type: 'image/png' })
     expect(isHeicFile(pngFile)).toBe(false)
+  })
+
+  it('resolves correct content types for all supported image formats', () => {
+    // Empty browser mime falls back to filename extension
+    expect(resolveContentType(new File([''], 'photo.heic', { type: '' }))).toBe('image/heic')
+    expect(resolveContentType(new File([''], 'PHOTO.HEIC', { type: '' }))).toBe('image/heic')
+    expect(resolveContentType(new File([''], 'image.heif', { type: 'application/octet-stream' }))).toBe('image/heif')
+    expect(resolveContentType(new File([''], 'photo.jpg', { type: '' }))).toBe('image/jpeg')
+    expect(resolveContentType(new File([''], 'photo.jpeg', { type: '' }))).toBe('image/jpeg')
+    expect(resolveContentType(new File([''], 'image.png', { type: '' }))).toBe('image/png')
+    expect(resolveContentType(new File([''], 'anim.gif', { type: '' }))).toBe('image/gif')
+    expect(resolveContentType(new File([''], 'modern.webp', { type: '' }))).toBe('image/webp')
+
+    // Preserves specific valid MIME types when provided
+    expect(resolveContentType(new File([''], 'camera.heic', { type: 'image/heic' }))).toBe('image/heic')
+    expect(resolveContentType(new File([''], 'picture.png', { type: 'image/png' }))).toBe('image/png')
+
+    // Unsupported or unknown extension returns null
+    expect(mimeFromName('archive.unknown')).toBeNull()
+    expect(resolveContentType(new File([''], 'app.exe', { type: '' }))).toBeNull()
   })
 })

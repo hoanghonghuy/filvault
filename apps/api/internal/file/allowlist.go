@@ -9,13 +9,13 @@ import (
 )
 
 var allowlist = map[string][]string{
-	"jpg":  {"image/jpeg"},
-	"jpeg": {"image/jpeg"},
-	"png":  {"image/png"},
+	"jpg":  {"image/jpeg", "image/pjpeg"},
+	"jpeg": {"image/jpeg", "image/pjpeg"},
+	"png":  {"image/png", "image/x-png"},
 	"gif":  {"image/gif"},
 	"webp": {"image/webp"},
-	"heic": {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"},
-	"heif": {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"},
+	"heic": {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence", "image/x-heic", "image/x-heif"},
+	"heif": {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence", "image/x-heic", "image/x-heif"},
 	"mp4":  {"video/mp4"},
 	"mov":  {"video/quicktime"},
 	"webm": {"video/webm"},
@@ -49,8 +49,9 @@ func ValidateUpload(name, contentType string, size int64) error {
 	if !ok {
 		return apperr.Validation
 	}
+	parsedType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
 	for _, mime := range allowed {
-		if mime == contentType {
+		if strings.EqualFold(mime, parsedType) {
 			return nil
 		}
 	}
