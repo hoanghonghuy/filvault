@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
@@ -13,38 +13,86 @@ import type {
   SharedBrowser,
 } from '@/api/types'
 
+interface ShareLinkInfo {
+  token: string
+  fileId: string
+  fileName: string
+  url?: string
+  expiresAt: string | null
+  createdAt: string
+}
+
 const ui = useUiStore()
 const { t } = useI18n()
 
+const shareTab = ref<'my-shares' | 'with-me'>('my-shares')
 const loading = ref(false)
 const error = ref('')
 const shares = ref<IncomingShare[]>([])
-// Folder currently browsed (one level deep per spec 09 §5.5).
+const shareLinks = ref<ShareLinkInfo[]>([])
 const browsing = ref<SharedBrowser | null>(null)
+const viewMode = ref<'list' | 'grid'>('list')
 
-async function load() {
-  loading.value = true
-  error.value = ''
+function toggleViewMode() {
+  viewMode.value = viewMode.value === 'list' ? 'grid' : 'list'
+}
+
+async function loadIncomingShares() {
   try {
     const out = await api<{ shares: IncomingShare[] }>('/shares/with-me')
     shares.value = out.shares
   } catch (e) {
     error.value = formatApiError(e, 'Could not load shared items')
+  }
+}
+
+async function loadMyShareLinks() {
+  try {
+    const out = await api<{ links: ShareLinkInfo[] }>('/share-links')
+    shareLinks.value = out.links
+  } catch (e) {
+    error.value = formatApiError(e, 'Could not load your share links')
+  }
+}
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    await Promise.all([loadIncomingShares(), loadMyShareLinks()])
   } finally {
     loading.value = false
   }
 }
 
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const minutes = Math.round(diffMs / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  if (days < 30) return `${days}d ago`
-  return new Date(iso).toLocaleDateString()
+function formatDate(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatExpiry(expiresAt: string | null): string {
+  if (!expiresAt) return t.value.activeForever || 'Có hiệu lực vĩnh viễn'
+  const exp = new Date(expiresAt)
+  if (exp.getTime() < Date.now()) return 'Đã hết hạn'
+  return `Hết hạn ${formatDate(expiresAt)}`
+}
+
+function getFileTypeColor(name?: string): string {
+  if (!name) return '#0084ff'
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '#8b5cf6'
+  if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) return '#ec4899'
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '#f97316'
+  if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) return '#06b6d4'
+  if (['pdf'].includes(ext)) return '#ef4444'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '#10b981'
+  return '#0084ff'
 }
 
 async function browseFolder(share: IncomingShare) {
@@ -67,10 +115,50 @@ async function downloadFile(fileId: string, name: string) {
   }
 }
 
-function onRowClick(share: IncomingShare) {
+function onIncomingRowClick(share: IncomingShare) {
   if (browsing.value) return
   if (share.resourceType === 'folder') void browseFolder(share)
   else void downloadFile(share.resourceId, share.resourceName)
+}
+
+async function copyLink(link: ShareLinkInfo) {
+  try {
+    const fullUrl = window.location.origin + (link.url ?? `/s/${link.token}`)
+    await navigator.clipboard.writeText(fullUrl)
+    ui.showToast('Link copied')
+  } catch {
+    ui.showToast('Copy failed', 'info')
+  }
+}
+
+async function revokeLink(link: ShareLinkInfo) {
+  const ok = await ui.confirm({
+    title: 'Revoke link?',
+    message: `"${link.fileName}" will no longer be shared publicly.`,
+    confirmLabel: 'Revoke link',
+    danger: true,
+  })
+  if (!ok) return
+  error.value = ''
+  try {
+    await api(`/files/${link.fileId}/share`, { method: 'DELETE' })
+    ui.showToast('Link revoked')
+    await loadMyShareLinks()
+  } catch (e) {
+    error.value = formatApiError(e, 'Failed to revoke link')
+  }
+}
+
+async function openMyShareActions(link: ShareLinkInfo) {
+  const fullUrl = window.location.origin + (link.url ?? `/s/${link.token}`)
+  const action = await ui.openActionSheet(link.fileName, [
+    { id: 'copy', label: 'Copy link', icon: 'copy' },
+    { id: 'open', label: 'Open link', icon: 'external-link' },
+    { id: 'revoke', label: 'Revoke link', icon: 'trash', danger: true },
+  ])
+  if (action === 'copy') await copyLink(link)
+  if (action === 'open') window.open(fullUrl, '_blank', 'noopener')
+  if (action === 'revoke') await revokeLink(link)
 }
 
 onMounted(load)
@@ -78,31 +166,100 @@ onMounted(load)
 
 <template>
   <div class="shared-page">
-    <h1 class="page-title desktop-only">{{ t.sharedWithMe }}</h1>
+    <h1 class="page-title desktop-only">{{ t.navShared || 'Chia sẻ' }}</h1>
 
+    <!-- TeraBox Segmented Tabs -->
+    <div class="tabs-header">
+      <div class="tabs-pill-list" role="tablist" aria-label="Shares views">
+        <button
+          type="button"
+          role="tab"
+          class="tab-pill"
+          :class="{ active: shareTab === 'my-shares' }"
+          :aria-selected="shareTab === 'my-shares'"
+          @click="shareTab = 'my-shares'"
+        >
+          {{ t.myShares || 'Chia sẻ của tôi' }}
+          <span v-if="shareLinks.length" class="tab-count-badge">{{ shareLinks.length }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab-pill"
+          :class="{ active: shareTab === 'with-me' }"
+          :aria-selected="shareTab === 'with-me'"
+          @click="shareTab = 'with-me'"
+        >
+          {{ t.sharedWithMeTab || 'Được chia sẻ' }}
+          <span v-if="shares.length" class="tab-count-badge">{{ shares.length }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sub-toolbar -->
+    <div v-if="!browsing" class="shares-sub-bar">
+      <span class="sub-label">
+        <Icon name="filter" :size="15" />
+        {{ t.sortByTime || 'Sắp xếp theo thời gian' }}
+      </span>
+      <div class="sub-actions">
+        <button
+          type="button"
+          class="sub-icon-btn"
+          :title="viewMode === 'list' ? t.viewGrid : t.viewList"
+          @click="toggleViewMode"
+        >
+          <Icon :name="viewMode === 'list' ? 'palette' : 'file'" :size="18" />
+        </button>
+      </div>
+    </div>
+
+    <!-- Folder Browse View -->
     <Transition name="page">
       <section v-if="browsing" class="browse" aria-label="Shared folder contents">
         <button type="button" class="back-btn" @click="browsing = null">
-          <Icon name="restore" :size="16" />
-          {{ t.allSharedItems }}
+          <Icon name="arrow-left" :size="18" />
+          {{ t.allSharedItems || 'Tất cả mục chia sẻ' }}
         </button>
         <h2 class="folder-name">{{ browsing.folder?.name }}</h2>
-        <ul v-if="browsing.folders.length" class="rows">
-          <li v-for="f in browsing.folders" :key="'d-' + f.id" class="row static">
-            <span class="row-icon"><Icon name="folder" :size="18" /></span>
-            <span class="row-name">{{ f.name }}</span>
-            <span class="row-meta">{{ t.folder }}</span>
-          </li>
-        </ul>
-        <ul v-if="browsing.files.length" class="rows">
-          <li v-for="f in browsing.files" :key="'f-' + f.id">
-            <button type="button" class="row tappable" @click="downloadFile(f.id, f.name)">
-              <span class="row-icon"><Icon :name="mimeIcon(f.mimeType)" :size="18" /></span>
-              <span class="row-name">{{ f.name }}</span>
-              <span class="row-meta">{{ formatBytes(f.sizeBytes) }}</span>
+        <div class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
+          <div
+            v-for="f in browsing.folders"
+            :key="'d-' + f.id"
+            class="share-item-card static"
+          >
+            <div class="share-icon-badge folder-badge">
+              <Icon name="folder" :size="22" />
+            </div>
+            <div class="share-item-info">
+              <span class="share-item-title">{{ f.name }}</span>
+              <span class="share-item-sub">{{ t.folder }}</span>
+            </div>
+          </div>
+          <div
+            v-for="f in browsing.files"
+            :key="'f-' + f.id"
+            class="share-item-card tappable"
+            @click="downloadFile(f.id, f.name)"
+          >
+            <div
+              class="share-icon-badge"
+              :style="{
+                background: `color-mix(in srgb, ${getFileTypeColor(f.name)} 14%, transparent)`,
+                color: getFileTypeColor(f.name)
+              }"
+            >
+              <Icon :name="mimeIcon(f.mimeType)" :size="20" />
+            </div>
+            <div class="share-item-info">
+              <span class="share-item-title">{{ f.name }}</span>
+              <span class="share-item-sub">{{ formatBytes(f.sizeBytes) }}</span>
+            </div>
+            <button class="share-action-btn" type="button" aria-label="Download">
+              <Icon name="download" :size="18" />
             </button>
-          </li>
-        </ul>
+          </div>
+        </div>
         <p v-if="!browsing.folders.length && !browsing.files.length" class="empty-inline">
           {{ t.folderEmpty }}
         </p>
@@ -110,38 +267,97 @@ onMounted(load)
     </Transition>
 
     <template v-if="!browsing">
-      <p v-if="error" class="error" role="alert">{{ error }} <button type="button" class="retry-btn" @click="load">{{ t.retry }}</button></p>
+      <p v-if="error" class="error" role="alert">
+        {{ error }}
+        <button type="button" class="retry-btn" @click="load">{{ t.retry }}</button>
+      </p>
 
-      <div v-if="loading" class="list" aria-busy="true" aria-live="polite">
-        <div v-for="i in 3" :key="i" class="skeleton sk-row" />
+      <div v-if="loading" class="shares-container">
+        <div v-for="i in 4" :key="i" class="skeleton sk-row" />
       </div>
 
-      <EmptyState
-        v-else-if="!shares.length"
-        icon="users"
-        :title="t.nothingShared"
-        :description="t.nothingSharedDesc"
-      />
+      <!-- Tab 1: My Shares (/share-links) -->
+      <div v-else-if="shareTab === 'my-shares'">
+        <EmptyState
+          v-if="!shareLinks.length"
+          icon="share"
+          title="Chưa có liên kết chia sẻ nào"
+          description="Khi bạn tạo liên kết công khai cho tệp, chúng sẽ xuất hiện tại đây."
+        />
+        <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
+          <div
+            v-for="link in shareLinks"
+            :key="link.token"
+            class="share-item-card tappable"
+            @click="openMyShareActions(link)"
+          >
+            <div
+              class="share-icon-badge"
+              :style="{
+                background: `color-mix(in srgb, ${getFileTypeColor(link.fileName)} 14%, transparent)`,
+                color: getFileTypeColor(link.fileName)
+              }"
+            >
+              <Icon name="file" :size="20" />
+            </div>
+            <div class="share-item-info">
+              <span class="share-item-title">{{ link.fileName }}</span>
+              <span class="share-item-sub">{{ formatDate(link.createdAt) }} · {{ formatExpiry(link.expiresAt) }}</span>
+            </div>
+            <button
+              class="share-action-btn"
+              type="button"
+              aria-label="Share actions"
+              @click.stop="openMyShareActions(link)"
+            >
+              <Icon name="more" :size="18" />
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <ul v-else class="rows" :aria-label="t.sharedWithMe">
-        <li v-for="share in shares" :key="share.id">
-          <button type="button" class="row tappable" @click="onRowClick(share)">
-            <span class="row-icon">
-              <Icon
-                :name="share.resourceType === 'folder' ? 'folder' : mimeIcon('')"
-                :size="18"
-              />
-            </span>
-            <span class="row-copy">
-              <span class="row-name">{{ share.resourceName }}</span>
-              <span class="row-sub">by {{ share.owner.displayName }} · {{ relativeTime(share.createdAt) }}</span>
-            </span>
-            <span class="row-meta">
-              {{ share.resourceType === 'folder' ? t.open : t.download }}
-            </span>
-          </button>
-        </li>
-      </ul>
+      <!-- Tab 2: Shared With Me (/shares/with-me) -->
+      <div v-else-if="shareTab === 'with-me'">
+        <EmptyState
+          v-if="!shares.length"
+          icon="users"
+          :title="t.nothingShared"
+          :description="t.nothingSharedDesc"
+        />
+        <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
+          <div
+            v-for="share in shares"
+            :key="share.id"
+            class="share-item-card tappable"
+            @click="onIncomingRowClick(share)"
+          >
+            <div
+              class="share-icon-badge"
+              :class="{ 'folder-badge': share.resourceType === 'folder' }"
+              :style="share.resourceType === 'folder' ? {} : {
+                background: `color-mix(in srgb, ${getFileTypeColor(share.resourceName)} 14%, transparent)`,
+                color: getFileTypeColor(share.resourceName)
+              }"
+            >
+              <Icon :name="share.resourceType === 'folder' ? 'folder' : 'file'" :size="20" />
+            </div>
+            <div class="share-item-info">
+              <span class="share-item-title">{{ share.resourceName }}</span>
+              <span class="share-item-sub">
+                {{ share.owner.displayName }} · {{ formatDate(share.createdAt) }}
+              </span>
+            </div>
+            <button
+              class="share-action-btn"
+              type="button"
+              :aria-label="share.resourceType === 'folder' ? t.open : t.download"
+              @click.stop="onIncomingRowClick(share)"
+            >
+              <Icon :name="share.resourceType === 'folder' ? 'chevron-right' : 'download'" :size="18" />
+            </button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -153,133 +369,250 @@ onMounted(load)
   gap: var(--space-md);
 }
 
-.back-btn {
+/* TeraBox Tabs */
+.tabs-header {
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 4px;
+}
+
+.tabs-pill-list {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tab-pill {
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xxs);
-  min-height: var(--touch-min);
-  padding: 0 var(--space-sm);
-  margin-left: calc(-1 * var(--space-sm));
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
+  gap: 6px;
 }
 
-.back-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.folder-name {
-  margin: 0 0 var(--space-xs);
-  font-size: 1.125rem;
-  font-weight: 600;
+.tab-pill.active {
   color: var(--ink);
 }
 
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.tab-pill.active::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent);
 }
 
-.row {
+.tab-count-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Sub-toolbar */
+.shares-sub-bar {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  width: 100%;
-  min-height: var(--touch-min);
-  padding: var(--space-xs) var(--space-sm);
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.sub-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.sub-icon-btn {
+  background: transparent;
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--ink);
-  text-align: left;
-  transition:
-    background-color var(--motion-press) var(--ease-standard),
-    border-color var(--motion-press) var(--ease-standard);
+  border-radius: var(--radius-sm, 8px);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  cursor: pointer;
 }
 
-.row.static {
-  cursor: default;
+/* Container & Cards */
+.shares-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.row.tappable:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.shares-container.grid-mode {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
-@media (hover: hover) {
-  .row.tappable:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+@media (min-width: 640px) {
+  .shares-container.grid-mode {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
-.row-icon {
+@media (min-width: 1024px) {
+  .shares-container.grid-mode {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.share-item-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--canvas);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  cursor: pointer;
+}
+
+.share-item-card:hover {
+  background: var(--surface-card, rgba(255, 255, 255, 0.03));
+}
+
+.share-item-card:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.share-item-card.static {
+  cursor: default;
+}
+
+.share-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
   flex-shrink: 0;
-  border-radius: var(--radius-md);
-  background: var(--surface-soft);
-  color: var(--muted);
 }
 
-.row-copy {
+.folder-badge {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+}
+
+.share-item-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
+  gap: 3px;
 }
 
-.row-name {
+.share-item-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.share-item-sub {
+  font-size: 12px;
+  color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.share-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.share-action-btn:active {
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--accent);
   font-size: 14px;
   font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 8px;
 }
 
-.row-sub {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.row-meta {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
+.folder-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
 }
 
 .empty-inline {
-  margin: 0;
+  margin: var(--space-md) 0;
   font-size: 14px;
   color: var(--muted);
 }
 
 .error {
-  margin: 0;
   font-size: 14px;
   color: var(--danger);
 }
 
 .retry-btn {
-  margin-left: var(--space-xs);
-  font-weight: 600;
+  margin-left: 6px;
+  background: none;
+  border: none;
   color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .sk-row {
-  height: var(--touch-min);
+  height: 52px;
   border-radius: var(--radius-md);
+}
+
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .desktop-only {
+    display: block;
+  }
 }
 </style>
