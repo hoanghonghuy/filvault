@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '@/components/AppIcon.vue'
+import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 
 const props = defineProps<{
   mimeType: string
@@ -14,6 +15,29 @@ const emit = defineEmits<{
 
 const failed = ref(false)
 const isVideo = props.mimeType.startsWith('video/')
+const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
+const heicThumbUrl = ref<string>('')
+
+const displaySrc = computed(() => {
+  if (isHeicMedia.value && heicThumbUrl.value) {
+    return heicThumbUrl.value
+  }
+  return props.thumbnailUrl
+})
+
+async function loadHeicThumb() {
+  if (isHeicMedia.value && props.thumbnailUrl && !failed.value) {
+    try {
+      const url = await getHeicDisplayUrl(props.thumbnailUrl, 0.5)
+      heicThumbUrl.value = url
+    } catch {
+      // If conversion fails, let standard <img> try or fallback
+    }
+  }
+}
+
+watch(() => props.thumbnailUrl, loadHeicThumb)
+onMounted(loadHeicThumb)
 
 function handleError() {
   failed.value = true
@@ -22,10 +46,10 @@ function handleError() {
 
 <template>
   <button type="button" class="photo-thumb" :title="name" @click="emit('click')">
-    <template v-if="thumbnailUrl && !failed">
+    <template v-if="(displaySrc || (thumbnailUrl && !isHeicMedia)) && !failed">
       <img
         v-if="!isVideo"
-        :src="thumbnailUrl"
+        :src="displaySrc || thumbnailUrl"
         :alt="name"
         loading="lazy"
         decoding="async"
@@ -43,10 +67,12 @@ function handleError() {
       <span v-if="isVideo" class="media-badge">
         <Icon name="video" :size="14" />
       </span>
+      <span v-if="isHeicMedia" class="heic-badge">HEIC</span>
     </template>
     <span v-else class="fallback" :class="{ video: isVideo }">
       <Icon :name="isVideo ? 'video' : 'image'" :size="28" />
       <span class="name">{{ name }}</span>
+      <span v-if="isHeicMedia" class="heic-badge fallback-badge">HEIC</span>
     </span>
   </button>
 </template>
@@ -100,6 +126,29 @@ video {
   border-radius: var(--radius-pill);
   background: rgba(17, 24, 39, 0.72);
   color: var(--on-ink);
+}
+
+.heic-badge {
+  position: absolute;
+  left: var(--space-xs);
+  bottom: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs, 4px);
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  backdrop-filter: blur(4px);
+}
+
+.heic-badge.fallback-badge {
+  position: static;
+  margin-top: 2px;
 }
 
 .fallback {

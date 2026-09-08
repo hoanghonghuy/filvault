@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import type { VaultFile } from '@/api/types'
@@ -32,6 +33,7 @@ const changePinOpen = ref(false)
 const currentPin = ref('')
 const newPin = ref('')
 const confirmNewPin = ref('')
+const showChangePins = ref(false)
 const changePinError = ref('')
 const changingPin = ref(false)
 
@@ -40,6 +42,7 @@ const resetPinOpen = ref(false)
 const accountPassword = ref('')
 const resetNewPin = ref('')
 const confirmResetNewPin = ref('')
+const showResetPins = ref(false)
 const resetPinError = ref('')
 const resettingPin = ref(false)
 
@@ -50,6 +53,8 @@ const fileActionOpen = ref(false)
 // In-app preview
 const previewOpen = ref(false)
 const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
+const previewDisplayUrl = ref('')
+const previewHeicLoading = ref(false)
 
 const totalVaultSize = computed(() => {
   return vault.files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0)
@@ -180,9 +185,30 @@ async function previewMediaFile(file: VaultFile) {
     const out = await api<{ downloadUrl: string }>(`/files/${file.id}/download`)
     previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
     previewOpen.value = true
+    if (isHeic(file.name, file.mimeType)) {
+      previewHeicLoading.value = true
+      previewDisplayUrl.value = ''
+      try {
+        const resolved = await getHeicDisplayUrl(out.downloadUrl)
+        previewDisplayUrl.value = resolved
+      } catch {
+        previewDisplayUrl.value = out.downloadUrl
+      } finally {
+        previewHeicLoading.value = false
+      }
+    } else {
+      previewDisplayUrl.value = out.downloadUrl
+    }
   } catch (e) {
     ui.showToast(formatApiError(e, 'Không thể xem trước tệp'), 'error')
   }
+}
+
+function closePreview() {
+  previewOpen.value = false
+  previewFile.value = null
+  previewDisplayUrl.value = ''
+  previewHeicLoading.value = false
 }
 
 async function removeSelectedFileFromVault() {
@@ -529,19 +555,26 @@ function formatDate(iso: string): string {
     </BottomSheet>
 
     <!-- Preview Modal -->
-    <div v-if="previewOpen && previewFile" class="preview-backdrop" @click="previewOpen = false">
+    <div v-if="previewOpen && previewFile" class="preview-backdrop" @click="closePreview">
       <div class="preview-dialog" @click.stop>
         <header class="preview-header">
-          <span class="preview-filename">{{ previewFile.name }}</span>
-          <button type="button" class="close-btn" aria-label="Đóng" @click="previewOpen = false">
+          <span class="preview-filename">
+            {{ previewFile.name }}
+            <span v-if="isHeic(previewFile.name, previewFile.mimeType)" class="heic-tag">HEIC</span>
+          </span>
+          <button type="button" class="close-btn" aria-label="Đóng" @click="closePreview">
             <Icon name="close" :size="20" />
           </button>
         </header>
 
         <div class="preview-body">
+          <div v-if="previewHeicLoading" class="preview-heic-loading">
+            <div class="heic-spinner" />
+            <p>{{ t.heicConverting }}</p>
+          </div>
           <img
-            v-if="previewFile.mimeType.startsWith('image/')"
-            :src="previewFile.url"
+            v-else-if="previewFile.mimeType.startsWith('image/')"
+            :src="previewDisplayUrl || previewFile.url"
             :alt="previewFile.name"
             class="preview-img"
           />
@@ -1113,5 +1146,42 @@ function formatDate(iso: string): string {
   gap: var(--space-md);
   padding: var(--space-xl);
   color: var(--muted);
+}
+
+.heic-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.preview-heic-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  color: var(--fg-soft, var(--ink));
+  font-size: 14px;
+}
+
+.heic-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(128, 128, 128, 0.2);
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: heic-spin 0.8s linear infinite;
+}
+
+@keyframes heic-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

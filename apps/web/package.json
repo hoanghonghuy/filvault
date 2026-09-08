@@ -19,6 +19,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "heic-to": "^1.5.2",
     "livekit-client": "^2.22.2",
     "pinia": "^4.0.2",
     "vue": "^3.5.40",

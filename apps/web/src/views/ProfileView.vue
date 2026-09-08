@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
+import { isHeic, convertHeicBlobToJpeg } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
 import type { User } from '@/api/types'
 
@@ -30,19 +31,26 @@ function triggerAvatarPick() {
   avatarInputRef.value?.click()
 }
 
-function compressImage(file: File, maxSize = 256): Promise<string> {
+async function compressImage(file: File, maxSize = 256): Promise<string> {
+  const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)
+  if (!isImage) {
+    throw new Error('Vui lòng chọn file hình ảnh (JPG, PNG, WebP, HEIC)')
+  }
+
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error('Kích thước ảnh quá lớn (tối đa 25MB)')
+  }
+
+  let sourceBlob: Blob = file
+  if (isHeic(file.name, file.type)) {
+    try {
+      sourceBlob = await convertHeicBlobToJpeg(file, 0.9)
+    } catch {
+      throw new Error('Không thể giải mã file ảnh HEIC. Vui lòng thử lại.')
+    }
+  }
+
   return new Promise((resolve, reject) => {
-    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)
-    if (!isImage) {
-      reject(new Error('Vui lòng chọn file hình ảnh (JPG, PNG, WebP)'))
-      return
-    }
-
-    if (file.size > 25 * 1024 * 1024) {
-      reject(new Error('Kích thước ảnh quá lớn (tối đa 25MB)'))
-      return
-    }
-
     const reader = new FileReader()
     reader.onerror = () => {
       reject(new Error('Không thể đọc file ảnh từ thiết bị'))
@@ -238,7 +246,7 @@ async function logout() {
           <input
             ref="avatarInputRef"
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/*"
+            accept="image/png,image/jpeg,image/webp,image/*,.heic,.heif"
             class="sr-only"
             @change="handleAvatarSelected"
           />

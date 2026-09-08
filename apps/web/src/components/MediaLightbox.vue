@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import Icon from '@/components/AppIcon.vue'
 import { useI18n } from '@/lib/i18n'
+import { isHeic, getHeicDisplayUrl, downloadHeicAsJpeg } from '@/lib/heic'
 
 const props = withDefaults(
   defineProps<{
@@ -29,6 +30,42 @@ const isImage = computed(() => props.mimeType.startsWith('image/'))
 const isVideo = computed(() => props.mimeType.startsWith('video/'))
 const isPdf = computed(() => props.mimeType === 'application/pdf')
 const isAudio = computed(() => props.mimeType.startsWith('audio/'))
+
+const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
+const heicLoading = ref(false)
+const heicError = ref(false)
+const heicDisplayUrl = ref('')
+
+const displayImageUrl = computed(() => {
+  if (isHeicMedia.value && heicDisplayUrl.value) {
+    return heicDisplayUrl.value
+  }
+  return props.url
+})
+
+async function resolveHeicImage() {
+  if (!props.open || !isHeicMedia.value || !props.url) {
+    heicLoading.value = false
+    heicError.value = false
+    return
+  }
+  heicLoading.value = true
+  heicError.value = false
+  try {
+    const objectUrl = await getHeicDisplayUrl(props.url)
+    heicDisplayUrl.value = objectUrl
+  } catch {
+    heicError.value = true
+  } finally {
+    heicLoading.value = false
+  }
+}
+
+async function onDownloadJpeg() {
+  if (props.url) {
+    await downloadHeicAsJpeg(props.url, props.name)
+  }
+}
 
 const dialogRef = ref<HTMLDialogElement | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -156,8 +193,12 @@ watch(
       if (!dialogRef.value?.open) {
         dialogRef.value?.showModal()
       }
+      resolveHeicImage()
     } else {
       pauseMedia()
+      heicLoading.value = false
+      heicError.value = false
+      heicDisplayUrl.value = ''
       window.removeEventListener('keydown', onKeydown)
       if (dialogRef.value?.open) dialogRef.value.close()
     }
@@ -165,13 +206,16 @@ watch(
 )
 
 watch(
-  () => props.url,
+  () => [props.url, props.name, props.mimeType],
   () => {
     pauseMedia()
     scale.value = 1
     baseScale = 1
     translateX.value = 0
     translateY.value = 0
+    if (props.open) {
+      resolveHeicImage()
+    }
   },
 )
 
@@ -206,7 +250,10 @@ onUnmounted(() => {
             >
               <Icon name="arrow-left" :size="18" />
             </button>
-            <p class="lightbox-title">{{ name }}</p>
+            <p class="lightbox-title">
+              {{ name }}
+              <span v-if="isHeicMedia" class="heic-pill">{{ t.heicBadge }}</span>
+            </p>
             <button
               v-if="hasNext"
               type="button"
@@ -216,6 +263,15 @@ onUnmounted(() => {
               @click="emit('next')"
             >
               <Icon name="arrow-right" :size="18" />
+            </button>
+            <button
+              v-if="isHeicMedia"
+              type="button"
+              class="btn ghost heic-download-btn"
+              :title="t.downloadAsJpeg"
+              @click="onDownloadJpeg"
+            >
+              {{ t.downloadAsJpeg }}
             </button>
             <button type="button" class="btn ghost" @click="emit('download')">{{ t.download }}</button>
             <button type="button" class="btn icon-only" :aria-label="t.closePreview" @click="emit('close')" :title="t.closePreview">
@@ -236,7 +292,17 @@ onUnmounted(() => {
                 transition: isTouching ? 'none' : 'transform 200ms var(--ease-standard)',
               }"
             >
-              <img v-if="isImage" :src="url" :alt="name" draggable="false" />
+              <div v-if="isHeicMedia && heicLoading" class="heic-loading-state">
+                <div class="heic-spinner" />
+                <p>{{ t.heicConverting }}</p>
+              </div>
+              <img
+                v-if="isImage"
+                v-show="!isHeicMedia || !heicLoading"
+                :src="displayImageUrl"
+                :alt="name"
+                draggable="false"
+              />
               <video v-else-if="isVideo" ref="videoRef" :src="url" controls playsinline>
                 <track kind="captions" label="No captions" srclang="en" :src="captionsUrl" default />
               </video>
@@ -399,5 +465,48 @@ onUnmounted(() => {
 .lightbox-enter-from,
 .lightbox-leave-to {
   opacity: 0;
+}
+
+.heic-pill {
+  display: inline-block;
+  padding: 2px 7px;
+  margin-left: var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.heic-download-btn {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.heic-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  color: var(--fg-soft, #fff);
+  font-size: 14px;
+}
+
+.heic-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: heic-spin 0.8s linear infinite;
+}
+
+@keyframes heic-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
