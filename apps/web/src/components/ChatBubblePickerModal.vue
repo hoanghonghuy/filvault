@@ -275,7 +275,7 @@ function handleCancel() {
 
 .bubble-decoration-img {
   display: block;
-  max-height: 30px;
+  max-height: 40px;
   width: auto;
   object-fit: contain;
   pointer-events: none;
@@ -284,45 +284,45 @@ function handleCancel() {
 }
 
 .dec-top-left {
-  top: -16px;
+  top: -20px;
   left: 8px;
 }
 
 .dec-top-right {
-  top: -16px;
+  top: -20px;
   right: 8px;
 }
 
 .dec-bottom-left {
-  bottom: -10px;
+  bottom: -14px;
   left: 8px;
 }
 
 .dec-bottom-right {
-  bottom: -8px;
+  bottom: -12px;
   right: 8px;
 }
 
 .dec-left {
-  left: -16px;
+  left: -18px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .dec-right {
-  right: -16px;
+  right: -18px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .dec-top {
-  top: -14px;
+  top: -18px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .dec-bottom {
-  bottom: -8px;
+  bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
 }

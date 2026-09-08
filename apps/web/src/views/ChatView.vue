@@ -2300,6 +2300,11 @@ watch(
                     'cluster-last': isLastInCluster(index),
                     'cluster-middle': !isFirstInCluster(index) && !isLastInCluster(index),
                     'cluster-single': isFirstInCluster(index) && isLastInCluster(index),
+                    'has-bubble-decoration':
+                      message.senderId === auth.user?.id &&
+                      isFirstInCluster(index) &&
+                      currentBubbleStyle.id !== 'default' &&
+                      currentBubbleStyle.decorations.length > 0,
                   }"
                 >
                   <img
@@ -2337,8 +2342,8 @@ watch(
                     @contextmenu.prevent="openMessageMenu(message, $event.currentTarget as HTMLElement)"
                     @click="handleMessageBubbleClick(message)"
                   >
-                    <!-- Decorations for custom bubble style -->
-                    <template v-if="message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && !isStickerMessage(message.body) && message.body !== '👍'">
+                    <!-- Decorations for custom bubble style (only on first/single in cluster) -->
+                    <template v-if="message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && !isStickerMessage(message.body) && message.body !== '👍' && isFirstInCluster(index)">
                       <div
                         v-for="(dec, dIdx) in currentBubbleStyle.decorations"
                         :key="dIdx"
@@ -5201,6 +5206,11 @@ watch(
   margin-top: 8px;
 }
 
+/* Extra space so top decorations don't overlap the message above */
+.message-row.has-bubble-decoration {
+  margin-top: 26px;
+}
+
 .message-row:first-child {
   margin-top: 0;
 }
@@ -5255,7 +5265,7 @@ watch(
 
 .bubble-decoration-img {
   display: block;
-  max-height: 28px;
+  max-height: 40px;
   width: auto;
   object-fit: contain;
   pointer-events: none;
@@ -5264,45 +5274,45 @@ watch(
 }
 
 .dec-top-left {
-  top: -14px;
+  top: -20px;
   left: 6px;
 }
 
 .dec-top-right {
-  top: -14px;
+  top: -20px;
   right: 6px;
 }
 
 .dec-bottom-left {
-  bottom: -10px;
+  bottom: -14px;
   left: 6px;
 }
 
 .dec-bottom-right {
-  bottom: -10px;
+  bottom: -14px;
   right: 6px;
 }
 
 .dec-left {
-  left: -14px;
+  left: -18px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .dec-right {
-  right: -14px;
+  right: -18px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .dec-top {
-  top: -12px;
+  top: -18px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .dec-bottom {
-  bottom: -6px;
+  bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
 }
