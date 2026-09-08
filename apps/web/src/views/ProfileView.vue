@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { api, setTokens } from '@/api/client'
+import { api, setTokens, ApiError } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -32,76 +32,37 @@ function triggerAvatarPick() {
 
 function compressImage(file: File, maxSize = 256): Promise<string> {
   return new Promise((resolve, reject) => {
-    let objectUrl = ''
-    try {
-      objectUrl = URL.createObjectURL(file)
-    } catch {
-      // ignore
-    }
-
-    const cleanup = () => {
-      if (objectUrl) {
-        try {
-          URL.revokeObjectURL(objectUrl)
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    if (typeof createImageBitmap === 'function') {
-      createImageBitmap(file)
-        .then((bitmap) => {
-          cleanup()
-          let width = bitmap.width
-          let height = bitmap.height
-          if (width > height) {
-            if (width > maxSize) {
-              height = Math.round((height * maxSize) / width)
-              width = maxSize
-            }
-          } else {
-            if (height > maxSize) {
-              width = Math.round((width * maxSize) / height)
-              height = maxSize
-            }
-          }
-          const canvas = document.createElement('canvas')
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')
-          if (!ctx) {
-            bitmap.close()
-            reject(new Error('Không thể xử lý đồ họa ảnh'))
-            return
-          }
-          ctx.drawImage(bitmap, 0, 0, width, height)
-          bitmap.close()
-          try {
-            const dataUrl = canvas.toDataURL('image/webp', 0.85)
-            if (dataUrl.startsWith('data:image/webp')) {
-              resolve(dataUrl)
-              return
-            }
-          } catch {
-            // fallback to jpeg
-          }
-          resolve(canvas.toDataURL('image/jpeg', 0.85))
-        })
-        .catch(() => {
-          fallbackImage()
-        })
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)
+    if (!isImage) {
+      reject(new Error('Vui lòng chọn file hình ảnh (JPG, PNG, WebP)'))
       return
     }
 
-    fallbackImage()
+    if (file.size > 25 * 1024 * 1024) {
+      reject(new Error('Kích thước ảnh quá lớn (tối đa 25MB)'))
+      return
+    }
 
-    function fallbackImage() {
+    const reader = new FileReader()
+    reader.onerror = () => {
+      reject(new Error('Không thể đọc file ảnh từ thiết bị'))
+    }
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string' || !result) {
+        reject(new Error('Dữ liệu ảnh không hợp lệ'))
+        return
+      }
+
       const img = new Image()
       img.onload = () => {
-        cleanup()
         let width = img.naturalWidth || img.width
         let height = img.naturalHeight || img.height
+        if (!width || !height) {
+          reject(new Error('Không thể xác định kích thước ảnh'))
+          return
+        }
+
         if (width > height) {
           if (width > maxSize) {
             height = Math.round((height * maxSize) / width)
@@ -113,6 +74,7 @@ function compressImage(file: File, maxSize = 256): Promise<string> {
             height = maxSize
           }
         }
+
         const canvas = document.createElement('canvas')
         canvas.width = width
         canvas.height = height
@@ -121,33 +83,40 @@ function compressImage(file: File, maxSize = 256): Promise<string> {
           reject(new Error('Không thể xử lý đồ họa ảnh'))
           return
         }
+
         ctx.drawImage(img, 0, 0, width, height)
+
         try {
-          const dataUrl = canvas.toDataURL('image/webp', 0.85)
-          if (dataUrl.startsWith('data:image/webp')) {
-            resolve(dataUrl)
+          const webp = canvas.toDataURL('image/webp', 0.85)
+          if (webp && webp.startsWith('data:image/webp')) {
+            resolve(webp)
             return
           }
         } catch {
           // fallback to jpeg
         }
-        resolve(canvas.toDataURL('image/jpeg', 0.85))
-      }
-      img.onerror = () => {
-        cleanup()
-        reject(new Error('Không thể đọc định dạng ảnh này. Vui lòng chọn ảnh JPG hoặc PNG.'))
-      }
-      if (objectUrl) {
-        img.src = objectUrl
-      } else {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          img.src = e.target?.result as string
+
+        try {
+          const jpeg = canvas.toDataURL('image/jpeg', 0.85)
+          if (jpeg && jpeg.startsWith('data:image/jpeg')) {
+            resolve(jpeg)
+            return
+          }
+        } catch {
+          // fallback
         }
-        reader.onerror = () => reject(new Error('Không thể đọc file ảnh'))
-        reader.readAsDataURL(file)
+
+        resolve(canvas.toDataURL())
       }
+
+      img.onerror = () => {
+        reject(new Error('Không thể giải mã định dạng ảnh này. Vui lòng chọn ảnh JPG, PNG hoặc WebP.'))
+      }
+
+      img.src = result
     }
+
+    reader.readAsDataURL(file)
   })
 }
 
@@ -165,8 +134,12 @@ async function handleAvatarSelected(e: Event) {
     await auth.updateAvatar(dataUrl)
     ui.showToast('Đã cập nhật ảnh đại diện', 'success')
   } catch (err) {
-    error.value = formatApiError(err, 'Không thể tải ảnh lên')
-    ui.showToast(error.value, 'error')
+    const message =
+      err instanceof ApiError
+        ? formatApiError(err, 'Không thể tải ảnh lên')
+        : (err as Error)?.message || 'Không thể tải ảnh lên'
+    error.value = message
+    ui.showToast(message, 'error')
   } finally {
     updatingAvatar.value = false
     target.value = ''
@@ -180,7 +153,12 @@ async function removeAvatar() {
     await auth.updateAvatar('')
     ui.showToast('Đã xóa ảnh đại diện', 'success')
   } catch (err) {
-    error.value = formatApiError(err, 'Không thể xóa ảnh')
+    const message =
+      err instanceof ApiError
+        ? formatApiError(err, 'Không thể xóa ảnh')
+        : (err as Error)?.message || 'Không thể xóa ảnh'
+    error.value = message
+    ui.showToast(message, 'error')
   } finally {
     updatingAvatar.value = false
   }
