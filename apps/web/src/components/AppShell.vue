@@ -177,7 +177,7 @@ const navLabels = computed<Record<string, string>>(() => ({
   gap: var(--space-sm);
   min-height: var(--header-h);
   padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
-  background: var(--canvas);
+  background: var(--header-bg, var(--canvas));
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -351,7 +351,7 @@ const navLabels = computed<Record<string, string>>(() => ({
   justify-content: space-between;
   min-height: var(--bottom-nav-h);
   padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
-  background: var(--canvas);
+  background: var(--header-bg, var(--canvas));
   border-top: 1px solid var(--hairline);
 }
 

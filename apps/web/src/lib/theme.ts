@@ -37,7 +37,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
     accentColor: '#2563eb',
-    previewBg: '#ffffff',
+    previewBg: '#f0f7ff',
     todayAccent: '#2563eb',
   },
   {
@@ -47,7 +47,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 100%)',
     accentColor: '#0284c7',
-    previewBg: '#ffffff',
+    previewBg: '#f0f9ff',
     todayAccent: '#0284c7',
   },
   {
@@ -57,7 +57,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #5eead4 0%, #0d9488 100%)',
     accentColor: '#0d9488',
-    previewBg: '#ffffff',
+    previewBg: '#f0fdfa',
     todayAccent: '#0d9488',
   },
   {
@@ -67,7 +67,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #bef264 0%, #84cc16 100%)',
     accentColor: '#65a30d',
-    previewBg: '#ffffff',
+    previewBg: '#f7fee7',
     todayAccent: '#65a30d',
   },
   {
@@ -77,7 +77,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)',
     accentColor: '#d97706',
-    previewBg: '#ffffff',
+    previewBg: '#fffbeb',
     todayAccent: '#d97706',
   },
   {
@@ -97,7 +97,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #ddd6fe 0%, #8b5cf6 100%)',
     accentColor: '#7c3aed',
-    previewBg: '#faf5ff',
+    previewBg: '#fbf8ff',
     todayAccent: '#8b5cf6',
   },
   {
@@ -107,7 +107,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)',
     accentColor: '#475569',
-    previewBg: '#ffffff',
+    previewBg: '#f8fafc',
     todayAccent: '#475569',
   },
   {
@@ -117,7 +117,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #94a3b8 0%, #475569 100%)',
     accentColor: '#52525b',
-    previewBg: '#ffffff',
+    previewBg: '#fafafa',
     todayAccent: '#52525b',
   },
   {
@@ -138,7 +138,7 @@ export const THEMES: ThemeDef[] = [
     isPro: true,
     swatchGradient: 'linear-gradient(135deg, #a78bfa 0%, #38bdf8 50%, #34d399 100%)',
     accentColor: '#0284c7',
-    previewBg: '#ffffff',
+    previewBg: '#f1f5f9',
     todayAccent: '#0284c7',
   },
   // Seasonal
