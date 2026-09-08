@@ -24,6 +24,7 @@ const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
 const albums = ref<Album[]>([])
 const newAlbumName = ref('')
+const activePhotoTab = ref<'timeline' | 'albums'>('timeline')
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
@@ -264,49 +265,39 @@ onBeforeUnmount(() => {
     <h1 class="page-title desktop-only">{{ t.photosTitle }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
-    <div v-else>
-      <section class="section" aria-labelledby="albums-heading">
-        <h2 id="albums-heading" class="section-title">{{ t.albums }}</h2>
-        <form class="album-form" @submit.prevent="createAlbum">
-          <label class="field album-field">
-            <span class="sr-only">{{ t.newAlbumName }}</span>
-            <input v-model="newAlbumName" type="text" :placeholder="t.newAlbumName" autocomplete="off" />
-          </label>
-          <button class="btn ink" type="submit" :disabled="!newAlbumName.trim()">{{ t.create }}</button>
-        </form>
-        <div v-if="albums.length" class="list">
-          <div
-            v-for="(album, index) in albums"
-            :key="album.id"
-            class="row tappable appear"
-            :style="{ animationDelay: cellDelay(index) }"
-            @click="router.push(`/photos/albums/${album.id}`)"
-          >
-            <div class="album-cover" aria-hidden="true">
-              <img v-if="album.coverUrl" :src="album.coverUrl" alt="" loading="lazy" />
-              <Icon v-else-if="album.coverFileId" name="video" :size="20" />
-              <Icon v-else name="photos" :size="20" />
-            </div>
-            <button type="button" class="name link-btn" @click.stop="router.push(`/photos/albums/${album.id}`)">
-              {{ album.name }}
-            </button>
-            <span class="meta album-count">{{ album.itemCount }}</span>
-            <button class="btn icon-only" type="button" :aria-label="t.albumMenu" @click.stop="openAlbumActions(album)">
-              <Icon name="more" :size="18" />
-            </button>
-          </div>
-        </div>
-        <EmptyState
-          v-else
-          compact
-          :title="t.noAlbums"
-          :description="t.noAlbumsDesc"
-          icon="photos"
-        />
-      </section>
+    <!-- TeraBox Segmented Tabs -->
+    <div class="tabs-header">
+      <div class="tabs-pill-list" role="tablist" aria-label="Photos views">
+        <button
+          type="button"
+          role="tab"
+          class="tab-pill"
+          :class="{ active: activePhotoTab === 'timeline' }"
+          :aria-selected="activePhotoTab === 'timeline'"
+          @click="activePhotoTab = 'timeline'"
+        >
+          {{ t.timeline }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab-pill"
+          :class="{ active: activePhotoTab === 'albums' }"
+          :aria-selected="activePhotoTab === 'albums'"
+          @click="activePhotoTab = 'albums'"
+        >
+          {{ t.albums }} ({{ albums.length }})
+        </button>
+      </div>
+    </div>
 
-      <section v-for="group in groups" :key="group.date" class="section" :aria-label="group.date">
-        <h2 class="section-title">{{ group.date }}</h2>
+    <!-- Timeline Tab -->
+    <div v-if="activePhotoTab === 'timeline'" class="timeline-container">
+      <section v-for="group in groups" :key="group.date" class="timeline-date-group" :aria-label="group.date">
+        <div class="timeline-sticky-header">
+          <h2 class="timeline-date-title">{{ group.date }}</h2>
+          <span class="timeline-count-badge">{{ group.items.length }}</span>
+        </div>
         <div class="grid photos">
           <PhotoThumb
             v-for="(item, index) in group.items"
@@ -334,6 +325,50 @@ onBeforeUnmount(() => {
           {{ loadingMore ? t.loading : t.loadMore }}
         </button>
       </div>
+    </div>
+
+    <!-- Albums Tab -->
+    <div v-else-if="activePhotoTab === 'albums'" class="albums-container">
+      <form class="album-form" @submit.prevent="createAlbum">
+        <label class="field album-field">
+          <span class="sr-only">{{ t.newAlbumName }}</span>
+          <input v-model="newAlbumName" type="text" :placeholder="t.newAlbumName" autocomplete="off" />
+        </label>
+        <button class="btn accent" type="submit" :disabled="!newAlbumName.trim()">{{ t.create }}</button>
+      </form>
+
+      <div v-if="albums.length" class="albums-grid">
+        <div
+          v-for="(album, index) in albums"
+          :key="album.id"
+          class="album-card tappable appear"
+          :style="{ animationDelay: cellDelay(index) }"
+          @click="router.push(`/photos/albums/${album.id}`)"
+        >
+          <div class="album-cover" aria-hidden="true">
+            <img v-if="album.coverUrl" :src="album.coverUrl" alt="" loading="lazy" />
+            <Icon v-else-if="album.coverFileId" name="video" :size="24" />
+            <Icon v-else name="photos" :size="24" />
+          </div>
+          <div class="album-meta-row">
+            <div class="album-text-col">
+              <span class="album-title">{{ album.name }}</span>
+              <span class="album-sub">{{ album.itemCount }} {{ t.photosTitle.toLowerCase() }}</span>
+            </div>
+            <button class="btn icon-only album-more-btn" type="button" :aria-label="t.albumMenu" @click.stop="openAlbumActions(album)">
+              <Icon name="more" :size="18" />
+            </button>
+          </div>
+        </div>
+      </div>
+      <EmptyState
+        v-else
+        compact
+        :title="t.noAlbums"
+        :description="t.noAlbumsDesc"
+        icon="photos"
+      />
+    </div>
 
       <PhotoMediaSheet
         :open="mediaOpen"
@@ -387,60 +422,142 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
-.section {
+/* TeraBox Tabs */
+.tabs-header {
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 4px;
+}
+
+.tabs-pill-list {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tab-pill {
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tab-pill.active {
+  color: var(--ink);
+}
+
+.tab-pill.active::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+/* Timeline */
+.timeline-date-group {
   margin-bottom: var(--space-lg);
 }
 
-.album-form {
+.timeline-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--canvas);
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  margin-bottom: 8px;
 }
 
-.album-field {
-  flex: 1 1 100%;
-  margin-bottom: 0;
-}
-
-.album-form .btn {
-  width: 100%;
-}
-
-.link-btn {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.album-count {
-  flex-shrink: 0;
-  min-width: 24px;
-  text-align: center;
-  padding: 0.1rem 0.5rem;
-  border-radius: var(--radius-pill);
-  background: var(--surface-card);
-  color: var(--muted);
-  font-size: 0.75rem;
+.timeline-date-title {
+  font-size: 15px;
   font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.timeline-count-badge {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.grid.photos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+@media (min-width: 640px) {
+  .grid.photos {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid.photos {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+}
+
+/* Albums */
+.albums-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: var(--space-md);
+}
+
+@media (min-width: 768px) {
+  .albums-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .albums-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.album-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg, 16px);
+  background: var(--surface-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.album-card:active {
+  transform: scale(0.98);
+  border-color: var(--accent);
 }
 
 .album-cover {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--surface-card, rgba(255, 255, 255, 0.08));
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
   color: var(--muted);
   overflow: hidden;
 }
@@ -449,6 +566,51 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.album-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.album-text-col {
+  min-width: 0;
+  flex: 1;
+}
+
+.album-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.album-more-btn {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.album-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+}
+
+.album-field {
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .load-more {
@@ -462,14 +624,6 @@ onBeforeUnmount(() => {
 @media (min-width: 768px) {
   .desktop-only {
     display: block;
-  }
-
-  .album-field {
-    flex: 1 1 auto;
-  }
-
-  .album-form .btn {
-    width: auto;
   }
 }
 </style>
