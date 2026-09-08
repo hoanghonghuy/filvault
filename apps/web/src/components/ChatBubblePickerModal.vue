@@ -89,8 +89,10 @@ function handleCancel() {
                   :key="idx"
                   class="bubble-decoration"
                   :class="`dec-${dec.position}`"
-                  v-html="dec.svg"
-                />
+                >
+                  <img v-if="dec.imgUrl" :src="dec.imgUrl" class="bubble-decoration-img" alt="" />
+                  <div v-else-if="dec.svg" v-html="dec.svg" />
+                </div>
                 <p class="preview-text">
                   Nay bạn có thể thay đổi kiểu bong bóng và cuộc trò chuyện sẽ có giao diện mới. Quá ngầu!
                 </p>
@@ -121,7 +123,9 @@ function handleCancel() {
                 :aria-label="item.name"
                 @click="selectStyle(item.id)"
               >
-                <div class="mini-bubble-wrap" v-html="item.previewSvg" />
+                <div class="mini-bubble-wrap">
+                  <img :src="item.thumbUrl" :alt="item.name" class="mini-bubble-img" />
+                </div>
                 <span class="style-name">{{ item.name }}</span>
               </button>
             </div>
@@ -159,7 +163,7 @@ function handleCancel() {
   max-width: 480px;
   height: 94vh;
   height: 94dvh;
-  background: #0d0d0f;
+  background: #000000;
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
   overflow: hidden;
@@ -180,13 +184,12 @@ function handleCancel() {
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  background: #0d0d0f;
+  background: #000000;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .modal-title {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #ffffff;
   margin: 0;
@@ -197,7 +200,7 @@ function handleCancel() {
   background: transparent;
   border: none;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 6px;
@@ -205,15 +208,16 @@ function handleCancel() {
 }
 
 .cancel-btn {
-  color: #e4e4e7;
-}
-
-.cancel-btn:hover {
   color: #ffffff;
 }
 
+.cancel-btn:hover {
+  opacity: 0.8;
+}
+
 .save-btn {
-  color: #71717a;
+  color: #7f1d1d;
+  font-weight: 600;
 }
 
 .save-btn.changed {
@@ -227,7 +231,7 @@ function handleCancel() {
 
 /* Upper Live Preview Area */
 .live-preview-section {
-  padding: 24px 16px 20px;
+  padding: 24px 16px 28px;
   background: #000000;
   display: flex;
   justify-content: flex-end;
@@ -247,8 +251,8 @@ function handleCancel() {
   padding: 12px 18px;
   border-radius: 18px;
   font-size: 15px;
-  line-height: 1.4;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  line-height: 1.45;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transition: background 0.2s ease, color 0.2s ease;
   word-break: break-word;
 }
@@ -269,46 +273,56 @@ function handleCancel() {
   justify-content: center;
 }
 
+.bubble-decoration-img {
+  display: block;
+  max-height: 30px;
+  width: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
 .dec-top-left {
-  top: -14px;
-  left: 6px;
+  top: -16px;
+  left: 8px;
 }
 
 .dec-top-right {
-  top: -14px;
-  right: 6px;
+  top: -16px;
+  right: 8px;
 }
 
 .dec-bottom-left {
   bottom: -10px;
-  left: 6px;
+  left: 8px;
 }
 
 .dec-bottom-right {
-  bottom: -10px;
-  right: 6px;
+  bottom: -8px;
+  right: 8px;
 }
 
 .dec-left {
-  left: -14px;
+  left: -16px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .dec-right {
-  right: -14px;
+  right: -16px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .dec-top {
-  top: -12px;
+  top: -14px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .dec-bottom {
-  bottom: -6px;
+  bottom: -8px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -316,11 +330,11 @@ function handleCancel() {
 /* Bottom Selection Sheet */
 .bubble-sheet-panel {
   flex: 1;
-  background: #18181b;
-  border-top-left-radius: 24px;
-  border-top-right-radius: 24px;
+  background: #1e1e1e;
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
   overflow-y: auto;
-  padding: 0 16px 32px;
+  padding: 0 16px 36px;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -329,7 +343,7 @@ function handleCancel() {
   width: 36px;
   height: 4px;
   border-radius: 2px;
-  background: #3f3f46;
+  background: #3e3e40;
   margin: 10px auto 14px;
 }
 
@@ -347,7 +361,7 @@ function handleCancel() {
 .sheet-subtext {
   font-size: 0.8rem;
   line-height: 1.45;
-  color: #a1a1aa;
+  color: #8e8e93;
   margin: 0;
 }
 
@@ -378,22 +392,30 @@ function handleCancel() {
 }
 
 .style-card.active {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  background: #2c2c2e;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .mini-bubble-wrap {
   width: 100%;
-  height: 44px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.mini-bubble-img {
+  max-height: 42px;
+  max-width: 95%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+  user-select: none;
+  pointer-events: none;
 }
 
 .style-name {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: #d4d4d8;
   text-align: center;
@@ -405,7 +427,7 @@ function handleCancel() {
 
 .style-card.active .style-name {
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* Transition */

@@ -2344,8 +2344,10 @@ watch(
                         :key="dIdx"
                         class="bubble-decoration"
                         :class="`dec-${dec.position}`"
-                        v-html="dec.svg"
-                      />
+                      >
+                        <img v-if="dec.imgUrl" :src="dec.imgUrl" class="bubble-decoration-img" alt="" />
+                        <div v-else-if="dec.svg" v-html="dec.svg" />
+                      </div>
                     </template>
                     <!-- Heart burst pop animation on double-tap -->
                     <div v-if="activeBurstMessageId === message.id" class="heart-burst" aria-hidden="true">
@@ -2466,8 +2468,10 @@ watch(
                       :key="dIdx"
                       class="bubble-decoration"
                       :class="`dec-${dec.position}`"
-                      v-html="dec.svg"
-                    />
+                    >
+                      <img v-if="dec.imgUrl" :src="dec.imgUrl" class="bubble-decoration-img" alt="" />
+                      <div v-else-if="dec.svg" v-html="dec.svg" />
+                    </div>
                   </template>
                   <p v-if="isStickerMessage(pendingMessage.body)" class="sticker-bubble">{{ parseStickerSymbol(pendingMessage.body) }}</p>
                   <p v-else :class="{ 'like-bubble': pendingMessage.body === '👍' }">{{ pendingMessage.body }}</p>
@@ -5247,6 +5251,16 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.bubble-decoration-img {
+  display: block;
+  max-height: 28px;
+  width: auto;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .dec-top-left {
