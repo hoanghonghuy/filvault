@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
-import { isHeic, convertHeicBlobToJpeg } from '@/lib/heic'
+import { isHeic, convertHeicBlobToJpeg, checkIsHeicBlob } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
 import type { User } from '@/api/types'
 
@@ -32,7 +32,10 @@ function triggerAvatarPick() {
 }
 
 async function compressImage(file: File, maxSize = 256): Promise<string> {
-  const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name)
+  const isImage =
+    file.type.startsWith('image/') ||
+    /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name) ||
+    isHeic(file.name, file.type)
   if (!isImage) {
     throw new Error('Vui lòng chọn file hình ảnh (JPG, PNG, WebP, HEIC)')
   }
@@ -42,28 +45,44 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
   }
 
   let sourceBlob: Blob = file
-  if (isHeic(file.name, file.type)) {
+  const isHeicImage = isHeic(file.name, file.type) || (await checkIsHeicBlob(file))
+  if (isHeicImage) {
     try {
       sourceBlob = await convertHeicBlobToJpeg(file, 0.9)
-    } catch {
-      throw new Error('Không thể giải mã file ảnh HEIC. Vui lòng thử lại.')
+    } catch (err) {
+      console.error('HEIC conversion failed:', err)
+      throw new Error('Không thể giải mã file ảnh HEIC. Vui lòng chọn ảnh JPG, PNG hoặc thử lại.')
     }
   }
 
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => {
-      reject(new Error('Không thể đọc file ảnh từ thiết bị'))
-    }
-    reader.onload = () => {
-      const result = reader.result
-      if (typeof result !== 'string' || !result) {
-        reject(new Error('Dữ liệu ảnh không hợp lệ'))
-        return
+    let objectUrl = ''
+    try {
+      objectUrl = URL.createObjectURL(sourceBlob)
+    } catch {
+      // Fallback to FileReader if createObjectURL fails
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('Không thể đọc file ảnh từ thiết bị'))
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result !== 'string' || !result) {
+          reject(new Error('Dữ liệu ảnh không hợp lệ'))
+          return
+        }
+        loadImageAndCompress(result, null)
       }
+      reader.readAsDataURL(sourceBlob)
+      return
+    }
 
+    loadImageAndCompress(objectUrl, objectUrl)
+
+    function loadImageAndCompress(src: string, urlToRevoke: string | null) {
       const img = new Image()
       img.onload = () => {
+        if (urlToRevoke) {
+          URL.revokeObjectURL(urlToRevoke)
+        }
         let width = img.naturalWidth || img.width
         let height = img.naturalHeight || img.height
         if (!width || !height) {
@@ -118,13 +137,14 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
       }
 
       img.onerror = () => {
+        if (urlToRevoke) {
+          URL.revokeObjectURL(urlToRevoke)
+        }
         reject(new Error('Không thể giải mã định dạng ảnh này. Vui lòng chọn ảnh JPG, PNG hoặc WebP.'))
       }
 
-      img.src = result
+      img.src = src
     }
-
-    reader.readAsDataURL(file)
   })
 }
 
@@ -246,7 +266,7 @@ async function logout() {
           <input
             ref="avatarInputRef"
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/*,.heic,.heif"
+            accept="image/png,image/jpeg,image/webp,image/*,.heic,.heif,.HEIC,.HEIF"
             class="sr-only"
             @change="handleAvatarSelected"
           />

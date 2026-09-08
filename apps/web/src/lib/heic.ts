@@ -44,6 +44,39 @@ export function isHeicFile(file: File | Blob): boolean {
 }
 
 /**
+ * Asynchronously inspects file/blob to check if it is HEIC/HEIF,
+ * checking file extension, MIME type, and binary magic bytes (ftyp brand).
+ */
+export async function checkIsHeicBlob(blob: Blob): Promise<boolean> {
+  if (isHeicFile(blob)) return true
+  if ('name' in blob && typeof (blob as File).name === 'string' && isHeic((blob as File).name, blob.type)) {
+    return true
+  }
+
+  try {
+    if (blob.size >= 12) {
+      const buffer = await blob.slice(0, 32).arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      let ascii = ''
+      for (let i = 0; i < bytes.length; i++) {
+        ascii += String.fromCharCode(bytes[i]!)
+      }
+      if (ascii.includes('ftyp')) {
+        const brands = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']
+        const lower = ascii.toLowerCase()
+        if (brands.some((brand) => lower.includes(brand))) {
+          return true
+        }
+      }
+    }
+  } catch {
+    // Ignore buffer reading error
+  }
+
+  return false
+}
+
+/**
  * Convert a HEIC Blob to a JPEG Blob in the browser.
  */
 export async function convertHeicBlobToJpeg(blob: Blob, quality = 0.85): Promise<Blob> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isHeic, isHeicFile } from './heic'
+import { isHeic, isHeicFile, checkIsHeicBlob } from './heic'
 import { resolveContentType, mimeFromName } from './mimeIcon'
 
 describe('heic utility', () => {
@@ -39,6 +39,34 @@ describe('heic utility', () => {
 
     const pngFile = new File(['mock'], 'sample.png', { type: 'image/png' })
     expect(isHeicFile(pngFile)).toBe(false)
+  })
+
+  it('checkIsHeicBlob correctly identifies blobs with extension or ftyp header', async () => {
+    const heicFile = new File(['mock'], 'camera.heic')
+    expect(await checkIsHeicBlob(heicFile)).toBe(true)
+
+    const heicBlob = new Blob(['mock'], { type: 'image/heic' })
+    expect(await checkIsHeicBlob(heicBlob)).toBe(true)
+
+    const pngBlob = new Blob(['mock'], { type: 'image/png' })
+    expect(await checkIsHeicBlob(pngBlob)).toBe(false)
+
+    // Construct a binary blob with ftypheic header
+    const ftypBuffer = new Uint8Array(24)
+    // 0..3: size (00 00 00 18)
+    ftypBuffer[3] = 24
+    // 4..7: "ftyp"
+    ftypBuffer[4] = 102
+    ftypBuffer[5] = 116
+    ftypBuffer[6] = 121
+    ftypBuffer[7] = 112
+    // 8..11: "heic"
+    ftypBuffer[8] = 104
+    ftypBuffer[9] = 101
+    ftypBuffer[10] = 105
+    ftypBuffer[11] = 99
+    const rawHeicBlob = new Blob([ftypBuffer])
+    expect(await checkIsHeicBlob(rawHeicBlob)).toBe(true)
   })
 
   it('resolves correct content types for all supported image formats', () => {
