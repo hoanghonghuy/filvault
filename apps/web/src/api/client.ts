@@ -3,7 +3,7 @@ import type { ApiErrorBody, Session } from './types'
 export const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
   (typeof window !== 'undefined' && window.location
-    ? `${window.location.protocol}//${window.location.hostname}:8080/api/v1`
+    ? `${window.location.origin}/api/v1`
     : 'http://localhost:8080/api/v1')
 
 const ACCESS_KEY = 'filvault.accessToken'

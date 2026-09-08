@@ -48,7 +48,7 @@ func isAllowedOrigin(origin string, allowed map[string]struct{}) bool {
 		return false
 	}
 	host := u.Hostname()
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || strings.HasSuffix(host, ".local") {
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".trycloudflare.com") {
 		return true
 	}
 	ip := net.ParseIP(host)

@@ -74,3 +74,22 @@ func TestCORS_PrivateLANOrigin(t *testing.T) {
 		t.Fatalf("allow-origin=%q", got)
 	}
 }
+
+func TestCORS_TryCloudflareOrigin(t *testing.T) {
+	engine := gin.New()
+	engine.Use(httpx.CORS([]string{"http://localhost:5173"}))
+	engine.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+
+	req := httptest.NewRequest(http.MethodOptions, "/ping", nil)
+	req.Header.Set("Origin", "https://quick-tunnel-subdomain.trycloudflare.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status=%d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://quick-tunnel-subdomain.trycloudflare.com" {
+		t.Fatalf("allow-origin=%q", got)
+	}
+}
