@@ -12,6 +12,7 @@ type Repository interface {
 	DeleteRow(ctx context.Context, ownerID, id string) error
 	SoftDelete(ctx context.Context, ownerID, id string, at time.Time) error
 	ExistsAliveByName(ctx context.Context, ownerID string, folderID *string, name, excludeFileID string) (bool, error)
+	GetAliveByName(ctx context.Context, ownerID string, folderID *string, name string) (*File, error)
 
 	CreateVersion(ctx context.Context, v FileVersion) error
 	ListVersions(ctx context.Context, fileID string) ([]FileVersion, error)
@@ -20,6 +21,9 @@ type Repository interface {
 	AddFavorite(ctx context.Context, ownerID, fileID string, at time.Time) error
 	RemoveFavorite(ctx context.Context, ownerID, fileID string) error
 	ListFavorites(ctx context.Context, ownerID string, limit int) ([]FavoriteFile, error)
+
+	CompleteUpload(ctx context.Context, ownerID, fileID string, size int64, contentType string, now time.Time) (*File, error)
+	CompleteReplaceUpload(ctx context.Context, ownerID, pendingFileID, targetFileID string, size int64, contentType string, now time.Time) (*File, error)
 }
 
 type QuotaStore interface {

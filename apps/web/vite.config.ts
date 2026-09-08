@@ -25,6 +25,14 @@ export default defineConfig({
       '/filvault': {
         target: 'http://localhost:9002',
         changeOrigin: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const presignedHost = req.headers['x-presigned-host']
+            if (presignedHost && typeof presignedHost === 'string') {
+              proxyReq.setHeader('host', presignedHost)
+            }
+          })
+        },
       },
     },
   },

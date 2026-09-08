@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVaultStore } from '@/stores/vault'
 import { useUiStore } from '@/stores/ui'
@@ -60,7 +60,28 @@ const totalVaultSize = computed(() => {
   return vault.files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0)
 })
 
+let hiddenTimeout: ReturnType<typeof setTimeout> | null = null
+
+function onVisibilityChange() {
+  if (document.hidden) {
+    if (vault.isUnlocked) {
+      hiddenTimeout = setTimeout(() => {
+        if (vault.isUnlocked) {
+          vault.lock()
+          ui.showToast('Kho cá nhân đã tự động khóa', 'info')
+        }
+      }, 2 * 60 * 1000)
+    }
+  } else {
+    if (hiddenTimeout) {
+      clearTimeout(hiddenTimeout)
+      hiddenTimeout = null
+    }
+  }
+}
+
 onMounted(async () => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
   try {
     await vault.fetchStatus()
     if (vault.isUnlocked) {
@@ -68,6 +89,14 @@ onMounted(async () => {
     }
   } catch (e) {
     // ignore
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  if (hiddenTimeout) {
+    clearTimeout(hiddenTimeout)
+    hiddenTimeout = null
   }
 })
 

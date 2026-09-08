@@ -30,8 +30,11 @@ export function formatApiError(e: unknown, fallback: string): string {
   if (!(e instanceof ApiError)) {
     return fallback
   }
-  if (e.code === 'CONFLICT' && e.message) {
-    return e.message
+  if (e.code === 'CONFLICT') {
+    if (e.message && e.message.toLowerCase() !== 'conflict') {
+      return e.message
+    }
+    return friendly.CONFLICT
   }
   return friendly[e.code] ?? e.message ?? fallback
 }

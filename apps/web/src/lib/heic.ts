@@ -82,12 +82,34 @@ export async function checkIsHeicBlob(blob: Blob): Promise<boolean> {
  * Convert a HEIC Blob to a JPEG Blob in the browser.
  */
 export async function convertHeicBlobToJpeg(blob: Blob, quality = 0.85): Promise<Blob> {
-  const { heicTo } = await import('heic-to')
-  return await heicTo({
-    blob,
-    type: 'image/jpeg',
-    quality,
-  })
+  try {
+    const { heicTo } = await import('heic-to')
+    return await heicTo({
+      blob,
+      type: 'image/jpeg',
+      quality,
+    })
+  } catch (err) {
+    if (typeof window !== 'undefined' && typeof createImageBitmap === 'function') {
+      try {
+        const bmp = await createImageBitmap(blob)
+        const canvas = document.createElement('canvas')
+        canvas.width = bmp.width
+        canvas.height = bmp.height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(bmp, 0, 0)
+          const fallbackBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+          if (fallbackBlob) {
+            return fallbackBlob
+          }
+        }
+      } catch {
+        // Native decode also failed
+      }
+    }
+    throw err
+  }
 }
 
 /**

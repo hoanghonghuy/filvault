@@ -81,6 +81,13 @@ func (s *Store) ExistsAliveFileByName(ctx context.Context, ownerID string, folde
 	return exists, err
 }
 
+func (s *Store) GetAliveFileByName(ctx context.Context, ownerID string, folderID *string, name string) (*file.File, error) {
+	if folderID == nil {
+		return scanFile(s.pool.QueryRow(ctx, fileSelect+` AND owner_id = $1 AND folder_id IS NULL AND name = $2`, ownerID, name))
+	}
+	return scanFile(s.pool.QueryRow(ctx, fileSelect+` AND owner_id = $1 AND folder_id = $2 AND name = $3`, ownerID, *folderID, name))
+}
+
 func (s *Store) GetUserStorage(ctx context.Context, userID string) (used, quota int64, err error) {
 	err = s.pool.QueryRow(ctx, `
 		SELECT storage_used, storage_quota FROM users WHERE id = $1
@@ -140,6 +147,158 @@ func (s *Store) GetFileVersion(ctx context.Context, fileID, versionID string) (*
 		return nil, err
 	}
 	return &v, nil
+}
+
+func (s *Store) CompleteUpload(ctx context.Context, ownerID, fileID string, size int64, contentType string, now time.Time) (*file.File, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var used, quota int64
+	err = tx.QueryRow(ctx, `
+		SELECT storage_used, storage_quota FROM users WHERE id = $1 FOR UPDATE
+	`, ownerID).Scan(&used, &quota)
+	if err != nil {
+		return nil, err
+	}
+	if used+size > quota {
+		return nil, apperr.QuotaExceeded
+	}
+
+	var f file.File
+	err = tx.QueryRow(ctx, `
+		UPDATE files
+		SET status = 'READY',
+			size_bytes = $2,
+			mime_type = CASE WHEN $3 <> '' THEN $3 ELSE mime_type END,
+			upload_expires_at = NULL,
+			updated_at = $4
+		WHERE id = $1 AND owner_id = $5 AND status = 'PENDING' AND deleted_at IS NULL
+		RETURNING id, owner_id, folder_id, name, original_name, object_key,
+			mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id,
+			source, source_ref_id
+	`, fileID, size, contentType, now, ownerID).Scan(
+		&f.ID, &f.OwnerID, &f.FolderID, &f.Name, &f.OriginalName, &f.ObjectKey,
+		&f.MimeType, &f.SizeBytes, &f.Status, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt, &f.UploadExpiresAt, &f.ReplacesFileID,
+		&f.Source, &f.SourceRefID,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.NotFound
+	}
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, apperr.Conflict
+		}
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE users SET storage_used = storage_used + $2, updated_at = $3 WHERE id = $1
+	`, ownerID, size, now)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+func (s *Store) CompleteReplaceUpload(ctx context.Context, ownerID, pendingFileID, targetFileID string, size int64, contentType string, now time.Time) (*file.File, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var pending file.File
+	err = tx.QueryRow(ctx, `
+		SELECT id, object_key, mime_type FROM files
+		WHERE id = $1 AND owner_id = $2 AND status = 'PENDING' AND deleted_at IS NULL
+	`, pendingFileID, ownerID).Scan(&pending.ID, &pending.ObjectKey, &pending.MimeType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.NotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var target file.File
+	err = tx.QueryRow(ctx, `
+		SELECT id, object_key, size_bytes, mime_type, name
+		FROM files
+		WHERE id = $1 AND owner_id = $2 AND status = 'READY' AND deleted_at IS NULL
+		FOR UPDATE
+	`, targetFileID, ownerID).Scan(&target.ID, &target.ObjectKey, &target.SizeBytes, &target.MimeType, &target.Name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.NotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	sizeDelta := size - target.SizeBytes
+	var used, quota int64
+	err = tx.QueryRow(ctx, `
+		SELECT storage_used, storage_quota FROM users WHERE id = $1 FOR UPDATE
+	`, ownerID).Scan(&used, &quota)
+	if err != nil {
+		return nil, err
+	}
+	if sizeDelta > 0 && used+sizeDelta > quota {
+		return nil, apperr.QuotaExceeded
+	}
+
+	versionID := auth.NewID()
+	_, err = tx.Exec(ctx, `
+		INSERT INTO file_versions (id, file_id, object_key, size_bytes, mime_type, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, versionID, target.ID, target.ObjectKey, target.SizeBytes, target.MimeType, now)
+	if err != nil {
+		return nil, err
+	}
+
+	var updated file.File
+	err = tx.QueryRow(ctx, `
+		UPDATE files
+		SET object_key = $2,
+			size_bytes = $3,
+			mime_type = CASE WHEN $4 <> '' THEN $4 ELSE mime_type END,
+			updated_at = $5
+		WHERE id = $1 AND owner_id = $6
+		RETURNING id, owner_id, folder_id, name, original_name, object_key,
+			mime_type, size_bytes, status, created_at, updated_at, deleted_at, upload_expires_at, replaces_file_id,
+			source, source_ref_id
+	`, target.ID, pending.ObjectKey, size, contentType, now, ownerID).Scan(
+		&updated.ID, &updated.OwnerID, &updated.FolderID, &updated.Name, &updated.OriginalName, &updated.ObjectKey,
+		&updated.MimeType, &updated.SizeBytes, &updated.Status, &updated.CreatedAt, &updated.UpdatedAt, &updated.DeletedAt, &updated.UploadExpiresAt, &updated.ReplacesFileID,
+		&updated.Source, &updated.SourceRefID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM files WHERE id = $1 AND owner_id = $2`, pendingFileID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if sizeDelta != 0 {
+		_, err = tx.Exec(ctx, `
+			UPDATE users SET storage_used = storage_used + $2, updated_at = $3 WHERE id = $1
+		`, ownerID, sizeDelta, now)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
 const fileSelect = `
@@ -248,6 +407,10 @@ func (r fileRepo) ExistsAliveByName(ctx context.Context, ownerID string, folderI
 	return r.store.ExistsAliveFileByName(ctx, ownerID, folderID, name, excludeFileID)
 }
 
+func (r fileRepo) GetAliveByName(ctx context.Context, ownerID string, folderID *string, name string) (*file.File, error) {
+	return r.store.GetAliveFileByName(ctx, ownerID, folderID, name)
+}
+
 func (r fileRepo) CreateVersion(ctx context.Context, v file.FileVersion) error {
 	return r.store.CreateFileVersion(ctx, v)
 }
@@ -270,6 +433,14 @@ func (r fileRepo) RemoveFavorite(ctx context.Context, ownerID, fileID string) er
 
 func (r fileRepo) ListFavorites(ctx context.Context, ownerID string, limit int) ([]file.FavoriteFile, error) {
 	return r.store.ListFavorites(ctx, ownerID, limit)
+}
+
+func (r fileRepo) CompleteUpload(ctx context.Context, ownerID, fileID string, size int64, contentType string, now time.Time) (*file.File, error) {
+	return r.store.CompleteUpload(ctx, ownerID, fileID, size, contentType, now)
+}
+
+func (r fileRepo) CompleteReplaceUpload(ctx context.Context, ownerID, pendingFileID, targetFileID string, size int64, contentType string, now time.Time) (*file.File, error) {
+	return r.store.CompleteReplaceUpload(ctx, ownerID, pendingFileID, targetFileID, size, contentType, now)
 }
 
 type quotaRepo struct {

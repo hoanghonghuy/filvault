@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, formatBytes, uploadToPresigned } from '@/api/client'
+import { ApiError, api, formatBytes, uploadToPresigned } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import UploadFab from '@/components/UploadFab.vue'
@@ -416,21 +416,50 @@ function triggerFolderUpload() {
   folderInputRef.value?.click()
 }
 
+function getNextNumberedName(originalName: string, counter: number): string {
+  const lastDot = originalName.lastIndexOf('.')
+  if (lastDot > 0) {
+    const base = originalName.substring(0, lastDot)
+    const ext = originalName.substring(lastDot)
+    return `${base} (${counter})${ext}`
+  }
+  return `${originalName} (${counter})`
+}
+
 async function uploadOneFile(file: File, targetFolderId: string | null) {
   const contentType = resolveContentType(file)
   if (!contentType) {
-    ui.showToast(`Skipped "${file.name}" (unsupported type)`, 'info')
+    ui.showToast(`Bỏ qua "${file.name}" (định dạng không hỗ trợ)`, 'info')
     return
   }
-  const session = await api<UploadSession>('/files/upload-sessions', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: file.name,
-      size: file.size,
-      contentType,
-      folderId: targetFolderId,
-    }),
-  })
+
+  let uploadName = file.name
+  let session: UploadSession | null = null
+  let attempt = 0
+  const maxAttempts = 10
+
+  while (!session && attempt < maxAttempts) {
+    try {
+      session = await api<UploadSession>('/files/upload-sessions', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: uploadName,
+          size: file.size,
+          contentType,
+          folderId: targetFolderId,
+        }),
+      })
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'CONFLICT' && attempt < maxAttempts - 1) {
+        attempt++
+        uploadName = getNextNumberedName(file.name, attempt)
+        continue
+      }
+      throw e
+    }
+  }
+
+  if (!session) return
   await uploadToPresigned(session.uploadUrl, file, contentType)
   await api(`/files/${session.fileId}/complete`, { method: 'POST', body: '{}' })
 }

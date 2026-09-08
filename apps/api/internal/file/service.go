@@ -79,12 +79,17 @@ func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, conten
 			return UploadSession{}, apperr.Validation
 		}
 	} else {
-		exists, err := s.repo.ExistsAliveByName(ctx, ownerID, folderID, displayName, "")
+		existing, err := s.repo.GetAliveByName(ctx, ownerID, folderID, displayName)
 		if err != nil {
 			return UploadSession{}, err
 		}
-		if exists {
-			return UploadSession{}, apperr.Conflict
+		if existing != nil {
+			if existing.Status == StatusReady {
+				return UploadSession{}, apperr.Conflict
+			}
+			// Clean up previous incomplete/abandoned/failed upload session for this name
+			_ = s.objects.Delete(ctx, existing.ObjectKey)
+			_ = s.repo.DeleteRow(ctx, ownerID, existing.ID)
 		}
 	}
 
@@ -156,61 +161,27 @@ func (s *Service) Complete(ctx context.Context, ownerID, fileID string) (File, e
 		return File{}, apperr.QuotaExceeded
 	}
 
-	// Replace flow: archive the old file, update the target, drop the PENDING row.
+	// Replace flow: archive the old file, update the target, drop the PENDING row atomically.
 	if f.ReplacesFileID != nil {
-		target, err := s.repo.GetByID(ctx, ownerID, *f.ReplacesFileID)
+		rec, err := s.repo.CompleteReplaceUpload(ctx, ownerID, fileID, *f.ReplacesFileID, stat.Size, stat.ContentType, now)
 		if err != nil {
+			if errors.Is(err, apperr.QuotaExceeded) {
+				_ = s.markFailed(ctx, *f)
+			}
 			return File{}, err
 		}
-		if target == nil || target.DeletedAt != nil || target.Status != StatusReady {
-			return File{}, apperr.NotFound
-		}
-		version := FileVersion{
-			ID:        auth.NewID(),
-			FileID:    target.ID,
-			ObjectKey: target.ObjectKey,
-			SizeBytes: target.SizeBytes,
-			MimeType:  target.MimeType,
-			CreatedAt: now,
-		}
-		if err := s.repo.CreateVersion(ctx, version); err != nil {
-			return File{}, err
-		}
-		rec := *target
-		rec.ObjectKey = f.ObjectKey
-		rec.SizeBytes = stat.Size
-		if stat.ContentType != "" {
-			rec.MimeType = stat.ContentType
-		}
-		rec.UpdatedAt = now
-		if err := s.repo.Update(ctx, rec); err != nil {
-			return File{}, err
-		}
-		if err := s.repo.DeleteRow(ctx, ownerID, fileID); err != nil {
-			return File{}, err
-		}
-		if err := s.quota.AddStorageUsed(ctx, ownerID, stat.Size); err != nil {
-			return File{}, err
-		}
-		return rec, nil
+		return *rec, nil
 	}
 
-	rec := *f
-	rec.Status = StatusReady
-	rec.SizeBytes = stat.Size
-	if stat.ContentType != "" {
-		rec.MimeType = stat.ContentType
-	}
-	rec.UploadExpiresAt = nil
-	rec.UpdatedAt = now
-	if err := s.repo.Update(ctx, rec); err != nil {
-		return File{}, err
-	}
-	if err := s.quota.AddStorageUsed(ctx, ownerID, stat.Size); err != nil {
+	rec, err := s.repo.CompleteUpload(ctx, ownerID, fileID, stat.Size, stat.ContentType, now)
+	if err != nil {
+		if errors.Is(err, apperr.QuotaExceeded) {
+			_ = s.markFailed(ctx, *f)
+		}
 		return File{}, err
 	}
 	s.activity.Record(ctx, ownerID, activity.TypeFileUploaded, rec.Name)
-	return rec, nil
+	return *rec, nil
 }
 
 func (s *Service) Get(ctx context.Context, ownerID, fileID string) (File, error) {

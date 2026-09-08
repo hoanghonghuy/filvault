@@ -5666,14 +5666,16 @@ watch(
 
 .message-bubble {
   position: relative;
-  max-width: min(74%, 480px);
-  padding: 8px 14px;
+  max-width: min(76%, 520px);
+  padding: 9px 15px;
   border-radius: 18px;
   background: var(--surface-card);
   color: var(--ink);
   font-size: 15px;
-  line-height: 1.36;
-  word-break: break-word;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: pre-wrap;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   cursor: pointer;
   -webkit-touch-callout: none;

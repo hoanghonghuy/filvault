@@ -213,21 +213,27 @@
 
 [data-color-theme='peach'] {
   --accent: #f472b6;
-  --accent-hover: #ec4899;
+  --accent-hover: #fb7185;
   --accent-soft: #fce7f3;
-  --surface-soft: #fff0f3;
-  --sidebar-bg: #ffe4e9;
+  --canvas: #fff5f7;
+  --surface-card: #ffffff;
+  --surface-soft: #ffe4ea;
+  --sidebar-bg: #ffdbe4;
+  --header-bg: #fff0f4;
   --hairline: #fbcfe8;
   --hairline-soft: #fdf2f8;
   --primary-cta: #f472b6;
-  --primary-cta-hover: #ec4899;
+  --primary-cta-hover: #fb7185;
 }
 [data-theme='dark'][data-color-theme='peach'] {
   --accent: #f472b6;
   --accent-hover: #f9a8d4;
   --accent-soft: rgba(244, 114, 182, 0.18);
-  --surface-soft: #180d12;
-  --sidebar-bg: #201018;
+  --canvas: #160b10;
+  --surface-card: #1f1018;
+  --surface-soft: #281420;
+  --sidebar-bg: #221019;
+  --header-bg: #1c0e15;
   --hairline: #381a29;
   --hairline-soft: #28141e;
   --on-accent: #ffffff;
@@ -237,9 +243,11 @@
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-soft: #f5f3ff;
-  --surface-soft: #fbf8ff;
-  --sidebar-bg: #f3e8ff;
-  --header-bg: #ffffff;
+  --canvas: #faf5ff;
+  --surface-card: #ffffff;
+  --surface-soft: #f3e8ff;
+  --sidebar-bg: #edd9ff;
+  --header-bg: #f6eeff;
   --hairline: #e9d5ff;
   --hairline-soft: #f5f3ff;
   --primary-cta: #7c3aed;
@@ -347,10 +355,12 @@
   --accent: #db2777;
   --accent-hover: #be185d;
   --accent-soft: #fdf2f8;
-  --surface-soft: #fdf2f8;
-  --sidebar-bg: #fce7f3;
-  --header-bg: #ffffff;
-  --hairline: #fbcfe8;
+  --canvas: #fdf4f9;
+  --surface-card: #ffffff;
+  --surface-soft: #fce7f3;
+  --sidebar-bg: #fbcfe8;
+  --header-bg: #fdf0f7;
+  --hairline: #f9a8d4;
   --hairline-soft: #fdf2f8;
 }
 [data-theme='dark'][data-color-theme='spring'] {
@@ -389,10 +399,12 @@
   --accent: #ea580c;
   --accent-hover: #c2410c;
   --accent-soft: #fff7ed;
-  --surface-soft: #fff7ed;
-  --sidebar-bg: #ffedd5;
-  --header-bg: #ffffff;
-  --hairline: #fed7aa;
+  --canvas: #fffaf5;
+  --surface-card: #ffffff;
+  --surface-soft: #ffedd5;
+  --sidebar-bg: #fed7aa;
+  --header-bg: #fff5eb;
+  --hairline: #fdba74;
   --hairline-soft: #fff7ed;
 }
 [data-theme='dark'][data-color-theme='autumn'] {

@@ -42,7 +42,7 @@ const storagePercent = computed(() => {
 const quickCategories = computed(() => [
   { to: '/files', label: t.value.myFiles, icon: 'folder', color: '#f59e0b' },
   { to: '/photos', label: t.value.navPhotos, icon: 'photos', color: '#10b981' },
-  { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos, icon: 'video', color: '#8b5cf6' },
+  { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos || 'Video', icon: 'video', color: '#8b5cf6' },
   { to: { path: '/files', query: { view: 'favorites' } }, label: t.value.tabFavorites, icon: 'star', color: '#eab308' },
   { to: '/shared', label: t.value.sharedWithMe, icon: 'users', color: '#06b6d4' },
   { to: '/vault', label: t.value.personalVault, icon: 'lock', color: '#6366f1' },

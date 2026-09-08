@@ -213,6 +213,14 @@ export function uploadToPresigned(
     try {
       xhr.open('PUT', targetUrl)
       xhr.setRequestHeader('Content-Type', contentType)
+      try {
+        const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')
+        if (parsed.host) {
+          xhr.setRequestHeader('X-Presigned-Host', parsed.host)
+        }
+      } catch {
+        // ignore URL parsing error
+      }
       xhr.send(file)
     } catch (err) {
       cleanup()
