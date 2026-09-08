@@ -17,8 +17,10 @@ import LoadingSkeletonChatRail from '@/components/LoadingSkeletonChatRail.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
+import ChatBubblePickerModal from '@/components/ChatBubblePickerModal.vue'
 import { resolveContentType } from '@/lib/mimeIcon'
 import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
+import { getBubbleStyle, activeBubbleStyleId, type ChatBubbleStyle } from '@/lib/chatBubbles'
 import { userInitials } from '@/lib/userInitials'
 import {
   STICKERS,
@@ -90,6 +92,20 @@ const chatThemes = [
 const activeTheme = ref<string>('blue')
 const currentTheme = computed(() => chatThemes.find((entry) => entry.id === activeTheme.value) ?? chatThemes[0]!)
 const activeWallpaperTheme = ref<WallpaperTheme | null>(null)
+
+const bubblePickerOpen = ref(false)
+const currentBubbleStyle = computed<ChatBubbleStyle>(() => getBubbleStyle(activeBubbleStyleId.value))
+
+function outgoingBubbleStyle(message: ChatMessage) {
+  if (message.senderId !== auth.user?.id) return undefined
+  if (isStickerMessage(message.body) || message.body === '👍') return undefined
+  if (currentBubbleStyle.value.id === 'default') return undefined
+  return {
+    background: currentBubbleStyle.value.bg,
+    color: currentBubbleStyle.value.color,
+    border: currentBubbleStyle.value.border || 'none',
+  }
+}
 
 const threadThemeStyle = computed(() => {
   const theme = activeWallpaperTheme.value
@@ -2313,6 +2329,7 @@ watch(
                       'has-sticker': isStickerMessage(message.body),
                       'has-reactions': message.reactions && message.reactions.length > 0,
                     }"
+                    :style="outgoingBubbleStyle(message)"
                     @touchstart.passive="onMessageTouch($event, message)"
                     @touchmove.passive="onMessageTouchMove($event)"
                     @touchend="onMessageTouchEnd"
@@ -2320,6 +2337,16 @@ watch(
                     @contextmenu.prevent="openMessageMenu(message, $event.currentTarget as HTMLElement)"
                     @click="handleMessageBubbleClick(message)"
                   >
+                    <!-- Decorations for custom bubble style -->
+                    <template v-if="message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && !isStickerMessage(message.body) && message.body !== '👍'">
+                      <div
+                        v-for="(dec, dIdx) in currentBubbleStyle.decorations"
+                        :key="dIdx"
+                        class="bubble-decoration"
+                        :class="`dec-${dec.position}`"
+                        v-html="dec.svg"
+                      />
+                    </template>
                     <!-- Heart burst pop animation on double-tap -->
                     <div v-if="activeBurstMessageId === message.id" class="heart-burst" aria-hidden="true">
                       ❤️
@@ -2429,8 +2456,19 @@ watch(
                     'has-like': pendingMessage.body === '👍',
                     'has-sticker': isStickerMessage(pendingMessage.body)
                   }"
+                  :style="outgoingBubbleStyle({ senderId: auth.user?.id, body: pendingMessage.body } as any)"
                   aria-live="polite"
                 >
+                  <!-- Decorations for custom bubble style -->
+                  <template v-if="currentBubbleStyle.id !== 'default' && !isStickerMessage(pendingMessage.body) && pendingMessage.body !== '👍'">
+                    <div
+                      v-for="(dec, dIdx) in currentBubbleStyle.decorations"
+                      :key="dIdx"
+                      class="bubble-decoration"
+                      :class="`dec-${dec.position}`"
+                      v-html="dec.svg"
+                    />
+                  </template>
                   <p v-if="isStickerMessage(pendingMessage.body)" class="sticker-bubble">{{ parseStickerSymbol(pendingMessage.body) }}</p>
                   <p v-else :class="{ 'like-bubble': pendingMessage.body === '👍' }">{{ pendingMessage.body }}</p>
                   <span v-if="pendingMessageError" class="message-status">{{ pendingMessageError }}</span>
@@ -2791,6 +2829,13 @@ watch(
                 <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
                 <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
                 <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+
+              <button type="button" class="menu-row-item" @click="bubblePickerOpen = true">
+                <span class="menu-item-icon badge-theme"><Icon name="chat" :size="18" /></span>
+                <span class="menu-item-text">{{ t.chatBubbleStyle || 'Kiểu bong bóng' }}</span>
+                <span class="menu-badge">{{ currentBubbleStyle.name }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
@@ -3698,6 +3743,13 @@ watch(
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
+              <button type="button" class="menu-row-item" @click="bubblePickerOpen = true">
+                <span class="menu-item-icon badge-theme"><Icon name="chat" :size="18" /></span>
+                <span class="menu-item-text">{{ t.chatBubbleStyle || 'Kiểu bong bóng' }}</span>
+                <span class="menu-badge">{{ currentBubbleStyle.name }}</span>
+                <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
+              </button>
+
               <button type="button" class="menu-row-item" @click="changeNickname">
                 <span class="menu-item-icon badge-folder"><Icon name="pencil" :size="18" /></span>
                 <span class="menu-item-text">{{ t.changeNickname }}</span>
@@ -4097,6 +4149,12 @@ watch(
         </div>
       </div>
     </BottomSheet>
+
+    <!-- Modal Chọn kiểu bong bóng -->
+    <ChatBubblePickerModal
+      :open="bubblePickerOpen"
+      @close="bubblePickerOpen = false"
+    />
   </div>
 </template>
 
@@ -5179,6 +5237,60 @@ watch(
 .message-bubble.outgoing {
   background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
   color: #ffffff;
+}
+
+/* Bubble decorations */
+.bubble-decoration {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dec-top-left {
+  top: -14px;
+  left: 6px;
+}
+
+.dec-top-right {
+  top: -14px;
+  right: 6px;
+}
+
+.dec-bottom-left {
+  bottom: -10px;
+  left: 6px;
+}
+
+.dec-bottom-right {
+  bottom: -10px;
+  right: 6px;
+}
+
+.dec-left {
+  left: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dec-right {
+  right: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dec-top {
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dec-bottom {
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 /* Incoming bubble corners */
