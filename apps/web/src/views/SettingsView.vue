@@ -339,18 +339,26 @@ onMounted(() => {
 
       <div class="theme-entry-divider"></div>
 
-      <div class="theme-entry-row">
-        <div class="theme-entry-text">
-          <span class="theme-entry-label">{{ t.themeTitle }}</span>
-          <span class="theme-current-name">{{ (t as any)[currentThemeDef.nameKey] || currentThemeDef.nameDefault }}</span>
+      <!-- Theme Entry Tile -->
+      <RouterLink to="/settings/theme" class="theme-tile-link">
+        <div class="theme-tile-info">
+          <div class="theme-tile-header">
+            <span class="theme-tile-label">{{ t.themeTitle }}</span>
+            <span class="theme-current-pill">
+              <span class="theme-dot" :style="{ background: currentThemeDef.swatchGradient }"></span>
+              {{ (t as any)[currentThemeDef.nameKey] || currentThemeDef.nameDefault }}
+            </span>
+          </div>
+          <span class="theme-tile-hint">{{ t.themeColorPalette }}</span>
         </div>
-        <RouterLink to="/settings/theme" class="btn ink theme-browse-btn">
-          <span>{{ t.seeAll }}</span>
-          <Icon name="arrow-right" :size="16" />
-        </RouterLink>
-      </div>
+        <div class="theme-tile-action">
+          <span class="theme-action-text">{{ t.seeAll }}</span>
+          <Icon name="arrow-right" :size="15" />
+        </div>
+      </RouterLink>
 
-      <div class="quick-swatches-strip" role="radiogroup" aria-label="Quick themes">
+      <!-- Quick Swatches Grid (balanced 6 columns, no clipping) -->
+      <div class="quick-swatches-grid" role="radiogroup" aria-label="Quick themes">
         <button
           v-for="th in THEMES.slice(0, 6)"
           :key="th.id"
@@ -362,8 +370,8 @@ onMounted(() => {
           :aria-label="(t as any)[th.nameKey] || th.nameDefault"
           @click="applyColorTheme(th.id)"
         >
-          <span v-if="currentColorTheme === th.id" class="quick-swatch-check">
-            <Icon name="check" :size="12" />
+          <span v-if="currentColorTheme === th.id" class="quick-swatch-check" aria-hidden="true">
+            <Icon name="check" :size="10" />
           </span>
         </button>
       </div>
@@ -885,58 +893,91 @@ onMounted(() => {
   margin: var(--space-md) 0 var(--space-sm);
 }
 
-.theme-entry-row {
+.theme-tile-link {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 6px 0;
+  text-decoration: none;
+  color: inherit;
   margin-bottom: var(--space-xs);
+  transition: opacity var(--duration-short) var(--ease-standard);
 }
 
-.theme-entry-text {
+.theme-tile-link:hover {
+  opacity: 0.8;
+}
+
+.theme-tile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-tile-header {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
 }
 
-.theme-entry-label {
+.theme-tile-label {
   font-weight: 600;
   font-size: 0.9375rem;
   color: var(--ink);
 }
 
-.theme-current-name {
-  font-size: 0.8125rem;
+.theme-current-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--surface-soft);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline);
+}
+
+.theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-tile-hint {
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
-.theme-browse-btn {
+.theme-tile-action {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  color: var(--accent);
   font-size: 0.8125rem;
-  padding: 4px 10px;
+  font-weight: 600;
 }
 
-.quick-swatches-strip {
-  display: flex;
-  align-items: center;
+.quick-swatches-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-xs);
-  padding: var(--space-xxs) 0;
-  overflow-x: auto;
+  padding: 4px 2px;
 }
 
 .quick-swatch {
   position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  max-width: 44px;
+  margin: 0 auto;
+  border-radius: 12px;
   border: none;
   cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  padding: 0;
   transition: transform var(--duration-short) var(--ease-standard);
 }
 
@@ -949,15 +990,18 @@ onMounted(() => {
 }
 
 .quick-swatch-check {
-  width: 16px;
-  height: 16px;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #ffffff;
   color: #111827;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {
