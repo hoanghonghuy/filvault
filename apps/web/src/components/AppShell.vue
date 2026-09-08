@@ -449,7 +449,7 @@ const navLabels = computed<Record<string, string>>(() => ({
     width: 220px;
     flex-shrink: 0;
     padding: var(--space-lg) var(--space-md);
-    background: var(--canvas);
+    background: var(--sidebar-bg, var(--canvas));
     border-right: 1px solid var(--hairline);
     overflow-y: auto;
   }

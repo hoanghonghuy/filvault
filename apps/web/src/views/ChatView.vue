@@ -2333,6 +2333,10 @@ watch(
                       'has-like': message.body === '👍',
                       'has-sticker': isStickerMessage(message.body),
                       'has-reactions': message.reactions && message.reactions.length > 0,
+                      'has-dec-left': message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && isFirstInCluster(index) && currentBubbleStyle.decorations.some(d => d.position === 'left'),
+                      'has-dec-right': message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && isFirstInCluster(index) && currentBubbleStyle.decorations.some(d => d.position === 'right'),
+                      'has-dec-top': message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && isFirstInCluster(index) && currentBubbleStyle.decorations.some(d => d.position.startsWith('top')),
+                      'has-dec-bottom': message.senderId === auth.user?.id && currentBubbleStyle.id !== 'default' && isFirstInCluster(index) && currentBubbleStyle.decorations.some(d => d.position.startsWith('bottom')),
                     }"
                     :style="outgoingBubbleStyle(message)"
                     @touchstart.passive="onMessageTouch($event, message)"
@@ -2817,8 +2821,10 @@ watch(
             </button>
             <div v-show="infoSectionsOpen.customization" class="menu-items-group">
               <div class="theme-picker-row">
-                <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
-                <span class="menu-item-text">{{ t.themeColor }}</span>
+                <div class="theme-picker-header">
+                  <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
+                  <span class="menu-item-text">{{ t.themeColor }}</span>
+                </div>
                 <div class="theme-dots">
                   <button
                     v-for="th in chatThemes"
@@ -3728,8 +3734,10 @@ watch(
             </button>
             <div v-show="infoSectionsOpen.customization" class="menu-items-group">
               <div class="theme-picker-row">
-                <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
-                <span class="menu-item-text">{{ t.themeColor }}</span>
+                <div class="theme-picker-header">
+                  <span class="menu-item-icon badge-theme"><Icon name="palette" :size="18" /></span>
+                  <span class="menu-item-text">{{ t.themeColor }}</span>
+                </div>
                 <div class="theme-dots">
                   <button
                     v-for="th in chatThemes"
@@ -4162,6 +4170,7 @@ watch(
     <!-- Modal Chọn kiểu bong bóng -->
     <ChatBubblePickerModal
       :open="bubblePickerOpen"
+      @saved="bubblePickerOpen = false"
       @close="bubblePickerOpen = false"
     />
   </div>
@@ -4199,7 +4208,7 @@ watch(
 .chat-rail {
   display: flex;
   flex-direction: column;
-  background: var(--canvas);
+  background: var(--sidebar-bg, var(--canvas));
   border-right: 1px solid var(--hairline);
 }
 
@@ -4216,11 +4225,15 @@ watch(
 
 .rail-header h1 {
   flex: 1;
+  min-width: 0;
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rail-filter {
@@ -5317,6 +5330,22 @@ watch(
   transform: translateX(-50%);
 }
 
+.message-bubble.has-dec-left {
+  padding-left: 36px;
+}
+
+.message-bubble.has-dec-right {
+  padding-right: 36px;
+}
+
+.message-bubble.has-dec-top {
+  padding-top: 12px;
+}
+
+.message-bubble.has-dec-bottom {
+  padding-bottom: 12px;
+}
+
 /* Incoming bubble corners */
 .message-row:not(.outgoing).cluster-single .message-bubble {
   border-radius: 18px;
@@ -6084,20 +6113,33 @@ img.avatar-img {
 
 .theme-picker-row {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.theme-picker-header {
+  display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--hairline);
+}
+
+.theme-picker-header .menu-item-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .theme-dots {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 170px;
-  margin-left: auto;
+  padding-left: 36px;
+  max-width: 100%;
 }
 
 .theme-dot {
@@ -6776,6 +6818,8 @@ img.avatar-img {
   padding: 4px 8px 4px 2px;
   border-radius: var(--radius-sm);
   transition: background 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .subpage-back-btn:hover {
@@ -6783,9 +6827,15 @@ img.avatar-img {
 }
 
 .subpage-title {
+  flex: 1;
+  min-width: 0;
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 
 .subpage-close-btn {

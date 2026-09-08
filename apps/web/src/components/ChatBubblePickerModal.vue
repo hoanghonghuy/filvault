@@ -77,6 +77,12 @@ function handleCancel() {
             <div class="preview-stage">
               <div
                 class="preview-bubble"
+                :class="{
+                  'has-dec-left': activeStyle.decorations.some(d => d.position === 'left'),
+                  'has-dec-right': activeStyle.decorations.some(d => d.position === 'right'),
+                  'has-dec-top': activeStyle.decorations.some(d => d.position.startsWith('top')),
+                  'has-dec-bottom': activeStyle.decorations.some(d => d.position.startsWith('bottom')),
+                }"
                 :style="{
                   background: activeStyle.bg,
                   color: activeStyle.color,
@@ -255,6 +261,22 @@ function handleCancel() {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transition: background 0.2s ease, color 0.2s ease;
   word-break: break-word;
+}
+
+.preview-bubble.has-dec-left {
+  padding-left: 42px;
+}
+
+.preview-bubble.has-dec-right {
+  padding-right: 42px;
+}
+
+.preview-bubble.has-dec-top {
+  padding-top: 16px;
+}
+
+.preview-bubble.has-dec-bottom {
+  padding-bottom: 16px;
 }
 
 .preview-text {
