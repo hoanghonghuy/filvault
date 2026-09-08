@@ -162,6 +162,10 @@ const icons: Record<string, string[]> = {
     'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2',
     'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   ],
+  crown: [
+    'M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z',
+    'M3 20h18v-2H3v2z',
+  ],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.file)

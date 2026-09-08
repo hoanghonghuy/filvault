@@ -13,6 +13,11 @@ if (savedTheme === 'dark') {
   delete document.documentElement.dataset.theme
 }
 
+const savedColorTheme = localStorage.getItem('filvault.colorTheme')
+if (savedColorTheme) {
+  document.documentElement.dataset.colorTheme = savedColorTheme
+}
+
 const app = createApp(App)
 
 app.use(createPinia())

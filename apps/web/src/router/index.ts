@@ -36,6 +36,7 @@ const router = createRouter({
       meta: { auth: true, verified: true },
     },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true, verified: true } },
+    { path: '/settings/theme', name: 'theme', component: () => import('@/views/ThemeView.vue'), meta: { auth: true, verified: true } },
     { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { auth: true, verified: true } },
     {
       path: '/s/:token',

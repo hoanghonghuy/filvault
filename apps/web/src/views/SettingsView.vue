@@ -9,10 +9,15 @@ import Icon from '@/components/AppIcon.vue'
 import { userInitials } from '@/lib/userInitials'
 import type { ActivityEvent, ActivityEventType, ShareLinkInfo, User } from '@/api/types'
 import { setLocale, useI18n, type Locale } from '@/lib/i18n'
+import { THEMES, useTheme } from '@/lib/theme'
 
 const auth = useAuthStore()
 const ui = useUiStore()
 const { locale, t } = useI18n()
+const { currentColorTheme, applyColorTheme } = useTheme()
+const currentThemeDef = computed(
+  () => THEMES.find((item) => item.id === currentColorTheme.value) || THEMES[0],
+)
 
 const storageUsed = computed(() => auth.user?.storageUsed ?? 0)
 const storageQuota = computed(() => auth.user?.storageQuota ?? 10 * 1024 * 1024 * 1024)
@@ -331,6 +336,37 @@ onMounted(() => {
         </button>
       </div>
       <p class="field-hint">{{ t.languageHint }}</p>
+
+      <div class="theme-entry-divider"></div>
+
+      <div class="theme-entry-row">
+        <div class="theme-entry-text">
+          <span class="theme-entry-label">{{ t.themeTitle }}</span>
+          <span class="theme-current-name">{{ (t as any)[currentThemeDef.nameKey] || currentThemeDef.nameDefault }}</span>
+        </div>
+        <RouterLink to="/settings/theme" class="btn ink theme-browse-btn">
+          <span>{{ t.seeAll }}</span>
+          <Icon name="arrow-right" :size="16" />
+        </RouterLink>
+      </div>
+
+      <div class="quick-swatches-strip" role="radiogroup" aria-label="Quick themes">
+        <button
+          v-for="th in THEMES.slice(0, 6)"
+          :key="th.id"
+          type="button"
+          class="quick-swatch"
+          :class="{ active: currentColorTheme === th.id }"
+          :style="{ background: th.swatchGradient }"
+          :title="(t as any)[th.nameKey] || th.nameDefault"
+          :aria-label="(t as any)[th.nameKey] || th.nameDefault"
+          @click="applyColorTheme(th.id)"
+        >
+          <span v-if="currentColorTheme === th.id" class="quick-swatch-check">
+            <Icon name="check" :size="12" />
+          </span>
+        </button>
+      </div>
     </section>
 
     <section class="card section">
@@ -841,6 +877,87 @@ onMounted(() => {
   font-weight: 500;
   text-align: center;
   white-space: nowrap;
+}
+
+.theme-entry-divider {
+  height: 1px;
+  background: var(--hairline);
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+.theme-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xs);
+}
+
+.theme-entry-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.theme-entry-label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+
+.theme-current-name {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.theme-browse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  padding: 4px 10px;
+}
+
+.quick-swatches-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xxs) 0;
+  overflow-x: auto;
+}
+
+.quick-swatch {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform var(--duration-short) var(--ease-standard);
+}
+
+.quick-swatch:active {
+  transform: scale(0.92);
+}
+
+.quick-swatch.active {
+  box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+}
+
+.quick-swatch-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 @media (prefers-reduced-motion: reduce) {
