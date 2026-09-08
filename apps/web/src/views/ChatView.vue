@@ -948,7 +948,9 @@ function startRailResize(e: PointerEvent) {
 
   const onPointerMove = (moveEv: PointerEvent) => {
     const delta = moveEv.clientX - startX
-    const newW = Math.max(MIN_RAIL_WIDTH, Math.min(MAX_RAIL_WIDTH, Math.round(startW + delta)))
+    const availableWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+    const maxAllowedRail = Math.max(MIN_RAIL_WIDTH, Math.min(MAX_RAIL_WIDTH, availableWidth - (desktopInfoOpen.value ? infoWidth.value : 0) - 300))
+    const newW = Math.max(MIN_RAIL_WIDTH, Math.min(maxAllowedRail, Math.round(startW + delta)))
     railWidth.value = newW
   }
 
@@ -984,7 +986,9 @@ function startInfoResize(e: PointerEvent) {
 
   const onPointerMove = (moveEv: PointerEvent) => {
     const delta = startX - moveEv.clientX
-    const newW = Math.max(MIN_INFO_WIDTH, Math.min(MAX_INFO_WIDTH, Math.round(startW + delta)))
+    const availableWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+    const maxAllowedInfo = Math.max(MIN_INFO_WIDTH, Math.min(MAX_INFO_WIDTH, availableWidth - railWidth.value - 300))
+    const newW = Math.max(MIN_INFO_WIDTH, Math.min(maxAllowedInfo, Math.round(startW + delta)))
     infoWidth.value = newW
   }
 
@@ -2226,7 +2230,7 @@ watch(
 </script>
 
 <template>
-  <div class="chat-app" :class="{ 'in-thread': inThread }" :style="{ '--rail-w': `${railWidth}px`, '--info-w': `${infoWidth}px` }">
+  <div class="chat-app" :class="{ 'in-thread': inThread, 'resizing-col': isResizingRail || isResizingInfo }" :style="{ '--rail-w': `${railWidth}px`, '--info-w': `${infoWidth}px` }">
     <aside class="chat-rail" aria-label="Conversations">
       <!-- Left resizer splitter (Desktop only) -->
       <div

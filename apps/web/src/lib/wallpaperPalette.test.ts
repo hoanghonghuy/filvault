@@ -30,7 +30,7 @@ describe('wallpaperPalette', () => {
     expect(l2).toBe(0.5)
 
     // Cyan
-    const [h3, s3, l3] = rgbToHsl(0, 255, 255)
+    const [h3] = rgbToHsl(0, 255, 255)
     expect(h3).toBe(180)
   })
 

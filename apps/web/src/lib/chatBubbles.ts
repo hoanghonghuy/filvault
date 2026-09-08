@@ -336,7 +336,7 @@ function loadInitialBubbleStyle(): string {
 export function getBubbleStyle(id?: string | null): ChatBubbleStyle {
   const targetId = id || activeBubbleStyleId.value
   const found = CHAT_BUBBLE_STYLES.find((s) => s.id === targetId)
-  return found || CHAT_BUBBLE_STYLES[0]
+  return (found ?? CHAT_BUBBLE_STYLES[0]) as ChatBubbleStyle
 }
 
 export function setBubbleStyle(id: string): void {

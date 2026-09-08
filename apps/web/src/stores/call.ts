@@ -191,7 +191,8 @@ export const useCallStore = defineStore('call', () => {
       await r.connect(connectUrl, token)
 
       // Bail out if call was cancelled during connection
-      if (state.value === 'idle' || state.value === 'ended' || conversationId.value !== convId) {
+      const currentCallState = state.value as CallState
+      if (currentCallState === 'idle' || currentCallState === 'ended' || conversationId.value !== convId) {
         void r.disconnect()
         room.value = null
         return

@@ -84,7 +84,7 @@ describe('chat surface contract', () => {
   it('keeps mobile in the inbox until a conversation is chosen', () => {
     expect(chat).toMatch(/function isMobileViewport/)
     expect(chat).toMatch(/!isMobileViewport\(\)/)
-    expect(chat).toMatch(/class="chat-app" :class="\{ 'in-thread': inThread \}"/)
+    expect(chat).toMatch(/class="chat-app" :class="\{[^}]*'in-thread': inThread[^}]*\}"/)
     expect(chat).toMatch(/name="arrow-left"/)
   })
 

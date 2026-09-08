@@ -34,7 +34,7 @@ export function formatApiError(e: unknown, fallback: string): string {
     if (e.message && e.message.toLowerCase() !== 'conflict') {
       return e.message
     }
-    return friendly.CONFLICT
+    return friendly.CONFLICT ?? 'Name already exists in this location.'
   }
   return friendly[e.code] ?? e.message ?? fallback
 }

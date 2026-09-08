@@ -1,4 +1,5 @@
 import type { ApiErrorBody, Session } from './types'
+import { normalizePresignedUrl } from '@/lib/presignedUrl'
 
 export const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||

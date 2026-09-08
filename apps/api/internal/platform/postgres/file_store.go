@@ -261,6 +261,13 @@ func (s *Store) CompleteReplaceUpload(ctx context.Context, ownerID, pendingFileI
 		return nil, err
 	}
 
+	// Delete the pending row first to free up pending.ObjectKey before updating target
+	// to avoid duplicate key error on files_object_key_key unique constraint.
+	_, err = tx.Exec(ctx, `DELETE FROM files WHERE id = $1 AND owner_id = $2`, pendingFileID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+
 	var updated file.File
 	err = tx.QueryRow(ctx, `
 		UPDATE files
@@ -277,11 +284,6 @@ func (s *Store) CompleteReplaceUpload(ctx context.Context, ownerID, pendingFileI
 		&updated.MimeType, &updated.SizeBytes, &updated.Status, &updated.CreatedAt, &updated.UpdatedAt, &updated.DeletedAt, &updated.UploadExpiresAt, &updated.ReplacesFileID,
 		&updated.Source, &updated.SourceRefID,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = tx.Exec(ctx, `DELETE FROM files WHERE id = $1 AND owner_id = $2`, pendingFileID, ownerID)
 	if err != nil {
 		return nil, err
 	}

@@ -9,14 +9,15 @@ import Icon from '@/components/AppIcon.vue'
 import { userInitials } from '@/lib/userInitials'
 import type { ActivityEvent, ActivityEventType, ShareLinkInfo, User } from '@/api/types'
 import { setLocale, useI18n, type Locale } from '@/lib/i18n'
-import { THEMES, useTheme } from '@/lib/theme'
+import { THEMES, useTheme, type ThemeDef } from '@/lib/theme'
 
 const auth = useAuthStore()
 const ui = useUiStore()
 const { locale, t } = useI18n()
 const { currentColorTheme, applyColorTheme } = useTheme()
-const currentThemeDef = computed(
-  () => THEMES.find((item) => item.id === currentColorTheme.value) || THEMES[0],
+const fallbackTheme = THEMES[0] as ThemeDef
+const currentThemeDef = computed<ThemeDef>(
+  () => THEMES.find((item) => item.id === currentColorTheme.value) ?? fallbackTheme,
 )
 
 const storageUsed = computed(() => auth.user?.storageUsed ?? 0)
