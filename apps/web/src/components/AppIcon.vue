@@ -147,6 +147,13 @@ const icons: Record<string, string[]> = {
     'm15 3 6 6',
     'M10 14 21 3',
   ],
+  cloud: [
+    'M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z',
+  ],
+  lock: [
+    'M5 11a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z',
+    'M8 11V7a4 4 0 0 1 8 0v4',
+  ],
 }
 
 const paths = computed(() => icons[props.name] ?? icons.file)
