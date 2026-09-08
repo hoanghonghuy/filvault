@@ -363,6 +363,7 @@ function switchStoragePickerTab(tab: 'chat' | 'personal') {
 
 async function selectPhotoFromChatMedia(photo: ChatAttachment) {
   if (!selectedConversation.value) return
+  storagePickerOpen.value = false
   const convId = selectedConversation.value.id
   let photoUrl = photo.thumbnailUrl
   if (!photoUrl || photoUrl.startsWith('/api')) {
@@ -387,12 +388,12 @@ async function selectPhotoFromChatMedia(photo: ChatAttachment) {
   }
   addCustomWallpaperToConversation(convId, customItem)
   setConversationWallpaper(convId, photoUrl)
-  storagePickerOpen.value = false
   ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
 }
 
 async function selectPhotoFromPersonalStorage(item: TimelineItem) {
   if (!selectedConversation.value) return
+  storagePickerOpen.value = false
   const convId = selectedConversation.value.id
   let photoUrl = item.thumbnailUrl
   try {
@@ -415,7 +416,6 @@ async function selectPhotoFromPersonalStorage(item: TimelineItem) {
   }
   addCustomWallpaperToConversation(convId, customItem)
   setConversationWallpaper(convId, photoUrl)
-  storagePickerOpen.value = false
   ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
 }
 
