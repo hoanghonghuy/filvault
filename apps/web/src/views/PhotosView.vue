@@ -394,7 +394,6 @@ onBeforeUnmount(() => {
         @close="lightboxOpen = false"
       />
     </div>
-  </div>
 </template>
 
 <style scoped>

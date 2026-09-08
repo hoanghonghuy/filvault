@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import Icon from '@/components/AppIcon.vue'
+import { userInitials } from '@/lib/userInitials'
 import type { ActivityEvent, ActivityEventType, ShareLinkInfo, User } from '@/api/types'
 import { setLocale, useI18n, type Locale } from '@/lib/i18n'
 
 const auth = useAuthStore()
 const ui = useUiStore()
 const { locale, t } = useI18n()
+
+const storageUsed = computed(() => auth.user?.storageUsed ?? 0)
+const storageQuota = computed(() => auth.user?.storageQuota ?? 10 * 1024 * 1024 * 1024)
+const storagePercent = computed(() => {
+  if (!storageQuota.value) return 0
+  return Math.min(100, Math.round((storageUsed.value / storageQuota.value) * 100))
+})
+const avatarInitials = computed(() =>
+  userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
+)
 
 const imageThumbnailsEnabled = ref(auth.user?.imageThumbnailsEnabled ?? true)
 const videoThumbnailsEnabled = ref(auth.user?.videoThumbnailsEnabled ?? true)
@@ -217,9 +228,81 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="settings-page">
     <h1 class="page-title desktop-only">{{ t.settingsTitle }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+
+    <!-- Profile Header Card (TeraBox style) -->
+    <section class="card profile-header-card">
+      <div class="profile-header-main">
+        <div class="profile-avatar-box">
+          <img
+            v-if="auth.user?.avatarUrl"
+            :src="auth.user.avatarUrl"
+            :alt="auth.user.displayName || 'Avatar'"
+            class="profile-avatar-img"
+          />
+          <span v-else class="profile-avatar-initials">{{ avatarInitials }}</span>
+        </div>
+        <div class="profile-meta">
+          <div class="profile-name-row">
+            <h2 class="profile-name">{{ auth.user?.displayName || auth.user?.email || 'Người dùng Filvault' }}</h2>
+            <span class="pro-badge">PRO</span>
+          </div>
+          <p class="profile-email muted">{{ auth.user?.email }}</p>
+        </div>
+        <RouterLink to="/profile" class="profile-arrow-link" :title="t.profile" :aria-label="t.profile">
+          <Icon name="arrow-right" :size="18" />
+        </RouterLink>
+      </div>
+    </section>
+
+    <!-- Storage Card & Shortcuts (TeraBox style "Đám mây của tôi") -->
+    <section class="card storage-card">
+      <div class="storage-card-header">
+        <div class="storage-title-wrap">
+          <Icon name="cloud" :size="20" class="storage-cloud-icon" />
+          <span class="storage-title">{{ t.myCloud }}</span>
+        </div>
+        <span class="storage-stats-text">
+          <strong>{{ formatBytes(storageUsed) }}</strong> / {{ formatBytes(storageQuota) }}
+        </span>
+      </div>
+
+      <div class="storage-bar-track">
+        <div class="storage-bar-fill" :style="{ width: `${storagePercent}%` }"></div>
+      </div>
+
+      <div class="storage-shortcuts-grid">
+        <RouterLink to="/files" class="shortcut-item">
+          <div class="shortcut-icon-box files-icon">
+            <Icon name="folder" :size="22" />
+          </div>
+          <span class="shortcut-label">{{ t.navFiles }}</span>
+        </RouterLink>
+
+        <RouterLink to="/shared" class="shortcut-item">
+          <div class="shortcut-icon-box shared-icon">
+            <Icon name="share" :size="22" />
+          </div>
+          <span class="shortcut-label">{{ t.navShared }}</span>
+        </RouterLink>
+
+        <RouterLink to="/trash" class="shortcut-item">
+          <div class="shortcut-icon-box trash-icon">
+            <Icon name="trash" :size="22" />
+          </div>
+          <span class="shortcut-label">{{ t.navTrash }}</span>
+        </RouterLink>
+
+        <RouterLink to="/files?view=favorites" class="shortcut-item">
+          <div class="shortcut-icon-box fav-icon">
+            <Icon name="star-filled" :size="22" />
+          </div>
+          <span class="shortcut-label">{{ t.tabFavorites }}</span>
+        </RouterLink>
+      </div>
+    </section>
 
     <section class="card section">
       <h2 class="section-title">{{ t.appearance }}</h2>
@@ -248,20 +331,6 @@ onMounted(() => {
         </button>
       </div>
       <p class="field-hint">{{ t.languageHint }}</p>
-    </section>
-
-    <section class="card section profile-shortcut-section">
-      <div class="profile-shortcut-row">
-        <div class="profile-shortcut-text">
-          <h2 class="section-title">{{ t.profile }}</h2>
-          <p class="profile-shortcut-name">{{ auth.user?.displayName || auth.user?.email || 'Your account' }}</p>
-          <p class="muted">{{ auth.user?.email }}</p>
-        </div>
-        <RouterLink to="/profile" class="btn ink profile-shortcut-btn">
-          <span>{{ t.profile }}</span>
-          <Icon name="arrow-right" :size="16" />
-        </RouterLink>
-      </div>
     </section>
 
     <section class="card section">
@@ -551,24 +620,227 @@ onMounted(() => {
   }
 }
 
-.profile-shortcut-row {
+.settings-page {
+  padding-bottom: var(--space-xl);
+}
+
+.profile-header-card {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+}
+
+.profile-header-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-md);
 }
 
-.profile-shortcut-name {
-  margin: 0 0 2px;
-  font-weight: 600;
+.profile-avatar-box {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2);
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-initials {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.profile-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.profile-name {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pro-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.profile-email {
+  margin: 2px 0 0;
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-arrow-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  color: var(--muted);
+  flex-shrink: 0;
+  text-decoration: none;
+  transition: transform var(--duration-short) var(--ease-standard), background-color var(--duration-short) var(--ease-standard);
+}
+
+.profile-arrow-link:hover {
+  color: var(--ink);
+  background: var(--hairline-soft);
+}
+
+/* Storage card */
+.storage-card {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+}
+
+.storage-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.storage-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.storage-cloud-icon {
+  color: var(--accent);
+}
+
+.storage-title {
+  font-weight: 700;
+  font-size: 0.9375rem;
   color: var(--ink);
 }
 
-.profile-shortcut-btn {
-  display: inline-flex;
+.storage-stats-text {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.storage-stats-text strong {
+  color: var(--ink);
+}
+
+.storage-bar-track {
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--hairline);
+  overflow: hidden;
+  margin-bottom: var(--space-md);
+}
+
+.storage-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, #0284c7 0%, #0d9488 100%);
+  transition: width var(--duration-medium) var(--ease-standard);
+}
+
+.storage-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--hairline);
+}
+
+.shortcut-item {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  text-decoration: none;
+  color: var(--ink);
+  padding: var(--space-xs) 0;
+  border-radius: var(--radius-lg);
+  transition: background-color var(--duration-short) var(--ease-standard);
+}
+
+.shortcut-item:hover {
+  background: var(--surface-soft);
+}
+
+.shortcut-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.files-icon {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.shared-icon {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+}
+
+.trash-icon {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.fav-icon {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.shortcut-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
