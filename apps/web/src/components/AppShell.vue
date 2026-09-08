@@ -51,6 +51,7 @@ const pageTitle = computed(() =>
     album: t.value.album,
     chat: t.value.chat,
     shared: t.value.sharedWithMe,
+    vault: t.value.vaultTitle,
   }),
 )
 const showShell = computed(() => auth.isAuthenticated && auth.isVerified && !route.meta.bare)

@@ -45,7 +45,7 @@ const quickCategories = computed(() => [
   { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos, icon: 'video', color: '#8b5cf6' },
   { to: { path: '/files', query: { view: 'favorites' } }, label: t.value.tabFavorites, icon: 'star', color: '#eab308' },
   { to: '/shared', label: t.value.sharedWithMe, icon: 'users', color: '#06b6d4' },
-  { to: '/files', label: t.value.personalVault, icon: 'lock', color: '#6366f1' },
+  { to: '/vault', label: t.value.personalVault, icon: 'lock', color: '#6366f1' },
   { to: '/trash', label: t.value.navTrash, icon: 'trash', color: '#ef4444' },
   { to: '/settings', label: t.value.navSettings, icon: 'settings', color: '#64748b' },
 ])

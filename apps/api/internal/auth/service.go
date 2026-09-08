@@ -223,6 +223,14 @@ func (s *Service) PatchMe(
 	return s.Me(ctx, userID)
 }
 
+func (s *Service) VerifyPassword(ctx context.Context, userID, password string) (bool, error) {
+	u, err := s.Me(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return verifyPassword(u.PasswordHash, password), nil
+}
+
 func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) (Session, error) {
 	if currentPassword == "" || len(newPassword) < config.MinPasswordLength {
 		return Session{}, apperr.Validation

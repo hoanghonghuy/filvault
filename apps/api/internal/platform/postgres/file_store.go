@@ -174,7 +174,7 @@ func (s *Store) ListFavorites(ctx context.Context, ownerID string, limit int) ([
 		SELECT f.id, f.name, f.mime_type, f.size_bytes, f.updated_at, fav.created_at
 		FROM favorites fav
 		JOIN files f ON f.id = fav.file_id
-		WHERE fav.owner_id = $1 AND f.deleted_at IS NULL AND f.status = 'READY'
+		WHERE fav.owner_id = $1 AND f.deleted_at IS NULL AND f.status = 'READY' AND f.is_vault = FALSE
 		ORDER BY fav.created_at DESC
 		LIMIT $2
 	`, ownerID, limit)

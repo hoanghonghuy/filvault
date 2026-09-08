@@ -88,7 +88,7 @@ func (s *Store) CountAliveFolderChildren(ctx context.Context, ownerID, folderID 
 	}
 	err = s.pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM files
-		WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY'
+		WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 	`, ownerID, folderID).Scan(&files)
 	return subfolders, files, err
 }
@@ -100,14 +100,14 @@ func (s *Store) ListAliveFilesInFolder(ctx context.Context, ownerID string, fold
 		rows, err = s.pool.Query(ctx, `
 			SELECT id, name, mime_type, size_bytes, updated_at
 			FROM files
-			WHERE owner_id = $1 AND folder_id IS NULL AND deleted_at IS NULL AND status = 'READY'
+			WHERE owner_id = $1 AND folder_id IS NULL AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 			ORDER BY name
 		`, ownerID)
 	} else {
 		rows, err = s.pool.Query(ctx, `
 			SELECT id, name, mime_type, size_bytes, updated_at
 			FROM files
-			WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY'
+			WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 			ORDER BY name
 		`, ownerID, *folderID)
 	}

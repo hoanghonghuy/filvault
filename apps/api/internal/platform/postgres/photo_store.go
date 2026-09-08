@@ -16,7 +16,7 @@ func (s *Store) ListTimelineFiles(ctx context.Context, ownerID string, before *t
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, mime_type, size_bytes, created_at, object_key
 		FROM files
-		WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'READY'
+		WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 			AND mime_type = ANY($2::text[])
 			AND ($3::timestamptz IS NULL OR created_at < $3)
 		ORDER BY created_at DESC
@@ -34,7 +34,7 @@ func (s *Store) GetPhotoFile(ctx context.Context, ownerID, fileID string) (*phot
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, name, mime_type, size_bytes, created_at, object_key
 		FROM files
-		WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL AND status = 'READY'
+		WHERE owner_id = $1 AND id = $2 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 	`, ownerID, fileID).Scan(&item.ID, &item.Name, &item.MimeType, &item.SizeBytes, &item.CreatedAt, &item.ObjectKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.NotFound

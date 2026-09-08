@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS files_vault_list;
+ALTER TABLE files DROP COLUMN IF EXISTS is_vault;
+DROP TABLE IF EXISTS user_vaults;

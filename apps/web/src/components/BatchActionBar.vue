@@ -16,6 +16,7 @@ const emit = defineEmits<{
   download: []
   move: []
   favorite: []
+  vault: []
 }>()
 
 const { t } = useI18n()
@@ -98,6 +99,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           @click="emit('move')"
         >
           <Icon name="move" :size="20" />
+        </button>
+
+        <button
+          type="button"
+          class="btn-icon"
+          :title="t.vaultMoveToVault"
+          :aria-label="t.vaultMoveToVault"
+          :disabled="selectedCount === 0"
+          @click="emit('vault')"
+        >
+          <Icon name="lock" :size="20" />
         </button>
 
         <button

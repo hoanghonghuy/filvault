@@ -811,6 +811,7 @@ async function openFileActions(file: { id: string; name: string; mimeType?: stri
     { id: 'share-user', label: 'Share with user', icon: 'users' },
     { id: 'rename', label: 'Rename', icon: 'pencil' },
     { id: 'move', label: 'Move', icon: 'move' },
+    { id: 'vault', label: 'Move to vault', icon: 'lock' },
     { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
   ])
   if (action === 'preview') await previewMediaFile({ id: file.id, name: file.name, mimeType: file.mimeType ?? '' })
@@ -827,7 +828,57 @@ async function openFileActions(file: { id: string; name: string; mimeType?: stri
   }
   if (action === 'rename') await renameFile(file.id, file.name)
   if (action === 'move') openMoveFile(file.id)
+  if (action === 'vault') await moveFileToVault(file.id, file.name)
   if (action === 'delete') await deleteFile(file.id)
+}
+
+async function moveFileToVault(id: string, name: string) {
+  const ok = await ui.confirm({
+    title: 'Chuyển vào kho cá nhân?',
+    message: `"${name}" sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.`,
+    confirmLabel: 'Chuyển vào kho',
+  })
+  if (!ok) return
+  error.value = ''
+  removeOptimistic(id)
+  try {
+    await api('/vault/items', {
+      method: 'POST',
+      body: JSON.stringify({ fileIds: [id] }),
+    })
+    ui.showToast(t.value.vaultMoveInSuccess, 'success')
+    await loadBrowser()
+  } catch (e) {
+    error.value = formatApiError(e, 'Không thể chuyển vào kho cá nhân')
+    await loadBrowser()
+  }
+}
+
+async function batchMoveToVault() {
+  const fileIds = Array.from(selectedFileIds.value)
+  if (fileIds.length === 0) return
+  const ok = await ui.confirm({
+    title: `Chuyển ${fileIds.length} tệp vào kho cá nhân?`,
+    message: 'Các tệp này sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.',
+    confirmLabel: 'Chuyển vào kho',
+  })
+  if (!ok) return
+  error.value = ''
+  for (const id of fileIds) {
+    removeOptimistic(id)
+  }
+  try {
+    await api('/vault/items', {
+      method: 'POST',
+      body: JSON.stringify({ fileIds }),
+    })
+    ui.showToast(`Đã chuyển ${fileIds.length} tệp vào kho cá nhân`, 'success')
+    clearSelection()
+    await loadBrowser()
+  } catch (e) {
+    error.value = formatApiError(e, 'Không thể chuyển vào kho cá nhân')
+    await loadBrowser()
+  }
 }
 
 const shareSheetOpen = ref(false)
@@ -1295,6 +1346,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       @delete="batchDelete"
       @move="batchMove"
       @favorite="batchFavorite"
+      @vault="batchMoveToVault"
       @download="batchDownload"
     />
 

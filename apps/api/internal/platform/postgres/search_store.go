@@ -19,7 +19,7 @@ const searchFolderSelect = `
 const searchFileSelect = `
 	SELECT id, name, mime_type, size_bytes, created_at, updated_at
 	FROM files
-	WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'READY'
+	WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 `
 
 // folderSubtreeSQL returns a recursive CTE selecting the folder and all its

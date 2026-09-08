@@ -25,11 +25,12 @@ export const OVERVIEW_DESTINATIONS = [
 export function pageTitleForRoute(
   path: string,
   routeName?: string | symbol | null,
-  titles?: Partial<Record<'overview' | 'album' | 'files' | 'photos' | 'chat' | 'trash' | 'shared' | 'settings' | 'profile', string>>,
+  titles?: Partial<Record<'overview' | 'album' | 'files' | 'vault' | 'photos' | 'chat' | 'trash' | 'shared' | 'settings' | 'profile', string>>,
 ): string {
   if (path === '/' || path === '') return titles?.overview ?? 'Overview'
   if (routeName === 'album') return titles?.album ?? 'Album'
   if (path === '/files' || path.startsWith('/files/')) return titles?.files ?? 'My Files'
+  if (path === '/vault' || path.startsWith('/vault/')) return titles?.vault ?? 'Personal Vault'
   if (path === '/photos' || path.startsWith('/photos/')) return titles?.photos ?? 'Photos'
   if (path === '/chat' || path.startsWith('/chat/')) return titles?.chat ?? 'Chat'
   if (path === '/trash') return titles?.trash ?? 'Trash'

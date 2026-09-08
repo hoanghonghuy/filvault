@@ -288,3 +288,23 @@ export interface SharedBrowser {
   folders: SharedFolderInfo[]
   files: SharedFileInfo[]
 }
+
+export interface VaultStatus {
+  initialized: boolean
+  unlocked: boolean
+}
+
+export interface VaultSession {
+  unlocked: boolean
+  token: string
+  expiresAt: string
+}
+
+export interface VaultFile {
+  id: string
+  name: string
+  mimeType: string
+  sizeBytes: number
+  createdAt: string
+  updatedAt: string
+}

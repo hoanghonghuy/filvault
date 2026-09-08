@@ -22,6 +22,7 @@ import (
 	"filvault/internal/sharelink"
 	"filvault/internal/storage"
 	"filvault/internal/trash"
+	"filvault/internal/vault"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -90,6 +91,11 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 
 	storageHandlers := storage.NewHandler(quota)
 
+	vaultRepo := postgres.NewVaultRepository(store)
+	vaultTokens := vault.NewTokens(cfg.JWTSecret, 1*time.Hour)
+	vaultSvc := vault.NewService(vaultRepo, authSvc, vaultTokens)
+	vaultHandlers := vault.NewHandler(vaultSvc)
+
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.Use(httpx.RequestLog())
@@ -117,6 +123,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	chatHandlers.RegisterRoutes(v1, storage...)
 	storageHandlers.RegisterRoutes(v1, storage...)
 	shareLinkHandlers.RegisterOwnerRoutes(v1, storage...)
+	vaultHandlers.RegisterRoutes(v1, storage...)
 	activityHandlers.Register(engine, authHandlers.AuthRequired(), authHandlers.EmailVerifiedRequired())
 
 	public := v1.Group("", httpx.NewIPRateLimiter(cfg.PublicShareRateLimitPerMin).Middleware())

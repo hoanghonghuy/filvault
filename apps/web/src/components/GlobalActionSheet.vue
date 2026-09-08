@@ -14,6 +14,7 @@ const actionLabels = computed<Record<string, string>>(() => ({
   'Open': t.value.open,
   'Rename': t.value.rename,
   'Move': t.value.move,
+  'Move to vault': t.value.vaultMoveToVault,
   'Move to trash': t.value.moveToTrash,
   'Preview': t.value.preview,
   'Download': t.value.download,
