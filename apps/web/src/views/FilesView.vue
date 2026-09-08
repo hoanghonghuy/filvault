@@ -112,6 +112,103 @@ const { start: startLongPress, move: moveLongPress, end: endLongPress, cancel: c
 // Mobile breadcrumb sheet
 const breadcrumbSheetOpen = ref(false)
 
+const sortBy = ref<'updatedAt' | 'name' | 'size'>('updatedAt')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+const viewMode = ref<'list' | 'grid'>((localStorage.getItem('filvault.filesViewMode') as 'list' | 'grid') || 'list')
+
+function toggleViewMode() {
+  viewMode.value = viewMode.value === 'list' ? 'grid' : 'list'
+  localStorage.setItem('filvault.filesViewMode', viewMode.value)
+}
+
+function formatItemDate(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function getFileTypeColor(mimeType?: string): string {
+  if (!mimeType) return '#64748b'
+  if (mimeType.startsWith('image/')) return '#8b5cf6'
+  if (mimeType.startsWith('video/')) return '#ec4899'
+  if (mimeType.startsWith('audio/')) return '#06b6d4'
+  if (mimeType.includes('pdf')) return '#ef4444'
+  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('rar') || mimeType.includes('7z') || mimeType.includes('compressed')) return '#f97316'
+  if (mimeType.includes('sheet') || mimeType.includes('excel') || mimeType.includes('csv')) return '#10b981'
+  if (mimeType.includes('word') || mimeType.includes('document')) return '#0084ff'
+  return '#3b82f6'
+}
+
+const currentSortLabel = computed(() => {
+  if (sortBy.value === 'name') return t.value.sortByName
+  if (sortBy.value === 'size') return t.value.sortBySize
+  return t.value.sortByTime
+})
+
+async function openSortMenu() {
+  const choice = await ui.openActionSheet(t.value.sortByTime, [
+    { id: 'updatedAt', label: t.value.sortByTime, icon: 'filter' },
+    { id: 'name', label: t.value.sortByName, icon: 'doc' },
+    { id: 'size', label: t.value.sortBySize, icon: 'archive' },
+  ])
+  if (choice) {
+    if (sortBy.value === choice) {
+      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+    } else {
+      sortBy.value = choice as 'updatedAt' | 'name' | 'size'
+      sortOrder.value = choice === 'name' ? 'asc' : 'desc'
+    }
+  }
+}
+
+const sortedFolders = computed(() => {
+  if (!browser.value?.folders) return []
+  const list = [...browser.value.folders]
+  list.sort((a, b) => {
+    if (sortBy.value === 'name') {
+      const cmp = a.name.localeCompare(b.name)
+      return sortOrder.value === 'asc' ? cmp : -cmp
+    }
+    const cmp = (a.updatedAt || '').localeCompare(b.updatedAt || '')
+    return sortOrder.value === 'asc' ? cmp : -cmp
+  })
+  return list
+})
+
+const sortedFiles = computed(() => {
+  if (!browser.value?.files) return []
+  const list = [...browser.value.files]
+  list.sort((a, b) => {
+    if (sortBy.value === 'name') {
+      const cmp = a.name.localeCompare(b.name)
+      return sortOrder.value === 'asc' ? cmp : -cmp
+    }
+    if (sortBy.value === 'size') {
+      const cmp = (a.sizeBytes || 0) - (b.sizeBytes || 0)
+      return sortOrder.value === 'asc' ? cmp : -cmp
+    }
+    const cmp = (a.updatedAt || '').localeCompare(b.updatedAt || '')
+    return sortOrder.value === 'asc' ? cmp : -cmp
+  })
+  return list
+})
+
+async function onFabClick() {
+  const action = await ui.openActionSheet(t.value.upload, [
+    { id: 'file', label: t.value.upload, icon: 'upload' },
+    { id: 'folder-upload', label: t.value.uploadFolder, icon: 'folder' },
+    { id: 'new-folder', label: t.value.newFolder, icon: 'plus' },
+  ])
+  if (action === 'file') triggerUpload()
+  else if (action === 'folder-upload') triggerFolderUpload()
+  else if (action === 'new-folder') folderSheetOpen.value = true
+}
+
 // In-app preview
 const previewOpen = ref(false)
 const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
@@ -864,39 +961,71 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         </div>
       </div>
     </Transition>
-    <h1 class="page-title desktop-only">{{ t.navFiles }}</h1>
-
-    <div class="segment-tabs" role="tablist" aria-label="File views">
+    <!-- TeraBox Search Bar -->
+    <div class="files-search-wrap">
+      <Icon name="search" :size="18" class="files-search-icon" />
+      <input
+        v-model="searchQuery"
+        type="search"
+        class="files-search-input"
+        :placeholder="t.searchInFilvault || 'Tìm kiếm trong Filvault…'"
+        :aria-label="t.searchByName"
+        enterkeyhint="search"
+      />
       <button
+        v-if="searchQuery"
         type="button"
-        role="tab"
-        class="segment-tab"
-        :class="{ active: segment === 'all' }"
-        :aria-selected="segment === 'all'"
-        @click="segment = 'all'"
+        class="files-search-clear"
+        aria-label="Clear search"
+        @click="searchQuery = ''; searchResults = null"
       >
-        {{ t.all }}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="segment-tab"
-        :class="{ active: segment === 'favorites' }"
-        :aria-selected="segment === 'favorites'"
-        @click="segment = 'favorites'"
-      >
-        {{ t.favorites }}
+        <Icon name="close" :size="16" />
       </button>
     </div>
 
-    <nav v-if="segment === 'all'" class="breadcrumb" aria-label="Folder path">
+    <!-- TeraBox Segmented Tabs -->
+    <div class="tabs-header">
+      <div class="tabs-pill-list" role="tablist" aria-label="File views">
+        <button
+          type="button"
+          role="tab"
+          class="tab-pill"
+          :class="{ active: segment === 'all' }"
+          :aria-selected="segment === 'all'"
+          @click="segment = 'all'"
+        >
+          {{ t.all }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab-pill"
+          :class="{ active: segment === 'favorites' }"
+          :aria-selected="segment === 'favorites'"
+          @click="segment = 'favorites'"
+        >
+          {{ t.favorites }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Breadcrumb / Folder Top Bar -->
+    <div v-if="segment === 'all' && folderId" class="folder-header-bar">
       <button
-        v-if="folderId"
         type="button"
-        class="btn ghost mobile-back"
+        class="folder-back-btn"
         @click="openFolder(browser?.folder?.parentId ?? null)"
       >
-        ← {{ t.back }}
+        <Icon name="arrow-left" :size="20" />
+        <span class="folder-header-title">{{ browser?.folder?.name || t.navFiles }}</span>
+      </button>
+      <button
+        type="button"
+        class="folder-hierarchy-btn mobile-only"
+        aria-label="View hierarchy"
+        @click="breadcrumbSheetOpen = true"
+      >
+        <Icon name="more" :size="18" />
       </button>
       <span class="breadcrumb-trail desktop-only">
         <a href="#" @click.prevent="openFolder(null)">{{ t.root }}</a>
@@ -909,50 +1038,37 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <span class="current">{{ browser.folder.name }}</span>
         </template>
       </span>
-      <button
-        type="button"
-        class="mobile-folder-btn mobile-only"
-        aria-label="View folder hierarchy"
-        @click="breadcrumbSheetOpen = true"
-      >
-        <span v-if="browser?.folder" class="mobile-current">{{ browser.folder.name }}</span>
-        <span v-else-if="!folderId" class="mobile-current">{{ t.root }}</span>
-        <Icon name="more" :size="14" class="mobile-breadcrumb-more" />
-      </button>
-    </nav>
+    </div>
 
-    <div v-if="segment === 'all'" class="toolbar toolbar-sticky">
-      <input
-        v-model="searchQuery"
-        class="search-input"
-        type="search"
-        :placeholder="t.searchByName"
-        :aria-label="t.searchByName"
-        enterkeyhint="search"
-      />
-      <button
-        class="btn icon-only filter-toggle"
-        :class="{ 'filter-active': hasActiveFilters }"
-        type="button"
-        aria-label="Search filters"
-        @click="filterSheetOpen = true"
-      >
-        <Icon name="filter" :size="18" />
+    <!-- Sub-Toolbar (Sort + View Mode + Actions) -->
+    <div v-if="segment === 'all'" class="files-sub-bar">
+      <button type="button" class="sub-sort-btn" @click="openSortMenu">
+        <Icon name="filter" :size="16" />
+        <span>{{ currentSortLabel }}</span>
+        <Icon name="chevron-down" :size="12" />
       </button>
-      <button class="btn accent desktop-only" type="button" @click="triggerUpload">{{ t.upload }}</button>
-      <button class="btn desktop-only" type="button" @click="triggerFolderUpload">{{ t.uploadFolder }}</button>
-      <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">{{ t.newFolder }}</button>
-      <button class="btn mobile-only" type="button" :aria-label="t.newFolder" @click="folderSheetOpen = true">
-        {{ t.newFolder }}
-      </button>
-      <button
-        v-if="searchResults"
-        class="btn ghost"
-        type="button"
-        @click="searchResults = null; searchQuery = ''"
-      >
-        {{ t.clear }}
-      </button>
+      <div class="sub-actions">
+        <button
+          type="button"
+          class="sub-icon-btn"
+          :class="{ 'filter-active': hasActiveFilters }"
+          aria-label="Search filters"
+          @click="filterSheetOpen = true"
+        >
+          <Icon name="filter" :size="18" />
+        </button>
+        <button
+          type="button"
+          class="sub-icon-btn"
+          :title="viewMode === 'list' ? t.viewGrid : t.viewList"
+          @click="toggleViewMode"
+        >
+          <Icon :name="viewMode === 'list' ? 'palette' : 'file'" :size="18" />
+        </button>
+        <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">{{ t.newFolder }}</button>
+        <button class="btn accent desktop-only" type="button" @click="triggerUpload">{{ t.upload }}</button>
+        <button class="btn desktop-only" type="button" @click="triggerFolderUpload">{{ t.uploadFolder }}</button>
+      </div>
     </div>
 
     <UploadProgress :progress="uploadProgress" />
@@ -1009,16 +1125,34 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </EmptyState>
     </TransitionGroup>
 
+    <!-- TeraBox Root Vault Shortcut -->
+    <div
+      v-if="!folderId && segment === 'all' && !searchResults && !loading"
+      class="vault-entry-card tappable"
+      @click="segment = 'favorites'"
+    >
+      <div class="vault-icon-box">
+        <Icon name="lock" :size="20" />
+      </div>
+      <div class="vault-info">
+        <span class="vault-title">{{ t.personalVault || 'Kho cá nhân' }}</span>
+        <span class="vault-hint">{{ t.favorites }}</span>
+      </div>
+      <Icon name="chevron-right" :size="16" class="vault-arrow" />
+    </div>
+
     <TransitionGroup
-      v-else-if="segment === 'all' && !loading"
+      v-if="segment === 'all' && !loading"
       name="row"
       tag="section"
-      class="list"
+      class="files-container"
+      :class="{ 'grid-mode': viewMode === 'grid' }"
     >
+      <!-- Folders -->
       <div
-        v-for="folder in browser?.folders ?? []"
+        v-for="folder in sortedFolders"
         :key="folder.id"
-        class="row tappable"
+        class="file-item-card tappable"
         :class="{ selected: selectedFolderIds.has(folder.id) }"
         @touchstart.passive="startLongPress($event, { type: 'folder', id: folder.id })"
         @touchmove.passive="moveLongPress"
@@ -1029,10 +1163,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFolderIds.has(folder.id) }">
           <Icon v-if="selectedFolderIds.has(folder.id)" name="check" :size="14" />
         </span>
-        <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
+        <div class="file-icon-badge folder-badge">
+          <Icon name="folder" :size="22" />
+        </div>
+        <div class="file-item-info">
+          <span class="file-item-title">{{ folder.name }}</span>
+          <span class="file-item-sub">{{ formatItemDate(folder.updatedAt) }}</span>
+        </div>
         <button
           v-if="!isSelecting"
-          class="btn icon-only"
+          class="file-item-more-btn"
           type="button"
           aria-label="Folder actions"
           @click.stop="openFolderActions(folder)"
@@ -1040,10 +1180,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <Icon name="more" :size="18" />
         </button>
       </div>
+
+      <!-- Files -->
       <div
-        v-for="file in browser?.files ?? []"
+        v-for="file in sortedFiles"
         :key="file.id"
-        class="row tappable"
+        class="file-item-card tappable"
         :class="{ selected: selectedFileIds.has(file.id) }"
         @touchstart.passive="startLongPress($event, { type: 'file', id: file.id })"
         @touchmove.passive="moveLongPress"
@@ -1054,17 +1196,25 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFileIds.has(file.id) }">
           <Icon v-if="selectedFileIds.has(file.id)" name="check" :size="14" />
         </span>
-        <span class="name">
+        <div
+          class="file-icon-badge"
+          :style="{
+            background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
+            color: getFileTypeColor(file.mimeType)
+          }"
+        >
           <Icon
             :name="isFavorited(file.id) ? 'star-filled' : mimeIcon(file.mimeType)"
-            :size="18"
-            class="row-icon favorite-icon"
-          />{{ file.name }}
-        </span>
-        <span class="meta desktop-only">{{ mimeLabel(file.mimeType) }} · {{ formatBytes(file.sizeBytes) }}</span>
+            :size="20"
+          />
+        </div>
+        <div class="file-item-info">
+          <span class="file-item-title">{{ file.name }}</span>
+          <span class="file-item-sub">{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span>
+        </div>
         <button
           v-if="!isSelecting"
-          class="btn icon-only"
+          class="file-item-more-btn"
           type="button"
           aria-label="File actions"
           @click.stop="openFileActions(file)"
@@ -1083,20 +1233,35 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       />
     </TransitionGroup>
 
-    <TransitionGroup v-else-if="segment === 'favorites'" name="row" tag="section" class="list">
+    <TransitionGroup
+      v-else-if="segment === 'favorites'"
+      name="row"
+      tag="section"
+      class="files-container"
+      :class="{ 'grid-mode': viewMode === 'grid' }"
+    >
       <LoadingSkeletonFiles v-if="favoritesLoading" key="fav-skeleton" mode="browse" />
       <template v-else>
         <div
           v-for="file in favorites ?? []"
           :key="file.id"
-          class="row tappable"
+          class="file-item-card tappable"
           @click="openFileActions(file)"
         >
-          <span class="name">
-            <Icon name="star-filled" :size="18" class="row-icon favorite-icon" />{{ file.name }}
-          </span>
-          <span class="meta desktop-only">{{ formatBytes(file.sizeBytes) }}</span>
-          <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+          <div
+            class="file-icon-badge"
+            :style="{
+              background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
+              color: getFileTypeColor(file.mimeType)
+            }"
+          >
+            <Icon name="star-filled" :size="20" style="color: #f59e0b;" />
+          </div>
+          <div class="file-item-info">
+            <span class="file-item-title">{{ file.name }}</span>
+            <span class="file-item-sub">{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span>
+          </div>
+          <button class="file-item-more-btn" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
             <Icon name="more" :size="18" />
           </button>
         </div>
@@ -1117,7 +1282,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       v-if="segment === 'all' && !isSelecting"
       :label="t.uploadFile"
       :disabled="uploadProgress !== null"
-      @click="triggerUpload"
+      @click="onFabClick"
     />
 
     <BatchActionBar
@@ -1525,5 +1690,381 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 .breadcrumb-sheet-item.current {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* TeraBox Search Bar */
+.files-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-card, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  padding: 8px 16px;
+  margin-bottom: var(--space-md);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.files-search-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(0, 132, 255, 0.15));
+}
+
+.files-search-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.files-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  outline: none;
+  min-width: 0;
+}
+
+.files-search-input::placeholder {
+  color: var(--muted);
+}
+
+.files-search-clear {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* TeraBox Tabs */
+.tabs-header {
+  margin-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 4px;
+}
+
+.tabs-pill-list {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tab-pill {
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tab-pill.active {
+  color: var(--ink);
+}
+
+.tab-pill.active::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+/* Folder Header / Breadcrumbs */
+.folder-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: var(--space-xs);
+}
+
+.folder-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.folder-header-title {
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-hierarchy-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Sub-toolbar */
+.files-sub-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  margin-bottom: var(--space-sm);
+  font-size: 13px;
+}
+
+.sub-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.sub-sort-btn:active {
+  color: var(--ink);
+}
+
+.sub-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sub-icon-btn {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm, 8px);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sub-icon-btn.filter-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Root Vault Card */
+.vault-entry-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg, 16px);
+  background: var(--surface-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--hairline);
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vault-entry-card:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.vault-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vault-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vault-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vault-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vault-arrow {
+  color: var(--muted);
+}
+
+/* Files Container (List & Grid Modes) */
+.files-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.files-container.grid-mode {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .files-container.grid-mode {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .files-container.grid-mode {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* File Item Card */
+.file-item-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--canvas);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.file-item-card:hover {
+  background: var(--surface-card, rgba(255, 255, 255, 0.03));
+}
+
+.file-item-card:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.file-item-card.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.file-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.folder-badge {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+}
+
+.file-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.file-item-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-item-sub {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-item-more-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.file-item-more-btn:active {
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+/* Grid mode adjustments */
+.files-container.grid-mode .file-item-card {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 12px;
+  border: 1px solid var(--hairline);
+  position: relative;
+}
+
+.files-container.grid-mode .file-icon-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  margin-bottom: 6px;
+}
+
+.files-container.grid-mode .file-item-info {
+  align-items: center;
+  width: 100%;
+}
+
+.files-container.grid-mode .file-item-more-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 </style>
