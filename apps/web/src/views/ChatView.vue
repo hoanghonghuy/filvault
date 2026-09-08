@@ -921,6 +921,97 @@ watch(desktopInfoOpen, (val) => {
     // ignore
   }
 })
+
+// Desktop Resizable Panels Configuration
+const DEFAULT_RAIL_WIDTH = 320
+const MIN_RAIL_WIDTH = 240
+const MAX_RAIL_WIDTH = 520
+
+const DEFAULT_INFO_WIDTH = 340
+const MIN_INFO_WIDTH = 260
+const MAX_INFO_WIDTH = 540
+
+const savedRailWidth = typeof localStorage !== 'undefined' ? Number(localStorage.getItem('filvault.chat.railWidth')) : NaN
+const railWidth = ref(!isNaN(savedRailWidth) && savedRailWidth >= MIN_RAIL_WIDTH && savedRailWidth <= MAX_RAIL_WIDTH ? savedRailWidth : DEFAULT_RAIL_WIDTH)
+
+const savedInfoWidth = typeof localStorage !== 'undefined' ? Number(localStorage.getItem('filvault.chat.infoWidth')) : NaN
+const infoWidth = ref(!isNaN(savedInfoWidth) && savedInfoWidth >= MIN_INFO_WIDTH && savedInfoWidth <= MAX_INFO_WIDTH ? savedInfoWidth : DEFAULT_INFO_WIDTH)
+
+const isResizingRail = ref(false)
+const isResizingInfo = ref(false)
+
+function startRailResize(e: PointerEvent) {
+  if (e.button !== 0) return
+  isResizingRail.value = true
+  const startX = e.clientX
+  const startW = railWidth.value
+
+  const onPointerMove = (moveEv: PointerEvent) => {
+    const delta = moveEv.clientX - startX
+    const newW = Math.max(MIN_RAIL_WIDTH, Math.min(MAX_RAIL_WIDTH, Math.round(startW + delta)))
+    railWidth.value = newW
+  }
+
+  const onPointerUp = () => {
+    isResizingRail.value = false
+    try {
+      localStorage.setItem('filvault.chat.railWidth', String(railWidth.value))
+    } catch {
+      // ignore
+    }
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp)
+  }
+
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+}
+
+function resetRailWidth() {
+  railWidth.value = DEFAULT_RAIL_WIDTH
+  try {
+    localStorage.setItem('filvault.chat.railWidth', String(DEFAULT_RAIL_WIDTH))
+  } catch {
+    // ignore
+  }
+}
+
+function startInfoResize(e: PointerEvent) {
+  if (e.button !== 0) return
+  isResizingInfo.value = true
+  const startX = e.clientX
+  const startW = infoWidth.value
+
+  const onPointerMove = (moveEv: PointerEvent) => {
+    const delta = startX - moveEv.clientX
+    const newW = Math.max(MIN_INFO_WIDTH, Math.min(MAX_INFO_WIDTH, Math.round(startW + delta)))
+    infoWidth.value = newW
+  }
+
+  const onPointerUp = () => {
+    isResizingInfo.value = false
+    try {
+      localStorage.setItem('filvault.chat.infoWidth', String(infoWidth.value))
+    } catch {
+      // ignore
+    }
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', onPointerUp)
+  }
+
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+}
+
+function resetInfoWidth() {
+  infoWidth.value = DEFAULT_INFO_WIDTH
+  try {
+    localStorage.setItem('filvault.chat.infoWidth', String(DEFAULT_INFO_WIDTH))
+  } catch {
+    // ignore
+  }
+}
+
 type AttachmentUploadStatus = 'queued' | 'uploading' | 'failed' | 'canceled'
 type AttachmentUpload = {
   id: string
@@ -2135,8 +2226,19 @@ watch(
 </script>
 
 <template>
-  <div class="chat-app" :class="{ 'in-thread': inThread }">
+  <div class="chat-app" :class="{ 'in-thread': inThread }" :style="{ '--rail-w': `${railWidth}px`, '--info-w': `${infoWidth}px` }">
     <aside class="chat-rail" aria-label="Conversations">
+      <!-- Left resizer splitter (Desktop only) -->
+      <div
+        v-if="isDesktop"
+        class="chat-resizer right-edge"
+        :class="{ active: isResizingRail }"
+        title="Kéo để chỉnh độ rộng danh sách chat (Nhấp đúp để đặt lại)"
+        @pointerdown.stop.prevent="startRailResize"
+        @dblclick="resetRailWidth"
+      >
+        <div class="resizer-handle-line" />
+      </div>
       <header class="rail-header">
         <button
           type="button"
@@ -2884,6 +2986,16 @@ watch(
       class="chat-info-sidebar"
       aria-label="Chat details"
     >
+      <!-- Right resizer splitter (Desktop only) -->
+      <div
+        class="chat-resizer left-edge"
+        :class="{ active: isResizingInfo }"
+        title="Kéo để chỉnh độ rộng thông tin đoạn chat (Nhấp đúp để đặt lại)"
+        @pointerdown.stop.prevent="startInfoResize"
+        @dblclick="resetInfoWidth"
+      >
+        <div class="resizer-handle-line" />
+      </div>
       <div class="desktop-info-header">
         <span class="desktop-info-header-title">{{ chatInfoTitle }}</span>
         <button
@@ -4362,6 +4474,7 @@ watch(
 }
 
 .chat-rail {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--sidebar-bg, var(--canvas));
@@ -6170,7 +6283,7 @@ img.avatar-img {
 
 @media (min-width: 768px) {
   .chat-app {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: var(--rail-w, 320px) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
 
@@ -6198,11 +6311,11 @@ img.avatar-img {
 
 @media (min-width: 1200px) {
   .chat-app {
-    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-columns: var(--rail-w, 340px) minmax(0, 1fr);
   }
 
   .chat-app:has(.chat-info-sidebar) {
-    grid-template-columns: 340px minmax(0, 1fr) 340px;
+    grid-template-columns: var(--rail-w, 340px) minmax(0, 1fr) var(--info-w, 340px);
   }
 
   .media-panel {
@@ -6262,16 +6375,63 @@ img.avatar-img {
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .chat-app {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: var(--rail-w, 320px) minmax(0, 1fr);
   }
 
   .chat-app:has(.chat-info-sidebar) {
-    grid-template-columns: 300px minmax(0, 1fr) 320px;
+    grid-template-columns: var(--rail-w, 300px) minmax(0, 1fr) var(--info-w, 320px);
   }
 
   .media-panel {
     display: none;
   }
+}
+
+/* Draggable resizer splitter for desktop */
+.chat-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.chat-resizer.right-edge {
+  right: -6px;
+}
+
+.chat-resizer.left-edge {
+  left: -6px;
+}
+
+.chat-resizer .resizer-handle-line {
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  border-radius: 1px;
+  transition: background 0.15s ease, width 0.15s ease;
+}
+
+.chat-resizer:hover .resizer-handle-line,
+.chat-resizer.active .resizer-handle-line {
+  width: 4px;
+  background: var(--accent);
+}
+
+.chat-app.resizing-col {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+.chat-app.resizing-col * {
+  user-select: none !important;
+  cursor: col-resize !important;
 }
 
 /* Mobile master-detail: show rail OR thread, never both stacked */
@@ -8409,6 +8569,7 @@ img.avatar-img {
 
 @media (min-width: 1024px) {
   .chat-info-sidebar {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
