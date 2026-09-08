@@ -3,12 +3,19 @@ import {
   HOME_PATH,
   OVERVIEW_DESTINATIONS,
   PROFILE_PATH,
+  SHELL_NAV,
   pageTitleForRoute,
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
   showStorageBar,
 } from './shellNav'
 import type { BrowserFile, TimelineGroup } from '@/api/types'
+
+describe('SHELL_NAV', () => {
+  it('has 5 destinations: Home, Files, Photos, Shared, Settings', () => {
+    expect(SHELL_NAV.map((item) => item.to)).toEqual(['/', '/files', '/photos', '/shared', '/settings'])
+  })
+})
 
 describe('HOME_PATH', () => {
   it('is the app overview', () => {

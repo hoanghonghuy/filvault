@@ -61,11 +61,11 @@ const avatarInitials = computed(() =>
 const profileLabel = computed(
   () => `Open profile for ${auth.user?.displayName || auth.user?.email || 'account'}`,
 )
-const navLabels = computed(() => ({
-  '/chat': t.value.chat,
+const navLabels = computed<Record<string, string>>(() => ({
+  '/': t.value.navHome,
   '/files': t.value.navFiles,
   '/photos': t.value.navPhotos,
-  '/trash': t.value.navTrash,
+  '/shared': t.value.navShared,
   '/settings': t.value.navSettings,
 }))
 </script>
