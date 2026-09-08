@@ -19,6 +19,7 @@ export const OVERVIEW_DESTINATIONS = [
   { to: '/files', label: 'My Files', hint: 'Browse and upload', icon: 'folder' },
   { to: '/photos', label: 'Photos', hint: 'Timeline and albums', icon: 'photos' },
   { to: '/shared', label: 'Shared with me', hint: 'Items shared to you', icon: 'users' },
+  { to: '/chat', label: 'Chat', hint: 'Messages and video calls', icon: 'chat' },
 ] as const
 
 export function pageTitleForRoute(

@@ -38,6 +38,7 @@ const localizedDestinations = computed(() => [
   { to: '/files', label: t.value.myFiles, hint: t.value.browseAndUpload, icon: 'folder' },
   { to: '/photos', label: t.value.navPhotos, hint: t.value.timelineAndAlbums, icon: 'photos' },
   { to: '/shared', label: t.value.sharedWithMe, hint: t.value.itemsSharedToYou, icon: 'users' },
+  { to: '/chat', label: t.value.chat, hint: t.value.chatHint, icon: 'chat' },
 ])
 
 const bothFailed = computed(() => Boolean(filesError.value && photosError.value))
@@ -106,8 +107,7 @@ onMounted(load)
 
     <div v-if="loading" class="overview-loading" aria-busy="true" aria-live="polite">
       <div class="destinations">
-        <div class="skeleton dest-sk" />
-        <div class="skeleton dest-sk" />
+        <div v-for="i in 4" :key="i" class="skeleton dest-sk" />
       </div>
       <div class="list">
         <div v-for="i in 4" :key="i" class="skeleton sk-row" />

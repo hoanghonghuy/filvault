@@ -23,8 +23,8 @@ describe('PROFILE_PATH', () => {
 })
 
 describe('OVERVIEW_DESTINATIONS', () => {
-  it('exposes Files, Photos and Shared with me', () => {
-    expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos', '/shared'])
+  it('exposes Files, Photos, Shared with me and Chat', () => {
+    expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos', '/shared', '/chat'])
   })
 })
 
