@@ -16,7 +16,9 @@
     "lint:oxlint:ci": "oxlint .",
     "lint:eslint": "eslint . --fix --cache",
     "lint:eslint:ci": "eslint . --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "heic-to": "^1.5.2",
@@ -26,6 +28,7 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.13.3",
