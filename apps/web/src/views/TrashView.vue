@@ -6,7 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
-import { mimeIcon, mimeLabel } from '@/lib/mimeIcon'
+import { mimeIcon } from '@/lib/mimeIcon'
 import { useI18n } from '@/lib/i18n'
 import type { TrashList } from '@/api/types'
 

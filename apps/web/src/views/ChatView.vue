@@ -10,7 +10,6 @@ import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
-import PhotoThumb from '@/components/PhotoThumb.vue'
 import ChatInlineImage from '@/components/ChatInlineImage.vue'
 import LoadingSkeletonThread from '@/components/LoadingSkeletonThread.vue'
 import LoadingSkeletonChatRail from '@/components/LoadingSkeletonChatRail.vue'
@@ -23,8 +22,6 @@ import { isHeic, getHeicDisplayUrl, convertHeicBlobToJpeg } from '@/lib/heic'
 import { getBubbleStyle, activeBubbleStyleId, type ChatBubbleStyle } from '@/lib/chatBubbles'
 import { userInitials } from '@/lib/userInitials'
 import {
-  STICKERS,
-  STICKER_CATEGORIES,
   isStickerMessage,
   parseStickerSymbol,
   formatStickerMessage,
@@ -614,8 +611,6 @@ async function handleWallpaperUpload(event: Event) {
 }
 
 const stickerPickerOpen = ref(false)
-const selectedStickerCategory = ref<'expressions' | 'gestures' | 'pets' | 'fun'>('expressions')
-const filteredStickers = computed(() => STICKERS.filter((s) => s.category === selectedStickerCategory.value))
 
 function toggleStickerPicker() {
   stickerPickerOpen.value = !stickerPickerOpen.value
@@ -847,14 +842,6 @@ function closeDesktopInfo() {
     infoSearchOpen.value = false
   } else {
     desktopInfoOpen.value = false
-  }
-}
-
-function toggleInfoSearch() {
-  if (chatInfoCurrentView.value === 'search') {
-    returnToMainInfo()
-  } else {
-    openInfoSearchView()
   }
 }
 
