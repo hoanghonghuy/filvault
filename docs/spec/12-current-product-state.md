@@ -67,11 +67,11 @@ make dev-web            # Vue :5173 (Node ^22)
 | **Vault** — khu vực file cá nhân (`/vault`) | Có (routing [#37](https://github.com/hoanghonghuy/filvault/pull/37); UX media/a11y [#44](https://github.com/hoanghonghuy/filvault/pull/44) / [#18](https://github.com/hoanghonghuy/filvault/issues/18)) | Cross-cutting: [#29](https://github.com/hoanghonghuy/filvault/issues/29) (MediaLightbox) | Chưa |
 | **Themes & settings** — dark/system, color themes, Theme Center | Có (cơ bản) | [#15](https://github.com/hoanghonghuy/filvault/issues/15), [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#34](https://github.com/hoanghonghuy/filvault/issues/34), [#36](https://github.com/hoanghonghuy/filvault/issues/36) | Chưa |
 | **Trash & activity** | Có | [#26](https://github.com/hoanghonghuy/filvault/issues/26) | Chưa |
-| **Shell & navigation** — responsive, Overview shortcuts | Có | [#6](https://github.com/hoanghonghuy/filvault/issues/6) (PR [#48](https://github.com/hoanghonghuy/filvault/pull/48) draft), [#22](https://github.com/hoanghonghuy/filvault/issues/22), [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#17](https://github.com/hoanghonghuy/filvault/issues/17) | Chưa |
+| **Shell & navigation** — responsive, Overview shortcuts | Có | [#6](https://github.com/hoanghonghuy/filvault/issues/6) IN_PROGRESS (PR [#48](https://github.com/hoanghonghuy/filvault/pull/48) open), [#22](https://github.com/hoanghonghuy/filvault/issues/22), [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#17](https://github.com/hoanghonghuy/filvault/issues/17) | Chưa |
 | **CLI** (`bin/filvault`) | Có (login, ls, upload, download — spec [09-cli](09-cli.md)) | Chưa ưu tiên release | Chưa |
 | **Secrets & config hardening** | Có ([#13](https://github.com/hoanghonghuy/filvault/pull/13)) | — | Một phần — xem [#3](https://github.com/hoanghonghuy/filvault/issues/3) |
 | **Health / readiness / migration gate** | Có ([#45](https://github.com/hoanghonghuy/filvault/pull/45) / [#41](https://github.com/hoanghonghuy/filvault/issues/41); runtime [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42)) | — | Contract trên `develop` |
-| **Production deploy & release smoke** | Baseline runtime [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42) | — | Blocker — epic [#4](https://github.com/hoanghonghuy/filvault/issues/4); cổng tiếp theo [#43](https://github.com/hoanghonghuy/filvault/issues/43) (READY) |
+| **Production deploy & release smoke** | Baseline runtime [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42) | — | Blocker — epic [#4](https://github.com/hoanghonghuy/filvault/issues/4); [#43](https://github.com/hoanghonghuy/filvault/issues/43) IN_PROGRESS (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) draft) |
 
 Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành chức năng** (chi tiết lịch sử: [08](08-phase-1-status.md), [10](10-phase-2-status.md)). Điều đó **không** có nghĩa sản phẩm đã production-ready.
 
@@ -85,11 +85,11 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 | Secret scanning (PR) | Đã có | [#3](https://github.com/hoanghonghuy/filvault/issues/3), [#13](https://github.com/hoanghonghuy/filvault/pull/13) |
 | Health `/healthz`, readiness `/readyz`, migration gate | Đã merge | [#45](https://github.com/hoanghonghuy/filvault/pull/45), [`docs/ops/health-readiness-migration.md`](../ops/health-readiness-migration.md) |
 | Production runtime (TLS edge, reverse proxy, env contract) | **Đã merge** | [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42) (`17bad79`) |
-| Release smoke + persistence restart + rollback runbook | **READY** | [#43](https://github.com/hoanghonghuy/filvault/issues/43) — prereqs #41 + #42 đã trên `develop` |
+| Release smoke + persistence restart + rollback runbook | **IN_PROGRESS** | [#43](https://github.com/hoanghonghuy/filvault/issues/43), PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (draft) |
 | Browser E2E critical path | Chưa | [#7](https://github.com/hoanghonghuy/filvault/issues/7) |
 | Design system đồng bộ surfaces hiện tại | Chưa | [#8](https://github.com/hoanghonghuy/filvault/issues/8) |
 
-**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41 và #42 đã merge; cổng release còn lại chủ yếu [#43](https://github.com/hoanghonghuy/filvault/issues/43) (+ [#7](https://github.com/hoanghonghuy/filvault/issues/7) E2E, design backlog).
+**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41 và #42 đã merge; [#43](https://github.com/hoanghonghuy/filvault/issues/43) IN_PROGRESS (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49)) (+ [#7](https://github.com/hoanghonghuy/filvault/issues/7) E2E, design backlog).
 
 ---
 
@@ -101,7 +101,8 @@ Tra GitHub để lấy trạng thái mới nhất. Danh sách dưới đây ph�
 
 | PR | Issue | Mô tả ngắn |
 |---|---|---|
-| [#48](https://github.com/hoanghonghuy/filvault/pull/48) | [#6](https://github.com/hoanghonghuy/filvault/issues/6) | Responsive AppShell & navigation (draft) |
+| [#48](https://github.com/hoanghonghuy/filvault/pull/48) | [#6](https://github.com/hoanghonghuy/filvault/issues/6) | Responsive AppShell & navigation (open) |
+| [#49](https://github.com/hoanghonghuy/filvault/pull/49) | [#43](https://github.com/hoanghonghuy/filvault/issues/43) | Release smoke + persistence + rollback runbook (draft) |
 | [#47](https://github.com/hoanghonghuy/filvault/pull/47) | [#39](https://github.com/hoanghonghuy/filvault/issues/39) | Handoff doc này (draft) |
 
 ### Đã merge gần đây (tham chiếu, không làm lại)
@@ -122,7 +123,7 @@ Nhóm **shell & cross-cutting:** [#6](https://github.com/hoanghonghuy/filvault/i
 
 Nhóm **theo surface:** [#21](https://github.com/hoanghonghuy/filvault/issues/21)–[#36](https://github.com/hoanghonghuy/filvault/issues/36) (Files, Overview, Photos, Shared, share-link, Trash, Profile, Auth, calls, Chat composer, themes, Settings, 404)
 
-Nhóm **release / QA:** [#43](https://github.com/hoanghonghuy/filvault/issues/43) (release smoke — **READY**), [#7](https://github.com/hoanghonghuy/filvault/issues/7) (E2E, song song)
+Nhóm **release / QA:** [#43](https://github.com/hoanghonghuy/filvault/issues/43) IN_PROGRESS (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) draft), [#7](https://github.com/hoanghonghuy/filvault/issues/7) (E2E, song song)
 
 ### Việc **không** nên làm (đã xong hoặc lỗi thời)
 
