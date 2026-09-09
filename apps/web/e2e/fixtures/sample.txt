@@ -1,0 +1,2 @@
+Filvault E2E smoke test fixture.
+This file is uploaded and deleted during automated browser tests.
