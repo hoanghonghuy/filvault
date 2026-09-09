@@ -9,7 +9,7 @@ func TestReadCredentialsPipedInput(t *testing.T) {
 	// Piped stdin carries both lines; a single shared reader must see both
 	// (a second bufio.Reader would hit EOF after the first drained the pipe).
 	var in strings.Builder
-	in.WriteString("dev@filvault.com\nDev1234@\n")
+	in.WriteString("dev@filvault.com\nlocal-cli-test-password\n")
 
 	email, password, err := readCredentials(strings.NewReader(in.String()))
 	if err != nil {
@@ -18,8 +18,8 @@ func TestReadCredentialsPipedInput(t *testing.T) {
 	if email != "dev@filvault.com" {
 		t.Fatalf("email=%q want dev@filvault.com", email)
 	}
-	if password != "Dev1234@" {
-		t.Fatalf("password=%q want Dev1234@", password)
+	if password != "local-cli-test-password" {
+		t.Fatalf("password=%q want local-cli-test-password", password)
 	}
 }
 

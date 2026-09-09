@@ -16,9 +16,7 @@ import (
 
 const (
 	DefaultEmail       = "dev@filvault.com"
-	DefaultPassword    = "Dev1234@"
 	DefaultDisplayName = "Filvault Dev"
-	DefaultInviteCode  = "dev-invite"
 )
 
 type Options struct {
@@ -48,25 +46,29 @@ func (nopRepo) List(context.Context, string, time.Time, int) ([]activity.Event, 
 
 func (nopRepo) DeleteOlderThan(context.Context, time.Time) (int64, error) { return 0, nil }
 
-func (o Options) withDefaults() Options {
+func (o Options) withDefaults() (Options, error) {
 	if o.Email == "" {
 		o.Email = DefaultEmail
-	}
-	if o.Password == "" {
-		o.Password = DefaultPassword
 	}
 	if o.DisplayName == "" {
 		o.DisplayName = DefaultDisplayName
 	}
-	if o.InviteCode == "" {
-		o.InviteCode = DefaultInviteCode
+	if o.Password == "" {
+		return Options{}, fmt.Errorf("seed password is required (set FILVAULT_SEED_PASSWORD)")
 	}
-	return o
+	if o.InviteCode == "" {
+		return Options{}, fmt.Errorf("invite code is required (set FILVAULT_INVITE_CODE)")
+	}
+	return o, nil
 }
 
 // EnsureDevUser creates a verified dev account or ensures an existing one is verified.
 func EnsureDevUser(ctx context.Context, pool *pgxpool.Pool, opts Options) (Result, error) {
-	opts = opts.withDefaults()
+	var err error
+	opts, err = opts.withDefaults()
+	if err != nil {
+		return Result{}, err
+	}
 	store := postgres.NewStore(pool)
 
 	existing, err := store.GetUserByEmail(ctx, opts.Email)

@@ -16,6 +16,7 @@ const (
 )
 
 type Config struct {
+	Env                       Env
 	DatabaseURL               string
 	InviteCode                string
 	JWTSecret                 string

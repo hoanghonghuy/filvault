@@ -8,7 +8,12 @@ import (
 )
 
 func Load() (Config, error) {
+	env, err := parseEnv(os.Getenv("FILVAULT_ENV"))
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
+		Env:                        env,
 		DatabaseURL:                os.Getenv("FILVAULT_DATABASE_URL"),
 		InviteCode:                 os.Getenv("FILVAULT_INVITE_CODE"),
 		JWTSecret:                  os.Getenv("FILVAULT_JWT_SECRET"),
@@ -66,6 +71,11 @@ func Load() (Config, error) {
 	}
 	if cfg.MetadataStore != "postgres" {
 		return Config{}, fmt.Errorf("unsupported FILVAULT_METADATA_STORE %q", cfg.MetadataStore)
+	}
+	if cfg.Env == EnvProduction {
+		if err := validateProduction(cfg); err != nil {
+			return Config{}, err
+		}
 	}
 	return cfg, nil
 }

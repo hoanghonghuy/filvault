@@ -21,7 +21,7 @@ func main() {
 		Email:       os.Getenv("FILVAULT_SEED_EMAIL"),
 		Password:    os.Getenv("FILVAULT_SEED_PASSWORD"),
 		DisplayName: os.Getenv("FILVAULT_SEED_DISPLAY_NAME"),
-		InviteCode:  getenv("FILVAULT_INVITE_CODE", devseed.DefaultInviteCode),
+		InviteCode:  os.Getenv("FILVAULT_INVITE_CODE"),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -49,13 +49,6 @@ func main() {
   displayName: %s
   inviteCode:  %s (chỉ cần khi đăng ký tay trên UI)
 `, status, result.Email, result.Password, result.DisplayName, result.InviteCode)
-}
-
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }
 
 func fatal(format string, args ...any) {

@@ -27,7 +27,7 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 ### Bắt đầu từ đây
 
 1. `make up` → mở `http://localhost:5173`.
-2. Đăng nhập `dev@filvault.com` / `Dev1234@`.
+2. Đăng nhập bằng `FILVAULT_SEED_EMAIL` / `FILVAULT_SEED_PASSWORD` từ `.env` (copy từ `.env.example`).
 3. Smoke tay phần UI (checklist dưới; phần API đã smoke đủ 2026-08-23). Ghi lệch spec / bug nếu thấy.
 4. Feature Phase 2 web: [10-phase-2-status.md](10-phase-2-status.md) — đã Done cả 6 slice. Deploy/AWS: bàn riêng sau smoke Phase 1.
 
@@ -54,11 +54,11 @@ Web `http://localhost:5173` · API `http://localhost:8080` · MinIO `http://loca
 
 Tạo tự động khi `make up` / `make dev-api` nếu `FILVAULT_SEED_DEV_USER=true` (chỉ bật trong `docker-compose.yml` local).
 
-| Trường | Giá trị |
+| Trường | Biến env (xem `.env.example`) |
 |---|---|
-| Email | `dev@filvault.com` |
-| Mật khẩu | `Dev1234@` |
-| Mã mời (register tay) | `dev-invite` |
+| Email | `FILVAULT_SEED_EMAIL` |
+| Mật khẩu | `FILVAULT_SEED_PASSWORD` |
+| Mã mời (register tay) | `FILVAULT_INVITE_CODE` |
 
 **Production: không set `FILVAULT_SEED_DEV_USER=true`.**
 
@@ -161,7 +161,7 @@ Phần chỉ kiểm tra được bằng mắt/tương tác (API tương ứng b�
 - [ ] Ô **F** header mobile / wordmark sidebar desktop về Overview `/`
 - [ ] Mobile shell: bottom nav + FAB; desktop: side nav
 - [ ] Mở ảnh/video từ Photos xem được nội dung qua presign (URL presign PASS)
-- [ ] Đăng nhập lại bằng UI với `dev@filvault.com / Dev1234@` sau toàn bộ flow trên
+- [ ] Đăng nhập lại bằng UI với credential từ `.env` (`FILVAULT_SEED_EMAIL` / `FILVAULT_SEED_PASSWORD`) sau toàn bộ flow trên
 
 ### Test API tối thiểu — đã có
 
@@ -183,7 +183,7 @@ Không phải nợ. Không nhét vào công việc tiếp theo.
 
 ## Việc tiếp theo cho người nhận
 
-1. `make up` → login `dev@filvault.com` / `Dev1234@`.
+1. `make up` → login bằng credential từ `.env`.
 2. Smoke API xuyên suốt đã xong (2026-08-23, xem trên). Chạy nốt **Smoke test tay phần UI**; ghi bug nếu lệch spec / `DESIGN.md`.
 3. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
 4. Phase 2 feature (S1–S6) đã Done — xem [10-phase-2-status.md](10-phase-2-status.md); smoke Phase 2 đã chạy kèm ở đó. Deploy/AWS vẫn tách khỏi checklist feature.
