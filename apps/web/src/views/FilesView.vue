@@ -30,6 +30,19 @@ import type {
 } from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
+import {
+  buildFilesRouteQuery,
+  buildSearchApiQueryString,
+  getActiveFilterChipKeys,
+  getEmptySearchCause,
+  hasActiveSearchFilters,
+  parseSearchFiltersFromRoute,
+  parseSearchQueryFromRoute,
+  removeSearchFilter,
+  resetSearchFilters,
+  routeQueriesEqual,
+  type FilesSearchChipKey,
+} from '@/lib/filesSearchState'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,7 +55,7 @@ const searchResults = ref<SearchResult | null>(null)
 const loading = ref(false)
 const searchLoading = ref(false)
 const error = ref('')
-const searchQuery = ref('')
+const searchQuery = ref(parseSearchQueryFromRoute(route.query))
 const {
   aggregateProgress: uploadAggregateProgress,
   progressItems: uploadProgressItems,
@@ -60,7 +73,8 @@ const {
   showToast: (message, tone) => ui.showToast(message, tone),
 })
 const filterSheetOpen = ref(false)
-const filters = ref<SearchFilters>({ type: 'all', sort: 'relevance', order: 'desc' })
+const filters = ref<SearchFilters>(parseSearchFiltersFromRoute(route.query))
+let syncingFromRoute = false
 const newFolderName = ref('')
 const folderSheetOpen = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -250,8 +264,8 @@ const currentSortLabel = computed(() => {
 })
 
 async function openSortMenu() {
-  const choice = await ui.openActionSheet(t.value.sortByTime, [
-    { id: 'updatedAt', label: t.value.sortByTime, icon: 'filter' },
+  const choice = await ui.openActionSheet(t.value.sortFilesAria, [
+    { id: 'updatedAt', label: t.value.sortByTime, icon: 'sort' },
     { id: 'name', label: t.value.sortByName, icon: 'doc' },
     { id: 'size', label: t.value.sortBySize, icon: 'archive' },
   ])
@@ -324,6 +338,7 @@ async function previewMediaFile(file: { id: string; name: string; mimeType: stri
 
 onMounted(() => {
   if (filesPageRef.value) attachListeners(filesPageRef.value)
+  if (searchQuery.value.trim()) void runSearch()
 })
 
 function onDragEnter(event: DragEvent) {
@@ -382,59 +397,75 @@ async function loadBrowser() {
   }
 }
 
-const hasActiveFilters = computed(
-  () =>
-    filters.value.type !== 'all' ||
-    filters.value.sort !== 'relevance' ||
-    filters.value.order !== 'desc' ||
-    Boolean(filters.value.folderId) ||
-    Boolean(filters.value.from) ||
-    Boolean(filters.value.to),
+const hasActiveFilters = computed(() => hasActiveSearchFilters(filters.value))
+
+function filterChipLabel(key: FilesSearchChipKey): string {
+  const f = filters.value
+  const sortLabels: Record<SearchFilters['sort'], string> = {
+    relevance: t.value.searchSortRelevance,
+    name: t.value.searchSortName,
+    date: t.value.searchSortDate,
+    size: t.value.searchSortSize,
+  }
+  const typeLabels: Record<SearchFilters['type'], string> = {
+    all: t.value.all,
+    image: t.value.filterTypeImage,
+    video: t.value.filterTypeVideo,
+    document: t.value.filterTypeDocument,
+    archive: t.value.filterTypeArchive,
+    folder: t.value.filterTypeFolder,
+  }
+  switch (key) {
+    case 'type':
+      return typeLabels[f.type]
+    case 'folderId':
+      return t.value.filterThisFolder
+    case 'from':
+      return t.value.filterChipFrom.replace('{date}', f.from ?? '')
+    case 'to':
+      return t.value.filterChipTo.replace('{date}', f.to ?? '')
+    case 'sort':
+      return t.value.filterChipSort.replace('{sort}', sortLabels[f.sort])
+    case 'order':
+      return t.value.filterChipOrderAsc
+    default:
+      return ''
+  }
+}
+
+const activeFilterChips = computed(() =>
+  getActiveFilterChipKeys(filters.value).map((key) => ({
+    key,
+    label: filterChipLabel(key),
+  })),
 )
 
-const TYPE_LABELS: Record<SearchFilters['type'], string> = {
-  all: 'All',
-  image: 'Images',
-  video: 'Videos',
-  document: 'Documents',
-  archive: 'Archives',
-  folder: 'Folders',
-}
-
-const SORT_LABELS: Record<SearchFilters['sort'], string> = {
-  relevance: 'Best match',
-  name: 'Name',
-  date: 'Date',
-  size: 'Size',
-}
-
-const activeFilterChips = computed(() => {
-  const f = filters.value
-  const chips: Array<{ key: keyof SearchFilters; label: string }> = []
-  if (f.type !== 'all') chips.push({ key: 'type', label: TYPE_LABELS[f.type] })
-  if (f.folderId) chips.push({ key: 'folderId', label: 'This folder' })
-  if (f.from) chips.push({ key: 'from', label: `From ${f.from}` })
-  if (f.to) chips.push({ key: 'to', label: `To ${f.to}` })
-  if (f.sort !== 'relevance') {
-    chips.push({ key: 'sort', label: `Sort: ${SORT_LABELS[f.sort]}` })
-  }
-  if (f.sort !== 'relevance' && f.order !== 'desc') {
-    chips.push({ key: 'order', label: 'Ascending' })
-  }
-  return chips
+const emptySearchCause = computed(() => {
+  if (!searchResults.value) return null
+  if (searchResults.value.folders.length > 0 || searchResults.value.files.length > 0) return null
+  return getEmptySearchCause(searchQuery.value, filters.value)
 })
 
-function buildSearchQuery(): string {
-  const params = new URLSearchParams()
-  params.set('q', searchQuery.value.trim())
-  const f = filters.value
-  if (f.type !== 'all') params.set('type', f.type)
-  if (f.folderId) params.set('folderId', f.folderId)
-  if (f.from) params.set('from', f.from)
-  if (f.to) params.set('to', f.to)
-  if (f.sort !== 'relevance') params.set('sort', f.sort)
-  if (f.order !== 'desc') params.set('order', f.order)
-  return params.toString()
+const emptySearchTitle = computed(() => {
+  const cause = emptySearchCause.value
+  if (cause === 'both') return t.value.noResultsQueryAndFilters
+  if (cause === 'filters') return t.value.noResultsFiltered
+  return t.value.noResults
+})
+
+const emptySearchDesc = computed(() => {
+  const cause = emptySearchCause.value
+  if (cause === 'both') return t.value.noResultsQueryAndFiltersDesc
+  if (cause === 'filters') return t.value.noResultsFilteredDesc
+  return t.value.noResultsDesc
+})
+
+function syncRouteFromSearchState() {
+  if (syncingFromRoute) return
+  const nextQuery = buildFilesRouteQuery(route.query, searchQuery.value, filters.value)
+  if (!routeQueriesEqual(route.query, nextQuery)) {
+    void router.replace({ path: route.path, query: nextQuery })
+  }
 }
 
 async function runSearch() {
@@ -446,7 +477,7 @@ async function runSearch() {
   error.value = ''
   searchLoading.value = true
   try {
-    searchResults.value = await api<SearchResult>(`/search?${buildSearchQuery()}`)
+    searchResults.value = await api<SearchResult>(`/search?${buildSearchApiQueryString(searchQuery.value, filters.value)}`)
   } catch (e) {
     error.value = formatApiError(e, 'Search failed')
   } finally {
@@ -456,15 +487,41 @@ async function runSearch() {
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 watch(searchQuery, () => {
+  if (syncingFromRoute) return
   if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(runSearch, 300)
+  searchTimer = setTimeout(() => {
+    syncRouteFromSearchState()
+    void runSearch()
+  }, 300)
 })
 
 onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer)
 })
 
-watch(filters, runSearch)
+watch(filters, () => {
+  if (syncingFromRoute) return
+  syncRouteFromSearchState()
+  void runSearch()
+})
+
+watch(
+  () => route.query,
+  (query) => {
+    syncingFromRoute = true
+    const nextQ = parseSearchQueryFromRoute(query)
+    const nextFilters = parseSearchFiltersFromRoute(query)
+    const qChanged = searchQuery.value !== nextQ
+    const filtersChanged = JSON.stringify(filters.value) !== JSON.stringify(nextFilters)
+    if (qChanged) searchQuery.value = nextQ
+    if (filtersChanged) filters.value = nextFilters
+    syncingFromRoute = false
+    if (qChanged || filtersChanged) {
+      if (nextQ.trim()) void runSearch()
+      else searchResults.value = null
+    }
+  },
+)
 
 function onFiltersApply(applied: SearchFilters) {
   filterSheetOpen.value = false
@@ -474,16 +531,17 @@ function onFiltersApply(applied: SearchFilters) {
 }
 
 function clearFilters() {
-  filters.value = { type: 'all', sort: 'relevance', order: 'desc' }
+  filters.value = resetSearchFilters()
 }
 
-function removeFilter(key: keyof SearchFilters) {
-  const next = { ...filters.value }
-  if (key === 'type') next.type = 'all'
-  else if (key === 'sort') next.sort = 'relevance'
-  else if (key === 'order') next.order = 'desc'
-  else delete next[key]
-  filters.value = next
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = null
+  syncRouteFromSearchState()
+}
+
+function removeFilter(key: FilesSearchChipKey) {
+  filters.value = removeSearchFilter(filters.value, key)
 }
 
 async function openFolder(id: string | null) {
@@ -1047,8 +1105,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-if="searchQuery"
         type="button"
         class="files-search-clear"
-        aria-label="Clear search"
-        @click="searchQuery = ''; searchResults = null"
+        :aria-label="t.clearSearchAria"
+        @click="clearSearch"
       >
         <Icon name="close" :size="16" />
       </button>
@@ -1113,8 +1171,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <!-- Sub-Toolbar (Sort + View Mode + Actions) -->
     <div v-if="segment === 'all'" class="files-sub-bar">
-      <button type="button" class="sub-sort-btn" @click="openSortMenu">
-        <Icon name="filter" :size="16" />
+      <button
+        type="button"
+        class="sub-sort-btn"
+        :aria-label="t.sortFilesAria"
+        @click="openSortMenu"
+      >
+        <Icon name="sort" :size="16" />
         <span>{{ currentSortLabel }}</span>
         <Icon name="chevron-down" :size="12" />
       </button>
@@ -1123,10 +1186,10 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           type="button"
           class="sub-icon-btn"
           :class="{ 'filter-active': hasActiveFilters }"
-          aria-label="Search filters"
+          :aria-label="t.searchFiltersAria"
           @click="filterSheetOpen = true"
         >
-          <Icon name="filter" :size="18" />
+          <Icon name="sliders" :size="18" />
         </button>
         <button
           type="button"
@@ -1174,11 +1237,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <div v-if="hasActiveFilters" key="filter-chips" class="filter-chips">
         <span v-for="chip in activeFilterChips" :key="chip.key" class="filter-chip">
           {{ chip.label }}
-          <button type="button" class="chip-remove" aria-label="Remove filter" @click="removeFilter(chip.key)">
+          <button type="button" class="chip-remove" :aria-label="t.removeFilterAria" @click="removeFilter(chip.key)">
             ×
           </button>
         </span>
-        <button type="button" class="chip-clear" @click="clearFilters">{{ t.clearAll }}<!-- Clear all --></button>
+        <button type="button" class="chip-clear" @click="clearFilters">{{ t.clearFilters }}</button>
       </div>
       <div
         v-for="folder in searchResults.folders"
@@ -1206,12 +1269,28 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <EmptyState
         v-if="searchResults.folders.length === 0 && searchResults.files.length === 0"
         key="search-empty"
-        :title="hasActiveFilters ? t.noResultsFiltered : t.noResults"
-        :description="hasActiveFilters ? t.noResultsFilteredDesc : t.noResultsDesc"
+        :title="emptySearchTitle"
+        :description="emptySearchDesc"
         icon="file"
       >
-        <!-- No results match your filters -->
-        <button v-if="hasActiveFilters" type="button" class="btn" @click="clearFilters">{{ t.clearFilters }}</button>
+        <div class="empty-search-actions">
+          <button
+            v-if="emptySearchCause === 'query' || emptySearchCause === 'both'"
+            type="button"
+            class="btn"
+            @click="clearSearch"
+          >
+            {{ t.clearSearch }}
+          </button>
+          <button
+            v-if="emptySearchCause === 'filters' || emptySearchCause === 'both'"
+            type="button"
+            class="btn"
+            @click="clearFilters"
+          >
+            {{ t.clearFilters }}
+          </button>
+        </div>
       </EmptyState>
     </TransitionGroup>
 
@@ -1632,6 +1711,13 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   color: var(--accent);
   font-weight: 600;
   cursor: pointer;
+}
+
+.empty-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  justify-content: center;
 }
 
 .breadcrumb {
