@@ -240,12 +240,8 @@ function applyColorThemeToDom(themeId: ThemeId) {
 
 function migratePersistedState(): { appearanceMode: AppearanceMode; colorTheme: ThemeId } {
   const legacyColorTheme = localStorage.getItem(COLOR_THEME_STORAGE_KEY)
-  let appearanceMode = migrateAppearanceMode()
+  const appearanceMode = migrateAppearanceMode()
   const colorTheme = normalizeColorThemeId(legacyColorTheme)
-
-  if (legacyColorTheme === LEGACY_DARK_COLOR_THEME && appearanceMode === 'light') {
-    appearanceMode = 'dark'
-  }
 
   persistAppearanceMode(appearanceMode)
   localStorage.setItem(COLOR_THEME_STORAGE_KEY, colorTheme)
@@ -262,19 +258,21 @@ const appearanceMode = ref<AppearanceMode>(initialState.appearanceMode)
 const currentColorTheme = ref<ThemeId>(initialState.colorTheme)
 const systemPrefersDark = ref(readSystemPrefersDark())
 
-export function hydrateAppearance() {
-  if (typeof localStorage === 'undefined' || typeof document === 'undefined') return
-  const state = migratePersistedState()
+function syncReactiveAppearanceState(state: { appearanceMode: AppearanceMode; colorTheme: ThemeId }) {
   appearanceMode.value = state.appearanceMode
   currentColorTheme.value = state.colorTheme
+  systemPrefersDark.value = readSystemPrefersDark()
+}
+
+export function hydrateAppearance() {
+  if (typeof localStorage === 'undefined' || typeof document === 'undefined') return
+  syncReactiveAppearanceState(migratePersistedState())
 }
 
 /** Re-read persisted appearance from storage into reactive state (used in tests and after external resets). */
 export function syncAppearanceFromStorage() {
   if (typeof localStorage === 'undefined') return
-  const state = migratePersistedState()
-  appearanceMode.value = state.appearanceMode
-  currentColorTheme.value = state.colorTheme
+  syncReactiveAppearanceState(migratePersistedState())
 }
 
 const resolvedIsDark = computed(() => {

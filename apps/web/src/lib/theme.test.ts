@@ -101,6 +101,7 @@ describe('multi-theme system contract', () => {
   })
 
   it('migrates legacy dark color theme into dark appearance with a neutral accent theme', () => {
+    localStorage.clear()
     localStorage.setItem(COLOR_THEME_STORAGE_KEY, 'dark')
     localStorage.setItem('filvault.theme', 'dark')
     syncAppearanceFromStorage()
@@ -109,6 +110,53 @@ describe('multi-theme system contract', () => {
     expect(localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('default')
     expect(document.documentElement.dataset.colorTheme).toBe('default')
     expect(document.documentElement.dataset.theme).toBe('dark')
+  })
+
+  it('keeps explicit light appearance when stale legacy colorTheme is dark', () => {
+    localStorage.clear()
+    localStorage.setItem(APPEARANCE_MODE_STORAGE_KEY, 'light')
+    localStorage.setItem(COLOR_THEME_STORAGE_KEY, 'dark')
+    syncAppearanceFromStorage()
+
+    const { appearanceMode, resolvedIsDark } = useTheme()
+    expect(migrateAppearanceMode()).toBe('light')
+    expect(appearanceMode.value).toBe('light')
+    expect(resolvedIsDark.value).toBe(false)
+    expect(localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('default')
+    expect(document.documentElement.dataset.colorTheme).toBe('default')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+  })
+
+  it('keeps explicit system appearance when stale legacy colorTheme is dark', () => {
+    localStorage.clear()
+    localStorage.setItem(APPEARANCE_MODE_STORAGE_KEY, 'system')
+    localStorage.setItem(COLOR_THEME_STORAGE_KEY, 'dark')
+    mockMatchMedia(false)
+    syncAppearanceFromStorage()
+
+    const { appearanceMode, resolvedIsDark } = useTheme()
+    expect(migrateAppearanceMode()).toBe('system')
+    expect(appearanceMode.value).toBe('system')
+    expect(resolvedIsDark.value).toBe(false)
+    expect(localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('default')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+  })
+
+  it('persists explicit light appearance across hydrate and sync', () => {
+    const { setAppearanceMode, appearanceMode } = useTheme()
+    setAppearanceMode('light')
+
+    hydrateAppearance()
+    expect(appearanceMode.value).toBe('light')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+
+    localStorage.setItem(COLOR_THEME_STORAGE_KEY, 'dark')
+    syncAppearanceFromStorage()
+
+    expect(appearanceMode.value).toBe('light')
+    expect(localStorage.getItem(APPEARANCE_MODE_STORAGE_KEY)).toBe('light')
+    expect(localStorage.getItem(COLOR_THEME_STORAGE_KEY)).toBe('default')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
   })
 
   it('migrates legacy followSystemDark flag to system appearance mode', () => {
