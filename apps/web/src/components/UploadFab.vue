@@ -39,7 +39,7 @@ const emit = defineEmits<{
   background: var(--accent);
   color: var(--on-accent);
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
   transition:
     background-color var(--motion-press) var(--ease-standard),
     transform var(--motion-press) var(--ease-standard),
@@ -53,13 +53,13 @@ const emit = defineEmits<{
 
 .fab:hover:not(:disabled) {
   background: var(--accent-hover);
-  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .fab:not(:disabled):active {
   transform: scale(0.94);
   background: var(--accent-hover);
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .fab:disabled {

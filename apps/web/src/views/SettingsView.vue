@@ -14,7 +14,7 @@ import { THEMES, useTheme, type ThemeDef } from '@/lib/theme'
 const auth = useAuthStore()
 const ui = useUiStore()
 const { locale, t } = useI18n()
-const { currentColorTheme, applyColorTheme } = useTheme()
+const { currentColorTheme, applyColorTheme, isDarkMode, setDarkMode } = useTheme()
 const fallbackTheme = THEMES[0] as ThemeDef
 const currentThemeDef = computed<ThemeDef>(
   () => THEMES.find((item) => item.id === currentColorTheme.value) ?? fallbackTheme,
@@ -36,17 +36,8 @@ const trashAutoDeleteEnabled = ref(auth.user?.trashAutoDeleteEnabled ?? false)
 const trashRetentionDays = ref(auth.user?.trashRetentionDays ?? 30)
 const error = ref('')
 const savingSettings = ref(false)
-const darkModeEnabled = ref(document.documentElement.dataset.theme === 'dark')
-
 function toggleDarkMode() {
-  darkModeEnabled.value = !darkModeEnabled.value
-  if (darkModeEnabled.value) {
-    document.documentElement.dataset.theme = 'dark'
-    localStorage.setItem('filvault.theme', 'dark')
-    return
-  }
-  delete document.documentElement.dataset.theme
-  localStorage.setItem('filvault.theme', 'light')
+  setDarkMode(!isDarkMode.value)
 }
 
 // Persisted in localStorage under filvault.locale
@@ -313,7 +304,7 @@ onMounted(() => {
     <section class="card section">
       <h2 class="section-title">{{ t.appearance }}</h2>
       <label class="toggle-row">
-        <input :checked="darkModeEnabled" type="checkbox" class="switch-input" @change="toggleDarkMode" />
+        <input :checked="isDarkMode" type="checkbox" class="switch-input" @change="toggleDarkMode" />
         <span class="switch-track" aria-hidden="true"></span>
         <span class="toggle-label">{{ t.darkMode }}</span>
       </label>

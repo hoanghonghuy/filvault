@@ -24,10 +24,11 @@ describe('dark mode contract', () => {
     expect(main).toMatch(/document\.documentElement\.dataset\.theme/)
   })
 
-  it('exposes a theme toggle in Settings', () => {
+  it('exposes a theme toggle in Settings wired through useTheme', () => {
     expect(settings).toMatch(/t\.appearance/)
     expect(settings).toMatch(/t\.darkMode/)
-    expect(settings).toMatch(/localStorage\.setItem\('filvault.theme'/)
-    expect(settings).toMatch(/document\.documentElement\.dataset\.theme/)
+    expect(settings).toMatch(/useTheme\(\)/)
+    expect(settings).toMatch(/setDarkMode/)
+    expect(settings).toMatch(/isDarkMode/)
   })
 })

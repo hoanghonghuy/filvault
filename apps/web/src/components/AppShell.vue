@@ -247,8 +247,8 @@ const navLabels = computed<Record<string, string>>(() => ({
 }
 
 .header-chat-btn:hover {
-  background: rgba(0, 132, 255, 0.1);
-  color: #0084ff;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
   transform: scale(1.05);
 }
 
