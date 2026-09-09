@@ -63,6 +63,7 @@ describe('upload progress contract', () => {
     const files = readSrc('../views/FilesView.vue')
     expect(files).toContain('<UploadProgress')
     expect(files).toContain('useFileUploadQueue')
+    expect(files).not.toMatch(/:disabled="isUploading"/)
     expect(files).not.toMatch(/Uploading…\s*\{\{/)
   })
 

@@ -295,6 +295,43 @@ describe('FileUploadQueue', () => {
     expect(queue.dismissFailed(failedId)).toBe(false)
   })
 
+  it('appends and processes files enqueued while another upload is in flight', async () => {
+    let releaseFirst: (() => void) | undefined
+    let firstStarted: (() => void) | undefined
+    deps.uploadBytes = vi.fn<UploadQueueDeps['uploadBytes']>(async (_url, file) => {
+      if (file.name === 'first.txt') {
+        firstStarted?.()
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve
+        })
+      }
+    })
+
+    const queue = new FileUploadQueue(deps)
+    queue.enqueueFiles([makeFile('first.txt', 1000)], null)
+    const runPromise = queue.run()
+
+    await new Promise<void>((resolve) => {
+      firstStarted = resolve
+    })
+    expect(queue.items.find((item) => item.file.name === 'first.txt')?.status).toBe('uploading')
+
+    queue.enqueueFiles([makeFile('second.txt', 2000), makeFile('third.txt', 3000)], null)
+    queue.scheduleRun()
+
+    expect(queue.items).toHaveLength(3)
+    expect(queue.items.filter((item) => item.status === 'queued')).toHaveLength(2)
+    expect(computeAggregateProgress(queue.items)).toBeLessThan(1)
+
+    releaseFirst?.()
+    await runPromise
+    await queue.run()
+
+    expect(deps.createSession).toHaveBeenCalledTimes(3)
+    expect(queue.items.every((item) => item.status === 'completed')).toBe(true)
+    expect(computeAggregateProgress(queue.items)).toBe(1)
+  })
+
   it('surfaces actionable conflict errors without auto-renaming when rename budget is exhausted', async () => {
     deps.createSession = vi.fn<UploadQueueDeps['createSession']>(async () => {
       throw new ApiError('CONFLICT', 'Name already exists in this location.', 409)

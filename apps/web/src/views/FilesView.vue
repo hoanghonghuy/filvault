@@ -46,7 +46,6 @@ const searchQuery = ref('')
 const {
   aggregateProgress: uploadAggregateProgress,
   progressItems: uploadProgressItems,
-  isUploading,
   enqueueFiles: enqueueUploadFiles,
   retryUpload,
   cancelUpload,
@@ -1383,7 +1382,6 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <UploadFab
       v-if="segment === 'all' && !isSelecting"
       :label="t.uploadFile"
-      :disabled="isUploading"
       @click="onFabClick"
     />
 

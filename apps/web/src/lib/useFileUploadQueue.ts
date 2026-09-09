@@ -95,8 +95,9 @@ export function useFileUploadQueue(options: {
     return revision >= 0 && queue.items.some((item) => item.status === 'queued' || item.status === 'uploading')
   })
 
-  async function runQueue(): Promise<void> {
-    await queue.run()
+  let activeRun: Promise<void> | null = null
+
+  async function settleQueue(): Promise<void> {
     bump()
 
     const active = queue.items.filter((item) => item.status !== 'cancelled')
@@ -125,6 +126,18 @@ export function useFileUploadQueue(options: {
         await options.onBatchSettled()
       }
     }
+  }
+
+  async function runQueue(): Promise<void> {
+    if (!activeRun) {
+      activeRun = (async () => {
+        await queue.run()
+        await settleQueue()
+      })().finally(() => {
+        activeRun = null
+      })
+    }
+    await activeRun
   }
 
   function enqueueFiles(files: File[], isFolderUpload = false) {

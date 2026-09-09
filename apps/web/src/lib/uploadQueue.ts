@@ -145,6 +145,7 @@ export class FileUploadQueue {
         attempt: 1,
       })
     }
+    this.notifyChange()
   }
 
   retry(id: string): boolean {
