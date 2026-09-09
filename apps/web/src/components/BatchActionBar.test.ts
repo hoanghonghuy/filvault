@@ -63,7 +63,7 @@ describe('BatchActionBar', () => {
     expect(wrapper.emitted('clear-selection')).toBeTruthy()
   })
 
-  it('disables file-only actions for folder-only selection', () => {
+  it('disables file-only actions for folder-only selection with distinct accessible names', () => {
     const wrapper = mount(BatchActionBar, {
       props: {
         selectedCount: 2,
@@ -75,9 +75,15 @@ describe('BatchActionBar', () => {
 
     expect(wrapper.text()).toContain('2 selected')
 
-    const fileOnlyBtns = wrapper.findAll('button[aria-label="Files only"]')
-    expect(fileOnlyBtns.length).toBe(3)
-    fileOnlyBtns.forEach((btn) => {
+    const disabledLabels = [
+      'Download — files only',
+      'Add to favorites — files only',
+      'Move to Vault — files only',
+    ]
+
+    disabledLabels.forEach((label) => {
+      const btn = wrapper.find(`button[aria-label="${label}"]`)
+      expect(btn.exists()).toBe(true)
       expect(btn.attributes('disabled')).toBeDefined()
     })
 
@@ -128,9 +134,15 @@ describe('BatchActionBar', () => {
       },
     })
 
-    const fileOnlyBtns = wrapper.findAll('button[aria-label="Files only"]')
-    expect(fileOnlyBtns.length).toBe(3)
-    fileOnlyBtns.forEach((btn) => {
+    const disabledLabels = [
+      'Download — files only',
+      'Add to favorites — files only',
+      'Move to Vault — files only',
+    ]
+
+    disabledLabels.forEach((label) => {
+      const btn = wrapper.find(`button[aria-label="${label}"]`)
+      expect(btn.exists()).toBe(true)
       expect(btn.attributes('disabled')).toBeDefined()
     })
 
@@ -139,6 +151,28 @@ describe('BatchActionBar', () => {
 
     const deleteBtn = wrapper.find('button[aria-label="Move to trash"]')
     expect(deleteBtn.attributes('disabled')).toBeDefined()
+  })
+
+  it('uses distinct disabled labels in Vietnamese', () => {
+    setLocale('vi')
+    const wrapper = mount(BatchActionBar, {
+      props: {
+        selectedCount: 1,
+        selectedFileCount: 0,
+        selectedFolderCount: 1,
+        totalCount: 5,
+      },
+    })
+
+    const disabledLabels = [
+      'Tải xuống — chỉ áp dụng cho tệp',
+      'Thêm vào yêu thích — chỉ áp dụng cho tệp',
+      'Chuyển vào kho cá nhân — chỉ áp dụng cho tệp',
+    ]
+
+    disabledLabels.forEach((label) => {
+      expect(wrapper.find(`button[aria-label="${label}"]`).exists()).toBe(true)
+    })
   })
 
   it('closes selection on Escape', async () => {

@@ -38,8 +38,12 @@ const countDetail = computed(() => {
     .replace('{folders}', String(props.selectedFolderCount))
 })
 
-function fileScopedLabel(singleKey: keyof typeof t.value, pluralKey: keyof typeof t.value): string {
-  if (!hasFiles.value) return t.value.filesOnlyDisabled
+function fileActionLabel(
+  singleKey: keyof typeof t.value,
+  pluralKey: keyof typeof t.value,
+  disabledKey: keyof typeof t.value,
+): string {
+  if (!hasFiles.value) return t.value[disabledKey] as string
   if (props.selectedFolderCount > 0) {
     const template = t.value[pluralKey] as string
     return template.replace('{n}', String(props.selectedFileCount))
@@ -47,9 +51,15 @@ function fileScopedLabel(singleKey: keyof typeof t.value, pluralKey: keyof typeo
   return t.value[singleKey] as string
 }
 
-const downloadLabel = computed(() => fileScopedLabel('downloadSelected', 'downloadNFiles'))
-const favoriteLabel = computed(() => fileScopedLabel('addToFavorites', 'favoriteNFiles'))
-const vaultLabel = computed(() => fileScopedLabel('vaultMoveToVault', 'vaultNFiles'))
+const downloadLabel = computed(() =>
+  fileActionLabel('downloadSelected', 'downloadNFiles', 'downloadFilesOnly'),
+)
+const favoriteLabel = computed(() =>
+  fileActionLabel('addToFavorites', 'favoriteNFiles', 'favoriteFilesOnly'),
+)
+const vaultLabel = computed(() =>
+  fileActionLabel('vaultMoveToVault', 'vaultNFiles', 'vaultFilesOnly'),
+)
 
 async function openMoreActions() {
   if (!canUseFileActions.value) return

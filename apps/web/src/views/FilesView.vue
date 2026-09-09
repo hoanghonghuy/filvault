@@ -147,7 +147,10 @@ function onItemKeydown(event: KeyboardEvent, type: 'file' | 'folder', id: string
       toggleSelectItem(type, id)
       return
     }
-    if (type === 'folder') void openFolder(id)
+    if (type === 'folder') {
+      event.preventDefault()
+      void openFolder(id)
+    }
   }
   if (event.key === 'Escape' && isSelecting.value) {
     event.preventDefault()
@@ -171,6 +174,7 @@ function onFileItemKeydown(
       toggleSelectItem('file', file.id)
       return
     }
+    event.preventDefault()
     void openFileActions(file)
   }
   if (event.key === 'Escape' && isSelecting.value) {
@@ -1330,7 +1334,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         :class="{ selected: selectedFolderIds.has(folder.id) }"
         role="button"
         tabindex="0"
-        :aria-selected="selectedFolderIds.has(folder.id)"
+        :aria-pressed="isSelecting ? selectedFolderIds.has(folder.id) : undefined"
         :aria-label="folder.name"
         @touchstart.passive="startLongPress($event, { type: 'folder', id: folder.id })"
         @touchmove.passive="moveLongPress"
@@ -1368,7 +1372,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         :class="{ selected: selectedFileIds.has(file.id) }"
         role="button"
         tabindex="0"
-        :aria-selected="selectedFileIds.has(file.id)"
+        :aria-pressed="isSelecting ? selectedFileIds.has(file.id) : undefined"
         :aria-label="file.name"
         @touchstart.passive="startLongPress($event, { type: 'file', id: file.id })"
         @touchmove.passive="moveLongPress"
