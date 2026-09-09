@@ -72,6 +72,21 @@ describe('FilesView filtered search contract', () => {
     expect(files).toMatch(/TransitionGroup[^>]*name="row"/)
     expect(files).toMatch(/results · filtered|results·filtered|· filtered/)
   })
+
+  it('exposes browse item selection with aria-pressed on role=button cards', () => {
+    expect(files).toMatch(/class="file-item-card[\s\S]*?:aria-pressed="isSelecting \? selectedFolderIds\.has\(folder\.id\) : undefined"/)
+    expect(files).toMatch(/class="file-item-card[\s\S]*?:aria-pressed="isSelecting \? selectedFileIds\.has\(file\.id\) : undefined"/)
+    const browseCards = files.match(/class="file-item-card tappable"[\s\S]*?@keydown="onFileItemKeydown/g) ?? []
+    expect(browseCards.length).toBeGreaterThanOrEqual(1)
+    for (const card of browseCards) {
+      expect(card).not.toContain('aria-selected')
+    }
+  })
+
+  it('routes the personal vault shortcut through RouterLink', () => {
+    expect(files).toMatch(/<RouterLink[\s\S]*?class="vault-entry-card/)
+    expect(files).toContain('to="/vault"')
+  })
 })
 
 describe('search filters typing contract', () => {

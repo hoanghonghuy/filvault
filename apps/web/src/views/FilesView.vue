@@ -66,6 +66,8 @@ const isSelecting = ref(false)
 const selectedFileIds = ref<Set<string>>(new Set())
 const selectedFolderIds = ref<Set<string>>(new Set())
 const totalSelectedCount = computed(() => selectedFileIds.value.size + selectedFolderIds.value.size)
+const selectedFileCount = computed(() => selectedFileIds.value.size)
+const selectedFolderCount = computed(() => selectedFolderIds.value.size)
 const totalItemsCount = computed(() => (browser.value?.folders.length ?? 0) + (browser.value?.files.length ?? 0))
 
 function startSelection(type: 'file' | 'folder', id: string) {
@@ -97,6 +99,88 @@ function clearSelection() {
   selectedFileIds.value.clear()
   selectedFolderIds.value.clear()
   isSelecting.value = false
+}
+
+function enterSelectionMode() {
+  isSelecting.value = true
+}
+
+function toggleSelectionMode() {
+  if (isSelecting.value) clearSelection()
+  else enterSelectionMode()
+}
+
+function onItemClick(event: MouseEvent, type: 'file' | 'folder', id: string) {
+  if (shouldIgnoreClick) return
+  const withModifier = event.ctrlKey || event.metaKey
+  if (isSelecting.value || withModifier) {
+    event.preventDefault()
+    if (!isSelecting.value) startSelection(type, id)
+    else toggleSelectItem(type, id)
+    return
+  }
+  if (type === 'folder') void openFolder(id)
+}
+
+function onFileItemClick(event: MouseEvent, file: { id: string; name: string; mimeType?: string }) {
+  if (shouldIgnoreClick) return
+  const withModifier = event.ctrlKey || event.metaKey
+  if (isSelecting.value || withModifier) {
+    event.preventDefault()
+    if (!isSelecting.value) startSelection('file', file.id)
+    else toggleSelectItem('file', file.id)
+    return
+  }
+  void openFileActions(file)
+}
+
+function onItemKeydown(event: KeyboardEvent, type: 'file' | 'folder', id: string) {
+  if (event.key === ' ' || event.key === 'Spacebar') {
+    event.preventDefault()
+    if (!isSelecting.value) startSelection(type, id)
+    else toggleSelectItem(type, id)
+    return
+  }
+  if (event.key === 'Enter') {
+    if (isSelecting.value) {
+      event.preventDefault()
+      toggleSelectItem(type, id)
+      return
+    }
+    if (type === 'folder') {
+      event.preventDefault()
+      void openFolder(id)
+    }
+  }
+  if (event.key === 'Escape' && isSelecting.value) {
+    event.preventDefault()
+    clearSelection()
+  }
+}
+
+function onFileItemKeydown(
+  event: KeyboardEvent,
+  file: { id: string; name: string; mimeType?: string },
+) {
+  if (event.key === ' ' || event.key === 'Spacebar') {
+    event.preventDefault()
+    if (!isSelecting.value) startSelection('file', file.id)
+    else toggleSelectItem('file', file.id)
+    return
+  }
+  if (event.key === 'Enter') {
+    if (isSelecting.value) {
+      event.preventDefault()
+      toggleSelectItem('file', file.id)
+      return
+    }
+    event.preventDefault()
+    void openFileActions(file)
+  }
+  if (event.key === 'Escape' && isSelecting.value) {
+    event.preventDefault()
+    clearSelection()
+  }
 }
 
 // Long-press detection
@@ -703,7 +787,9 @@ function batchMove() {
 }
 
 async function batchDownload() {
-  for (const id of selectedFileIds.value) {
+  const fileIds = Array.from(selectedFileIds.value)
+  if (fileIds.length === 0) return
+  for (const id of fileIds) {
     await downloadFile(id)
   }
   clearSelection()
@@ -1140,6 +1226,17 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <button
           type="button"
           class="sub-icon-btn"
+          :class="{ 'filter-active': isSelecting }"
+          :title="t.selectItems"
+          :aria-label="t.selectItems"
+          :aria-pressed="isSelecting"
+          @click="toggleSelectionMode"
+        >
+          <Icon name="check" :size="18" />
+        </button>
+        <button
+          type="button"
+          class="sub-icon-btn"
           :title="viewMode === 'list' ? t.viewGrid : t.viewList"
           @click="toggleViewMode"
         >
@@ -1235,11 +1332,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         :key="folder.id"
         class="file-item-card tappable"
         :class="{ selected: selectedFolderIds.has(folder.id) }"
+        role="button"
+        tabindex="0"
+        :aria-pressed="isSelecting ? selectedFolderIds.has(folder.id) : undefined"
+        :aria-label="folder.name"
         @touchstart.passive="startLongPress($event, { type: 'folder', id: folder.id })"
         @touchmove.passive="moveLongPress"
         @touchend="endLongPress"
         @touchcancel="cancelLongPress"
-        @click="shouldIgnoreClick ? undefined : (isSelecting ? toggleSelectItem('folder', folder.id) : openFolder(folder.id))"
+        @click="onItemClick($event, 'folder', folder.id)"
+        @keydown="onItemKeydown($event, 'folder', folder.id)"
       >
         <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFolderIds.has(folder.id) }">
           <Icon v-if="selectedFolderIds.has(folder.id)" name="check" :size="14" />
@@ -1268,11 +1370,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         :key="file.id"
         class="file-item-card tappable"
         :class="{ selected: selectedFileIds.has(file.id) }"
+        role="button"
+        tabindex="0"
+        :aria-pressed="isSelecting ? selectedFileIds.has(file.id) : undefined"
+        :aria-label="file.name"
         @touchstart.passive="startLongPress($event, { type: 'file', id: file.id })"
         @touchmove.passive="moveLongPress"
         @touchend="endLongPress"
         @touchcancel="cancelLongPress"
-        @click="shouldIgnoreClick ? undefined : (isSelecting ? toggleSelectItem('file', file.id) : openFileActions(file))"
+        @click="onFileItemClick($event, file)"
+        @keydown="onFileItemKeydown($event, file)"
       >
         <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFileIds.has(file.id) }">
           <Icon v-if="selectedFileIds.has(file.id)" name="check" :size="14" />
@@ -1369,6 +1476,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <BatchActionBar
       v-if="isSelecting"
       :selected-count="totalSelectedCount"
+      :selected-file-count="selectedFileCount"
+      :selected-folder-count="selectedFolderCount"
       :total-count="totalItemsCount"
       @close="clearSelection"
       @select-all="selectAllItems"
@@ -2067,6 +2176,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 .file-item-card.selected {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.file-item-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .file-icon-badge {
