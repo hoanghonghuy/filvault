@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import type { SearchFilters } from '@/api/types'
+import { isValidDateRange, resetSearchFilters } from '@/lib/filesSearchState'
+import { useI18n } from '@/lib/i18n'
 
 const props = defineProps<{
   open: boolean
@@ -13,34 +15,35 @@ const emit = defineEmits<{
   apply: [filters: SearchFilters]
 }>()
 
-const TYPE_OPTIONS: Array<{ value: SearchFilters['type']; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'image', label: 'Images' },
-  { value: 'video', label: 'Videos' },
-  { value: 'document', label: 'Documents' },
-  { value: 'archive', label: 'Archives' },
-  { value: 'folder', label: 'Folders' },
-]
-
-const SORT_OPTIONS: Array<{ value: SearchFilters['sort']; label: string }> = [
-  { value: 'relevance', label: 'Best match' },
-  { value: 'name', label: 'Name' },
-  { value: 'date', label: 'Date' },
-  { value: 'size', label: 'Size' },
-]
-
-type OrderValue = Exclude<SearchFilters['order'], undefined>
-
-const ORDER_OPTIONS: Array<{ value: OrderValue; label: string }> = [
-  { value: 'desc', label: 'Descending' },
-  { value: 'asc', label: 'Ascending' },
-]
+const { t } = useI18n()
 
 const type = ref<SearchFilters['type']>('all')
 const sort = ref<SearchFilters['sort']>('relevance')
-const order = ref<OrderValue>('desc')
+const order = ref<Exclude<SearchFilters['order'], undefined>>('desc')
 const fromDate = ref('')
 const toDate = ref('')
+const dateError = ref('')
+
+const typeOptions = computed(() => [
+  { value: 'all' as const, label: t.value.all },
+  { value: 'image' as const, label: t.value.filterTypeImage },
+  { value: 'video' as const, label: t.value.filterTypeVideo },
+  { value: 'document' as const, label: t.value.filterTypeDocument },
+  { value: 'archive' as const, label: t.value.filterTypeArchive },
+  { value: 'folder' as const, label: t.value.filterTypeFolder },
+])
+
+const sortOptions = computed(() => [
+  { value: 'relevance' as const, label: t.value.searchSortRelevance },
+  { value: 'name' as const, label: t.value.searchSortName },
+  { value: 'date' as const, label: t.value.searchSortDate },
+  { value: 'size' as const, label: t.value.searchSortSize },
+])
+
+const orderOptions = computed(() => [
+  { value: 'desc' as const, label: t.value.orderDescending },
+  { value: 'asc' as const, label: t.value.orderAscending },
+])
 
 watch(
   () => props.open,
@@ -52,27 +55,51 @@ watch(
     order.value = f.order ?? 'desc'
     fromDate.value = f.from ?? ''
     toDate.value = f.to ?? ''
+    dateError.value = ''
   },
 )
 
+watch([fromDate, toDate], () => {
+  if (!fromDate.value || !toDate.value) {
+    dateError.value = ''
+    return
+  }
+  dateError.value = isValidDateRange(fromDate.value, toDate.value) ? '' : t.value.dateRangeInvalid
+})
+
+function onReset() {
+  const defaults = resetSearchFilters()
+  type.value = defaults.type
+  sort.value = defaults.sort
+  order.value = defaults.order ?? 'desc'
+  fromDate.value = ''
+  toDate.value = ''
+  dateError.value = ''
+}
+
 function onApply() {
+  if (!isValidDateRange(fromDate.value, toDate.value)) {
+    dateError.value = t.value.dateRangeInvalid
+    return
+  }
   emit('apply', {
     type: type.value,
     sort: sort.value,
     order: order.value,
     ...(fromDate.value ? { from: fromDate.value } : {}),
     ...(toDate.value ? { to: toDate.value } : {}),
+    ...(props.filters.folderId ? { folderId: props.filters.folderId } : {}),
   })
 }
 </script>
 
 <template>
-  <BottomSheet :open="open" title="Search filters" @close="emit('close')">
+  <BottomSheet :open="open" :title="t.searchFiltersTitle" @close="emit('close')">
     <form class="filter-form" @submit.prevent="onApply">
       <fieldset class="field-group">
-        <legend>Type</legend>
+        <legend>{{ t.filterByType }}</legend>
         <div class="option-grid">
-          <label v-for="opt in TYPE_OPTIONS" :key="opt.value" class="option-pill">
+          <label v-for="opt in typeOptions" :key="opt.value" class="option-pill">
             <input v-model="type" type="radio" name="filter-type" :value="opt.value" />
             <span>{{ opt.label }}</span>
           </label>
@@ -80,9 +107,9 @@ function onApply() {
       </fieldset>
 
       <fieldset class="field-group">
-        <legend>Sort by</legend>
+        <legend>{{ t.searchSortBy }}</legend>
         <div class="option-grid">
-          <label v-for="opt in SORT_OPTIONS" :key="opt.value" class="option-pill">
+          <label v-for="opt in sortOptions" :key="opt.value" class="option-pill">
             <input v-model="sort" type="radio" name="filter-sort" :value="opt.value" />
             <span>{{ opt.label }}</span>
           </label>
@@ -90,9 +117,9 @@ function onApply() {
       </fieldset>
 
       <fieldset class="field-group">
-        <legend>Order</legend>
+        <legend>{{ t.searchOrder }}</legend>
         <div class="option-grid option-grid-narrow">
-          <label v-for="opt in ORDER_OPTIONS" :key="opt.value" class="option-pill">
+          <label v-for="opt in orderOptions" :key="opt.value" class="option-pill">
             <input v-model="order" type="radio" name="filter-order" :value="opt.value" />
             <span>{{ opt.label }}</span>
           </label>
@@ -100,20 +127,24 @@ function onApply() {
       </fieldset>
 
       <fieldset class="field-group">
-        <legend>Date range</legend>
+        <legend>{{ t.dateRange }}</legend>
         <div class="date-row">
           <label class="field">
-            <span>From</span>
-            <input v-model="fromDate" type="date" />
+            <span>{{ t.dateFrom }}</span>
+            <input v-model="fromDate" type="date" :aria-invalid="dateError ? 'true' : undefined" />
           </label>
           <label class="field">
-            <span>To</span>
-            <input v-model="toDate" type="date" />
+            <span>{{ t.dateTo }}</span>
+            <input v-model="toDate" type="date" :aria-invalid="dateError ? 'true' : undefined" />
           </label>
         </div>
+        <p v-if="dateError" class="date-error" role="alert">{{ dateError }}</p>
       </fieldset>
 
-      <button type="submit" class="btn block ink">Apply filters</button>
+      <div class="filter-actions">
+        <button type="button" class="btn" @click="onReset">{{ t.resetFilters }}</button>
+        <button type="submit" class="btn block ink" :disabled="Boolean(dateError)">{{ t.applyFilters }}</button>
+      </div>
     </form>
   </BottomSheet>
 </template>
@@ -184,5 +215,27 @@ function onApply() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-sm);
+}
+
+.date-error {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.8125rem;
+  color: var(--danger);
+}
+
+.filter-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+@media (min-width: 480px) {
+  .filter-actions {
+    flex-direction: row;
+  }
+
+  .filter-actions .btn.block {
+    flex: 1;
+  }
 }
 </style>
