@@ -3,6 +3,13 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { e2eFolderName, e2eImageFileName, e2eTextFileName } from './env'
+import {
+  clickActionSheetItem,
+  closePreviewDialog,
+  confirmDialog,
+  mobileFab,
+  topDialog,
+} from './ui'
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../fixtures')
 
@@ -19,17 +26,17 @@ export async function createFolder(page: Page, folderName: string): Promise<void
   const isMobile = (viewport?.width ?? 0) < 768
 
   if (isMobile) {
-    await page.getByRole('button', { name: /^Upload file$/ }).click()
-    await page.getByRole('button', { name: /^New folder$/ }).click()
+    await mobileFab(page).click()
+    await clickActionSheetItem(page, /^New folder$/)
   } else {
-    await page.getByRole('button', { name: /^New folder$/ }).click()
+    await page.locator('.files-page .desktop-only').getByRole('button', { name: /^New folder$/ }).click()
   }
 
-  const dialog = page.getByRole('dialog')
+  const dialog = topDialog(page)
   await expect(dialog).toBeVisible()
   await dialog.locator('input[type="text"]').fill(folderName)
   await dialog.getByRole('button', { name: /^Create folder$/ }).click()
-  await expect(page.getByRole('button', { name: folderName })).toBeVisible()
+  await expect(page.getByRole('button', { name: folderName, exact: true })).toBeVisible()
 }
 
 export async function uploadFile(page: Page, kind: 'text' | 'image', targetName: string): Promise<void> {
@@ -37,8 +44,8 @@ export async function uploadFile(page: Page, kind: 'text' | 'image', targetName:
   const isMobile = (viewport?.width ?? 0) < 768
 
   if (isMobile) {
-    await page.getByRole('button', { name: /^Upload file$/ }).click()
-    await page.getByRole('button', { name: /^Upload$/ }).click()
+    await mobileFab(page).click()
+    await clickActionSheetItem(page, /^Upload$/)
   }
 
   const payload =
@@ -54,22 +61,21 @@ export async function openFileActions(page: Page, fileName: string): Promise<voi
   const fileCard = page.getByRole('button', { name: fileName, exact: true })
   await expect(fileCard).toBeVisible()
   await fileCard.getByRole('button', { name: /^File actions$/ }).click()
-  await expect(page.getByRole('dialog').last()).toBeVisible()
+  await expect(topDialog(page)).toBeVisible()
 }
 
 export async function previewFile(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
-  await page.getByRole('dialog').last().getByRole('button', { name: /^Preview$/ }).click()
+  await clickActionSheetItem(page, /^Preview$/)
   const previewDialog = page.getByRole('dialog', { name: fileName })
   await expect(previewDialog).toBeVisible()
-  await previewDialog.getByRole('button', { name: /^Close preview$/ }).click()
-  await expect(previewDialog).toBeHidden()
+  await closePreviewDialog(page, fileName)
 }
 
 export async function downloadFile(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
   const popupPromise = page.waitForEvent('popup')
-  await page.getByRole('dialog').last().getByRole('button', { name: /^Download$/ }).click()
+  await clickActionSheetItem(page, /^Download$/)
   const popup = await popupPromise
   await popup.waitForLoadState('domcontentloaded')
   await popup.close()
@@ -77,16 +83,16 @@ export async function downloadFile(page: Page, fileName: string): Promise<void> 
 
 export async function moveFileToTrash(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
-  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
-  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
+  await clickActionSheetItem(page, /^Move to trash$/)
+  await confirmDialog(page, /^Move to trash$/)
   await expect(page.getByRole('button', { name: fileName, exact: true })).toHaveCount(0)
 }
 
 export async function moveFolderToTrash(page: Page, folderName: string): Promise<void> {
   const folderCard = page.getByRole('button', { name: folderName, exact: true })
   await folderCard.getByRole('button', { name: /^Folder actions$/ }).click()
-  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
-  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
+  await clickActionSheetItem(page, /^Move to trash$/)
+  await confirmDialog(page, /^Move to trash$/)
   await expect(folderCard).toHaveCount(0)
 }
 
@@ -99,8 +105,7 @@ export async function purgeFromTrash(page: Page, names: string[]): Promise<void>
       continue
     }
     await card.first().getByTitle('Delete forever').click()
-    const confirmDialog = page.getByRole('dialog')
-    await confirmDialog.getByRole('button', { name: /^Delete forever$/ }).click()
+    await confirmDialog(page, /^Delete forever$/)
     await expect(card).toHaveCount(0)
   }
 }

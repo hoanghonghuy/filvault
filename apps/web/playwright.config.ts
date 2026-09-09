@@ -57,6 +57,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       E2E_API_URL: apiURL,
+      VITE_DISABLE_VUE_DEVTOOLS: 'true',
     },
   },
 })

@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { e2eEmail, e2ePassword } from './env'
 import { useEnglishLocale } from './locale'
+import { confirmDialog } from './ui'
 
 export async function login(page: Page): Promise<void> {
   await useEnglishLocale(page)
@@ -13,7 +14,7 @@ export async function login(page: Page): Promise<void> {
 
 export async function logout(page: Page): Promise<void> {
   await page.goto('/settings')
-  await page.getByRole('button', { name: /^Log out$/ }).click()
-  await page.getByRole('button', { name: /^Log out$/ }).last().click()
+  await page.locator('.settings-page').getByRole('button', { name: /^Log out$/ }).click()
+  await confirmDialog(page, /^Log out$/)
   await expect(page).toHaveURL(/\/login/)
 }
