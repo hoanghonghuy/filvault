@@ -27,7 +27,8 @@ Filvault production-like release smoke (#43).
 Steps (--fail-at values): reachable, authenticate, browse, upload, verify, restart, persist, cleanup
 
 Environment:
-  SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD  deterministic test identity (defaults in smoke-common.sh)
+  SMOKE_USER_EMAIL       smoke account email (default: release-smoke@filvault.local)
+  SMOKE_USER_PASSWORD    optional; if unset, a strong ephemeral password is generated in-memory per run (never logged)
 EOF
 }
 
@@ -49,8 +50,16 @@ if $SELF_CHECK; then
   bash -n "$ROOT/deploy/production/rollback-verify.sh"
   require_cmd jq
   require_cmd curl
+  require_cmd openssl
   [[ -f "$ROOT/deploy/production/fixtures/release-smoke.txt" ]] || smoke_fail "missing fixture"
   grep -q 'release-smoke-persistence-v1' "$ROOT/deploy/production/fixtures/release-smoke.txt" || smoke_fail "fixture marker missing"
+  if grep -q 'release-smoke-password' "$ROOT/deploy/production/lib/smoke-common.sh"; then
+    smoke_fail "hardcoded smoke password fallback still present in smoke-common.sh"
+  fi
+  local_test_pw=""
+  local_test_pw="$(openssl rand -hex 16 2>/dev/null || true)"
+  [[ -n "$local_test_pw" ]] || smoke_fail "openssl ephemeral password generation unavailable"
+  unset local_test_pw
   smoke_log "self-check OK"
   exit 0
 fi

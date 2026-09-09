@@ -85,7 +85,16 @@ One documented command verifies the **core release path** against this stack:
 make prod-like-release-smoke
 ```
 
-Coverage: edge reachable → register/login (deterministic smoke user) → browse Files → upload fixture → download checksum → **restart `api`/`web`/`worker` only** (Postgres/MinIO volumes intact) → confirm metadata + object persist → logout/cleanup.
+Coverage: edge reachable → register/login (deterministic smoke email; **ephemeral or injected password**) → browse Files → upload fixture → download checksum → **restart `api`/`web`/`worker` only** (Postgres/MinIO volumes intact) → confirm metadata + object persist → logout/cleanup.
+
+Smoke identity:
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `SMOKE_USER_EMAIL` | `release-smoke@filvault.local` | Stable email for login-or-register within a run |
+| `SMOKE_USER_PASSWORD` | *(generated per run)* | Inject to reuse an existing smoke account; otherwise a strong ephemeral password is generated in-memory (never logged or written to disk) |
+
+If a prior run left `SMOKE_USER_EMAIL` in the database with a different ephemeral password, export `SMOKE_USER_PASSWORD` for that account or reset the smoke user / postgres volume before re-running.
 
 | Command | Purpose |
 |---------|---------|

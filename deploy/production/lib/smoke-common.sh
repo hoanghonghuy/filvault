@@ -9,10 +9,12 @@ SMOKE_ROOT="$(cd "$SMOKE_SCRIPT_DIR/../.." && pwd)"
 COMPOSE="${COMPOSE:-docker compose -f docker-compose.prod.yml --env-file deploy/production/.env}"
 MAILPIT_API="${MAILPIT_API:-http://127.0.0.1:8025/api/v1}"
 
-# Deterministic release-smoke identity (not a deployment secret).
+# Deterministic smoke email for login-or-register within a run (not a deployment secret).
 SMOKE_USER_EMAIL="${SMOKE_USER_EMAIL:-release-smoke@filvault.local}"
-SMOKE_USER_PASSWORD="${SMOKE_USER_PASSWORD:-release-smoke-password}"
 SMOKE_USER_DISPLAY="${SMOKE_USER_DISPLAY:-Release Smoke}"
+# SMOKE_USER_PASSWORD: inject via env or generate once per process in ensure_smoke_password() — never commit/log.
+SMOKE_USER_PASSWORD="${SMOKE_USER_PASSWORD:-}"
+SMOKE_PASSWORD_RESOLVED=false
 
 SMOKE_STEP=""
 SMOKE_FAIL_AT=""
@@ -54,6 +56,26 @@ require_cmd() {
   if ! command -v "$cmd" >/dev/null 2>&1; then
     smoke_fail "required command not found: $cmd"
   fi
+}
+
+ensure_smoke_password() {
+  if $SMOKE_PASSWORD_RESOLVED; then
+    return 0
+  fi
+  if [[ -n "$SMOKE_USER_PASSWORD" ]]; then
+    SMOKE_PASSWORD_RESOLVED=true
+    smoke_log "smoke password: operator-provided via SMOKE_USER_PASSWORD (value not logged)"
+    return 0
+  fi
+  require_cmd openssl
+  local generated=""
+  if ! generated="$(openssl rand -hex 16 2>/dev/null)" || [[ -z "$generated" ]]; then
+    smoke_fail "could not generate ephemeral smoke password (openssl rand failed)"
+  fi
+  SMOKE_USER_PASSWORD="$generated"
+  unset generated
+  SMOKE_PASSWORD_RESOLVED=true
+  smoke_log "smoke password: ephemeral (generated in-memory for this run; not logged)"
 }
 
 load_prod_env() {
@@ -143,6 +165,7 @@ restart_app_services() {
 }
 
 ensure_smoke_user() {
+  ensure_smoke_password
   local login_body
   login_body="$(printf '{"email":"%s","password":"%s"}' "$SMOKE_USER_EMAIL" "$SMOKE_USER_PASSWORD")"
   api_call POST /api/v1/auth/login "$login_body"
@@ -160,7 +183,7 @@ ensure_smoke_user() {
     '{email:$email,password:$password,displayName:$name,inviteCode:$invite}')"
   api_call POST /api/v1/auth/register "$reg_body"
   if [[ "$API_LAST_CODE" == "409" ]]; then
-    smoke_fail "smoke user exists but login failed (HTTP $API_LAST_CODE on prior login) — reset volumes or align password"
+    smoke_fail "smoke user $SMOKE_USER_EMAIL exists but login failed — export SMOKE_USER_PASSWORD for that account, or remove the user / reset postgres volume before re-running with an ephemeral password"
   fi
   assert_http "$API_LAST_CODE" "201" "register smoke user"
 
@@ -176,6 +199,7 @@ ensure_smoke_user() {
 }
 
 smoke_login() {
+  ensure_smoke_password
   local body
   body="$(printf '{"email":"%s","password":"%s"}' "$SMOKE_USER_EMAIL" "$SMOKE_USER_PASSWORD")"
   api_call POST /api/v1/auth/login "$body"
