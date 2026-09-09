@@ -34,11 +34,20 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             if docker compose exec -T postgres pg_isready -U filvault -d filvault >/dev/null 2>&1; then
+              echo "postgres ready after ${i}s"
               exit 0
             fi
             sleep 1
           done
-          echo "postgres did not become ready"
+          echo "postgres did not become ready within 30s"
+          echo "--- docker compose ps ---"
+          docker compose ps -a
+          echo "--- postgres logs (last 80 lines) ---"
+          docker compose logs --tail=80 postgres
+          echo "--- minio logs (last 40 lines) ---"
+          docker compose logs --tail=40 minio
+          echo "--- minio-init logs (last 40 lines) ---"
+          docker compose logs --tail=40 minio-init
           exit 1
 
       - name: Migrate (pre-deploy)
