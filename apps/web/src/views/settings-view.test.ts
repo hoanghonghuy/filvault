@@ -6,8 +6,12 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SettingsView from './SettingsView.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import { setLocale } from '@/lib/i18n'
 import type { User } from '@/api/types'
+
+const setAppearanceMode = vi.fn<(mode: 'system' | 'light' | 'dark') => void>()
+let routeLeaveGuard: (() => Promise<boolean>) | null = null
 
 const baseUser: User = {
   id: '01KSETTINGSUSER00000000000001',
@@ -40,7 +44,9 @@ vi.mock('vue-router', () => ({
     props: ['to'],
     template: '<a><slot /></a>',
   },
-  onBeforeRouteLeave: vi.fn<() => void>(),
+  onBeforeRouteLeave: vi.fn<(guard: () => Promise<boolean>) => void>((guard) => {
+    routeLeaveGuard = guard
+  }),
 }))
 
 vi.mock('@/lib/theme', () => ({
@@ -53,8 +59,11 @@ vi.mock('@/lib/theme', () => ({
     },
   ],
   useTheme: () => ({
+    appearanceMode: { value: 'light' },
     currentColorTheme: { value: 'default' },
+    resolvedIsDark: { value: false },
     applyColorTheme: vi.fn<(id: string) => void>(),
+    setAppearanceMode,
   }),
 }))
 
@@ -95,6 +104,8 @@ function findCheckboxByLabel(wrapper: ReturnType<typeof mount>, label: string) {
 describe('SettingsView explicit settings', () => {
   beforeEach(() => {
     setLocale('en')
+    routeLeaveGuard = null
+    setAppearanceMode.mockReset()
     apiMock.mockReset()
     apiMock.mockImplementation(async (path: string) => {
       if (path === '/share-links') return { links: [] }
@@ -220,5 +231,47 @@ describe('SettingsView explicit settings', () => {
     expect(auth.user?.videoThumbnailsEnabled).toBe(true)
     expect((previewToggle!.element as HTMLInputElement).checked).toBe(false)
     expect(findPreviewSaveButton(wrapper)?.attributes('disabled')).toBeUndefined()
+  })
+
+  it('applies appearance mode immediately via theme service without account PATCH', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const darkModeButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Dark')
+    expect(darkModeButton).toBeTruthy()
+    await darkModeButton!.trigger('click')
+    await flushPromises()
+
+    expect(setAppearanceMode).toHaveBeenCalledWith('dark')
+    const patchCalls = apiMock.mock.calls.filter(([path, options]) => path === '/users/me' && options?.method === 'PATCH')
+    expect(patchCalls).toHaveLength(0)
+  })
+
+  it('prompts before route leave when explicit-save sections have unsaved edits', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const auth = useAuthStore(pinia)
+    auth.user = { ...baseUser }
+    const ui = useUiStore(pinia)
+    const confirmSpy = vi.spyOn(ui, 'confirm').mockResolvedValue(false)
+
+    const wrapper = mount(SettingsView, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    await wrapper.get('input[type="number"]').setValue(14)
+    await flushPromises()
+
+    expect(routeLeaveGuard).toBeTruthy()
+    const allowed = await routeLeaveGuard!()
+    expect(allowed).toBe(false)
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Discard unsaved changes?',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Stay',
+      }),
+    )
   })
 })
