@@ -1,6 +1,6 @@
 # Filvault — Trạng thái sản phẩm & bàn giao (hiện tại)
 
-Cập nhật: **2026-09-10** (`develop` @ `21e2eeb` — post [#55](https://github.com/hoanghonghuy/filvault/pull/55) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) E2E; trước đó [#56](https://github.com/hoanghonghuy/filvault/pull/56) / [#17](https://github.com/hoanghonghuy/filvault/issues/17), [#48](https://github.com/hoanghonghuy/filvault/pull/48) / [#6](https://github.com/hoanghonghuy/filvault/issues/6)).  
+Cập nhật: **2026-09-10** (`develop` @ `580b21a` — post [#58](https://github.com/hoanghonghuy/filvault/pull/58) / [#21](https://github.com/hoanghonghuy/filvault/issues/21) Files search/filter; trước đó [#55](https://github.com/hoanghonghuy/filvault/pull/55) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) E2E).  
 **Nguồn sự thật duy nhất** cho trạng thái sản phẩm, mục tiêu release và việc nên làm tiếp.
 
 > Các checklist Phase 1/2 ([08](08-phase-1-status.md), [10](10-phase-2-status.md)) chỉ còn giá trị **lịch sử** — không dùng phần “việc tiếp theo” ở đó.
@@ -14,7 +14,7 @@ Cập nhật: **2026-09-10** (`develop` @ `21e2eeb` — post [#55](https://githu
 | Nhánh điều khiển? | **`develop`** — mọi PR feature merge vào đây (protected; xem [Hợp đồng merge](#hợp-đồng-merge-pr--developmain)). |
 | Mục tiêu sản phẩm? | **Filvault production-ready** (không còn MVP/local-only). Triển khai, bảo mật, UX polish và QA release là công việc hiện tại — không phải “sau khi xong Phase 2”. |
 | Spec kiến trúc / API? | [`docs/spec/README.md`](README.md), [`04-api.md`](04-api.md), [`05-architecture.md`](05-architecture.md) |
-| Design system (SoT)? | [`DESIGN.md`](../../DESIGN.md) — [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) open (MERGEABLE vs `develop`; shell-language recon với AppShell three-form-factor contract #48; chờ Designer/QA review) |
+| Design system (SoT)? | [`DESIGN.md`](../../DESIGN.md) — [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) open (behind `develop`; cần reconcile; chờ Designer/QA review) |
 | Bảo mật / secrets? | [#3](https://github.com/hoanghonghuy/filvault/issues/3) (đã merge [#13](https://github.com/hoanghonghuy/filvault/pull/13)); audit: [`docs/security/`](../security/) |
 | Việc tiếp theo nên làm gì? | **Mục [Backlog đang mở](#backlog-đang-mở)** — chỉ link issue/PR; trạng thái mutable lấy từ GitHub, không freeze checklist chi tiết trong doc. |
 
@@ -59,13 +59,13 @@ make dev-web            # Vue :5173 (Node ^22)
 | Nhóm | Functional | Polish / hardening | Release-ready |
 |---|---|---|---|
 | **Auth & account** — invite, register, verify email, login/refresh, profile, đổi mật khẩu | Có (Phase 1) | [#28](https://github.com/hoanghonghuy/filvault/issues/28), [#27](https://github.com/hoanghonghuy/filvault/issues/27) | Chưa — phụ thuộc epic [#4](https://github.com/hoanghonghuy/filvault/issues/4) |
-| **Files & folders** — browser, upload presign, rename/move, search/filter, trash | Có | [#21](https://github.com/hoanghonghuy/filvault/issues/21) IN_PROGRESS → PR [#58](https://github.com/hoanghonghuy/filvault/pull/58) (coherent search & filters; MERGEABLE vs `develop`; PR-Agent order-chip thread đang fix riêng); upload queue đã merge [#12](https://github.com/hoanghonghuy/filvault/pull/12) | Chưa |
+| **Files & folders** — browser, upload presign, rename/move, search/filter, trash | Có (coherent search & filters [#58](https://github.com/hoanghonghuy/filvault/pull/58) / [#21](https://github.com/hoanghonghuy/filvault/issues/21); upload queue [#12](https://github.com/hoanghonghuy/filvault/pull/12)) | — | Chưa |
 | **Upload queue** — hàng đợi per-file, retry | Có ([#12](https://github.com/hoanghonghuy/filvault/pull/12)) | — | Chưa |
 | **Photos & albums** — timeline, album, cover, favorites | Có (Phase 2 S2–S3) | [#23](https://github.com/hoanghonghuy/filvault/issues/23), [#29](https://github.com/hoanghonghuy/filvault/issues/29) | Chưa |
 | **Sharing** — public link, share user nội bộ, Shared with me | Có (Phase 2 S4–S5) | [#25](https://github.com/hoanghonghuy/filvault/issues/25), [#24](https://github.com/hoanghonghuy/filvault/issues/24), [#32](https://github.com/hoanghonghuy/filvault/issues/32) | Chưa |
 | **Chat & calls** — direct message, attachment, SSE, video call (LiveKit) | Có (C1–C7 + ADR 0005) | [#33](https://github.com/hoanghonghuy/filvault/issues/33), [#30](https://github.com/hoanghonghuy/filvault/issues/30) | Chưa |
 | **Vault** — khu vực file cá nhân (`/vault`) | Có (routing [#37](https://github.com/hoanghonghuy/filvault/pull/37); UX media/a11y [#44](https://github.com/hoanghonghuy/filvault/pull/44) / [#18](https://github.com/hoanghonghuy/filvault/issues/18)) | Cross-cutting: [#29](https://github.com/hoanghonghuy/filvault/issues/29) (MediaLightbox) | Chưa |
-| **Themes & settings** — dark/system, color themes, Theme Center | Có (cơ bản; free-only UI [#56](https://github.com/hoanghonghuy/filvault/pull/56) / [#17](https://github.com/hoanghonghuy/filvault/issues/17)) | [#15](https://github.com/hoanghonghuy/filvault/issues/15) IN_PROGRESS → PR [#59](https://github.com/hoanghonghuy/filvault/pull/59) (unify appearance state; MERGEABLE vs `develop`; PR-Agent migration thread đang fix riêng), [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#34](https://github.com/hoanghonghuy/filvault/issues/34), [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (`auth.user` canonicality đã xử lý trên PR — PATCH response only, unsaved edits giữ trong SettingsView-local refs; chờ human review) | Chưa |
+| **Themes & settings** — dark/system, color themes, Theme Center | Có (cơ bản; free-only UI [#56](https://github.com/hoanghonghuy/filvault/pull/56) / [#17](https://github.com/hoanghonghuy/filvault/issues/17)) | [#15](https://github.com/hoanghonghuy/filvault/issues/15) IN_PROGRESS → PR [#59](https://github.com/hoanghonghuy/filvault/pull/59) (behind `develop`; cần reconcile; PR-Agent migration thread đang fix riêng), [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#34](https://github.com/hoanghonghuy/filvault/issues/34), [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (reconciled onto `develop`; `auth.user` canonicality đã xử lý — PATCH response only, unsaved edits giữ trong SettingsView-local refs; chờ human review) | Chưa |
 | **Trash & activity** | Có | [#26](https://github.com/hoanghonghuy/filvault/issues/26) | Chưa |
 | **Shell & navigation** — responsive, Overview shortcuts | Có (responsive AppShell [#48](https://github.com/hoanghonghuy/filvault/pull/48) / [#6](https://github.com/hoanghonghuy/filvault/issues/6); no misleading PRO UI [#56](https://github.com/hoanghonghuy/filvault/pull/56) / [#17](https://github.com/hoanghonghuy/filvault/issues/17)) | [#22](https://github.com/hoanghonghuy/filvault/issues/22), [#16](https://github.com/hoanghonghuy/filvault/issues/16) | Chưa |
 | **CLI** (`bin/filvault`) | Có (login, ls, upload, download — spec [09-cli](09-cli.md)) | Chưa ưu tiên release | Chưa |
@@ -87,12 +87,12 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 | Secret scanning (PR) | Enforced + đã merge hardening | [#3](https://github.com/hoanghonghuy/filvault/issues/3), [#13](https://github.com/hoanghonghuy/filvault/pull/13) |
 | Health `/healthz`, readiness `/readyz`, migration gate | Đã merge | [#45](https://github.com/hoanghonghuy/filvault/pull/45), [`docs/ops/health-readiness-migration.md`](../ops/health-readiness-migration.md) |
 | Production runtime (TLS edge, reverse proxy, env contract) | **Đã merge** | [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42) (`17bad79`) |
-| Release smoke + persistence restart + rollback runbook | **PARKED** | [#43](https://github.com/hoanghonghuy/filvault/issues/43) — Docker/production-like runtime evidence (`make prod-like-up`, `make prod-like-release-smoke`, fail-at diagnostic, `make prod-like-rollback-verify`); PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (draft; head reconciled vs `develop`; CI xanh **không** đủ để undraft) |
+| Release smoke + persistence restart + rollback runbook | **PARKED** | [#43](https://github.com/hoanghonghuy/filvault/issues/43) — Docker-host runtime evidence (`make prod-like-up`, `make prod-like-release-smoke`, fail-at diagnostic, `make prod-like-rollback-verify`); PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (draft; behind `develop`; cần reconcile; CI xanh **không** đủ để undraft) |
 | Protected integration branches + required PR quality gates + review-thread resolution | **Enforced** | Ruleset [22665159](https://github.com/hoanghonghuy/filvault/rules/22665159); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (handoff doc #39/#47 + human close) |
 | Browser E2E critical path (`Web — E2E critical path`) | **Đã merge** + **required** on ruleset | [#55](https://github.com/hoanghonghuy/filvault/pull/55) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) |
-| Design system đồng bộ surfaces hiện tại | Chưa | [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) open (MERGEABLE vs `develop`; shell-language recon với AppShell three-form-factor contract #48; chờ Designer/QA review) |
+| Design system đồng bộ surfaces hiện tại | Chưa | [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) open (behind `develop`; cần reconcile; shell-language recon với AppShell three-form-factor contract #48; chờ Designer/QA review) |
 
-**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41, #42 và #7/#55 (E2E) đã merge; branch protection + 5 required checks enforced (ruleset `22665159`, [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS until handoff lands + human close); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** on external Docker evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49)).
+**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41, #42, #7/#55 (E2E) và #21/#58 (Files search/filter) đã merge; branch protection + 5 required checks + review-thread resolution enforced (ruleset `22665159`, [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS until handoff #47 accepted + human close); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** on Docker-host runtime evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) draft).
 
 ---
 
@@ -115,23 +115,23 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 
 ## Backlog đang mở
 
-Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** issue/PR, không duplicate checklist mutable. Snapshot: `develop` @ `21e2eeb` (2026-09-10).
+Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** issue/PR, không duplicate checklist mutable. Snapshot: `develop` @ `580b21a` (2026-09-10).
 
 ### PR đang mở (ưu tiên review/merge)
 
 | PR | Issue | Mô tả ngắn |
 |---|---|---|
-| [#58](https://github.com/hoanghonghuy/filvault/pull/58) | [#21](https://github.com/hoanghonghuy/filvault/issues/21) | Coherent Files search & filters (open; MERGEABLE vs `develop`; PR-Agent order-chip thread đang fix riêng) |
-| [#59](https://github.com/hoanghonghuy/filvault/pull/59) | [#15](https://github.com/hoanghonghuy/filvault/issues/15) | Unify appearance state (light/dark/system + accent themes) (open; MERGEABLE vs `develop`; PR-Agent migration thread đang fix riêng) |
-| [#54](https://github.com/hoanghonghuy/filvault/pull/54) | [#8](https://github.com/hoanghonghuy/filvault/issues/8) | DESIGN.md reconcile (open; MERGEABLE vs `develop`; chờ Designer/QA — không self-merge) |
-| [#57](https://github.com/hoanghonghuy/filvault/pull/57) | [#36](https://github.com/hoanghonghuy/filvault/issues/36) | Settings section-scoped save (open; MERGEABLE vs `develop`; `auth.user` canonicality đã xử lý trên PR; chờ human review) |
-| [#49](https://github.com/hoanghonghuy/filvault/pull/49) | [#43](https://github.com/hoanghonghuy/filvault/issues/43) | Release smoke — **PARKED** (draft; head reconciled vs `develop`; evidence gate: `make prod-like-up`, `make prod-like-release-smoke`, fail-at diagnostic, `make prod-like-rollback-verify`; CI xanh không đủ để undraft) |
-| [#47](https://github.com/hoanghonghuy/filvault/pull/47) | [#39](https://github.com/hoanghonghuy/filvault/issues/39) | Handoff doc này (draft) |
+| [#57](https://github.com/hoanghonghuy/filvault/pull/57) | [#36](https://github.com/hoanghonghuy/filvault/issues/36) | Settings section-scoped save (reconciled onto `develop`; `auth.user` canonicality đã xử lý; chờ human review) |
+| [#59](https://github.com/hoanghonghuy/filvault/pull/59) | [#15](https://github.com/hoanghonghuy/filvault/issues/15) | Unify appearance state (behind `develop`; cần reconcile; PR-Agent migration thread đang fix riêng) |
+| [#54](https://github.com/hoanghonghuy/filvault/pull/54) | [#8](https://github.com/hoanghonghuy/filvault/issues/8) | DESIGN.md reconcile (behind `develop`; cần reconcile; chờ Designer/QA — không self-merge) |
+| [#49](https://github.com/hoanghonghuy/filvault/pull/49) | [#43](https://github.com/hoanghonghuy/filvault/issues/43) | Release smoke — **PARKED** (draft; behind `develop`; cần reconcile; Docker-host evidence gate — CI xanh không đủ để undraft) |
+| [#47](https://github.com/hoanghonghuy/filvault/pull/47) | [#39](https://github.com/hoanghonghuy/filvault/issues/39) | Handoff doc này (draft; chờ PM undraft sau khi truth current) |
 
 ### Đã merge gần đây (tham chiếu, không làm lại)
 
 | PR | Issue | Nội dung |
 |---|---|---|
+| [#58](https://github.com/hoanghonghuy/filvault/pull/58) | [#21](https://github.com/hoanghonghuy/filvault/issues/21) | Coherent Files search & filters UX |
 | [#55](https://github.com/hoanghonghuy/filvault/pull/55) | [#7](https://github.com/hoanghonghuy/filvault/issues/7) | Playwright E2E critical-path smoke (mobile/tablet/desktop) |
 | [#56](https://github.com/hoanghonghuy/filvault/pull/56) | [#17](https://github.com/hoanghonghuy/filvault/issues/17) | Remove misleading PRO/premium UI — free-only until entitlements exist |
 | [#48](https://github.com/hoanghonghuy/filvault/pull/48) | [#6](https://github.com/hoanghonghuy/filvault/issues/6) | Responsive AppShell & navigation |
@@ -145,19 +145,20 @@ Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** is
 
 ### Issue backlog (theo ref — tra GitHub cho trạng thái hiện tại)
 
-Nhóm **release / repository integrity:** [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** → PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (draft; head reconciled vs `develop`; evidence gate: `make prod-like-up`, `make prod-like-release-smoke`, fail-at diagnostic, `make prod-like-rollback-verify`; CI xanh không đủ để undraft); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (ruleset `22665159` active — 5 required checks incl. `Web — E2E critical path` + `required_review_thread_resolution`; close after handoff #47 accepted + human); epic [#4](https://github.com/hoanghonghuy/filvault/issues/4)
+Nhóm **release / repository integrity:** [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** → PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (draft; behind `develop`; cần reconcile; Docker-host evidence gate — CI xanh không đủ để undraft); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (ruleset `22665159` active — 5 required checks incl. `Web — E2E critical path` + `required_review_thread_resolution`; close after handoff #47 accepted + human); epic [#4](https://github.com/hoanghonghuy/filvault/issues/4)
 
-Nhóm **shell & cross-cutting:** [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) (MERGEABLE vs `develop`; shell-language recon: ≤767 bottom nav; 768–1023 80px icon rail + page header; ≥1024 220px expanded sidebar — contract #48; chờ Designer/QA review); [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#35](https://github.com/hoanghonghuy/filvault/issues/35)
+Nhóm **shell & cross-cutting:** [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) (behind `develop`; cần reconcile; shell-language recon: ≤767 bottom nav; 768–1023 80px icon rail + page header; ≥1024 220px expanded sidebar — contract #48; chờ Designer/QA review); [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#35](https://github.com/hoanghonghuy/filvault/issues/35)
 
-Nhóm **theo surface (design):** [#21](https://github.com/hoanghonghuy/filvault/issues/21) IN_PROGRESS → PR [#58](https://github.com/hoanghonghuy/filvault/pull/58) (coherent Files search & filters; MERGEABLE vs `develop`; PR-Agent order-chip thread đang fix riêng); [#15](https://github.com/hoanghonghuy/filvault/issues/15) IN_PROGRESS → PR [#59](https://github.com/hoanghonghuy/filvault/pull/59) (unify appearance state; MERGEABLE vs `develop`; PR-Agent migration thread đang fix riêng); [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (`auth.user` canonicality đã xử lý — removed `mergeUserAfterSectionSave`, `auth.user` = PATCH response only, unsaved edits trong SettingsView-local refs; chờ human review); [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#22](https://github.com/hoanghonghuy/filvault/issues/22)–[#35](https://github.com/hoanghonghuy/filvault/issues/35) — chi tiết AC trên từng issue
+Nhóm **theo surface (design):** [#15](https://github.com/hoanghonghuy/filvault/issues/15) IN_PROGRESS → PR [#59](https://github.com/hoanghonghuy/filvault/pull/59) (behind `develop`; cần reconcile; PR-Agent migration thread đang fix riêng); [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (reconciled onto `develop`; `auth.user` canonicality đã xử lý — removed `mergeUserAfterSectionSave`, `auth.user` = PATCH response only, unsaved edits trong SettingsView-local refs; chờ human review); [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#22](https://github.com/hoanghonghuy/filvault/issues/22)–[#35](https://github.com/hoanghonghuy/filvault/issues/35) — chi tiết AC trên từng issue
 
-Nhóm **PM / handoff:** [#39](https://github.com/hoanghonghuy/filvault/issues/39) IN_PROGRESS → PR [#47](https://github.com/hoanghonghuy/filvault/pull/47) (draft)
+Nhóm **PM / handoff:** [#39](https://github.com/hoanghonghuy/filvault/issues/39) IN_PROGRESS → PR [#47](https://github.com/hoanghonghuy/filvault/pull/47) (draft; chờ PM undraft)
 
 ### Việc **không** nên làm (đã xong hoặc lỗi thời)
 
 - Bắt đầu Phase 2 slice S1–S6 — **đã Done** (xem [10](10-phase-2-status.md) lịch sử).
 - Smoke tay Phase 1 UI như “việc tiếp theo” duy nhất — đã lệch thời; dùng [#43](https://github.com/hoanghonghuy/filvault/issues/43) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) cho QA release.
-- Browser E2E critical path ([#7](https://github.com/hoanghonghuy/filvault/issues/7) / [#55](https://github.com/hoanghonghuy/filvault/pull/55)) — **đã merge** trên `develop` (`21e2eeb`); `Web — E2E critical path` là required check trên ruleset.
+- Browser E2E critical path ([#7](https://github.com/hoanghonghuy/filvault/issues/7) / [#55](https://github.com/hoanghonghuy/filvault/pull/55)) — **đã merge** trên `develop`; `Web — E2E critical path` là required check trên ruleset.
+- Files search & filter UX ([#21](https://github.com/hoanghonghuy/filvault/issues/21) / [#58](https://github.com/hoanghonghuy/filvault/pull/58)) — **đã merge** trên `develop` (`580b21a`).
 - Production runtime baseline ([#42](https://github.com/hoanghonghuy/filvault/issues/42) / [#46](https://github.com/hoanghonghuy/filvault/pull/46)) — **đã merge** trên `develop` (`17bad79`).
 - Vault UX polish ([#18](https://github.com/hoanghonghuy/filvault/issues/18) / [#44](https://github.com/hoanghonghuy/filvault/pull/44)) — **đã merge** trên `develop`.
 - Deploy/AWS “sau Phase 2” — baseline runtime xong; release smoke ([#43](https://github.com/hoanghonghuy/filvault/issues/43)) **PARKED** on external Docker evidence trong epic [#4](https://github.com/hoanghonghuy/filvault/issues/4).
