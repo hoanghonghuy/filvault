@@ -43,6 +43,12 @@
   --header-h: 56px;
   --content-max: 1100px;
 
+  /* shell breakpoints (DESIGN.md §8 — mirrored in shellNav.ts) */
+  --bp-tablet: 768px;
+  --bp-desktop: 1024px;
+  --nav-rail-w: 80px;
+  --nav-sidebar-w: 220px;
+
   /* motion (Material 3 easing & duration) */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);

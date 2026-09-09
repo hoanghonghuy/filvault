@@ -82,7 +82,7 @@ const navLabels = computed<Record<string, string>>(() => ({
     <aside class="side-nav" aria-label="Main navigation">
       <RouterLink :to="HOME_PATH" class="brand" aria-label="Go to overview">
         <span class="header-brand-mark" aria-hidden="true">F</span>
-        <span>Filvault</span>
+        <span class="brand-wordmark">Filvault</span>
       </RouterLink>
       <nav class="side-links" aria-label="Destinations">
         <RouterLink
@@ -90,10 +90,12 @@ const navLabels = computed<Record<string, string>>(() => ({
           :key="item.to"
           :to="item.to"
           class="side-link"
+          :aria-label="navLabels[item.to]"
+          :title="navLabels[item.to]"
         >
           <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="20" />
-          <span>{{ navLabels[item.to] }}</span>
+          <span class="side-link-label">{{ navLabels[item.to] }}</span>
         </RouterLink>
       </nav>
       <div class="side-user">
@@ -133,12 +135,13 @@ const navLabels = computed<Record<string, string>>(() => ({
     </div>
 
     <nav class="bottom-nav" aria-label="Main navigation">
-        <RouterLink
-          v-for="item in SHELL_NAV"
-          :key="item.to"
-          :to="item.to"
-          class="bottom-link"
-        >
+      <RouterLink
+        v-for="item in SHELL_NAV"
+        :key="item.to"
+        :to="item.to"
+        class="bottom-link"
+        :aria-label="navLabels[item.to]"
+      >
         <span class="bottom-icon">
           <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="24" />
@@ -433,7 +436,8 @@ const navLabels = computed<Record<string, string>>(() => ({
   text-align: center;
 }
 
-@media (min-width: 768px) {
+/* Tablet: compact icon rail + page header (768–1023px) */
+@media (min-width: 768px) and (max-width: 1023.98px) {
   .shell {
     flex-direction: row;
   }
@@ -446,7 +450,136 @@ const navLabels = computed<Record<string, string>>(() => ({
     height: 100dvh;
     display: flex;
     flex-direction: column;
-    width: 220px;
+    align-items: stretch;
+    width: var(--nav-rail-w);
+    flex-shrink: 0;
+    padding: calc(var(--space-md) + env(safe-area-inset-top)) var(--space-xs) var(--space-md);
+    background: var(--sidebar-bg, var(--canvas));
+    border-right: 1px solid var(--hairline);
+    overflow-y: auto;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--ink);
+    margin-bottom: var(--space-md);
+    min-height: var(--touch-min);
+  }
+
+  .brand-wordmark,
+  .side-link-label,
+  .user-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .side-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    flex: 1;
+    align-items: center;
+  }
+
+  .side-link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    width: var(--touch-min);
+    min-height: var(--touch-min);
+    padding: 0;
+    border-radius: var(--radius-md);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    transition:
+      background-color var(--motion-press) var(--ease-standard),
+      color var(--motion-press) var(--ease-standard);
+  }
+
+  .side-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .side-link.router-link-active {
+    color: var(--accent);
+  }
+
+  .side-link .nav-indicator {
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    transform: translateX(-50%) scaleX(0);
+  }
+
+  .side-link.router-link-active .nav-indicator {
+    transform: translateX(-50%) scaleX(1);
+  }
+
+  .side-user {
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--hairline-soft);
+    display: flex;
+    justify-content: center;
+  }
+
+  .side-profile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--touch-min);
+    width: var(--touch-min);
+    padding: 0;
+    border-radius: var(--radius-md);
+    color: inherit;
+  }
+
+  .shell-main {
+    padding-bottom: 0;
+  }
+
+  .bottom-nav {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-md) var(--space-lg);
+  }
+}
+
+/* Desktop: expanded side nav (≥1024px) */
+@media (min-width: 1024px) {
+  .shell {
+    flex-direction: row;
+  }
+
+  .side-nav {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    width: var(--nav-sidebar-w);
     flex-shrink: 0;
     padding: var(--space-lg) var(--space-md);
     background: var(--sidebar-bg, var(--canvas));
@@ -562,6 +695,7 @@ const navLabels = computed<Record<string, string>>(() => ({
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
 
   .shell-main {
@@ -578,6 +712,29 @@ const navLabels = computed<Record<string, string>>(() => ({
 
   .main {
     padding: var(--space-lg);
+  }
+}
+
+@media (min-width: 768px) {
+  .brand:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  .brand.router-link-exact-active .header-brand-mark {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .side-profile:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .side-profile.router-link-active .avatar {
+    background: var(--accent);
+    color: var(--on-accent);
   }
 }
 
