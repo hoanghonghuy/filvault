@@ -1,4 +1,6 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+
+export type AppearanceMode = 'system' | 'light' | 'dark'
 
 export type ThemeId =
   | 'default'
@@ -10,12 +12,18 @@ export type ThemeId =
   | 'lavender'
   | 'pearl'
   | 'pebble'
-  | 'dark'
   | 'material'
   | 'spring'
   | 'summer'
   | 'autumn'
   | 'winter'
+
+export const APPEARANCE_MODE_STORAGE_KEY = 'filvault.appearanceMode'
+export const COLOR_THEME_STORAGE_KEY = 'filvault.colorTheme'
+
+const LEGACY_THEME_KEY = 'filvault.theme'
+const LEGACY_FOLLOW_SYSTEM_KEY = 'filvault.followSystemDark'
+const LEGACY_DARK_COLOR_THEME = 'dark'
 
 export interface ThemeDef {
   id: ThemeId
@@ -120,16 +128,6 @@ export const THEMES: ThemeDef[] = [
     todayAccent: '#52525b',
   },
   {
-    id: 'dark',
-    nameKey: 'themeDark',
-    nameDefault: 'Tối',
-    category: 'colors',
-    swatchGradient: 'linear-gradient(135deg, #1e293b 0%, #020617 100%)',
-    accentColor: '#3b82f6',
-    previewBg: '#0f172a',
-    todayAccent: '#3b82f6',
-  },
-  {
     id: 'material',
     nameKey: 'themeMaterial',
     nameDefault: 'Vật liệu của bạn',
@@ -139,7 +137,6 @@ export const THEMES: ThemeDef[] = [
     previewBg: '#f1f5f9',
     todayAccent: '#0284c7',
   },
-  // Seasonal
   {
     id: 'spring',
     nameKey: 'themeSpring',
@@ -182,71 +179,159 @@ export const THEMES: ThemeDef[] = [
   },
 ]
 
-const currentColorTheme = ref<ThemeId>(
-  (localStorage.getItem('filvault.colorTheme') as ThemeId) || 'default'
-)
+const VALID_THEME_IDS = new Set(THEMES.map((theme) => theme.id))
 
-const followSystemDark = ref<boolean>(
-  localStorage.getItem('filvault.followSystemDark') === 'true'
-)
+function isAppearanceMode(value: string | null): value is AppearanceMode {
+  return value === 'system' || value === 'light' || value === 'dark'
+}
 
-const isDarkMode = ref<boolean>(
-  typeof document !== 'undefined' &&
-    (document.documentElement.dataset.theme === 'dark' ||
-      localStorage.getItem('filvault.theme') === 'dark')
-)
+function readSystemPrefersDark(): boolean {
+  return typeof window !== 'undefined' &&
+    window.matchMedia !== undefined &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+}
 
-function setDarkMode(dark: boolean) {
-  isDarkMode.value = dark
-  if (typeof document !== 'undefined') {
-    if (dark) {
-      document.documentElement.dataset.theme = 'dark'
-      localStorage.setItem('filvault.theme', 'dark')
-    } else {
-      delete document.documentElement.dataset.theme
-      localStorage.setItem('filvault.theme', 'light')
-    }
+export function resolveAppearanceIsDark(mode: AppearanceMode): boolean {
+  if (mode === 'dark') return true
+  if (mode === 'light') return false
+  return readSystemPrefersDark()
+}
+
+function normalizeColorThemeId(raw: string | null): ThemeId {
+  if (raw === LEGACY_DARK_COLOR_THEME) return 'default'
+  if (raw && VALID_THEME_IDS.has(raw as ThemeId)) return raw as ThemeId
+  return 'default'
+}
+
+export function migrateAppearanceMode(): AppearanceMode {
+  if (typeof localStorage === 'undefined') return 'light'
+
+  const stored = localStorage.getItem(APPEARANCE_MODE_STORAGE_KEY)
+  if (isAppearanceMode(stored)) return stored
+
+  const legacyColorTheme = localStorage.getItem(COLOR_THEME_STORAGE_KEY)
+  const legacyFollowSystem = localStorage.getItem(LEGACY_FOLLOW_SYSTEM_KEY) === 'true'
+  const legacyTheme = localStorage.getItem(LEGACY_THEME_KEY)
+
+  if (legacyFollowSystem) return 'system'
+  if (legacyColorTheme === LEGACY_DARK_COLOR_THEME || legacyTheme === 'dark') return 'dark'
+  return 'light'
+}
+
+function persistAppearanceMode(mode: AppearanceMode) {
+  localStorage.setItem(APPEARANCE_MODE_STORAGE_KEY, mode)
+  localStorage.removeItem(LEGACY_THEME_KEY)
+  localStorage.setItem(LEGACY_FOLLOW_SYSTEM_KEY, mode === 'system' ? 'true' : 'false')
+}
+
+function applyResolvedDarkToDom(isDark: boolean) {
+  if (typeof document === 'undefined') return
+  if (isDark) {
+    document.documentElement.dataset.theme = 'dark'
+  } else {
+    delete document.documentElement.dataset.theme
   }
+}
+
+function applyColorThemeToDom(themeId: ThemeId) {
+  if (typeof document === 'undefined') return
+  document.documentElement.dataset.colorTheme = themeId
+}
+
+function migratePersistedState(): { appearanceMode: AppearanceMode; colorTheme: ThemeId } {
+  const legacyColorTheme = localStorage.getItem(COLOR_THEME_STORAGE_KEY)
+  let appearanceMode = migrateAppearanceMode()
+  const colorTheme = normalizeColorThemeId(legacyColorTheme)
+
+  if (legacyColorTheme === LEGACY_DARK_COLOR_THEME && appearanceMode === 'light') {
+    appearanceMode = 'dark'
+  }
+
+  persistAppearanceMode(appearanceMode)
+  localStorage.setItem(COLOR_THEME_STORAGE_KEY, colorTheme)
+  applyResolvedDarkToDom(resolveAppearanceIsDark(appearanceMode))
+  applyColorThemeToDom(colorTheme)
+
+  return { appearanceMode, colorTheme }
+}
+
+const initialState =
+  typeof localStorage !== 'undefined' ? migratePersistedState() : { appearanceMode: 'light' as AppearanceMode, colorTheme: 'default' as ThemeId }
+
+const appearanceMode = ref<AppearanceMode>(initialState.appearanceMode)
+const currentColorTheme = ref<ThemeId>(initialState.colorTheme)
+const systemPrefersDark = ref(readSystemPrefersDark())
+
+export function hydrateAppearance() {
+  if (typeof localStorage === 'undefined' || typeof document === 'undefined') return
+  const state = migratePersistedState()
+  appearanceMode.value = state.appearanceMode
+  currentColorTheme.value = state.colorTheme
+}
+
+/** Re-read persisted appearance from storage into reactive state (used in tests and after external resets). */
+export function syncAppearanceFromStorage() {
+  if (typeof localStorage === 'undefined') return
+  const state = migratePersistedState()
+  appearanceMode.value = state.appearanceMode
+  currentColorTheme.value = state.colorTheme
+}
+
+const resolvedIsDark = computed(() => {
+  if (appearanceMode.value === 'dark') return true
+  if (appearanceMode.value === 'light') return false
+  return systemPrefersDark.value
+})
+
+function applyAppearanceMode(mode: AppearanceMode) {
+  appearanceMode.value = mode
+  if (mode === 'system') {
+    systemPrefersDark.value = readSystemPrefersDark()
+  }
+  persistAppearanceMode(mode)
+  applyResolvedDarkToDom(mode === 'system' ? systemPrefersDark.value : mode === 'dark')
+}
+
+function setAppearanceMode(mode: AppearanceMode) {
+  applyAppearanceMode(mode)
 }
 
 function applyColorTheme(themeId: ThemeId) {
   currentColorTheme.value = themeId
-  localStorage.setItem('filvault.colorTheme', themeId)
-  if (typeof document !== 'undefined') {
-    document.documentElement.dataset.colorTheme = themeId
-    if (themeId === 'dark') {
-      setDarkMode(true)
-    }
+  localStorage.setItem(COLOR_THEME_STORAGE_KEY, themeId)
+  applyColorThemeToDom(themeId)
+}
+
+function toggleResolvedAppearance() {
+  setAppearanceMode(resolvedIsDark.value ? 'light' : 'dark')
+}
+
+export function applySystemAppearanceIfNeeded() {
+  systemPrefersDark.value = readSystemPrefersDark()
+  if (appearanceMode.value === 'system') {
+    applyResolvedDarkToDom(systemPrefersDark.value)
   }
 }
 
-function setFollowSystemDark(follow: boolean) {
-  followSystemDark.value = follow
-  localStorage.setItem('filvault.followSystemDark', follow ? 'true' : 'false')
-  if (follow && typeof window !== 'undefined' && window.matchMedia) {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    setDarkMode(prefersDark)
-  }
-}
-
-// Attach listener for prefers-color-scheme if followSystemDark is active
 if (typeof window !== 'undefined' && window.matchMedia) {
   const mql = window.matchMedia('(prefers-color-scheme: dark)')
-  mql.addEventListener('change', (e) => {
-    if (followSystemDark.value) {
-      setDarkMode(e.matches)
-    }
+  mql.addEventListener('change', () => {
+    applySystemAppearanceIfNeeded()
   })
 }
 
 export function useTheme() {
   return {
+    appearanceMode,
     currentColorTheme,
-    followSystemDark,
-    isDarkMode,
+    resolvedIsDark,
+    isDarkMode: resolvedIsDark,
+    followSystemDark: computed(() => appearanceMode.value === 'system'),
     applyColorTheme,
-    setDarkMode,
-    setFollowSystemDark,
+    setAppearanceMode,
+    setDarkMode: (dark: boolean) => setAppearanceMode(dark ? 'dark' : 'light'),
+    setFollowSystemDark: (follow: boolean) => setAppearanceMode(follow ? 'system' : (resolvedIsDark.value ? 'dark' : 'light')),
+    toggleResolvedAppearance,
     THEMES,
   }
 }
