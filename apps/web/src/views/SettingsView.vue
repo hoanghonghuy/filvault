@@ -382,7 +382,6 @@ onMounted(() => {
         <div class="profile-meta">
           <div class="profile-name-row">
             <h2 class="profile-name">{{ auth.user?.displayName || auth.user?.email || 'Người dùng Filvault' }}</h2>
-            <span class="pro-badge">PRO</span>
           </div>
           <p class="profile-email muted">{{ auth.user?.email }}</p>
         </div>
@@ -926,20 +925,6 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.pro-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: #ffffff;
-  letter-spacing: 0.5px;
-  line-height: 1;
-  flex-shrink: 0;
 }
 
 .profile-email {

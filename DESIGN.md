@@ -477,7 +477,20 @@ Quick tokens:
 
 ---
 
-## 11. Implementation notes (`apps/web`)
+## 11. Entitlements & premium presentation (current policy)
+
+**Chưa có mô hình premium / subscription.** Cho đến khi có nguồn entitlement thật (API hoặc billing):
+
+- **Không** hiển thị badge PRO, crown, hoặc affordance “khóa” trên profile, theme, hoặc settings.
+- **Không** đánh dấu theme là premium (`isPro`) trong định nghĩa hoặc UI nếu chưa gate hành vi tương ứng.
+- **Không** thêm CTA upgrade, luồng mua giả, hoặc trạng thái “locked” chỉ mang tính trang trí.
+- Tất cả theme trong Theme Center **áp dụng tự do**; Settings và Theme Center phải **nhất quán** (cùng trạng thái free, không PRO).
+
+Khi monetization sẵn sàng: thêm entitlement source, gate theme/affordance theo quyền thật, và cập nhật mục này — không giữ UI premium placeholder.
+
+---
+
+## 12. Implementation notes (`apps/web`)
 
 1. Map tokens → CSS variables trong `src/assets/main.css`.
 2. Shell: refactor `AppShell.vue` (bottom nav + desktop side).

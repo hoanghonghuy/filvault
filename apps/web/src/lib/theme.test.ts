@@ -57,4 +57,19 @@ describe('multi-theme system contract', () => {
     expect(followSystemDark.value).toBe(false)
     expect(localStorage.getItem('filvault.followSystemDark')).toBe('false')
   })
+
+  it('does not mark any theme as premium until entitlements exist', () => {
+    for (const theme of THEMES) {
+      expect(theme).not.toHaveProperty('isPro')
+    }
+  })
+
+  it('applies seasonal themes without entitlement checks', () => {
+    const { applyColorTheme, currentColorTheme } = useTheme()
+    applyColorTheme('spring')
+
+    expect(currentColorTheme.value).toBe('spring')
+    expect(localStorage.getItem('filvault.colorTheme')).toBe('spring')
+    expect(document.documentElement.dataset.colorTheme).toBe('spring')
+  })
 })
