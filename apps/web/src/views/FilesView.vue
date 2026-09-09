@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ApiError, api, formatBytes, uploadToPresigned } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
@@ -1206,20 +1206,21 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     </TransitionGroup>
 
     <!-- TeraBox Root Vault Shortcut -->
-    <div
+    <RouterLink
       v-if="!folderId && segment === 'all' && !searchResults && !loading"
+      to="/vault"
       class="vault-entry-card tappable"
-      @click="segment = 'favorites'"
+      :aria-label="t.personalVault"
     >
       <div class="vault-icon-box">
-        <Icon name="lock" :size="20" />
+        <Icon name="lock" :size="20" aria-hidden="true" />
       </div>
       <div class="vault-info">
-        <span class="vault-title">{{ t.personalVault || 'Kho cá nhân' }}</span>
-        <span class="vault-hint">{{ t.favorites }}</span>
+        <span class="vault-title">{{ t.personalVault }}</span>
+        <span class="vault-hint">{{ t.vaultSubtitle }}</span>
       </div>
-      <Icon name="chevron-right" :size="16" class="vault-arrow" />
-    </div>
+      <Icon name="chevron-right" :size="16" class="vault-arrow" aria-hidden="true" />
+    </RouterLink>
 
     <TransitionGroup
       v-if="segment === 'all' && !loading"
@@ -1967,7 +1968,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   border: 1px solid var(--hairline);
   margin-bottom: 12px;
   cursor: pointer;
+  text-decoration: none;
+  color: inherit;
   transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vault-entry-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .vault-entry-card:active {
