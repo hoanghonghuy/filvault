@@ -62,11 +62,13 @@ printf 'FILVAULT_JWT_SECRET=%s\n' "$HIST_JWT" >"$HISTDIR/selftest-historical-lea
 expect_leaks "historical-default rule" "$HISTDIR/selftest-historical-leak.txt"
 
 # 2) Default gitleaks rules on compose/Makefile-shaped fixtures in isolated temp dirs.
-# Use unique fixture names (not repo docker-compose.yml / Makefile). One fixture per
-# directory — gitleaks can miss findings when multiple self-test files share a directory.
+# Fixtures live only under private temp dirs (never tracked docker-compose.yml / Makefile).
+# Note: synthetic github-pat (ghp_…) values do not trip default detectors in gitleaks v8.25.0
+# with this repo config (extend.useDefault = true) — CI reproduced ~97-byte fixture, zero findings.
+# Use stable built-in rules instead: discord-client-secret (compose) + generic-api-key (Makefile).
 COMPOSEDIR="$(make_tempdir)"
 MAKEDIR="$(make_tempdir)"
-# generic-api-key example from gitleaks docs; synthetic, not a real credential.
+# discord-client-secret example from gitleaks docs; base64 keeps the literal out of this script.
 SYNTHETIC_API_KEY=$(printf '%s' 'ODdyZnVpUnlxPXZWYzNSUnJfZWRSay1mS19fSkl0cFo=' | base64 -d)
 cat >"$COMPOSEDIR/selftest-compose-shaped-fixture.yml" <<EOF
 services:
