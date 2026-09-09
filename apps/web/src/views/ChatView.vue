@@ -28,6 +28,7 @@ import {
   type Sticker,
 } from '@/lib/stickers'
 import { useI18n } from '@/lib/i18n'
+import { useTheme } from '@/lib/theme'
 import { generateUUID } from '@/lib/uuid'
 import { useLongPress } from '@/lib/useLongPress'
 import { resolveWallpaperTheme, type WallpaperTheme } from '@/lib/wallpaperPalette'
@@ -40,6 +41,7 @@ const chatStore = useChatStore()
 const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
+const { resolvedIsDark, toggleResolvedAppearance } = useTheme()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>((route.params.id as string) || null)
@@ -517,7 +519,7 @@ const filteredWallpaperPresets = computed(() => {
 
 function openWallpaperSubPage() {
   chatInfoCurrentView.value = 'wallpaper'
-  wallpaperCategoryFilter.value = isDarkMode.value ? 'dark' : 'light'
+  wallpaperCategoryFilter.value = resolvedIsDark.value ? 'dark' : 'light'
 }
 
 function triggerWallpaperFileInput() {
@@ -1475,18 +1477,9 @@ function backToVault() {
 }
 
 const appMenuOpen = ref(false)
-const isDarkMode = ref(document.documentElement.dataset.theme === 'dark')
 
 function toggleDarkMode() {
-  if (isDarkMode.value) {
-    delete document.documentElement.dataset.theme
-    localStorage.removeItem('filvault.theme')
-    isDarkMode.value = false
-  } else {
-    document.documentElement.dataset.theme = 'dark'
-    localStorage.setItem('filvault.theme', 'dark')
-    isDarkMode.value = true
-  }
+  toggleResolvedAppearance()
 }
 
 function toggleLanguage() {
@@ -3661,10 +3654,10 @@ watch(
           <div class="menu-items-group">
             <button type="button" class="menu-row-item" @click="toggleDarkMode">
               <span class="menu-item-icon badge-theme">
-                <Icon :name="isDarkMode ? 'sun' : 'moon'" :size="18" />
+                <Icon :name="resolvedIsDark ? 'sun' : 'moon'" :size="18" />
               </span>
               <span class="menu-item-text">{{ t.darkMode }}</span>
-              <span class="menu-toggle-state">{{ isDarkMode ? 'Bật' : 'Tắt' }}</span>
+              <span class="menu-toggle-state">{{ resolvedIsDark ? 'Bật' : 'Tắt' }}</span>
             </button>
             <button type="button" class="menu-row-item" @click="toggleLanguage">
               <span class="menu-item-icon badge-lang"><Icon name="chat" :size="18" /></span>

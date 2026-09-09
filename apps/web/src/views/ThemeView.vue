@@ -9,7 +9,13 @@ import { THEMES, useTheme, type ThemeDef } from '@/lib/theme'
 const router = useRouter()
 const ui = useUiStore()
 const { t } = useI18n()
-const { currentColorTheme, followSystemDark, applyColorTheme, setFollowSystemDark } = useTheme()
+const { appearanceMode, currentColorTheme, resolvedIsDark, applyColorTheme, setAppearanceMode } = useTheme()
+
+const appearanceModes = [
+  { id: 'system' as const, labelKey: 'appearanceModeSystem' },
+  { id: 'light' as const, labelKey: 'appearanceModeLight' },
+  { id: 'dark' as const, labelKey: 'appearanceModeDark' },
+]
 
 const activeTab = ref<'theme' | 'icons' | 'display'>('theme')
 const previewTheme = ref<ThemeDef | null>(null)
@@ -38,8 +44,8 @@ function themeName(theme: ThemeDef): string {
   return (t.value[key] as string) || theme.nameDefault
 }
 
-function handleFollowSystemToggle() {
-  setFollowSystemDark(!followSystemDark.value)
+function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
+  setAppearanceMode(mode)
 }
 </script>
 
@@ -88,20 +94,33 @@ function handleFollowSystemToggle() {
       <div class="header-spacer"></div>
     </header>
 
-    <!-- Follow System Dark Mode Card -->
+    <!-- Appearance mode (shared with Settings) -->
     <section class="card system-dark-card">
-      <label class="toggle-row">
-        <span class="toggle-label">{{ t.themeFollowSystem }}</span>
-        <div class="switch-wrapper">
-          <input
-            :checked="followSystemDark"
-            type="checkbox"
-            class="switch-input"
-            @change="handleFollowSystemToggle"
-          />
-          <span class="switch-track" aria-hidden="true"></span>
-        </div>
-      </label>
+      <h2 class="section-title">{{ t.appearanceModeLabel }}</h2>
+      <div class="appearance-mode-row" role="radiogroup" :aria-label="t.appearanceModeLabel">
+        <button
+          v-for="mode in appearanceModes"
+          :key="mode.id"
+          type="button"
+          class="appearance-mode-btn"
+          :class="{ active: appearanceMode === mode.id }"
+          role="radio"
+          :aria-checked="appearanceMode === mode.id"
+          @click="chooseAppearanceMode(mode.id)"
+        >
+          {{ (t as any)[mode.labelKey] }}
+        </button>
+      </div>
+      <p class="appearance-mode-hint">
+        {{
+          appearanceMode === 'system'
+            ? t.appearanceModeSystemHint
+            : resolvedIsDark
+              ? t.appearanceModeDarkHint
+              : t.appearanceModeLightHint
+        }}
+      </p>
+      <p class="appearance-mode-hint color-theme-hint">{{ t.colorThemeAppearanceHint }}</p>
     </section>
 
     <!-- Section 1: Color Palette (Dòng màu sắc) -->
@@ -333,13 +352,52 @@ function handleFollowSystemToggle() {
   background: var(--accent);
 }
 
-/* System Dark Card */
+/* Appearance mode card */
 .system-dark-card {
   margin-bottom: var(--space-md);
   padding: var(--space-md);
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
+}
+
+.appearance-mode-row {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.appearance-mode-btn {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--hairline);
+  background: var(--surface-soft);
+  color: var(--ink);
+  border-radius: var(--radius-lg);
+  padding: 10px 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    border-color var(--duration-short) var(--ease-standard);
+}
+
+.appearance-mode-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.appearance-mode-hint {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.color-theme-hint {
+  margin-top: var(--space-xs);
 }
 
 .toggle-row {
