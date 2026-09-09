@@ -166,8 +166,8 @@ Bootstrap trước Vue mount: `main.ts` đọc `filvault.theme` + `filvault.colo
 
 | Category | IDs |
 |----------|-----|
-| Colors | `default`, `cyan`, `teal`, `sage`, `sunshine`, `peach`, `lavender`, `pearl`, `pebble`, `dark`, `material` (Pro) |
-| Seasonal (Pro) | `spring`, `summer`, `autumn`, `winter` |
+| Colors | `default`, `cyan`, `teal`, `sage`, `sunshine`, `peach`, `lavender`, `pearl`, `pebble`, `dark`, `material` |
+| Seasonal | `spring`, `summer`, `autumn`, `winter` |
 
 - Chọn theme `dark` → tự bật appearance dark.
 - `followSystemDark` (`localStorage.filvault.followSystemDark`) lắng nghe `prefers-color-scheme` và gọi `setDarkMode`.
@@ -443,7 +443,20 @@ Không multi-layer card stack hàng loạt.
 
 ---
 
-## 11. Agent Prompt Guide
+## 11. Entitlements & premium presentation (current policy)
+
+**Chưa có mô hình premium / subscription.** Cho đến khi có nguồn entitlement thật (API hoặc billing):
+
+- **Không** hiển thị badge PRO, crown, hoặc affordance “khóa” trên profile, theme, hoặc settings.
+- **Không** đánh dấu theme là premium (`isPro`) trong định nghĩa hoặc UI nếu chưa gate hành vi tương ứng.
+- **Không** thêm CTA upgrade, luồng mua giả, hoặc trạng thái “locked” chỉ mang tính trang trí.
+- Tất cả theme trong Theme Center **áp dụng tự do**; Settings và Theme Center phải **nhất quán** (cùng trạng thái free, không PRO).
+
+Khi monetization sẵn sàng: thêm entitlement source, gate theme/affordance theo quyền thật, và cập nhật mục này — không giữ UI premium placeholder.
+
+---
+
+## 12. Agent Prompt Guide
 
 ```text
 Follow DESIGN.md (Filvault). Cal.com-like utility UI, semantic tokens via CSS variables,
@@ -454,13 +467,14 @@ avatar → Profile, chat → bare /chat, FAB upload on Files (mobile ≤767 only
 bottom sheets not prompt/confirm, component states per §4,
 danger/success/warning never replaced by accent, touch ≥44px.
 Chat may use --chat-accent; shell must use var(--accent).
+No PRO badges, crowns, or premium placeholders until real entitlements exist (§11).
 ```
 
 Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8px controls / 12–16px cards, Plus Jakarta Sans.
 
 ---
 
-## 12. Implementation notes (`apps/web`)
+## 13. Implementation notes (`apps/web`)
 
 1. Tokens → CSS variables: `src/assets/main.css` (`:root`, `[data-theme='dark']`, `[data-color-theme='…']`).
 2. Theme logic: `src/lib/theme.ts` (`useTheme`, `THEMES`).

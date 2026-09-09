@@ -120,9 +120,6 @@ function handleFollowSystemToggle() {
             <span v-if="currentColorTheme === theme.id" class="swatch-check" aria-hidden="true">
               <Icon name="check" :size="14" />
             </span>
-            <span v-if="theme.isPro" class="swatch-pro-badge" aria-hidden="true">
-              <Icon name="crown" :size="11" />
-            </span>
           </div>
           <span class="swatch-label">{{ themeName(theme) }}</span>
         </button>
@@ -142,9 +139,6 @@ function handleFollowSystemToggle() {
           @click="openPreview(theme)"
         >
           <div class="seasonal-swatch-box" :style="{ background: theme.swatchGradient }">
-            <span class="seasonal-crown-badge" aria-hidden="true">
-              <Icon name="crown" :size="12" />
-            </span>
             <span v-if="currentColorTheme === theme.id" class="swatch-check" aria-hidden="true">
               <Icon name="check" :size="14" />
             </span>
@@ -473,19 +467,6 @@ function handleFollowSystemToggle() {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.swatch-pro-badge {
-  position: absolute;
-  bottom: 6px;
-  right: 6px;
-  padding: 2px 5px;
-  border-radius: var(--radius-pill);
-  background: #f59e0b;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .swatch-label {
   font-size: 0.75rem;
   font-weight: 500;
@@ -527,20 +508,6 @@ function handleFollowSystemToggle() {
   height: 60px;
   border-radius: 16px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.seasonal-crown-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #f59e0b;
-  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
