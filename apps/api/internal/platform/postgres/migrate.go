@@ -81,6 +81,24 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+// SchemaReady reports whether every embedded migration version has been applied.
+func SchemaReady(ctx context.Context, pool *pgxpool.Pool) error {
+	expected, err := listVersions()
+	if err != nil {
+		return err
+	}
+	applied, err := appliedVersions(ctx, pool)
+	if err != nil {
+		return fmt.Errorf("schema not ready: %w", err)
+	}
+	for _, version := range expected {
+		if !applied[version] {
+			return fmt.Errorf("schema not ready: missing migration %s", version)
+		}
+	}
+	return nil
+}
+
 // MigrateDown rolls back the latest applied version.
 func MigrateDown(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := pool.Ping(ctx); err != nil {

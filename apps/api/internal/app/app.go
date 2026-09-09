@@ -1,8 +1,6 @@
 package app
 
 import (
-	"context"
-	"net/http"
 	"time"
 
 	"filvault/internal/activity"
@@ -104,8 +102,8 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	if len(cfg.CORSAllowedOrigins) > 0 {
 		engine.Use(httpx.CORS(cfg.CORSAllowedOrigins))
 	}
-	engine.GET("/healthz", healthz(pool))
-	engine.GET("/readyz", readiness(pool))
+	engine.GET("/healthz", healthz())
+	engine.GET("/readyz", readiness(pool, obj))
 	engine.GET("/metrics", metrics.Handler)
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
@@ -130,42 +128,6 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	shareLinkHandlers.RegisterPublicRoutes(public)
 
 	return engine
-}
-
-func healthz(pool *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
-		defer cancel()
-		if err := pool.Ping(ctx); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	}
-}
-
-func readiness(pool *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
-		defer cancel()
-		if err := pool.Ping(ctx); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready"})
-			return
-		}
-		var migrationsReady bool
-		if err := pool.QueryRow(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM information_schema.tables
-				WHERE table_schema = current_schema()
-					AND table_name = 'schema_migrations'
-			)
-		`).Scan(&migrationsReady); err != nil || !migrationsReady {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
-	}
 }
 
 func NewTrashService(pool *pgxpool.Pool, obj objectstore.ObjectStore) *trash.Service {
