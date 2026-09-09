@@ -10,8 +10,6 @@ export type PreviewSettings = {
   videoThumbnailsEnabled: boolean
 }
 
-export type ExplicitSettingsSection = 'trash' | 'preview'
-
 export function trashSettingsFromUser(user: User): TrashSettings {
   return {
     trashAutoDeleteEnabled: user.trashAutoDeleteEnabled,
@@ -62,26 +60,5 @@ export function buildPreviewPatchBody(
   return {
     imageThumbnailsEnabled: current.imageThumbnailsEnabled,
     videoThumbnailsEnabled: current.videoThumbnailsEnabled,
-  }
-}
-
-/** Keep unsaved section values in auth state while applying the server response for the saved section. */
-export function mergeUserAfterSectionSave(
-  updated: User,
-  section: ExplicitSettingsSection,
-  localTrash: TrashSettings,
-  localPreview: PreviewSettings,
-): User {
-  if (section === 'trash') {
-    return {
-      ...updated,
-      imageThumbnailsEnabled: localPreview.imageThumbnailsEnabled,
-      videoThumbnailsEnabled: localPreview.videoThumbnailsEnabled,
-    }
-  }
-  return {
-    ...updated,
-    trashAutoDeleteEnabled: localTrash.trashAutoDeleteEnabled,
-    trashRetentionDays: localTrash.trashRetentionDays,
   }
 }

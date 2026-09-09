@@ -181,7 +181,7 @@ describe('SettingsView explicit settings', () => {
     expect(findTrashSaveButton(wrapper)?.attributes('disabled')).toBeUndefined()
   })
 
-  it('refreshes canonical auth state for the saved section without overwriting unrelated unsaved values', async () => {
+  it('keeps auth.user server-canonical while preserving unrelated unsaved section controls in the view', async () => {
     apiMock.mockImplementation(async (path: string, options?: RequestInit) => {
       if (path === '/share-links') return { links: [] }
       if (path.startsWith('/activity')) return { events: [] }
@@ -216,7 +216,9 @@ describe('SettingsView explicit settings', () => {
 
     expect(auth.user?.trashAutoDeleteEnabled).toBe(true)
     expect(auth.user?.trashRetentionDays).toBe(7)
-    expect(auth.user?.imageThumbnailsEnabled).toBe(false)
+    expect(auth.user?.imageThumbnailsEnabled).toBe(true)
+    expect(auth.user?.videoThumbnailsEnabled).toBe(true)
+    expect((previewToggle!.element as HTMLInputElement).checked).toBe(false)
     expect(findPreviewSaveButton(wrapper)?.attributes('disabled')).toBeUndefined()
   })
 })

@@ -15,7 +15,6 @@ import {
   hasUnsavedExplicitSettings,
   isPreviewSettingsDirty,
   isTrashSettingsDirty,
-  mergeUserAfterSectionSave,
   previewSettingsFromUser,
   trashSettingsFromUser,
   type PreviewSettings,
@@ -145,12 +144,7 @@ async function saveTrashSettings() {
     trashAutoDeleteEnabled.value = updated.trashAutoDeleteEnabled
     trashRetentionDays.value = updated.trashRetentionDays
     if (auth.user) {
-      auth.user = mergeUserAfterSectionSave(
-        updated,
-        'trash',
-        currentTrashSettings.value,
-        currentPreviewSettings.value,
-      )
+      auth.user = updated
     }
     trashSavedFeedback.value = true
     ui.showToast(t.value.trashSettingsSaved, 'success')
@@ -175,12 +169,7 @@ async function savePreviewSettings() {
     imageThumbnailsEnabled.value = updated.imageThumbnailsEnabled
     videoThumbnailsEnabled.value = updated.videoThumbnailsEnabled
     if (auth.user) {
-      auth.user = mergeUserAfterSectionSave(
-        updated,
-        'preview',
-        currentTrashSettings.value,
-        currentPreviewSettings.value,
-      )
+      auth.user = updated
     }
     previewSavedFeedback.value = true
     ui.showToast(t.value.previewSettingsSaved, 'success')
