@@ -17,6 +17,7 @@ import (
 	"filvault/internal/platform/postgres"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -115,7 +116,8 @@ func TestReadyz_ReturnsNotReadyWhenSchemaIsIncomplete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	t.Cleanup(cancel)
-	pool := openPool(t, ctx)
+	// Isolated schema: CI pre-migrates the shared public schema before tests run.
+	pool := openIsolatedPool(t, ctx)
 	t.Cleanup(pool.Close)
 
 	engine := app.NewWithDeps(config.Config{}, pool, mailer.NewMemory(), objectstore.NewMemory())
@@ -190,6 +192,34 @@ func openPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
 		t.Fatalf("pgxpool: %v", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		t.Fatalf("ping: %v", err)
+	}
+	return pool
+}
+
+func openIsolatedPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
+	t.Helper()
+	url := os.Getenv("FILVAULT_DATABASE_URL")
+	if url == "" {
+		t.Fatal("FILVAULT_DATABASE_URL is required")
+	}
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatalf("pgxpool.ParseConfig: %v", err)
+	}
+	schema := "health_test_" + strings.ToLower(strings.ReplaceAll(t.Name(), "/", "_"))
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		if _, err := conn.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS `+schema); err != nil {
+			return err
+		}
+		_, err := conn.Exec(ctx, `SET search_path TO `+schema)
+		return err
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("pgxpool.NewWithConfig: %v", err)
 	}
 	if err := pool.Ping(ctx); err != nil {
 		t.Fatalf("ping: %v", err)
