@@ -51,6 +51,7 @@ From the repository root:
 chmod +x deploy/production/postgres/generate-certs.sh deploy/production/generate-env.sh
 
 # 1. Postgres TLS (required for FILVAULT_ENV=production sslmode=require)
+#    Certs are owned as uid/gid 70 — the postgres user in postgres:16-alpine (Alpine standard; not 999).
 ./deploy/production/postgres/generate-certs.sh
 
 # 2. Generate gitignored deploy/production/.env with random secrets
