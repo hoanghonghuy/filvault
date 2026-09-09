@@ -115,6 +115,27 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/conversationId/)
     expect(chat).toMatch(/Cancel upload|cancelUpload|AbortController/)
     expect(chat).toMatch(/retryUpload|Retry upload/)
+    expect(chat).toMatch(/processNextInAttachmentQueue/)
+    expect(chat).toMatch(/sendingText/)
+    expect(chat).not.toMatch(/:disabled="sending"/)
+  })
+
+  it('keeps composer state separate from attachment upload progress', () => {
+    expect(chat).toMatch(/attachmentUploadProgressItems/)
+    expect(chat).toMatch(/attachmentAggregateProgress/)
+    expect(chat).not.toMatch(/class="attachment-queue sr-only"/)
+    expect(chat).toMatch(/UploadProgress[\s\S]*attachmentUploadProgressItems/)
+  })
+
+  it('implements accessible shared-media tabs and desktop pane resizing', () => {
+    expect(chat).toMatch(/onMediaTabKeydown/)
+    expect(chat).toMatch(/role="tabpanel"/)
+    expect(chat).toMatch(/aria-controls="shared-media-panel-/)
+    expect(chat).toMatch(/onRailResizerKeydown/)
+    expect(chat).toMatch(/onInfoResizerKeydown/)
+    expect(chat).toMatch(/role="separator"/)
+    expect(chat).toMatch(/resetRailWidth/)
+    expect(chat).toMatch(/resetInfoWidth/)
   })
 
   it('reconnects realtime events with a durable cursor and deduplicates messages', () => {
