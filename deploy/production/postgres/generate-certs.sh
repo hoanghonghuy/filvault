@@ -17,14 +17,16 @@ fix_cert_ownership() {
   fi
   if [[ $(id -u) -eq 0 ]]; then
     chown "${POSTGRES_UID}:${POSTGRES_GID}" "$CERT_DIR/server.crt" "$CERT_DIR/server.key"
+    chmod 644 "$CERT_DIR/server.crt"
+    chmod 600 "$CERT_DIR/server.key"
   elif command -v sudo >/dev/null 2>&1; then
     sudo chown "${POSTGRES_UID}:${POSTGRES_GID}" "$CERT_DIR/server.crt" "$CERT_DIR/server.key"
+    sudo chmod 644 "$CERT_DIR/server.crt"
+    sudo chmod 600 "$CERT_DIR/server.key"
   else
     echo "Cannot chown certs to ${POSTGRES_UID}:${POSTGRES_GID}; re-run as root or with sudo" >&2
     exit 1
   fi
-  chmod 644 "$CERT_DIR/server.crt"
-  chmod 600 "$CERT_DIR/server.key"
 }
 
 if [[ -f "$CERT_DIR/server.crt" && -f "$CERT_DIR/server.key" ]]; then
@@ -34,13 +36,16 @@ if [[ -f "$CERT_DIR/server.crt" && -f "$CERT_DIR/server.key" ]]; then
 fi
 
 if command -v docker >/dev/null 2>&1; then
+  # postgres:16-alpine has no openssl CLI; generate in alpine then chown to postgres uid 70.
   docker run --rm \
     -v "$CERT_DIR:/certs" \
-    -u "${POSTGRES_UID}:${POSTGRES_GID}" \
-    postgres:16-alpine \
-    sh -c 'openssl req -new -x509 -days 3650 -nodes \
-      -out /certs/server.crt -keyout /certs/server.key \
-      -subj "/CN=filvault-postgres" && chmod 600 /certs/server.key'
+    alpine:3.21 \
+    sh -c "apk add --no-cache openssl >/dev/null 2>&1 && \
+      openssl req -new -x509 -days 3650 -nodes \
+        -out /certs/server.crt -keyout /certs/server.key \
+        -subj '/CN=filvault-postgres' && \
+      chown ${POSTGRES_UID}:${POSTGRES_GID} /certs/server.crt /certs/server.key && \
+      chmod 644 /certs/server.crt && chmod 600 /certs/server.key"
 else
   openssl req -new -x509 -days 3650 -nodes -text \
     -out "$CERT_DIR/server.crt" \
