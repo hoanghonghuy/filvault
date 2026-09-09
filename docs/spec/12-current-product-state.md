@@ -1,6 +1,6 @@
 # Filvault — Trạng thái sản phẩm & bàn giao (hiện tại)
 
-Cập nhật: **2026-09-09**.  
+Cập nhật: **2026-09-09** (sau merge [#44](https://github.com/hoanghonghuy/filvault/pull/44) / `bd29815` trên `develop`).  
 **Nguồn sự thật duy nhất** cho trạng thái sản phẩm, mục tiêu release và việc nên làm tiếp.
 
 > Các checklist Phase 1/2 ([08](08-phase-1-status.md), [10](10-phase-2-status.md)) chỉ còn giá trị **lịch sử** — không dùng phần “việc tiếp theo” ở đó.
@@ -64,7 +64,7 @@ make dev-web            # Vue :5173 (Node ^22)
 | **Photos & albums** — timeline, album, cover, favorites | Có (Phase 2 S2–S3) | [#23](https://github.com/hoanghonghuy/filvault/issues/23), [#29](https://github.com/hoanghonghuy/filvault/issues/29) | Chưa |
 | **Sharing** — public link, share user nội bộ, Shared with me | Có (Phase 2 S4–S5) | [#25](https://github.com/hoanghonghuy/filvault/issues/25), [#24](https://github.com/hoanghonghuy/filvault/issues/24), [#32](https://github.com/hoanghonghuy/filvault/issues/32) | Chưa |
 | **Chat & calls** — direct message, attachment, SSE, video call (LiveKit) | Có (C1–C7 + ADR 0005) | [#33](https://github.com/hoanghonghuy/filvault/issues/33), [#30](https://github.com/hoanghonghuy/filvault/issues/30) | Chưa |
-| **Vault** — khu vực file cá nhân (`/vault`) | Có (routing [#37](https://github.com/hoanghonghuy/filvault/pull/37)) | [#18](https://github.com/hoanghonghuy/filvault/issues/18) / PR [#44](https://github.com/hoanghonghuy/filvault/pull/44) | Chưa |
+| **Vault** — khu vực file cá nhân (`/vault`) | Có (routing [#37](https://github.com/hoanghonghuy/filvault/pull/37); UX media/a11y [#44](https://github.com/hoanghonghuy/filvault/pull/44) / [#18](https://github.com/hoanghonghuy/filvault/issues/18)) | Cross-cutting: [#29](https://github.com/hoanghonghuy/filvault/issues/29) (MediaLightbox) | Chưa |
 | **Themes & settings** — dark/system, color themes, Theme Center | Có (cơ bản) | [#15](https://github.com/hoanghonghuy/filvault/issues/15), [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#34](https://github.com/hoanghonghuy/filvault/issues/34), [#36](https://github.com/hoanghonghuy/filvault/issues/36) | Chưa |
 | **Trash & activity** | Có | [#26](https://github.com/hoanghonghuy/filvault/issues/26) | Chưa |
 | **Shell & navigation** — responsive, Overview shortcuts | Có | [#6](https://github.com/hoanghonghuy/filvault/issues/6), [#22](https://github.com/hoanghonghuy/filvault/issues/22), [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#17](https://github.com/hoanghonghuy/filvault/issues/17) | Chưa |
@@ -95,19 +95,19 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 
 ## Backlog đang mở
 
-Tra GitHub để lấy trạng thái mới nhất. Danh sách dưới đây phản ánh `develop` tại 2026-09-09.
+Tra GitHub để lấy trạng thái mới nhất. Danh sách dưới đây phản ánh `develop` @ `bd29815` (2026-09-09).
 
 ### PR đang mở (ưu tiên review/merge)
 
 | PR | Issue | Mô tả ngắn |
 |---|---|---|
 | [#46](https://github.com/hoanghonghuy/filvault/pull/46) | [#42](https://github.com/hoanghonghuy/filvault/issues/42) | Production-like runtime baseline + TLS edge proxy |
-| [#44](https://github.com/hoanghonghuy/filvault/pull/44) | [#18](https://github.com/hoanghonghuy/filvault/issues/18) | Vault UX — align media preview & a11y |
 
 ### Đã merge gần đây (tham chiếu, không làm lại)
 
 | PR | Issue | Nội dung |
 |---|---|---|
+| [#44](https://github.com/hoanghonghuy/filvault/pull/44) | [#18](https://github.com/hoanghonghuy/filvault/issues/18) | Vault UX — align media preview & a11y |
 | [#45](https://github.com/hoanghonghuy/filvault/pull/45) | [#41](https://github.com/hoanghonghuy/filvault/issues/41) | Health/readiness probes + migration release gate |
 | [#12](https://github.com/hoanghonghuy/filvault/pull/12) | — | Upload queue (Files) |
 | [#13](https://github.com/hoanghonghuy/filvault/pull/13) | [#3](https://github.com/hoanghonghuy/filvault/issues/3) | Secret lifecycle hardening |
@@ -127,6 +127,7 @@ Nhóm **release / QA:** [#7](https://github.com/hoanghonghuy/filvault/issues/7) 
 - Bắt đầu Phase 2 slice S1–S6 — **đã Done** (xem [10](10-phase-2-status.md) lịch sử).
 - Smoke tay Phase 1 UI như “việc tiếp theo” duy nhất — đã lệch thời; dùng [#43](https://github.com/hoanghonghuy/filvault/issues/43) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) cho QA release.
 - Deploy/AWS “sau Phase 2” — **đang là công việc hiện tại** ([#4](https://github.com/hoanghonghuy/filvault/issues/4), [#42](https://github.com/hoanghonghuy/filvault/issues/42)).
+- Vault UX polish ([#18](https://github.com/hoanghonghuy/filvault/issues/18) / [#44](https://github.com/hoanghonghuy/filvault/pull/44)) — **đã merge** trên `develop`.
 
 ---
 
