@@ -36,6 +36,11 @@ coverage/
 apps/web/cypress/videos/
 apps/web/cypress/screenshots/
 
+# Playwright artifacts
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/blob-report/
+
 # Vite
 *.timestamp-*-*.mjs
 

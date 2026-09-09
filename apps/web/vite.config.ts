@@ -1,14 +1,19 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
+const disableVueDevtools = process.env.VITE_DISABLE_VUE_DEVTOOLS === 'true'
+
 // https://vite.dev/config/
 export default defineConfig({
+  test: {
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+  },
   plugins: [
     vue(),
-    vueDevTools(),
+    ...(disableVueDevtools ? [] : [vueDevTools()]),
   ],
   resolve: {
     alias: {
