@@ -5,18 +5,9 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import { hydrateAppearance } from '@/lib/theme'
 
-const savedTheme = localStorage.getItem('filvault.theme')
-if (savedTheme === 'dark') {
-  document.documentElement.dataset.theme = 'dark'
-} else {
-  delete document.documentElement.dataset.theme
-}
-
-const savedColorTheme = localStorage.getItem('filvault.colorTheme')
-if (savedColorTheme) {
-  document.documentElement.dataset.colorTheme = savedColorTheme
-}
+hydrateAppearance()
 
 const app = createApp(App)
 

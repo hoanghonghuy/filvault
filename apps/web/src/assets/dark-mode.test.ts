@@ -10,7 +10,10 @@ const readSrc = (relativePath: string) =>
 describe('dark mode contract', () => {
   const css = readSrc('./main.css')
   const settings = readSrc('../views/SettingsView.vue')
+  const themeView = readSrc('../views/ThemeView.vue')
+  const chatView = readSrc('../views/ChatView.vue')
   const main = readSrc('../main.ts')
+  const themeModule = readSrc('../lib/theme.ts')
 
   it('defines a dark theme token override', () => {
     expect(css).toMatch(/\[data-theme='dark'\]/)
@@ -19,15 +22,36 @@ describe('dark mode contract', () => {
     }
   })
 
-  it('applies a saved theme before mounting Vue', () => {
-    expect(main).toMatch(/localStorage\.getItem\('filvault.theme'\)/)
-    expect(main).toMatch(/document\.documentElement\.dataset\.theme/)
+  it('keeps semantic status colors in dark mode', () => {
+    expect(css).toMatch(/\[data-theme='dark'\][\s\S]*--danger:/)
+    expect(css).toMatch(/\[data-theme='dark'\][\s\S]*--success:/)
+    expect(css).toMatch(/\[data-theme='dark'\][\s\S]*--warning:/)
   })
 
-  it('exposes a theme toggle in Settings', () => {
-    expect(settings).toMatch(/t\.appearance/)
-    expect(settings).toMatch(/t\.darkMode/)
-    expect(settings).toMatch(/localStorage\.setItem\('filvault.theme'/)
-    expect(settings).toMatch(/document\.documentElement\.dataset\.theme/)
+  it('hydrates appearance before mounting Vue', () => {
+    expect(main).toMatch(/hydrateAppearance\(\)/)
+    expect(themeModule).toMatch(/export function hydrateAppearance/)
+  })
+
+  it('routes Settings through the canonical appearance API', () => {
+    expect(settings).toMatch(/useTheme\(\)/)
+    expect(settings).toMatch(/setAppearanceMode/)
+    expect(settings).not.toMatch(/localStorage\.setItem\('filvault\.theme'/)
+    expect(settings).not.toMatch(/document\.documentElement\.dataset\.theme/)
+  })
+
+  it('routes Theme Center through the canonical appearance API', () => {
+    expect(themeView).toMatch(/useTheme\(\)/)
+    expect(themeView).toMatch(/setAppearanceMode/)
+    expect(themeView).not.toMatch(/setFollowSystemDark/)
+    expect(themeView).not.toMatch(/document\.documentElement\.dataset\.theme/)
+  })
+
+  it('routes Chat quick toggle through the canonical appearance API', () => {
+    expect(chatView).toMatch(/useTheme\(\)/)
+    expect(chatView).toMatch(/toggleResolvedAppearance/)
+    expect(chatView).not.toMatch(/localStorage\.setItem\('filvault\.theme'/)
+    expect(chatView).not.toMatch(/localStorage\.removeItem\('filvault\.theme'/)
+    expect(chatView).not.toMatch(/document\.documentElement\.dataset\.theme/)
   })
 })
