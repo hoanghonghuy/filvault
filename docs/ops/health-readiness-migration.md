@@ -20,7 +20,8 @@ Filvault exposes two HTTP probes on the API process. Operators and deployment au
 
 - Returns `200` with `{"status":"ready","checks":{...}}` only when all mandatory dependencies are usable.
 - Returns `503` with `{"status":"not_ready","checks":{...}}` when any check fails.
-- Each check is bounded (2s timeout) and reports only `ok` or `failed` — no secrets or connection strings in the response.
+- Checks run sequentially; **each dependency gets its own independent 2s timeout** (not one shared deadline across all checks). A slow-but-healthy earlier check cannot starve later checks into a false `503`.
+- Each check reports only `ok` or `failed` — no secrets or connection strings in the response.
 - Checks performed:
   - `database` — Postgres connectivity (`Ping`)
   - `schema` — every embedded migration version is recorded in `schema_migrations`
