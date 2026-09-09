@@ -12,7 +12,7 @@ export PATH := $(HOME)/.local/go/bin:$(PATH)
 export FILVAULT_POSTGRES_PASSWORD
 
 .PHONY: compose-up compose-down up down prod-up migrate migrate-down seed test run-api dev-api dev-web \
-	lint-api typecheck-api lint-web typecheck-web ci-api ci-web cli-build cli-test
+	lint-api typecheck-api lint-web typecheck-web ci-api ci-web cli-build cli-test secret-scan
 
 compose-up:
 	$(COMPOSE) up -d postgres minio minio-init
@@ -80,3 +80,6 @@ cli-build:
 
 cli-test:
 	cd apps/cli && $(GO) test ./... -count=1
+
+secret-scan:
+	./scripts/verify-secret-scan-gate.sh

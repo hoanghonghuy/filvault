@@ -38,7 +38,7 @@ make dev-web       # Vue :5173
 |---|---|
 | Web | `http://localhost:5173` |
 | API | `http://localhost:8080` |
-| Dev login | `dev@filvault.com` / `Dev1234@` |
+| Dev login | `FILVAULT_SEED_EMAIL` / `FILVAULT_SEED_PASSWORD` từ `.env` |
 
 ---
 

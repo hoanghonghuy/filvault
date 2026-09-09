@@ -1,0 +1,43 @@
+title = "Filvault secret scanning"
+
+[[rules]]
+id = "filvault-historical-compose-default"
+description = "Historically committed local stack defaults that must not return to tracked config."
+regex = '''(?i)(dev-jwt-secret|dev-invite|filvaultsecret|Dev1234@)'''
+tags = ["filvault", "historical-default"]
+
+[[rules.allowlists]]
+description = "Validation/tests/docs name blocked literals without deploying them."
+paths = [
+  '''(?i)apps/api/internal/platform/config/(validate|load_test)\.go$''',
+  '''(?i)docs/security/secret-lifecycle-audit\.md$''',
+  '''(?i)docs/security/credential-rotation-evidence\.md$''',
+]
+
+[[rules]]
+id = "filvault-replace-with-placeholder"
+description = "Undocumented replace-with placeholders must not appear outside known local docs."
+regex = '''replace-with-local-[a-z0-9-]+'''
+tags = ["filvault", "placeholder"]
+
+[[rules.allowlists]]
+description = "Known-fake replace-with-local placeholder literals from .env.example"
+regexTarget = "secret"
+regexes = [
+  '''(?i)^replace-with-local-postgres-password$''',
+  '''(?i)^replace-with-local-s3-secret-key$''',
+  '''(?i)^replace-with-local-jwt-secret-min-32-chars$''',
+  '''(?i)^replace-with-local-invite-code$''',
+  '''(?i)^replace-with-local-seed-password$''',
+  '''(?i)^replace-with-local-livekit-api-key$''',
+  '''(?i)^replace-with-local-livekit-api-secret$''',
+]
+
+[[rules]]
+id = "livekit-dev-default-keypair"
+description = "LiveKit demo key pair historically committed to deploy/livekit.yaml."
+regex = '''(?i)devkey:\s*secret'''
+tags = ["filvault", "livekit", "historical-default"]
+
+[extend]
+useDefault = true

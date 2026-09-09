@@ -36,7 +36,7 @@ func TestEnsureDevUser_CreatesVerifiedUser(t *testing.T) {
 		Email:       email,
 		Password:    "filvault-dev",
 		DisplayName: "Filvault Dev",
-		InviteCode:  "dev-invite",
+		InviteCode:  "local-test-invite-code",
 	})
 	if err != nil {
 		t.Fatalf("EnsureDevUser: %v", err)
@@ -58,7 +58,7 @@ func TestEnsureDevUser_CreatesVerifiedUser(t *testing.T) {
 	}
 
 	svc := auth.NewService(config.Config{
-		InviteCode:                "dev-invite",
+		InviteCode:                "local-test-invite-code",
 		DefaultTrashAutoDelete:    false,
 		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
 	}, store, auth.NewTokens("test-jwt"), mailer.NewMemory(), activity.NewRecorder(nopRepo{}))
@@ -80,7 +80,7 @@ func TestEnsureDevUser_Idempotent(t *testing.T) {
 		Email:       email,
 		Password:    "filvault-dev",
 		DisplayName: "Filvault Dev",
-		InviteCode:  "dev-invite",
+		InviteCode:  "local-test-invite-code",
 	}
 
 	first, err := devseed.EnsureDevUser(ctx, pool, opts)
