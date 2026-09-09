@@ -34,3 +34,29 @@ make up    # postgres + minio + api + web
 ```
 
 Web: `http://localhost:5173` · API: `http://localhost:8080`
+
+## E2E (Playwright)
+
+Chạy smoke critical-path trên stack local thật (Postgres + MinIO + API + Vite), không mock backend:
+
+```bash
+# Từ repo root — một lệnh: compose, migrate, seed, API, Playwright
+make e2e
+```
+
+Hoặc nếu API đã chạy (`make dev-api`) và chỉ cần web + test:
+
+```bash
+cd apps/web
+E2E_EMAIL=dev@filvault.com E2E_PASSWORD=<FILVAULT_SEED_PASSWORD từ .env> npm run test:e2e
+```
+
+Biến môi trường (không commit secret):
+
+| Biến | Mục đích |
+|------|----------|
+| `E2E_EMAIL` / `E2E_PASSWORD` | Tài khoản seed (`FILVAULT_SEED_*`) |
+| `E2E_BASE_URL` | Web (mặc định `http://127.0.0.1:5173`) |
+| `E2E_API_URL` | API health check (mặc định `http://127.0.0.1:8080`) |
+
+Smoke chạy ở 3 viewport: mobile (≤767), tablet (768–1023), desktop (≥1024). Artifact (trace/screenshot/video) chỉ lưu khi fail.

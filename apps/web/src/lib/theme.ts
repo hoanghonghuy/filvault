@@ -22,7 +22,6 @@ export interface ThemeDef {
   nameKey: string
   nameDefault: string
   category: 'colors' | 'seasonal'
-  isPro?: boolean
   swatchGradient: string
   accentColor: string
   previewBg: string
@@ -135,7 +134,6 @@ export const THEMES: ThemeDef[] = [
     nameKey: 'themeMaterial',
     nameDefault: 'Vật liệu của bạn',
     category: 'colors',
-    isPro: true,
     swatchGradient: 'linear-gradient(135deg, #a78bfa 0%, #38bdf8 50%, #34d399 100%)',
     accentColor: '#0284c7',
     previewBg: '#f1f5f9',
@@ -147,7 +145,6 @@ export const THEMES: ThemeDef[] = [
     nameKey: 'themeSpring',
     nameDefault: 'Mùa xuân',
     category: 'seasonal',
-    isPro: true,
     swatchGradient: 'linear-gradient(135deg, #f472b6 0%, #34d399 100%)',
     accentColor: '#db2777',
     previewBg: '#fdf2f8',
@@ -158,7 +155,6 @@ export const THEMES: ThemeDef[] = [
     nameKey: 'themeSummer',
     nameDefault: 'Mùa hè',
     category: 'seasonal',
-    isPro: true,
     swatchGradient: 'linear-gradient(135deg, #0ea5e9 0%, #eab308 100%)',
     accentColor: '#0284c7',
     previewBg: '#f0f9ff',
@@ -169,7 +165,6 @@ export const THEMES: ThemeDef[] = [
     nameKey: 'themeAutumn',
     nameDefault: 'Mùa thu',
     category: 'seasonal',
-    isPro: true,
     swatchGradient: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
     accentColor: '#ea580c',
     previewBg: '#fff7ed',
@@ -180,7 +175,6 @@ export const THEMES: ThemeDef[] = [
     nameKey: 'themeWinter',
     nameDefault: 'Mùa đông',
     category: 'seasonal',
-    isPro: true,
     swatchGradient: 'linear-gradient(135deg, #38bdf8 0%, #a5b4fc 100%)',
     accentColor: '#0284c7',
     previewBg: '#f0f9ff',

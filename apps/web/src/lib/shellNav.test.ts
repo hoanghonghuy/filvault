@@ -3,7 +3,10 @@ import {
   HOME_PATH,
   OVERVIEW_DESTINATIONS,
   PROFILE_PATH,
+  SHELL_BREAKPOINTS,
   SHELL_NAV,
+  SHELL_NAV_WIDTH,
+  isShellNavActive,
   pageTitleForRoute,
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
@@ -14,6 +17,27 @@ import type { BrowserFile, TimelineGroup } from '@/api/types'
 describe('SHELL_NAV', () => {
   it('has 5 destinations: Home, Files, Photos, Shared, Settings', () => {
     expect(SHELL_NAV.map((item) => item.to)).toEqual(['/', '/files', '/photos', '/shared', '/settings'])
+  })
+})
+
+describe('SHELL_BREAKPOINTS', () => {
+  it('defines mobile, tablet, and desktop shell ranges', () => {
+    expect(SHELL_BREAKPOINTS.tabletMin).toBe(768)
+    expect(SHELL_BREAKPOINTS.desktopMin).toBe(1024)
+    expect(SHELL_NAV_WIDTH.rail).toBe(80)
+    expect(SHELL_NAV_WIDTH.sidebar).toBe(220)
+  })
+})
+
+describe('isShellNavActive', () => {
+  it('treats overview as an exact match only', () => {
+    expect(isShellNavActive('/', '/')).toBe(true)
+    expect(isShellNavActive('/files', '/')).toBe(false)
+  })
+
+  it('activates nested routes for section roots', () => {
+    expect(isShellNavActive('/photos/albums/01', '/photos')).toBe(true)
+    expect(isShellNavActive('/shared', '/settings')).toBe(false)
   })
 })
 

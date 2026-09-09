@@ -1,5 +1,21 @@
 import type { BrowserFile, TimelineGroup, TimelineItem } from '@/api/types'
 
+/**
+ * Responsive shell breakpoints (DESIGN.md §8).
+ * - Mobile: 0–767px — header + bottom nav, FAB above nav.
+ * - Tablet: 768–1023px — compact icon rail + page header (no bottom nav).
+ * - Desktop: ≥1024px — expanded side nav; titles live in page content.
+ */
+export const SHELL_BREAKPOINTS = {
+  tabletMin: 768,
+  desktopMin: 1024,
+} as const
+
+export const SHELL_NAV_WIDTH = {
+  rail: 80,
+  sidebar: 220,
+} as const
+
 export const HOME_PATH = '/'
 export const PROFILE_PATH = '/profile'
 
@@ -13,6 +29,15 @@ export const SHELL_NAV = [
   { to: '/shared', label: 'Shared', shortLabel: 'Shared', icon: 'share' },
   { to: '/settings', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
 ] as const
+
+/** Whether a shell nav destination should show as active for the current path. */
+export function isShellNavActive(path: string, navTo: string): boolean {
+  const normalized = path === '' ? HOME_PATH : path
+  if (navTo === HOME_PATH) {
+    return normalized === HOME_PATH
+  }
+  return normalized === navTo || normalized.startsWith(`${navTo}/`)
+}
 
 /** Home shortcuts: product surfaces only — Trash/Settings stay in persistent nav. */
 export const OVERVIEW_DESTINATIONS = [
