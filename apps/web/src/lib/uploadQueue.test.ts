@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { ApiError } from '@/api/client'
 import {
   FileUploadQueue,
+  buildFolderCacheKey,
   computeAggregateProgress,
   type UploadQueueItem,
   type UploadQueueDeps,
@@ -41,6 +42,7 @@ function createDeps(overrides: Partial<UploadQueueDeps> = {}): UploadQueueDeps {
       onProgress?.(1)
     }),
     completeUpload: vi.fn<UploadQueueDeps['completeUpload']>(async () => undefined),
+    abortSession: vi.fn<UploadQueueDeps['abortSession']>(async () => undefined),
     ensureFolderPath: vi.fn<UploadQueueDeps['ensureFolderPath']>(async () => 'folder-1'),
     resolveContentType: vi.fn<UploadQueueDeps['resolveContentType']>(() => 'text/plain'),
     formatError: vi.fn<UploadQueueDeps['formatError']>((e: unknown) =>
@@ -330,6 +332,114 @@ describe('FileUploadQueue', () => {
     expect(deps.createSession).toHaveBeenCalledTimes(3)
     expect(queue.items.every((item) => item.status === 'completed')).toBe(true)
     expect(computeAggregateProgress(queue.items)).toBe(1)
+  })
+
+  it('does not report cancelled when cancel races with finalize complete', async () => {
+    let releaseComplete: (() => void) | undefined
+    let finalizeStarted = false
+    deps.completeUpload = vi.fn<UploadQueueDeps['completeUpload']>(async () => {
+      finalizeStarted = true
+      await new Promise<void>((resolve) => {
+        releaseComplete = resolve
+      })
+    })
+
+    const queue = new FileUploadQueue(deps)
+    queue.enqueueFiles([makeFile('race.txt')], null)
+    const runPromise = queue.run()
+
+    await vi.waitFor(() => {
+      expect(finalizeStarted).toBe(true)
+    })
+    const item = queue.items[0]!
+    expect(item.status).toBe('finalizing')
+    expect(queue.cancel(item.id)).toBe(false)
+    expect(item.status).toBe('finalizing')
+
+    releaseComplete?.()
+    await runPromise
+
+    expect(item.status).toBe('completed')
+    expect(deps.completeUpload).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts server session only when cancel happens after session creation', async () => {
+    let releaseUpload: (() => void) | undefined
+    deps.uploadBytes = vi.fn<UploadQueueDeps['uploadBytes']>(async () => {
+      await new Promise<void>((resolve) => {
+        releaseUpload = resolve
+      })
+    })
+    const abortSession = vi.fn<UploadQueueDeps['abortSession']>(async () => undefined)
+    deps.abortSession = abortSession
+
+    const queue = new FileUploadQueue(deps)
+    queue.enqueueFiles([makeFile('in-flight.txt'), makeFile('queued.txt')], null)
+
+    const runPromise = queue.run()
+    await vi.waitFor(() => {
+      expect(
+        queue.items.find((item) => item.file.name === 'in-flight.txt')?.sessionFileId,
+      ).toBe('file-1')
+    })
+
+    const queued = queue.items.find((item) => item.file.name === 'queued.txt')!
+    expect(queued.status).toBe('queued')
+    queue.cancel(queued.id)
+    expect(abortSession).not.toHaveBeenCalled()
+
+    const active = queue.items.find((item) => item.file.name === 'in-flight.txt')!
+    expect(active.status).toBe('uploading')
+    queue.cancel(active.id)
+    await vi.waitFor(() => {
+      expect(abortSession).toHaveBeenCalledWith('file-1')
+    })
+    expect(abortSession).toHaveBeenCalledWith('file-1')
+
+    releaseUpload?.()
+    await runPromise
+  })
+
+  it('scopes folder cache keys by root parent id', async () => {
+    deps.ensureFolderPath = vi.fn<UploadQueueDeps['ensureFolderPath']>(
+      async (parts, rootParentId, cache) => {
+        let parentId = rootParentId
+        let currentPath = ''
+        for (const part of parts) {
+          currentPath = currentPath ? `${currentPath}/${part}` : part
+          const cacheKey = buildFolderCacheKey(rootParentId, currentPath)
+          const cached = cache.get(cacheKey)
+          if (cached) {
+            parentId = cached
+            continue
+          }
+          const id = `folder-${rootParentId ?? 'root'}-${currentPath}`
+          cache.set(cacheKey, id)
+          parentId = id
+        }
+        return parentId
+      },
+    )
+
+    const queue = new FileUploadQueue(deps)
+    const fileA = makeFile('a.txt')
+    Object.defineProperty(fileA, 'webkitRelativePath', { value: 'shared/a.txt' })
+    const fileB = makeFile('b.txt')
+    Object.defineProperty(fileB, 'webkitRelativePath', { value: 'shared/b.txt' })
+
+    queue.enqueueFiles([fileA], 'root-a', { isFolderUpload: true })
+    await queue.run()
+    queue.enqueueFiles([fileB], 'root-b', { isFolderUpload: true })
+    await queue.run()
+
+    expect(deps.createSession).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ folderId: 'folder-root-a-shared' }),
+    )
+    expect(deps.createSession).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ folderId: 'folder-root-b-shared' }),
+    )
   })
 
   it('surfaces actionable conflict errors without auto-renaming when rename budget is exhausted', async () => {

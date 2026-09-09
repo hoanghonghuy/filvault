@@ -50,13 +50,20 @@ const summary = computed(() => {
   const active = props.items.filter((item) => item.status !== 'cancelled')
   const completed = active.filter((item) => item.status === 'completed').length
   const failed = active.filter((item) => item.status === 'failed').length
-  const uploading = active.filter((item) => item.status === 'uploading').length
+  const uploading = active.filter(
+    (item) => item.status === 'uploading' || item.status === 'finalizing',
+  ).length
   const queued = active.filter((item) => item.status === 'queued').length
   return { completed, failed, uploading, queued, total: active.length }
 })
 
 const hasActiveTransfers = computed(() =>
-  props.items.some((item) => item.status === 'queued' || item.status === 'uploading'),
+  props.items.some(
+    (item) =>
+      item.status === 'queued' ||
+      item.status === 'uploading' ||
+      item.status === 'finalizing',
+  ),
 )
 
 const canClearSettled = computed(
@@ -66,6 +73,7 @@ const canClearSettled = computed(
 const statusLabels: Record<UploadItemStatus, keyof typeof t.value> = {
   queued: 'uploadStatusQueued',
   uploading: 'uploadStatusUploading',
+  finalizing: 'uploadStatusFinalizing',
   completed: 'uploadStatusCompleted',
   failed: 'uploadStatusFailed',
   cancelled: 'uploadStatusCancelled',
@@ -77,7 +85,9 @@ function statusLabel(status: UploadItemStatus): string {
 
 function itemPercent(item: UploadProgressItem): number {
   if (item.status === 'completed') return 100
-  if (item.status === 'uploading') return Math.round(item.progress * 100)
+  if (item.status === 'uploading' || item.status === 'finalizing') {
+    return item.status === 'finalizing' ? 100 : Math.round(item.progress * 100)
+  }
   return 0
 }
 
@@ -195,11 +205,13 @@ watch(
           <span class="upload-item-status">
             <span class="sr-only">{{ statusLabel(item.status) }}</span>
             <span aria-hidden="true">{{ statusLabel(item.status) }}</span>
-            <template v-if="item.status === 'uploading'"> · {{ itemPercent(item) }}%</template>
+            <template v-if="item.status === 'uploading' || item.status === 'finalizing'">
+              · {{ itemPercent(item) }}%
+            </template>
           </span>
         </div>
         <div
-          v-if="item.status === 'uploading'"
+          v-if="item.status === 'uploading' || item.status === 'finalizing'"
           class="upload-item-track"
           role="progressbar"
           :aria-label="formatTemplate(t.uploadItemProgressAria, { name: displayName(item) })"
@@ -207,7 +219,10 @@ watch(
           aria-valuemax="100"
           :aria-valuenow="itemPercent(item)"
         >
-          <div class="upload-item-fill" :style="{ transform: `scaleX(${item.progress})` }" />
+          <div
+            class="upload-item-fill"
+            :style="{ transform: `scaleX(${item.status === 'finalizing' ? 1 : item.progress})` }"
+          />
         </div>
         <p v-if="item.status === 'failed' && item.error" class="upload-item-error" role="alert">
           {{ item.error }}

@@ -1,7 +1,13 @@
 import { ApiError } from '@/api/client'
 import { generateUUID } from '@/lib/uuid'
 
-export type UploadItemStatus = 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled'
+export type UploadItemStatus =
+  | 'queued'
+  | 'uploading'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
 
 export interface UploadQueueItem {
   id: string
@@ -17,6 +23,7 @@ export interface UploadQueueItem {
   controller: AbortController
   attempt: number
   resolvedFolderId?: string | null
+  sessionFileId?: string
 }
 
 export interface UploadSessionResult {
@@ -40,6 +47,7 @@ export interface UploadQueueDeps {
     signal?: AbortSignal,
   ) => Promise<void>
   completeUpload: (fileId: string, attempt: number) => Promise<void>
+  abortSession?: (fileId: string) => Promise<void>
   ensureFolderPath: (
     parts: string[],
     rootParentId: string | null,
@@ -62,20 +70,31 @@ export function computeAggregateProgress(items: UploadQueueItem[]): number | nul
   const totalBytes = active.reduce((sum, item) => sum + fileSize(item), 0)
   if (totalBytes === 0) {
     const unresolved = active.some(
-      (item) => item.status === 'queued' || item.status === 'uploading' || item.status === 'failed',
+      (item) =>
+        item.status === 'queued' ||
+        item.status === 'uploading' ||
+        item.status === 'finalizing' ||
+        item.status === 'failed',
     )
     return unresolved ? 0 : 1
   }
 
   const uploadedBytes = active.reduce((sum, item) => {
     if (item.status === 'completed') return sum + fileSize(item)
-    if (item.status === 'uploading') return sum + fileSize(item) * item.progress
+    if (item.status === 'uploading' || item.status === 'finalizing') {
+      const ratio = item.status === 'finalizing' ? 1 : item.progress
+      return sum + fileSize(item) * ratio
+    }
     return sum
   }, 0)
 
   const ratio = uploadedBytes / totalBytes
   const unresolved = active.some(
-    (item) => item.status === 'queued' || item.status === 'uploading' || item.status === 'failed',
+    (item) =>
+      item.status === 'queued' ||
+      item.status === 'uploading' ||
+      item.status === 'finalizing' ||
+      item.status === 'failed',
   )
   if (unresolved && ratio >= 1) return 0.99
   return Math.min(1, ratio)
@@ -101,6 +120,11 @@ export function buildResolvedDisplayName(folderParts: string[], fileName: string
   return folderParts.length > 0 ? `${folderParts.join('/')}/${fileName}` : fileName
 }
 
+export function buildFolderCacheKey(rootParentId: string | null, relativePath: string): string {
+  const root = rootParentId ?? 'root'
+  return `${root}:${relativePath}`
+}
+
 export class FileUploadQueue {
   readonly items: UploadQueueItem[] = []
   private readonly deps: UploadQueueDeps
@@ -117,7 +141,21 @@ export class FileUploadQueue {
   }
 
   private shouldStop(item: UploadQueueItem, attempt: number): boolean {
-    return item.status === 'cancelled' || item.attempt !== attempt
+    if (item.attempt !== attempt) return true
+    return item.status === 'cancelled'
+  }
+
+  private isNonCancellable(item: UploadQueueItem): boolean {
+    return item.status === 'finalizing'
+  }
+
+  private async cleanupSession(item: UploadQueueItem): Promise<void> {
+    if (!item.sessionFileId || !this.deps.abortSession) return
+    try {
+      await this.deps.abortSession(item.sessionFileId)
+    } catch {
+      // Best-effort cleanup; local queue state remains authoritative for UX.
+    }
   }
 
   enqueueFiles(
@@ -162,14 +200,27 @@ export class FileUploadQueue {
 
   cancel(id: string): boolean {
     const item = this.items.find((entry) => entry.id === id)
-    if (!item || item.status === 'completed' || item.status === 'cancelled') return false
+    if (
+      !item ||
+      item.status === 'completed' ||
+      item.status === 'cancelled' ||
+      this.isNonCancellable(item)
+    ) {
+      return false
+    }
+
     if (item.status === 'uploading') {
       item.controller.abort()
     }
+
     item.status = 'cancelled'
     item.progress = 0
     item.error = undefined
     this.notifyChange()
+
+    if (item.sessionFileId) {
+      void this.cleanupSession(item)
+    }
     return true
   }
 
@@ -203,7 +254,11 @@ export class FileUploadQueue {
 
   hasActiveWork(): boolean {
     return this.items.some(
-      (item) => item.status === 'queued' || item.status === 'uploading' || item.status === 'failed',
+      (item) =>
+        item.status === 'queued' ||
+        item.status === 'uploading' ||
+        item.status === 'finalizing' ||
+        item.status === 'failed',
     )
   }
 
@@ -271,7 +326,14 @@ export class FileUploadQueue {
         targetFolderId,
         attempt,
       )
-      if (!session || this.shouldStop(item, attempt)) return
+      if (!session || this.shouldStop(item, attempt)) {
+        if (this.shouldStop(item, attempt)) {
+          await this.cleanupSession(item)
+        }
+        return
+      }
+
+      item.sessionFileId = session.fileId
 
       await this.deps.uploadBytes(
         session.uploadUrl,
@@ -286,7 +348,14 @@ export class FileUploadQueue {
         item.controller.signal,
       )
 
-      if (this.shouldStop(item, attempt)) return
+      if (this.shouldStop(item, attempt)) {
+        await this.cleanupSession(item)
+        return
+      }
+
+      item.status = 'finalizing'
+      item.progress = 1
+      this.notifyChange()
 
       await this.deps.completeUpload(session.fileId, attempt)
       if (this.shouldStop(item, attempt)) return

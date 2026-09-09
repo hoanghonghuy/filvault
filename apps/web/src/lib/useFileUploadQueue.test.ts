@@ -8,6 +8,7 @@ import { uploadToPresigned } from '@/api/client'
 import { useFileUploadQueue } from './useFileUploadQueue'
 
 let releaseUpload: (() => void) | undefined
+let releaseSettle: (() => void) | undefined
 
 vi.mock('@/api/client', () => ({
   api: vi.fn<(path: string, init?: RequestInit) => Promise<unknown>>(async (path, init) => {
@@ -15,6 +16,9 @@ vi.mock('@/api/client', () => ({
       return { fileId: 'file-1', uploadUrl: 'https://example.com/upload' }
     }
     if (path.startsWith('/files/') && init?.method === 'POST') {
+      return undefined
+    }
+    if (path.startsWith('/files/') && init?.method === 'DELETE') {
       return undefined
     }
     throw new Error(`Unexpected API path: ${path}`)
@@ -92,6 +96,7 @@ const Harness = defineComponent({
 describe('useFileUploadQueue', () => {
   beforeEach(() => {
     releaseUpload = undefined
+    releaseSettle = undefined
     vi.mocked(uploadToPresigned).mockClear()
   })
 
@@ -110,6 +115,55 @@ describe('useFileUploadQueue', () => {
 
     releaseUpload?.()
     await waitFor(() => vi.mocked(uploadToPresigned).mock.calls.length === 3)
+
+    wrapper.unmount()
+  })
+
+  it('processes files enqueued while batch settlement is still awaiting', async () => {
+    const SettleHarness = defineComponent({
+      setup() {
+        const queue = useFileUploadQueue({
+          getRootFolderId: () => null,
+          onBatchSettled: async () => {
+            await new Promise<void>((resolve) => {
+              releaseSettle = resolve
+            })
+          },
+          showToast: vi.fn<(message: string, tone?: 'success' | 'info') => void>(),
+        })
+        const summary = computed(() => ({
+          count: queue.progressItems.value.length,
+          queued: queue.progressItems.value.filter((item) => item.status === 'queued').length,
+          uploading: queue.progressItems.value.some((item) => item.status === 'uploading'),
+          progress: queue.aggregateProgress.value ?? 0,
+        }))
+        return { queue, summary }
+      },
+      template: `
+        <div
+          data-testid="summary"
+          :data-count="summary.count"
+          :data-queued="summary.queued"
+          :data-uploading="summary.uploading"
+          :data-progress="summary.progress"
+        />
+      `,
+    })
+
+    const wrapper = mount(SettleHarness)
+    const { queue } = wrapper.vm as { queue: ReturnType<typeof useFileUploadQueue> }
+
+    queue.enqueueFiles([makeFile('first.txt')])
+    await waitFor(() => vi.mocked(uploadToPresigned).mock.calls.length === 1)
+    await waitFor(() => releaseSettle !== undefined)
+
+    queue.enqueueFiles([makeFile('during-settle.txt')])
+    await waitFor(() => Number(wrapper.get('[data-testid="summary"]').attributes('data-queued')) >= 1)
+
+    releaseSettle?.()
+    await waitFor(() => vi.mocked(uploadToPresigned).mock.calls.length === 2)
+    expect(vi.mocked(uploadToPresigned).mock.calls.length).toBe(2)
+    expect(Number(wrapper.get('[data-testid="summary"]').attributes('data-queued'))).toBe(0)
 
     wrapper.unmount()
   })

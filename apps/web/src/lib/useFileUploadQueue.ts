@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n'
 import type { UploadSession } from '@/api/types'
 import {
   FileUploadQueue,
+  buildFolderCacheKey,
   computeAggregateProgress,
   type UploadQueueItem,
 } from '@/lib/uploadQueue'
@@ -38,17 +39,23 @@ export function useFileUploadQueue(options: {
       uploadToPresigned(url, file, contentType, onProgress, signal),
     completeUpload: async (fileId, attempt) => {
       const item = queue.items.find(
-        (entry) => entry.status === 'uploading' && entry.attempt === attempt,
+        (entry) =>
+          (entry.status === 'uploading' || entry.status === 'finalizing') &&
+          entry.attempt === attempt,
       )
       if (!item) return
       await api(`/files/${fileId}/complete`, { method: 'POST', body: '{}' })
+    },
+    abortSession: async (fileId) => {
+      await api(`/files/${fileId}/upload-session`, { method: 'DELETE' })
     },
     ensureFolderPath: async (parts, rootParentId, cache) => {
       let parentId = rootParentId
       let currentPath = ''
       for (const part of parts) {
         currentPath = currentPath ? `${currentPath}/${part}` : part
-        const cached = cache.get(currentPath)
+        const cacheKey = buildFolderCacheKey(rootParentId, currentPath)
+        const cached = cache.get(cacheKey)
         if (cached) {
           parentId = cached
           continue
@@ -58,7 +65,7 @@ export function useFileUploadQueue(options: {
           body: JSON.stringify({ name: part, parentId }),
         })
         parentId = created.id
-        cache.set(currentPath, parentId)
+        cache.set(cacheKey, parentId)
       }
       return parentId
     },
@@ -92,7 +99,15 @@ export function useFileUploadQueue(options: {
 
   const isUploading = computed(() => {
     const revision = queueRevision.value
-    return revision >= 0 && queue.items.some((item) => item.status === 'queued' || item.status === 'uploading')
+    return (
+      revision >= 0 &&
+      queue.items.some(
+        (item) =>
+          item.status === 'queued' ||
+          item.status === 'uploading' ||
+          item.status === 'finalizing',
+      )
+    )
   })
 
   let activeRun: Promise<void> | null = null
@@ -120,7 +135,15 @@ export function useFileUploadQueue(options: {
       return
     }
 
-    if (hasFailures && !queue.items.some((item) => item.status === 'queued' || item.status === 'uploading')) {
+    if (
+      hasFailures &&
+      !queue.items.some(
+        (item) =>
+          item.status === 'queued' ||
+          item.status === 'uploading' ||
+          item.status === 'finalizing',
+      )
+    ) {
       const completed = active.filter((item) => item.status === 'completed').length
       if (completed > 0) {
         await options.onBatchSettled()
@@ -131,8 +154,12 @@ export function useFileUploadQueue(options: {
   async function runQueue(): Promise<void> {
     if (!activeRun) {
       activeRun = (async () => {
-        await queue.run()
-        await settleQueue()
+        let hasQueuedWork = true
+        while (hasQueuedWork) {
+          await queue.run()
+          await settleQueue()
+          hasQueuedWork = queue.items.some((item) => item.status === 'queued')
+        }
       })().finally(() => {
         activeRun = null
       })
