@@ -1,7 +1,8 @@
 # Filvault
 
 Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).  
-**Trạng thái sản phẩm & handoff:** [`docs/spec/12-current-product-state.md`](docs/spec/12-current-product-state.md) (nhánh `develop`).
+**Trạng thái sản phẩm & handoff:** [`docs/spec/12-current-product-state.md`](docs/spec/12-current-product-state.md) (nhánh `develop`).  
+**Merge vào `develop`/`main`:** PR bắt buộc + 4 required CI checks — xem [Hợp đồng merge](docs/spec/12-current-product-state.md#hợp-đồng-merge-pr--developmain) trong doc 12.
 
 ## Chạy local
 
