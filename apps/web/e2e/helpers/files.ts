@@ -51,13 +51,15 @@ export async function uploadFile(page: Page, kind: 'text' | 'image', targetName:
 }
 
 export async function openFileActions(page: Page, fileName: string): Promise<void> {
-  await page.getByRole('button', { name: fileName, exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  const fileCard = page.getByRole('button', { name: fileName, exact: true })
+  await expect(fileCard).toBeVisible()
+  await fileCard.getByRole('button', { name: /^File actions$/ }).click()
+  await expect(page.getByRole('dialog').last()).toBeVisible()
 }
 
 export async function previewFile(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
-  await page.getByRole('button', { name: /^Preview$/ }).click()
+  await page.getByRole('dialog').last().getByRole('button', { name: /^Preview$/ }).click()
   const previewDialog = page.getByRole('dialog', { name: fileName })
   await expect(previewDialog).toBeVisible()
   await previewDialog.getByRole('button', { name: /^Close preview$/ }).click()
@@ -67,7 +69,7 @@ export async function previewFile(page: Page, fileName: string): Promise<void> {
 export async function downloadFile(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
   const popupPromise = page.waitForEvent('popup')
-  await page.getByRole('button', { name: /^Download$/ }).click()
+  await page.getByRole('dialog').last().getByRole('button', { name: /^Download$/ }).click()
   const popup = await popupPromise
   await popup.waitForLoadState('domcontentloaded')
   await popup.close()
@@ -75,8 +77,8 @@ export async function downloadFile(page: Page, fileName: string): Promise<void> 
 
 export async function moveFileToTrash(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
-  await page.getByRole('button', { name: /^Move to trash$/ }).click()
-  await page.getByRole('button', { name: /^Move to trash$/ }).last().click()
+  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
+  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
   await expect(page.getByRole('button', { name: fileName, exact: true })).toHaveCount(0)
 }
 
@@ -104,9 +106,11 @@ export async function purgeFromTrash(page: Page, names: string[]): Promise<void>
 }
 
 export async function cleanupSmokeArtifacts(page: Page): Promise<void> {
-  await page.goto('/files')
   const names = [e2eTextFileName, e2eImageFileName, e2eFolderName]
 
+  await purgeFromTrash(page, names)
+
+  await page.goto('/files')
   for (const name of names) {
     const item = page.getByRole('button', { name, exact: true })
     if (await item.count() === 0) {
