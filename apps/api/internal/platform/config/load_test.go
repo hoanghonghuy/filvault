@@ -110,6 +110,137 @@ func TestLoad_ProductionRejectsDatabaseWithoutSSLMode(t *testing.T) {
 	}
 }
 
+func TestLoad_EmptyEnvDefaultsDevelopment(t *testing.T) {
+	setEnv(t, map[string]string{
+		"FILVAULT_ENV":          "",
+		"FILVAULT_DATABASE_URL": "postgres://filvault:local@127.0.0.1:5435/filvault?sslmode=disable",
+		"FILVAULT_JWT_SECRET":   "replace-with-local-jwt-secret-min-32-chars",
+		"FILVAULT_OBJECT_STORE": "s3",
+		"FILVAULT_S3_ENDPOINT":  "http://127.0.0.1:9002",
+		"FILVAULT_S3_ACCESS_KEY":  "filvault",
+		"FILVAULT_S3_SECRET_KEY":  "replace-with-local-s3-secret-key",
+	})
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Env != EnvDevelopment {
+		t.Fatalf("Env = %q, want development", cfg.Env)
+	}
+}
+
+func TestLoad_RejectsUnknownEnv(t *testing.T) {
+	base := map[string]string{
+		"FILVAULT_DATABASE_URL": "postgres://filvault:local@127.0.0.1:5435/filvault?sslmode=disable",
+		"FILVAULT_JWT_SECRET":   "replace-with-local-jwt-secret-min-32-chars",
+		"FILVAULT_OBJECT_STORE": "s3",
+		"FILVAULT_S3_ENDPOINT":  "http://127.0.0.1:9002",
+		"FILVAULT_S3_ACCESS_KEY":  "filvault",
+		"FILVAULT_S3_SECRET_KEY":  "replace-with-local-s3-secret-key",
+	}
+	for _, unknown := range []string{"prodution", "staging", "test"} {
+		t.Run(unknown, func(t *testing.T) {
+			env := make(map[string]string, len(base)+1)
+			for k, v := range base {
+				env[k] = v
+			}
+			env["FILVAULT_ENV"] = unknown
+			setEnv(t, env)
+
+			_, err := Load()
+			if err == nil {
+				t.Fatalf("Load() expected error for unknown FILVAULT_ENV %q", unknown)
+			}
+			if !strings.Contains(err.Error(), "FILVAULT_ENV") {
+				t.Fatalf("error = %v, want FILVAULT_ENV guidance", err)
+			}
+		})
+	}
+}
+
+func TestLoad_ProductionAcceptsEnvCaseAndWhitespace(t *testing.T) {
+	for _, raw := range []string{"production", " PRODUCTION ", "Prod"} {
+		t.Run(raw, func(t *testing.T) {
+			env := baseProdEnv()
+			env["FILVAULT_ENV"] = raw
+			setEnv(t, env)
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.Env != EnvProduction {
+				t.Fatalf("Env = %q, want production", cfg.Env)
+			}
+		})
+	}
+}
+
+func TestLoad_ProductionRejectsDatabaseSSLPrefer(t *testing.T) {
+	env := baseProdEnv()
+	env["FILVAULT_DATABASE_URL"] = "postgres://app:strong-db-pass@db.example.com:5432/filvault?sslmode=prefer"
+	setEnv(t, env)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for sslmode=prefer in production")
+	}
+	if !strings.Contains(err.Error(), "sslmode") {
+		t.Fatalf("error = %v, want sslmode guidance", err)
+	}
+}
+
+func TestLoad_ProductionRejectsDatabaseSSLRequirementSuperstring(t *testing.T) {
+	env := baseProdEnv()
+	env["FILVAULT_DATABASE_URL"] = "postgres://app:strong-db-pass@db.example.com:5432/filvault?sslmode=requirement"
+	setEnv(t, env)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for sslmode=requirement in production")
+	}
+	if !strings.Contains(err.Error(), "requirement") {
+		t.Fatalf("error = %v, want sslmode value guidance", err)
+	}
+}
+
+func TestParseEnv(t *testing.T) {
+	t.Run("empty defaults development", func(t *testing.T) {
+		env, err := parseEnv("")
+		if err != nil || env != EnvDevelopment {
+			t.Fatalf("parseEnv(\"\") = (%q, %v)", env, err)
+		}
+	})
+	t.Run("unknown fails closed", func(t *testing.T) {
+		_, err := parseEnv("prodution")
+		if err == nil || !strings.Contains(err.Error(), "FILVAULT_ENV") {
+			t.Fatalf("parseEnv typo error = %v", err)
+		}
+	})
+}
+
+func TestDatabaseSSLMode(t *testing.T) {
+	t.Run("require ok", func(t *testing.T) {
+		mode, err := databaseSSLMode("postgres://app:pass@db.example.com:5432/filvault?sslmode=require")
+		if err != nil || mode != "require" {
+			t.Fatalf("databaseSSLMode() = (%q, %v)", mode, err)
+		}
+	})
+	t.Run("superstring rejected at validation", func(t *testing.T) {
+		mode, err := databaseSSLMode("postgres://app:pass@db.example.com:5432/filvault?sslmode=requirement")
+		if err != nil || mode != "requirement" {
+			t.Fatalf("databaseSSLMode() = (%q, %v)", mode, err)
+		}
+	})
+	t.Run("missing sslmode", func(t *testing.T) {
+		_, err := databaseSSLMode("postgres://app:pass@db.example.com:5432/filvault")
+		if err == nil || !strings.Contains(err.Error(), "sslmode") {
+			t.Fatalf("databaseSSLMode() error = %v", err)
+		}
+	})
+}
+
 func TestLoad_ProductionRejectsPlaceholderS3Secret(t *testing.T) {
 	env := baseProdEnv()
 	env["FILVAULT_S3_SECRET_KEY"] = "replace-with-local-s3-secret-key"

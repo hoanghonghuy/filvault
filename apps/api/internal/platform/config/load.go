@@ -8,8 +8,12 @@ import (
 )
 
 func Load() (Config, error) {
+	env, err := parseEnv(os.Getenv("FILVAULT_ENV"))
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
-		Env:                        parseEnv(os.Getenv("FILVAULT_ENV")),
+		Env:                        env,
 		DatabaseURL:                os.Getenv("FILVAULT_DATABASE_URL"),
 		InviteCode:                 os.Getenv("FILVAULT_INVITE_CODE"),
 		JWTSecret:                  os.Getenv("FILVAULT_JWT_SECRET"),

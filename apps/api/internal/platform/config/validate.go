@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"net/url"
+)
 
 type Env string
 
@@ -29,12 +32,18 @@ var unsafeSecretValues = []string{
 	"filvault",
 }
 
-func parseEnv(raw string) Env {
-	switch stringsToLower(stringsTrim(raw)) {
+func parseEnv(raw string) (Env, error) {
+	trimmed := stringsTrim(raw)
+	if trimmed == "" {
+		return EnvDevelopment, nil
+	}
+	switch stringsToLower(trimmed) {
 	case "production", "prod":
-		return EnvProduction
+		return EnvProduction, nil
+	case "development", "dev":
+		return EnvDevelopment, nil
 	default:
-		return EnvDevelopment
+		return "", fmt.Errorf("FILVAULT_ENV must be development or production (got %q)", trimmed)
 	}
 }
 
@@ -110,14 +119,14 @@ func validateProduction(cfg Config) error {
 }
 
 func validateProductionDatabaseURL(raw string) error {
-	lower := stringsToLower(raw)
-	if stringsContains(lower, "sslmode=disable") {
-		return fmt.Errorf("FILVAULT_DATABASE_URL must not use sslmode=disable in production; use sslmode=require or verify-full")
+	mode, err := databaseSSLMode(raw)
+	if err != nil {
+		return fmt.Errorf("FILVAULT_DATABASE_URL is invalid: %w", err)
 	}
-	if !stringsContains(lower, "sslmode=require") &&
-		!stringsContains(lower, "sslmode=verify-full") &&
-		!stringsContains(lower, "sslmode=verify-ca") {
-		return fmt.Errorf("FILVAULT_DATABASE_URL must set sslmode=require, verify-full, or verify-ca in production")
+	switch mode {
+	case "require", "verify-ca", "verify-full":
+	default:
+		return fmt.Errorf("FILVAULT_DATABASE_URL sslmode must be require, verify-ca, or verify-full in production (got %q)", mode)
 	}
 	host, err := databaseHost(raw)
 	if err != nil {
@@ -127,6 +136,33 @@ func validateProductionDatabaseURL(raw string) error {
 		return fmt.Errorf("FILVAULT_DATABASE_URL must not point to localhost or 127.0.0.1 in production")
 	}
 	return nil
+}
+
+func databaseSSLMode(raw string) (string, error) {
+	u, err := urlParse(raw)
+	if err != nil {
+		return "", err
+	}
+	value, err := queryParamSingle(u, "sslmode")
+	if err != nil {
+		return "", err
+	}
+	return stringsToLower(value), nil
+}
+
+func queryParamSingle(u *url.URL, key string) (string, error) {
+	vals, ok := u.Query()[key]
+	if !ok || len(vals) == 0 {
+		return "", fmt.Errorf("%s query parameter is required", key)
+	}
+	if len(vals) > 1 {
+		return "", fmt.Errorf("%s query parameter must appear once", key)
+	}
+	value := stringsTrim(vals[0])
+	if value == "" {
+		return "", fmt.Errorf("%s query parameter must not be empty", key)
+	}
+	return value, nil
 }
 
 func validateProductionMailer(cfg Config) error {

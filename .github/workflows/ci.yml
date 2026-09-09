@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch develop for commit-range base
+        run: git fetch origin develop:refs/remotes/origin/develop
 
       - name: Install gitleaks
         run: |
@@ -22,6 +27,8 @@ jobs:
             | tar xz -C /usr/local/bin gitleaks
 
       - name: Verify secret scan gate
+        env:
+          GITLEAKS_BASE_REF: origin/develop
         run: ./scripts/verify-secret-scan-gate.sh
 
   api:

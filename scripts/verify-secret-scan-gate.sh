@@ -38,6 +38,12 @@ run_detect() {
   "$GITLEAKS" detect --source "$1" --config "$CONFIG" --no-git --no-banner --redact "${@:2}"
 }
 
+run_detect_range() {
+  local log_opts=$1
+  local source=$2
+  "$GITLEAKS" detect --source "$source" --config "$CONFIG" --log-opts="$log_opts" --no-banner --redact --verbose
+}
+
 expect_leaks() {
   local label=$1
   local source=$2
@@ -53,6 +59,25 @@ expect_clean() {
   local source=$2
   echo "==> $label: expect zero findings"
   run_detect "$source" --verbose
+}
+
+expect_range_leaks() {
+  local label=$1
+  local source=$2
+  local log_opts=$3
+  echo "==> $label: expect findings ($log_opts)"
+  if run_detect_range "$log_opts" "$source"; then
+    echo "scanner self-test failed: $label was not detected" >&2
+    exit 1
+  fi
+}
+
+expect_range_clean() {
+  local label=$1
+  local log_opts=$2
+  local source=$3
+  echo "==> $label: expect zero findings ($log_opts)"
+  run_detect_range "$log_opts" "$source"
 }
 
 # 1) Custom historical-default rule (isolated temp dir; literal assembled at runtime).
@@ -96,6 +121,35 @@ expect_clean "documented placeholder in compose-shaped fixture" "$PLACEHOLDER_CO
 expect_clean "documented placeholder in Makefile-shaped fixture" "$PLACEHOLDER_MAKE_DIR/selftest-placeholder-makefile"
 
 # 4) Repository must stay clean with default detectors active on tracked files.
-expect_clean "repository scan" "$ROOT"
+expect_clean "repository scan (current tree)" "$ROOT"
+
+# 5) Commit-range self-test: synthetic leak introduced then removed must still fail the range scan.
+RANGE_TEST_REPO="$(make_tempdir)"
+git -C "$RANGE_TEST_REPO" init -q
+git -C "$RANGE_TEST_REPO" config user.email "selftest@filvault.local"
+git -C "$RANGE_TEST_REPO" config user.name "selftest"
+printf 'ok\n' >"$RANGE_TEST_REPO/README"
+git -C "$RANGE_TEST_REPO" add README
+git -C "$RANGE_TEST_REPO" commit -q -m "baseline"
+RANGE_BASE="$(git -C "$RANGE_TEST_REPO" rev-parse HEAD)"
+printf 'FILVAULT_JWT_SECRET=%s\n' "$HIST_JWT" >"$RANGE_TEST_REPO/leak.txt"
+git -C "$RANGE_TEST_REPO" add leak.txt
+git -C "$RANGE_TEST_REPO" commit -q -m "introduce synthetic leak"
+git -C "$RANGE_TEST_REPO" rm -q leak.txt
+git -C "$RANGE_TEST_REPO" commit -q -m "remove leak"
+expect_range_leaks "commit-range scan catches removed leak" "$RANGE_TEST_REPO" "${RANGE_BASE}..HEAD"
+
+# 6) PR commit-range scan vs develop (only commits on this branch; allowlists cover documented placeholders).
+BASE_REF="${GITLEAKS_BASE_REF:-origin/develop}"
+if git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+  COMMIT_COUNT="$(git rev-list --count "${BASE_REF}..HEAD" 2>/dev/null || echo 0)"
+  if [[ "$COMMIT_COUNT" -gt 0 ]]; then
+    expect_range_clean "PR commit-range scan" "${BASE_REF}..HEAD" "$ROOT"
+  else
+    echo "==> PR commit-range scan: skip (no commits ahead of $BASE_REF)"
+  fi
+else
+  echo "==> PR commit-range scan: skip ($BASE_REF not found; fetch base ref for full gate)" >&2
+fi
 
 echo "secret scan gate OK"
