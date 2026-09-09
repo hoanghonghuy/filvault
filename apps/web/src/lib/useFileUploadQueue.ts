@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { api, uploadToPresigned } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { resolveContentType } from '@/lib/mimeIcon'
+import { useI18n } from '@/lib/i18n'
 import type { UploadSession } from '@/api/types'
 import {
   FileUploadQueue,
@@ -9,11 +10,16 @@ import {
   type UploadQueueItem,
 } from '@/lib/uploadQueue'
 
+function formatTemplate(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
+}
+
 export function useFileUploadQueue(options: {
   getRootFolderId: () => string | null
   onBatchSettled: () => Promise<void>
   showToast: (message: string, tone?: 'success' | 'info') => void
 }) {
+  const { t } = useI18n()
   const queueRevision = ref(0)
   const showPanel = ref(false)
 
@@ -77,6 +83,7 @@ export function useFileUploadQueue(options: {
       .map((item) => ({
         id: item.id,
         name: item.displayName,
+        resolvedName: item.resolvedName,
         status: item.status,
         progress: item.progress,
         error: item.error,
@@ -98,11 +105,13 @@ export function useFileUploadQueue(options: {
 
     if (allSuccess) {
       options.showToast(
-        active.length === 1 ? 'Upload complete' : `${active.length} files uploaded`,
+        active.length === 1
+          ? t.value.uploadCompleteToast
+          : formatTemplate(t.value.uploadCompleteManyToast, { count: active.length }),
         'success',
       )
       await options.onBatchSettled()
-      queue.dismissCompleted()
+      queue.dismissSettled()
       if (!queue.hasActiveWork()) {
         showPanel.value = false
       }
@@ -136,14 +145,29 @@ export function useFileUploadQueue(options: {
     if (!queue.cancel(id)) return
     bump()
     if (!queue.hasActiveWork()) {
-      queue.dismissCompleted()
+      queue.dismissSettled()
       showPanel.value = queue.items.length > 0
     }
     void runQueue()
   }
 
+  function dismissFailedUpload(id: string) {
+    const item = queue.items.find((entry) => entry.id === id)
+    if (!queue.dismissFailed(id)) return
+    if (item) {
+      options.showToast(
+        formatTemplate(t.value.uploadDismissedFailedToast, { name: item.displayName }),
+        'info',
+      )
+    }
+    bump()
+    if (!queue.hasActiveWork()) {
+      showPanel.value = queue.items.length > 0
+    }
+  }
+
   function dismissUploadPanel() {
-    queue.dismissCompleted()
+    queue.dismissSettled()
     showPanel.value = queue.hasActiveWork()
     bump()
   }
@@ -155,6 +179,7 @@ export function useFileUploadQueue(options: {
     enqueueFiles,
     retryUpload,
     cancelUpload,
+    dismissFailedUpload,
     dismissUploadPanel,
   }
 }

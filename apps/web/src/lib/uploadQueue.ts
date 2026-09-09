@@ -7,6 +7,8 @@ export interface UploadQueueItem {
   id: string
   file: File
   displayName: string
+  /** Final stored filename when conflict auto-rename applies. */
+  resolvedName?: string
   folderParts: string[]
   rootFolderId: string | null
   status: UploadItemStatus
@@ -95,6 +97,10 @@ function folderPartsFromRelativePath(relativePath: string): string[] {
   return parts
 }
 
+export function buildResolvedDisplayName(folderParts: string[], fileName: string): string {
+  return folderParts.length > 0 ? `${folderParts.join('/')}/${fileName}` : fileName
+}
+
 export class FileUploadQueue {
   readonly items: UploadQueueItem[] = []
   private readonly deps: UploadQueueDeps
@@ -147,6 +153,7 @@ export class FileUploadQueue {
     item.status = 'queued'
     item.error = undefined
     item.progress = 0
+    item.resolvedName = undefined
     item.attempt += 1
     item.controller = new AbortController()
     return true
@@ -165,13 +172,32 @@ export class FileUploadQueue {
     return true
   }
 
-  dismissCompleted(): void {
+  dismissFailed(id: string): boolean {
+    const index = this.items.findIndex((entry) => entry.id === id)
+    if (index < 0) return false
+    const item = this.items[index]
+    if (!item || item.status !== 'failed') return false
+    this.items.splice(index, 1)
+    this.notifyChange()
+    return true
+  }
+
+  dismissSettled(): void {
     for (let index = this.items.length - 1; index >= 0; index -= 1) {
       const item = this.items[index]
-      if (item && (item.status === 'completed' || item.status === 'cancelled')) {
+      if (
+        item &&
+        (item.status === 'completed' || item.status === 'cancelled' || item.status === 'failed')
+      ) {
         this.items.splice(index, 1)
       }
     }
+    this.notifyChange()
+  }
+
+  /** @deprecated Use dismissSettled() */
+  dismissCompleted(): void {
+    this.dismissSettled()
   }
 
   hasActiveWork(): boolean {
@@ -238,7 +264,12 @@ export class FileUploadQueue {
 
       if (this.shouldStop(item, attempt)) return
 
-      const session = await this.createSessionWithConflictRetry(item, contentType, targetFolderId, attempt)
+      const session = await this.createSessionWithConflictRetry(
+        item,
+        contentType,
+        targetFolderId,
+        attempt,
+      )
       if (!session || this.shouldStop(item, attempt)) return
 
       await this.deps.uploadBytes(
@@ -291,12 +322,17 @@ export class FileUploadQueue {
     while (renameAttempt < MAX_CONFLICT_RENAMES) {
       if (this.shouldStop(item, attempt)) return null
       try {
-        return await this.deps.createSession({
+        const session = await this.deps.createSession({
           name: uploadName,
           size: item.file.size,
           contentType,
           folderId,
         })
+        if (uploadName !== item.file.name) {
+          item.resolvedName = buildResolvedDisplayName(item.folderParts, uploadName)
+          this.notifyChange()
+        }
+        return session
       } catch (error) {
         if (
           error instanceof ApiError &&

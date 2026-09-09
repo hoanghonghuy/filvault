@@ -50,6 +50,7 @@ const {
   enqueueFiles: enqueueUploadFiles,
   retryUpload,
   cancelUpload,
+  dismissFailedUpload,
   dismissUploadPanel,
 } = useFileUploadQueue({
   getRootFolderId: () => folderId.value,
@@ -1159,6 +1160,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       :label="t.upload"
       @retry="retryUpload"
       @cancel="cancelUpload"
+      @dismiss-failed="dismissFailedUpload"
       @dismiss="dismissUploadPanel"
     />
     <p v-if="error" class="error" role="alert">{{ error }}</p>

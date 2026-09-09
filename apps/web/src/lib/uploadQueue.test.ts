@@ -261,6 +261,40 @@ describe('FileUploadQueue', () => {
     )
   })
 
+  it('records resolvedName when conflict auto-rename succeeds', async () => {
+    let attempts = 0
+    deps.createSession = vi.fn<UploadQueueDeps['createSession']>(async (params) => {
+      attempts += 1
+      if (attempts === 1) {
+        throw new ApiError('CONFLICT', 'Name already exists in this location.', 409)
+      }
+      expect(params.name).toBe('dup (1).pdf')
+      return { fileId: 'file-1', uploadUrl: 'https://example.com/upload' }
+    })
+
+    const queue = new FileUploadQueue(deps)
+    queue.enqueueFiles([makeFile('dup.pdf')], null)
+    await queue.run()
+
+    expect(queue.items[0]?.resolvedName).toBe('dup (1).pdf')
+    expect(queue.items[0]?.status).toBe('completed')
+  })
+
+  it('removes failed items when dismissFailed is called', async () => {
+    deps.uploadBytes = vi.fn<UploadQueueDeps['uploadBytes']>(async () => {
+      throw new ApiError('UPLOAD_FAILED', 'Upload network error', 0)
+    })
+
+    const queue = new FileUploadQueue(deps)
+    queue.enqueueFiles([makeFile('bad.txt')], null)
+    await queue.run()
+
+    const failedId = queue.items[0]!.id
+    expect(queue.dismissFailed(failedId)).toBe(true)
+    expect(queue.items).toHaveLength(0)
+    expect(queue.dismissFailed(failedId)).toBe(false)
+  })
+
   it('surfaces actionable conflict errors without auto-renaming when rename budget is exhausted', async () => {
     deps.createSession = vi.fn<UploadQueueDeps['createSession']>(async () => {
       throw new ApiError('CONFLICT', 'Name already exists in this location.', 409)

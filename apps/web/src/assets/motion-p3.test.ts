@@ -69,6 +69,7 @@ describe('upload progress contract', () => {
   it('creates a reusable UploadProgress component wired to tokens', () => {
     const bar = readSrc('../components/UploadProgress.vue')
     expect(bar).toContain('--ease-standard')
+    expect(bar).toMatch(/upload-live-status/)
     expect(bar).toMatch(/aria-live="polite"/)
     expect(bar).toMatch(/role="progressbar"/)
     expect(bar).toMatch(/aggregateProgress/)

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { UploadItemStatus } from '@/lib/uploadQueue'
+import { useI18n } from '@/lib/i18n'
 
 export interface UploadProgressItem {
   id: string
   name: string
+  resolvedName?: string
   status: UploadItemStatus
   progress: number
   error?: string
@@ -27,8 +29,11 @@ const props = withDefaults(
 const emit = defineEmits<{
   retry: [id: string]
   cancel: [id: string]
+  dismissFailed: [id: string]
   dismiss: []
 }>()
+
+const { t } = useI18n()
 
 const effectiveProgress = computed(() => props.aggregateProgress ?? props.progress ?? null)
 
@@ -50,26 +55,24 @@ const summary = computed(() => {
   return { completed, failed, uploading, queued, total: active.length }
 })
 
-const canDismiss = computed(() =>
-  props.items.length > 0 &&
-  props.items.every((item) => item.status === 'completed' || item.status === 'cancelled'),
+const hasActiveTransfers = computed(() =>
+  props.items.some((item) => item.status === 'queued' || item.status === 'uploading'),
 )
 
+const canClearSettled = computed(
+  () => queueMode.value && props.items.length > 0 && !hasActiveTransfers.value,
+)
+
+const statusLabels: Record<UploadItemStatus, keyof typeof t.value> = {
+  queued: 'uploadStatusQueued',
+  uploading: 'uploadStatusUploading',
+  completed: 'uploadStatusCompleted',
+  failed: 'uploadStatusFailed',
+  cancelled: 'uploadStatusCancelled',
+}
+
 function statusLabel(status: UploadItemStatus): string {
-  switch (status) {
-    case 'queued':
-      return 'Đang chờ'
-    case 'uploading':
-      return 'Đang tải lên'
-    case 'completed':
-      return 'Hoàn tất'
-    case 'failed':
-      return 'Thất bại'
-    case 'cancelled':
-      return 'Đã hủy'
-    default:
-      return status
-  }
+  return t.value[statusLabels[status]]
 }
 
 function itemPercent(item: UploadProgressItem): number {
@@ -77,28 +80,86 @@ function itemPercent(item: UploadProgressItem): number {
   if (item.status === 'uploading') return Math.round(item.progress * 100)
   return 0
 }
+
+function displayName(item: UploadProgressItem): string {
+  if (item.status === 'completed' && item.resolvedName) {
+    return item.resolvedName
+  }
+  return item.name
+}
+
+function formatTemplate(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_match, key: string) => String(values[key] ?? ''))
+}
+
+function conflictNote(item: UploadProgressItem): string | null {
+  if (!item.resolvedName || item.resolvedName === item.name) return null
+  return formatTemplate(t.value.uploadConflictRenamed, { name: item.resolvedName })
+}
+
+const liveAnnouncement = ref('')
+const trackedStatuses = new Map<string, UploadItemStatus>()
+
+watch(
+  () => props.items.map((item) => ({ id: item.id, status: item.status, name: displayName(item) })),
+  (snapshots) => {
+    const messages: string[] = []
+    const seen = new Set<string>()
+
+    for (const snapshot of snapshots) {
+      seen.add(snapshot.id)
+      const previous = trackedStatuses.get(snapshot.id)
+      if (previous === snapshot.status) continue
+
+      trackedStatuses.set(snapshot.id, snapshot.status)
+      if (previous === undefined) continue
+
+      if (snapshot.status === 'completed') {
+        messages.push(formatTemplate(t.value.uploadLiveCompleted, { name: snapshot.name }))
+      } else if (snapshot.status === 'failed') {
+        messages.push(formatTemplate(t.value.uploadLiveFailed, { name: snapshot.name }))
+      } else if (snapshot.status === 'cancelled') {
+        messages.push(formatTemplate(t.value.uploadLiveCancelled, { name: snapshot.name }))
+      }
+    }
+
+    for (const id of trackedStatuses.keys()) {
+      if (!seen.has(id)) trackedStatuses.delete(id)
+    }
+
+    if (messages.length > 0) {
+      liveAnnouncement.value = messages.join('. ')
+    }
+  },
+)
 </script>
 
 <template>
-  <section v-if="visible" class="upload-progress" aria-live="polite">
+  <section v-if="visible" class="upload-progress">
+    <p class="upload-live-status sr-only" aria-live="polite" aria-atomic="true">
+      {{ liveAnnouncement }}
+    </p>
+
     <div class="upload-progress-head">
       <div class="upload-progress-title">
-        <span>{{ label || 'Đang tải lên…' }}</span>
+        <span>{{ label || t.uploadProgressLabel }}</span>
         <span v-if="queueMode" class="upload-progress-summary">
           {{ summary.completed }}/{{ summary.total }}
-          <template v-if="summary.failed > 0"> · {{ summary.failed }} thất bại</template>
+          <template v-if="summary.failed > 0">
+            · {{ summary.failed }} {{ t.uploadSummaryFailed }}
+          </template>
         </span>
       </div>
       <div class="upload-progress-actions">
-        <span class="upload-progress-percent">{{ percent }}%</span>
+        <span class="upload-progress-percent" aria-hidden="true">{{ percent }}%</span>
         <button
-          v-if="queueMode && canDismiss"
+          v-if="canClearSettled"
           type="button"
           class="upload-dismiss-btn"
-          aria-label="Đóng tiến trình tải lên"
+          :aria-label="t.uploadClearSettledAria"
           @click="emit('dismiss')"
         >
-          Đóng
+          {{ t.uploadClearSettled }}
         </button>
       </div>
     </div>
@@ -108,12 +169,12 @@ function itemPercent(item: UploadProgressItem): number {
       :aria-valuenow="percent"
       aria-valuemin="0"
       aria-valuemax="100"
-      :aria-label="label || 'Tiến trình tải lên tổng'"
+      :aria-label="label || t.uploadProgressAggregateAria"
     >
       <div class="fill" :style="{ transform: `scaleX(${effectiveProgress ?? 0})` }" />
     </div>
 
-    <ul v-if="queueMode" class="upload-item-list" aria-label="Danh sách tệp đang tải lên">
+    <ul v-if="queueMode" class="upload-item-list" :aria-label="t.uploadProgressListAria">
       <li
         v-for="item in items"
         :key="item.id"
@@ -121,7 +182,16 @@ function itemPercent(item: UploadProgressItem): number {
         :data-status="item.status"
       >
         <div class="upload-item-main">
-          <span class="upload-item-name" :title="item.name">{{ item.name }}</span>
+          <div class="upload-item-names">
+            <span class="upload-item-name" :title="displayName(item)">{{ displayName(item) }}</span>
+            <span
+              v-if="conflictNote(item)"
+              class="upload-item-renamed"
+              :title="conflictNote(item) ?? undefined"
+            >
+              {{ conflictNote(item) }}
+            </span>
+          </div>
           <span class="upload-item-status">
             <span class="sr-only">{{ statusLabel(item.status) }}</span>
             <span aria-hidden="true">{{ statusLabel(item.status) }}</span>
@@ -132,7 +202,7 @@ function itemPercent(item: UploadProgressItem): number {
           v-if="item.status === 'uploading'"
           class="upload-item-track"
           role="progressbar"
-          :aria-label="`Tiến trình ${item.name}`"
+          :aria-label="formatTemplate(t.uploadItemProgressAria, { name: displayName(item) })"
           aria-valuemin="0"
           aria-valuemax="100"
           :aria-valuenow="itemPercent(item)"
@@ -142,14 +212,26 @@ function itemPercent(item: UploadProgressItem): number {
         <p v-if="item.status === 'failed' && item.error" class="upload-item-error" role="alert">
           {{ item.error }}
         </p>
-        <div v-if="item.status === 'failed' || item.status === 'queued' || item.status === 'uploading'" class="upload-item-actions">
+        <div
+          v-if="item.status === 'failed' || item.status === 'queued' || item.status === 'uploading'"
+          class="upload-item-actions"
+        >
           <button
             v-if="item.status === 'failed'"
             type="button"
             class="upload-action-btn"
             @click="emit('retry', item.id)"
           >
-            Thử lại
+            {{ t.retry }}
+          </button>
+          <button
+            v-if="item.status === 'failed'"
+            type="button"
+            class="upload-action-btn subtle"
+            :aria-label="t.uploadDismissFailedAria"
+            @click="emit('dismissFailed', item.id)"
+          >
+            {{ t.uploadDismissFailed }}
           </button>
           <button
             v-if="item.status === 'queued' || item.status === 'uploading'"
@@ -157,7 +239,7 @@ function itemPercent(item: UploadProgressItem): number {
             class="upload-action-btn subtle"
             @click="emit('cancel', item.id)"
           >
-            Hủy
+            {{ t.cancel }}
           </button>
         </div>
       </li>
@@ -172,6 +254,10 @@ function itemPercent(item: UploadProgressItem): number {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface-soft);
+}
+
+.upload-live-status {
+  margin: 0;
 }
 
 .upload-progress-head {
@@ -263,6 +349,13 @@ function itemPercent(item: UploadProgressItem): number {
   gap: var(--space-sm);
 }
 
+.upload-item-names {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .upload-item-name {
   min-width: 0;
   overflow: hidden;
@@ -271,6 +364,16 @@ function itemPercent(item: UploadProgressItem): number {
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
+}
+
+.upload-item-renamed {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .upload-item-status {
@@ -309,10 +412,12 @@ function itemPercent(item: UploadProgressItem): number {
   color: var(--danger);
   font-size: 12px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .upload-item-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-xs);
   margin-top: var(--space-xxs);
 }
