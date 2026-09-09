@@ -196,16 +196,23 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  bottom: 0;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-md) calc(var(--space-xs) + env(safe-area-inset-bottom));
+  padding: var(--space-xs) var(--space-md);
   background: var(--canvas);
   border-top: 1px solid var(--hairline);
   box-shadow: 0 -4px 16px rgba(17, 24, 39, 0.08);
+}
+
+@media (max-width: 767px) {
+  .batch-bar {
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--space-xs) + env(safe-area-inset-bottom));
+  }
 }
 
 @media (min-width: 768px) {

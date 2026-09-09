@@ -1,11 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import BatchActionBar from './BatchActionBar.vue'
 import { setLocale } from '@/lib/i18n'
+
+const readSrc = (relativePath: string) =>
+  readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8')
 
 describe('BatchActionBar', () => {
   beforeEach(() => {
@@ -188,5 +193,33 @@ describe('BatchActionBar', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('close')).toBeTruthy()
+  })
+})
+
+describe('BatchActionBar placement contract', () => {
+  const bar = readSrc('./BatchActionBar.vue')
+
+  it('does not apply bottom-nav offset in the base rule', () => {
+    const baseBlock = bar.match(/\.batch-bar\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(baseBlock).toMatch(/bottom:\s*0/)
+    expect(baseBlock).not.toContain('--bottom-nav-h')
+    expect(baseBlock).not.toMatch(/env\(safe-area-inset-bottom\)/)
+  })
+
+  it('offsets above bottom nav and safe-area only on mobile (max-width: 767px)', () => {
+    const mobileBlock =
+      bar.match(/@media\s*\(\s*max-width:\s*767px\s*\)[\s\S]*?(?=@media)/)?.[0] ?? ''
+    expect(mobileBlock).toMatch(
+      /bottom:\s*calc\(var\(--bottom-nav-h\)\s*\+\s*env\(safe-area-inset-bottom\)\)/,
+    )
+    expect(mobileBlock).toMatch(/padding-bottom:\s*calc\(var\(--space-xs\)\s*\+\s*env\(safe-area-inset-bottom\)\)/)
+  })
+
+  it('uses floating tablet/desktop placement without bottom-nav height', () => {
+    const tabletBlock =
+      bar.match(/@media\s*\(\s*min-width:\s*768px\s*\)[\s\S]*?(?=\.batch-left)/)?.[0] ?? ''
+    expect(tabletBlock).toContain('bottom: var(--space-lg)')
+    expect(tabletBlock).not.toContain('--bottom-nav-h')
+    expect(tabletBlock).not.toMatch(/env\(safe-area-inset-bottom\)/)
   })
 })
