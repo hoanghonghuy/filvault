@@ -34,6 +34,19 @@ describe('search filter sheet contract', () => {
     expect(script).toMatch(/\bfrom\b/)
     expect(script).toMatch(/\bto\b/)
   })
+
+  it('validates date ranges before applying', () => {
+    expect(sheet).toMatch(/isValidDateRange/)
+    expect(sheet).toMatch(/dateRangeInvalid/)
+    expect(sheet).toMatch(/role="alert"/)
+  })
+
+  it('exposes reset and localized apply actions', () => {
+    expect(sheet).toMatch(/resetSearchFilters/)
+    expect(sheet).toMatch(/t\.resetFilters/)
+    expect(sheet).toMatch(/t\.applyFilters/)
+    expect(sheet).toMatch(/useI18n/)
+  })
 })
 
 describe('FilesView filtered search contract', () => {
@@ -42,35 +55,44 @@ describe('FilesView filtered search contract', () => {
   it('opens a SearchFilterSheet from a toolbar button', () => {
     expect(files).toMatch(/import\s+SearchFilterSheet\s+from/)
     expect(files).toContain('<SearchFilterSheet')
-    expect(files).toMatch(/aria-label="Search filters"/)
+    expect(files).toMatch(/t\.searchFiltersAria/)
   })
 
-  it('sends type, folderId, from, to, sort and order to the API', () => {
-    const fn = files.match(/function buildSearchQuery[\s\S]*?\n\}/)?.[0] ?? ''
-    for (const param of ['type', 'folderId', 'from', 'to', 'sort', 'order']) {
-      expect(fn).toContain(`'${param}'`)
-    }
+  it('uses distinct sort and filter affordances', () => {
+    expect(files).toMatch(/t\.sortFilesAria/)
+    expect(files).toMatch(/name="sort"/)
+    expect(files).toMatch(/name="sliders"/)
+  })
+
+  it('sends type, folderId, from, to, sort and order to the API via shared state', () => {
+    expect(files).toMatch(/buildSearchApiQueryString/)
     expect(files).toMatch(/runSearch/)
   })
 
-  it('re-runs the search when filters change', () => {
+  it('re-runs the search when filters change and syncs route query', () => {
     expect(files).toMatch(/watch\(filters/)
+    expect(files).toMatch(/syncRouteFromSearchState/)
+    expect(files).toMatch(/parseSearchFiltersFromRoute/)
+    expect(files).toMatch(/parseSearchQueryFromRoute/)
   })
 
-  it('shows removable chips for active filters plus a clear-all control', () => {
+  it('shows removable chips for active filters plus a clear-filters control', () => {
     expect(files).toMatch(/class="filter-chips"/)
-    expect(files).toMatch(/aria-label="Remove filter"/)
-    expect(files).toMatch(/Clear all/)
+    expect(files).toMatch(/t\.removeFilterAria/)
+    expect(files).toMatch(/t\.clearFilters/)
+    expect(files).toMatch(/getActiveFilterChipKeys/)
   })
 
-  it('labels filtered empty results and offers clearing filters', () => {
-    expect(files).toContain('No results match your filters')
+  it('labels empty results by cause and offers recovery actions', () => {
+    expect(files).toMatch(/getEmptySearchCause/)
+    expect(files).toMatch(/emptySearchTitle/)
+    expect(files).toMatch(/clearSearch/)
     expect(files).toMatch(/clearFilters/)
   })
 
   it('keeps the animated row list while showing a filtered caption', () => {
     expect(files).toMatch(/TransitionGroup[^>]*name="row"/)
-    expect(files).toMatch(/results · filtered|results·filtered|· filtered/)
+    expect(files).toMatch(/t\.filtered/)
   })
 
   it('exposes browse item selection with aria-pressed on role=button cards', () => {
