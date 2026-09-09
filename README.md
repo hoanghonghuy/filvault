@@ -22,13 +22,13 @@ Sau `make up`: web `http://localhost:5173`, API `http://localhost:8080`, MinIO `
 
 `make up` (Docker) và `make dev-api` (API trên host) **tự tạo** tài khoản dev sau migrate — không cần chạy `make seed` riêng.
 
-Thông tin đăng nhập mặc định:
+Thông tin đăng nhập dev (chỉ local) lấy từ `.env` sau khi copy `.env.example`:
 
-| Trường | Giá trị |
+| Trường | Biến env |
 |---|---|
-| Email | `dev@filvault.com` |
-| Mật khẩu | `Dev1234@` |
-| Mã mời (register tay) | `dev-invite` |
+| Email | `FILVAULT_SEED_EMAIL` |
+| Mật khẩu | `FILVAULT_SEED_PASSWORD` |
+| Mã mời (register tay) | `FILVAULT_INVITE_CODE` |
 
 Tài khoản đã **verify email** — đăng nhập và dùng Files/Photos ngay. Seed idempotent: chạy lại không tạo trùng.
 

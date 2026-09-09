@@ -35,8 +35,8 @@ func Load() (Config, error) {
 		CORSAllowedOrigins:         parseCSV(getenv("FILVAULT_CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),
 		LiveKitURL:                 getenv("FILVAULT_LIVEKIT_URL", "http://localhost:7880"),
 		LiveKitPublicURL:           getenv("FILVAULT_LIVEKIT_PUBLIC_URL", "ws://localhost:7880"),
-		LiveKitAPIKey:              getenv("FILVAULT_LIVEKIT_API_KEY", "devkey"),
-		LiveKitAPISecret:           getenv("FILVAULT_LIVEKIT_API_SECRET", "secret"),
+		LiveKitAPIKey:              os.Getenv("FILVAULT_LIVEKIT_API_KEY"),
+		LiveKitAPISecret:           os.Getenv("FILVAULT_LIVEKIT_API_SECRET"),
 	}
 	if days := os.Getenv("FILVAULT_DEFAULT_TRASH_RETENTION_DAYS"); days != "" {
 		n, err := strconv.Atoi(days)
