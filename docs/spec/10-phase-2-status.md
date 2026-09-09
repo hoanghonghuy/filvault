@@ -1,6 +1,10 @@
 # Phase 2 — Checklist bàn giao (web features)
 
-Cập nhật: **2026-08-22**.  
+> **ARCHIVAL — không phải handoff hiện tại.**  
+> Trạng thái sản phẩm, backlog và việc tiếp theo: **[12-current-product-state.md](12-current-product-state.md)**.  
+> File này giữ lại để tra cứu lịch sử Phase 2 (S1–S6, smoke 2026-08).
+
+Cập nhật: **2026-08-22** (archival mark: 2026-09-09).  
 Spec: [09-phase-2-features.md](09-phase-2-features.md).  
 ADR phạm vi: [decisions/0003-phase-2-features-scope.md](decisions/0003-phase-2-features-scope.md).  
 UI: [`DESIGN.md`](../../DESIGN.md) §9 / §9a.  
@@ -11,6 +15,8 @@ Phase 2 đợt này = **tính năng web** (search / cover / favorites / share / 
 ---
 
 ## Dừng ở đâu (đọc trước)
+
+> Việc tiếp theo hiện tại: **[12-current-product-state.md](12-current-product-state.md)** — S1–S6 đã Done; không bắt đầu slice mới từ đây.
 
 | Slice | Trạng thái |
 |---|---|
@@ -119,7 +125,7 @@ Tick khi DoD 09 §0.1 xanh **và** smoke tay slice xong.
 
 ## Smoke tay Phase 2 (tích lũy)
 
-Sau mỗi slice, tick thêm (dùng `dev@filvault.com`):
+Sau mỗi slice, tick thêm (dùng credential từ `.env` — `FILVAULT_SEED_EMAIL` / `FILVAULT_SEED_PASSWORD`):
 
 - [x] S1: search + filter type/date/sort; chip × và Clear all; empty có filter
 - [x] S2: album có/không cover; Set cover / Remove cover (smoke API 2026-08-23: auto = item mới nhất, pin/unpin, coverUrl xuất hiện khi bật image thumbnails)
@@ -143,8 +149,5 @@ Không phải nợ của checklist này:
 
 ## Việc tiếp theo cho người nhận
 
-1. Đọc [09](09-phase-2-features.md) §0 + § slice sắp làm; `DESIGN.md` §9a.
-2. `make up` → login dev → xác nhận S1 vẫn ổn (filter search).
-3. Bắt đầu **S2** theo TDD; tick DoD trong file này trước khi S3.
-4. Trước S4: viết ADR bảo mật, merge/duyệt ADR, rồi mới migration/API.
-5. Lệch spec → sửa 09 (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
+> **Đã lỗi thời — S1–S6 Done (2026-08-23).** Không bắt đầu slice mới từ đây.  
+> Xem **[12-current-product-state.md](12-current-product-state.md)** cho backlog và release blockers hiện tại.

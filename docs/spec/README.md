@@ -6,6 +6,7 @@ Thư mục này chứa **spec ý tưởng và quyết định thiết kế** đ�
 
 | Vai trò | Tài liệu | Khi nào thắng nếu lệch nhau |
 |---|---|---|
+| **Trạng thái sản phẩm, backlog, release** | [12-current-product-state.md](12-current-product-state.md) | **Luôn thắng** cho “đang ở đâu / làm gì tiếp” |
 | Phạm vi sản phẩm, Phase 1, roadmap | Concept v0.1 | Concept thắng cho **sản phẩm / phase** |
 | Kiến trúc, cổng nhà cung cấp, quyết định kỹ thuật mới | `docs/spec/` | Spec thắng cho **kiến trúc** |
 
@@ -20,6 +21,7 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 
 | File | Nội dung |
 |---|---|
+| **[12-current-product-state.md](12-current-product-state.md)** | **Handoff hiện tại:** trạng thái sản phẩm, ma trận năng lực, release blockers, backlog |
 | [01-idea.md](01-idea.md) | Spec ý tưởng: sản phẩm, mục tiêu, ranh giới |
 | [02-provider-strategy.md](02-provider-strategy.md) | Chiến lược nhà cung cấp: cổng, adapter, RDS vs DynamoDB |
 | [03-database.md](03-database.md) | Schema Phase 1, status, quota, trash, search |
@@ -27,10 +29,10 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [05-architecture.md](05-architecture.md) | Monorepo, module Go, flow upload, test |
 | [06-phase-1-plan.md](06-phase-1-plan.md) | Thứ tự slice + Definition of Done |
 | [07-phase-1-business.md](07-phase-1-business.md) | Nghiệp vụ đã chốt: invite, verify, Photos, allowlist, trash |
-| [08-phase-1-status.md](08-phase-1-status.md) | Checklist bàn giao Phase 1; việc tiếp theo: smoke test tay |
+| [08-phase-1-status.md](08-phase-1-status.md) | **Archival** — checklist Phase 1 (slice 0–9); xem [12](12-current-product-state.md) cho handoff |
 | [09-cli.md](09-cli.md) | CLI `filvault` (Phase 4): login, whoami, ls, upload, download |
 | [09-phase-2-features.md](09-phase-2-features.md) | Spec tính năng Phase 2 web (Accepted): search, cover, favorites, share, activity |
-| [10-phase-2-status.md](10-phase-2-status.md) | Checklist bàn giao Phase 2; S1 done → tiếp S2 |
+| [10-phase-2-status.md](10-phase-2-status.md) | **Archival** — checklist Phase 2 (S1–S6 Done); xem [12](12-current-product-state.md) cho handoff |
 | [10-sharing.md](10-sharing.md) | Sharing (Phase 5): chia sẻ file/folder cho user khác; đã đồng bộ S5 (anti-probing, mail mời, activity, UI `/shared`) |
 | [11-versioning.md](11-versioning.md) | Versioning (Phase 6): lịch sử phiên bản file khi replace |
 | [11-chat-experience.md](11-chat-experience.md) | Spec đề xuất Chat kiểu Messenger; tách riêng Vault/Photos |
@@ -41,8 +43,9 @@ Nghĩa là: học và dùng AWS thật, nhưng domain (nghiệp vụ) không dí
 | [decisions/0004-chat-separate-surface.md](decisions/0004-chat-separate-surface.md) | ADR đề xuất: Chat là surface riêng, media reuse storage |
 | [`../../DESIGN.md`](../../DESIGN.md) | Design system web (Cal.com-like + teal, mobile-first; §9a Phase 2) |
 
-**Phase 1** đã có spec + implement (checklist: [08](08-phase-1-status.md)).  
-**Phase 2 web:** spec [09](09-phase-2-features.md) Accepted; tiến độ [10](10-phase-2-status.md) — **đủ 6/6 slice Done** (S5 xong 2026-08-23).
+**Handoff & trạng thái hiện tại:** [12-current-product-state.md](12-current-product-state.md) — mục tiêu production-ready, không còn MVP.  
+**Phase 1** (archival): [08](08-phase-1-status.md). **Phase 2 web** (archival): [10](10-phase-2-status.md) — 6/6 slice Done; spec [09](09-phase-2-features.md).  
+**Chat, Vault, themes** và backlog UX/release: xem ma trận trong [12](12-current-product-state.md).
 
 ## Chưa viết (đúng lúc)
 

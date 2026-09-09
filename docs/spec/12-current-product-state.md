@@ -1,0 +1,150 @@
+# Filvault — Trạng thái sản phẩm & bàn giao (hiện tại)
+
+Cập nhật: **2026-09-09**.  
+**Nguồn sự thật duy nhất** cho trạng thái sản phẩm, mục tiêu release và việc nên làm tiếp.
+
+> Các checklist Phase 1/2 ([08](08-phase-1-status.md), [10](10-phase-2-status.md)) chỉ còn giá trị **lịch sử** — không dùng phần “việc tiếp theo” ở đó.
+
+---
+
+## Đọc trước khi làm việc
+
+| Câu hỏi | Trả lời |
+|---|---|
+| Nhánh điều khiển? | **`develop`** — mọi PR feature merge vào đây. |
+| Mục tiêu sản phẩm? | **Filvault production-ready** (không còn MVP/local-only). Triển khai, bảo mật, UX polish và QA release là công việc hiện tại — không phải “sau khi xong Phase 2”. |
+| Spec kiến trúc / API? | [`docs/spec/README.md`](README.md), [`04-api.md`](04-api.md), [`05-architecture.md`](05-architecture.md) |
+| Design system (SoT)? | [`DESIGN.md`](../../DESIGN.md) — backlog đồng bộ design: [#8](https://github.com/hoanghonghuy/filvault/issues/8) |
+| Bảo mật / secrets? | [#3](https://github.com/hoanghonghuy/filvault/issues/3) (đã merge [#13](https://github.com/hoanghonghuy/filvault/pull/13)); audit: [`docs/security/`](../security/) |
+| Việc tiếp theo nên làm gì? | **Mục [Backlog đang mở](#backlog-đang-mở)** bên dưới — tra GitHub issues/PRs để lấy trạng thái mới nhất. |
+
+---
+
+## Chạy local
+
+```bash
+cp .env.example .env    # chỉnh giá trị local trong file .env (không commit)
+make up                 # Docker: postgres + minio + api + web (+ seed dev nếu bật)
+make test               # API tests (cần Postgres + MinIO)
+make dev-api            # API trên host :8080
+make dev-web            # Vue :5173 (Node ^22)
+```
+
+| Dịch vụ | URL |
+|---|---|
+| Web | `http://localhost:5173` |
+| API | `http://localhost:8080` |
+| MinIO console | `http://localhost:9002` |
+
+### Tài khoản dev (chỉ local)
+
+`make up` / `make dev-api` tự seed user dev khi `FILVAULT_SEED_DEV_USER=true` (chỉ trong compose local). **Không bật seed dev trên production.**
+
+| Trường | Biến env (xem `.env.example`) |
+|---|---|
+| Email | `FILVAULT_SEED_EMAIL` |
+| Mật khẩu | `FILVAULT_SEED_PASSWORD` |
+| Mã mời (register tay) | `FILVAULT_INVITE_CODE` |
+
+---
+
+## Ma trận năng lực
+
+**Chú thích mức độ:**
+
+- **Functional** — luồng chính hoạt động trên stack local; API + web đã có.
+- **Polish / hardening** — còn issue design/UX, a11y, edge case hoặc QA chưa đóng.
+- **Release-ready** — đáp ứng contract production (config, health, deploy, smoke) — *chưa* đạt cho toàn sản phẩm.
+
+| Nhóm | Functional | Polish / hardening | Release-ready |
+|---|---|---|---|
+| **Auth & account** — invite, register, verify email, login/refresh, profile, đổi mật khẩu | Có (Phase 1) | [#28](https://github.com/hoanghonghuy/filvault/issues/28), [#27](https://github.com/hoanghonghuy/filvault/issues/27) | Chưa — phụ thuộc epic [#4](https://github.com/hoanghonghuy/filvault/issues/4) |
+| **Files & folders** — browser, upload presign, rename/move, search/filter, trash | Có | [#21](https://github.com/hoanghonghuy/filvault/issues/21), upload queue đã merge [#12](https://github.com/hoanghonghuy/filvault/pull/12) | Chưa |
+| **Upload queue** — hàng đợi per-file, retry | Có ([#12](https://github.com/hoanghonghuy/filvault/pull/12)) | — | Chưa |
+| **Photos & albums** — timeline, album, cover, favorites | Có (Phase 2 S2–S3) | [#23](https://github.com/hoanghonghuy/filvault/issues/23), [#29](https://github.com/hoanghonghuy/filvault/issues/29) | Chưa |
+| **Sharing** — public link, share user nội bộ, Shared with me | Có (Phase 2 S4–S5) | [#25](https://github.com/hoanghonghuy/filvault/issues/25), [#24](https://github.com/hoanghonghuy/filvault/issues/24), [#32](https://github.com/hoanghonghuy/filvault/issues/32) | Chưa |
+| **Chat & calls** — direct message, attachment, SSE, video call (LiveKit) | Có (C1–C7 + ADR 0005) | [#33](https://github.com/hoanghonghuy/filvault/issues/33), [#30](https://github.com/hoanghonghuy/filvault/issues/30) | Chưa |
+| **Vault** — khu vực file cá nhân (`/vault`) | Có (routing [#37](https://github.com/hoanghonghuy/filvault/pull/37)) | [#18](https://github.com/hoanghonghuy/filvault/issues/18) / PR [#44](https://github.com/hoanghonghuy/filvault/pull/44) | Chưa |
+| **Themes & settings** — dark/system, color themes, Theme Center | Có (cơ bản) | [#15](https://github.com/hoanghonghuy/filvault/issues/15), [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#34](https://github.com/hoanghonghuy/filvault/issues/34), [#36](https://github.com/hoanghonghuy/filvault/issues/36) | Chưa |
+| **Trash & activity** | Có | [#26](https://github.com/hoanghonghuy/filvault/issues/26) | Chưa |
+| **Shell & navigation** — responsive, Overview shortcuts | Có | [#6](https://github.com/hoanghonghuy/filvault/issues/6), [#22](https://github.com/hoanghonghuy/filvault/issues/22), [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#17](https://github.com/hoanghonghuy/filvault/issues/17) | Chưa |
+| **CLI** (`bin/filvault`) | Có (login, ls, upload, download — spec [09-cli](09-cli.md)) | Chưa ưu tiên release | Chưa |
+| **Secrets & config hardening** | Có ([#13](https://github.com/hoanghonghuy/filvault/pull/13)) | — | Một phần — xem [#3](https://github.com/hoanghonghuy/filvault/issues/3) |
+| **Health / readiness / migration gate** | Có ([#45](https://github.com/hoanghonghuy/filvault/pull/45) / [#41](https://github.com/hoanghonghuy/filvault/issues/41)) | — | API contract xong; tích hợp deploy: [#42](https://github.com/hoanghonghuy/filvault/issues/42) |
+| **Production deploy & release smoke** | Chưa | — | Blocker — epic [#4](https://github.com/hoanghonghuy/filvault/issues/4), [#42](https://github.com/hoanghonghuy/filvault/issues/42), [#43](https://github.com/hoanghonghuy/filvault/issues/43) |
+
+Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành chức năng** (chi tiết lịch sử: [08](08-phase-1-status.md), [10](10-phase-2-status.md)). Điều đó **không** có nghĩa sản phẩm đã production-ready.
+
+---
+
+## Cổng chất lượng & release blockers
+
+| Cổng | Trạng thái | Tham chiếu |
+|---|---|---|
+| CI lint / typecheck / test (API + web) | Xanh trên `develop` | GitHub Actions |
+| Secret scanning (PR) | Đã có | [#3](https://github.com/hoanghonghuy/filvault/issues/3), [#13](https://github.com/hoanghonghuy/filvault/pull/13) |
+| Health `/healthz`, readiness `/readyz`, migration gate | Đã merge | [#45](https://github.com/hoanghonghuy/filvault/pull/45), [`docs/ops/health-readiness-migration.md`](../ops/health-readiness-migration.md) |
+| Production runtime (TLS edge, reverse proxy, env contract) | **Đang mở** | [#42](https://github.com/hoanghonghuy/filvault/issues/42), PR [#46](https://github.com/hoanghonghuy/filvault/pull/46) |
+| Release smoke + persistence restart + rollback runbook | **Blocked** | [#43](https://github.com/hoanghonghuy/filvault/issues/43) (chờ #41 + #42) |
+| Browser E2E critical path | Chưa | [#7](https://github.com/hoanghonghuy/filvault/issues/7) |
+| Design system đồng bộ surfaces hiện tại | Chưa | [#8](https://github.com/hoanghonghuy/filvault/issues/8) |
+
+**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — hoàn thành khi #41, #42, #43 đóng và tích hợp được verify.
+
+---
+
+## Backlog đang mở
+
+Tra GitHub để lấy trạng thái mới nhất. Danh sách dưới đây phản ánh `develop` tại 2026-09-09.
+
+### PR đang mở (ưu tiên review/merge)
+
+| PR | Issue | Mô tả ngắn |
+|---|---|---|
+| [#46](https://github.com/hoanghonghuy/filvault/pull/46) | [#42](https://github.com/hoanghonghuy/filvault/issues/42) | Production-like runtime baseline + TLS edge proxy |
+| [#44](https://github.com/hoanghonghuy/filvault/pull/44) | [#18](https://github.com/hoanghonghuy/filvault/issues/18) | Vault UX — align media preview & a11y |
+
+### Đã merge gần đây (tham chiếu, không làm lại)
+
+| PR | Issue | Nội dung |
+|---|---|---|
+| [#45](https://github.com/hoanghonghuy/filvault/pull/45) | [#41](https://github.com/hoanghonghuy/filvault/issues/41) | Health/readiness probes + migration release gate |
+| [#12](https://github.com/hoanghonghuy/filvault/pull/12) | — | Upload queue (Files) |
+| [#13](https://github.com/hoanghonghuy/filvault/pull/13) | [#3](https://github.com/hoanghonghuy/filvault/issues/3) | Secret lifecycle hardening |
+| [#37](https://github.com/hoanghonghuy/filvault/pull/37) | [#19](https://github.com/hoanghonghuy/filvault/issues/19) | Vault shortcut routing |
+| [#38](https://github.com/hoanghonghuy/filvault/pull/38) | [#20](https://github.com/hoanghonghuy/filvault/issues/20) | Multi-select batch actions |
+
+### Issue READY — design / PM (chọn theo ưu tiên P1, không dump checklist)
+
+Nhóm **shell & cross-cutting:** [#6](https://github.com/hoanghonghuy/filvault/issues/6), [#8](https://github.com/hoanghonghuy/filvault/issues/8), [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#17](https://github.com/hoanghonghuy/filvault/issues/17), [#35](https://github.com/hoanghonghuy/filvault/issues/35)
+
+Nhóm **theo surface:** [#21](https://github.com/hoanghonghuy/filvault/issues/21)–[#36](https://github.com/hoanghonghuy/filvault/issues/36) (Files, Overview, Photos, Shared, share-link, Trash, Profile, Auth, calls, Chat composer, themes, Settings, 404)
+
+Nhóm **release / QA:** [#7](https://github.com/hoanghonghuy/filvault/issues/7) (E2E), [#43](https://github.com/hoanghonghuy/filvault/issues/43) (smoke — blocked)
+
+### Việc **không** nên làm (đã xong hoặc lỗi thời)
+
+- Bắt đầu Phase 2 slice S1–S6 — **đã Done** (xem [10](10-phase-2-status.md) lịch sử).
+- Smoke tay Phase 1 UI như “việc tiếp theo” duy nhất — đã lệch thời; dùng [#43](https://github.com/hoanghonghuy/filvault/issues/43) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) cho QA release.
+- Deploy/AWS “sau Phase 2” — **đang là công việc hiện tại** ([#4](https://github.com/hoanghonghuy/filvault/issues/4), [#42](https://github.com/hoanghonghuy/filvault/issues/42)).
+
+---
+
+## Tài liệu lịch sử (chỉ tra cứu)
+
+| File | Nội dung | Ghi chú |
+|---|---|---|
+| [08-phase-1-status.md](08-phase-1-status.md) | Checklist Phase 1 (2026-08) | **Archival** — slice API 0–9 + smoke ghi chép |
+| [10-phase-2-status.md](10-phase-2-status.md) | Checklist Phase 2 S1–S6 (2026-08) | **Archival** — 6/6 slice Done |
+| [06-phase-1-plan.md](06-phase-1-plan.md) | Thứ tự slice Phase 1 | Spec/plan, không phải backlog hiện tại |
+| [09-phase-2-features.md](09-phase-2-features.md) | Spec Phase 2 (Accepted) | Vẫn là spec; không phải trạng thái release |
+| [11-chat-experience.md](11-chat-experience.md) | Spec Chat (Accepted) | C1–C7 Done; polish qua issues #30, #33 |
+
+---
+
+## Quy ước cập nhật
+
+1. Khi merge issue/PR lớn ảnh hình release posture → cập nhật **file này** (không sửa “việc tiếp theo” trong 08/10).
+2. Backlog chi tiết luôn sống trên GitHub issues — doc chỉ tóm tắt nhóm và link.
+3. Không ghi password/invite/token cố định trong handoff — chỉ tham chiếu biến `.env` / `.env.example`.
+4. Lệch spec → sửa spec (hoặc ADR), không code xong rồi viết ngược.

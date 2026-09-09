@@ -1,8 +1,12 @@
 # Phase 1 — Checklist bàn giao
 
-Cập nhật: **2026-08-18**.  
+> **ARCHIVAL — không phải handoff hiện tại.**  
+> Trạng thái sản phẩm, backlog và việc tiếp theo: **[12-current-product-state.md](12-current-product-state.md)**.  
+> File này giữ lại để tra cứu lịch sử Phase 1 (slice 0–9, smoke 2026-08).
+
+Cập nhật: **2026-08-18** (archival mark: 2026-09-09).  
 Nhánh: `develop`.  
-**Chưa sang Phase 2 (deploy / AWS).**
+**Chưa sang Phase 2 (deploy / AWS).** *(Ghi chú lịch sử — deploy hiện là epic [#4](https://github.com/hoanghonghuy/filvault/issues/4).)*
 
 Nguồn sự thật cho thứ tự làm: [06-phase-1-plan.md](06-phase-1-plan.md).  
 Nghiệp vụ: [07-phase-1-business.md](07-phase-1-business.md).  
@@ -13,6 +17,8 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 ---
 
 ## Dừng ở đâu (đọc phần này trước khi làm tiếp)
+
+> Việc tiếp theo hiện tại: **[12-current-product-state.md](12-current-product-state.md)** — không dùng mục dưới làm backlog.
 
 **API Phase 1 (slice 0–9) đã xong.** Test API xanh.
 
@@ -183,7 +189,6 @@ Không phải nợ. Không nhét vào công việc tiếp theo.
 
 ## Việc tiếp theo cho người nhận
 
-1. `make up` → login bằng credential từ `.env`.
-2. Smoke API xuyên suốt đã xong (2026-08-23, xem trên). Chạy nốt **Smoke test tay phần UI**; ghi bug nếu lệch spec / `DESIGN.md`.
-3. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
-4. Phase 2 feature (S1–S6) đã Done — xem [10-phase-2-status.md](10-phase-2-status.md); smoke Phase 2 đã chạy kèm ở đó. Deploy/AWS vẫn tách khỏi checklist feature.
+> **Đã lỗi thời.** Xem **[12-current-product-state.md](12-current-product-state.md)** cho backlog và release blockers hiện tại.
+
+Ghi chú lịch sử (2026-08-23): smoke API Phase 1 đã xong; Phase 2 S1–S6 Done — xem [10-phase-2-status.md](10-phase-2-status.md).

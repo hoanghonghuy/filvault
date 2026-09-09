@@ -1,7 +1,7 @@
 # Filvault
 
 Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).  
-Checklist bàn giao Phase 1: [`docs/spec/08-phase-1-status.md`](docs/spec/08-phase-1-status.md).
+**Trạng thái sản phẩm & handoff:** [`docs/spec/12-current-product-state.md`](docs/spec/12-current-product-state.md) (nhánh `develop`).
 
 ## Chạy local
 
