@@ -53,7 +53,7 @@ Not required for this issue. Remediation is credential rotation (N/A for Categor
 | Control | Purpose |
 |---|---|
 | `FILVAULT_ENV=production` validation in `apps/api/internal/platform/config` | Fail closed on placeholders, localhost DB/CORS, console mailer, dev seed |
-| `.gitleaks.toml` + `scripts/verify-secret-scan-gate.sh` | PR CI secret scan of current tree + scanner self-test |
+| `.gitleaks.toml` + `scripts/verify-secret-scan-gate.sh` | PR CI: current-tree scan, `origin/develop..HEAD` commit-range scan, isolated fixture self-tests, and temp-repo introduce/remove range proof |
 | `.github/workflows/ci.yml` `secret-scan` job | Blocks regressions on pull requests |
 
 ## Allowlist policy (gitleaks)
