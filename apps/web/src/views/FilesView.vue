@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ApiError, api, formatBytes, uploadToPresigned } from '@/api/client'
+import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
+import { useFileUploadQueue } from '@/lib/useFileUploadQueue'
 import { useUiStore } from '@/stores/ui'
 import UploadFab from '@/components/UploadFab.vue'
 import UploadProgress from '@/components/UploadProgress.vue'
@@ -17,7 +18,7 @@ import BatchActionBar from '@/components/BatchActionBar.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import { usePullToRefresh } from '@/lib/usePullToRefresh'
 import { useLongPress } from '@/lib/useLongPress'
-import { mimeIcon, resolveContentType } from '@/lib/mimeIcon'
+import { mimeIcon } from '@/lib/mimeIcon'
 import type {
   Browser,
   DownloadURL,
@@ -26,7 +27,6 @@ import type {
   SearchResult,
   ShareLinkInfo,
   ShareLinkTTL,
-  UploadSession,
 } from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
@@ -42,8 +42,23 @@ const searchResults = ref<SearchResult | null>(null)
 const loading = ref(false)
 const searchLoading = ref(false)
 const error = ref('')
-const uploadProgress = ref<number | null>(null)
 const searchQuery = ref('')
+const {
+  aggregateProgress: uploadAggregateProgress,
+  progressItems: uploadProgressItems,
+  isUploading,
+  enqueueFiles: enqueueUploadFiles,
+  retryUpload,
+  cancelUpload,
+  dismissUploadPanel,
+} = useFileUploadQueue({
+  getRootFolderId: () => folderId.value,
+  onBatchSettled: async () => {
+    await loadBrowser()
+    await reloadStorage?.()
+  },
+  showToast: (message, tone) => ui.showToast(message, tone),
+})
 const filterSheetOpen = ref(false)
 const filters = ref<SearchFilters>({ type: 'all', sort: 'relevance', order: 'desc' })
 const newFolderName = ref('')
@@ -500,73 +515,10 @@ function triggerFolderUpload() {
   folderInputRef.value?.click()
 }
 
-function getNextNumberedName(originalName: string, counter: number): string {
-  const lastDot = originalName.lastIndexOf('.')
-  if (lastDot > 0) {
-    const base = originalName.substring(0, lastDot)
-    const ext = originalName.substring(lastDot)
-    return `${base} (${counter})${ext}`
-  }
-  return `${originalName} (${counter})`
-}
-
-async function uploadOneFile(file: File, targetFolderId: string | null) {
-  const contentType = resolveContentType(file)
-  if (!contentType) {
-    ui.showToast(`Bỏ qua "${file.name}" (định dạng không hỗ trợ)`, 'info')
-    return
-  }
-
-  let uploadName = file.name
-  let session: UploadSession | null = null
-  let attempt = 0
-  const maxAttempts = 10
-
-  while (!session && attempt < maxAttempts) {
-    try {
-      session = await api<UploadSession>('/files/upload-sessions', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: uploadName,
-          size: file.size,
-          contentType,
-          folderId: targetFolderId,
-        }),
-      })
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'CONFLICT' && attempt < maxAttempts - 1) {
-        attempt++
-        uploadName = getNextNumberedName(file.name, attempt)
-        continue
-      }
-      throw e
-    }
-  }
-
-  if (!session) return
-  await uploadToPresigned(session.uploadUrl, file, contentType)
-  await api(`/files/${session.fileId}/complete`, { method: 'POST', body: '{}' })
-}
-
-async function uploadFiles(files: File[]) {
+function uploadFiles(files: File[]) {
   if (files.length === 0) return
   error.value = ''
-  uploadProgress.value = 0
-  let done = 0
-  try {
-    for (const file of files) {
-      await uploadOneFile(file, folderId.value)
-      done += 1
-      uploadProgress.value = done / files.length
-    }
-    ui.showToast(files.length === 1 ? 'Upload complete' : `${files.length} files uploaded`)
-    await loadBrowser()
-    await reloadStorage?.()
-  } catch (e) {
-    error.value = formatApiError(e, 'Upload failed')
-  } finally {
-    uploadProgress.value = null
-  }
+  enqueueUploadFiles(files)
 }
 
 async function onUploadChange(event: Event) {
@@ -576,60 +528,13 @@ async function onUploadChange(event: Event) {
   await uploadFiles(files)
 }
 
-async function onFolderUploadChange(event: Event) {
+function onFolderUploadChange(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
   input.value = ''
   if (files.length === 0) return
   error.value = ''
-  uploadProgress.value = 0
-  let done = 0
-  try {
-    const folderCache = new Map<string, string>()
-    for (const file of files) {
-      const relPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? file.name
-      const parts = relPath.split('/')
-      parts.pop()
-      let parentId = folderId.value
-      if (parts.length > 0) {
-        parentId = await ensureFolderPath(parts, parentId, folderCache)
-      }
-      await uploadOneFile(file, parentId)
-      done += 1
-      uploadProgress.value = done / files.length
-    }
-    ui.showToast(files.length === 1 ? 'Upload complete' : `${files.length} files uploaded`)
-    await loadBrowser()
-    await reloadStorage?.()
-  } catch (e) {
-    error.value = formatApiError(e, 'Upload failed')
-  } finally {
-    uploadProgress.value = null
-  }
-}
-
-async function ensureFolderPath(
-  parts: string[],
-  rootParentId: string | null,
-  cache: Map<string, string>,
-): Promise<string | null> {
-  let parentId = rootParentId
-  let currentPath = ''
-  for (const part of parts) {
-    currentPath = currentPath ? `${currentPath}/${part}` : part
-    const cached = cache.get(currentPath)
-    if (cached) {
-      parentId = cached
-      continue
-    }
-    const created = await api<{ id: string }>('/folders/get-or-create', {
-      method: 'POST',
-      body: JSON.stringify({ name: part, parentId }),
-    })
-    parentId = created.id
-    cache.set(currentPath, parentId)
-  }
-  return parentId
+  enqueueUploadFiles(files, true)
 }
 
 async function downloadFile(id: string) {
@@ -1248,7 +1153,14 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       </div>
     </div>
 
-    <UploadProgress :progress="uploadProgress" />
+    <UploadProgress
+      :aggregate-progress="uploadAggregateProgress"
+      :items="uploadProgressItems"
+      :label="t.upload"
+      @retry="retryUpload"
+      @cancel="cancelUpload"
+      @dismiss="dismissUploadPanel"
+    />
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonFiles v-if="segment === 'all' && loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
@@ -1469,7 +1381,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <UploadFab
       v-if="segment === 'all' && !isSelecting"
       :label="t.uploadFile"
-      :disabled="uploadProgress !== null"
+      :disabled="isUploading"
       @click="onFabClick"
     />
 

@@ -62,6 +62,7 @@ describe('upload progress contract', () => {
   it('renders a ProgressBar component instead of a text-only status line', () => {
     const files = readSrc('../views/FilesView.vue')
     expect(files).toContain('<UploadProgress')
+    expect(files).toContain('useFileUploadQueue')
     expect(files).not.toMatch(/Uploading…\s*\{\{/)
   })
 
@@ -70,5 +71,6 @@ describe('upload progress contract', () => {
     expect(bar).toContain('--ease-standard')
     expect(bar).toMatch(/aria-live="polite"/)
     expect(bar).toMatch(/role="progressbar"/)
+    expect(bar).toMatch(/aggregateProgress/)
   })
 })
