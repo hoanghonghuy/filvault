@@ -15,6 +15,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Filvault</title>
+    <script>
+      (function () {
+        try {
+          var mode = localStorage.getItem('filvault.appearanceMode');
+          if (!mode) {
+            if (localStorage.getItem('filvault.followSystemDark') === 'true') mode = 'system';
+            else mode = localStorage.getItem('filvault.theme') === 'dark' ? 'dark' : 'light';
+          }
+          var isDark =
+            mode === 'dark' ||
+            (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) document.documentElement.dataset.theme = 'dark';
+          var color = localStorage.getItem('filvault.colorTheme');
+          if (color === 'dark') document.documentElement.dataset.colorTheme = 'default';
+          else if (color) document.documentElement.dataset.colorTheme = color;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
