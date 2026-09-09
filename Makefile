@@ -1,5 +1,6 @@
 GO ?= $(HOME)/.local/go/bin/go
 COMPOSE ?= docker compose
+PROD_COMPOSE = $(COMPOSE) -f docker-compose.prod.yml --env-file deploy/production/.env
 
 ifneq (,$(wildcard .env))
 include .env
@@ -11,7 +12,7 @@ DSN ?= postgres://filvault:$(FILVAULT_POSTGRES_PASSWORD)@127.0.0.1:5435/filvault
 export PATH := $(HOME)/.local/go/bin:$(PATH)
 export FILVAULT_POSTGRES_PASSWORD
 
-.PHONY: compose-up compose-down up down prod-up migrate migrate-down seed test run-api dev-api dev-web \
+.PHONY: compose-up compose-down up down prod-up prod-like-up prod-like-down migrate migrate-down seed test run-api dev-api dev-web \
 	lint-api typecheck-api lint-web typecheck-web ci-api ci-web cli-build cli-test secret-scan
 
 compose-up:
@@ -34,6 +35,22 @@ up:
 
 prod-up:
 	$(COMPOSE) up -d --build migrate api worker web
+
+prod-like-up:
+	@test -f deploy/production/.env || (echo "run ./deploy/production/generate-env.sh first" >&2; exit 1)
+	./deploy/production/postgres/generate-certs.sh
+	$(PROD_COMPOSE) up -d --build
+	@echo "waiting for API /readyz..."
+	@i=0; \
+	until $(PROD_COMPOSE) exec -T api wget -qO- http://127.0.0.1:8080/readyz 2>/dev/null | grep -q '"status":"ready"'; do \
+		i=$$((i+1)); \
+		if [ $$i -gt 60 ]; then echo "API did not become ready"; $(PROD_COMPOSE) logs --tail=40 api; exit 1; fi; \
+		sleep 2; \
+	done
+	@echo "production-like stack ready at https://$${FILVAULT_PUBLIC_HOST:-filvault.local}:$${FILVAULT_PUBLIC_PORT:-8443}"
+
+prod-like-down:
+	$(PROD_COMPOSE) down
 
 down:
 	$(COMPOSE) down

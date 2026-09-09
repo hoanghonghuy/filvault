@@ -83,3 +83,5 @@ curl -s localhost:8080/readyz
 ```
 
 Refs: #4 (deployment epic), #41 (this contract), #42 (runtime / reverse-proxy integration).
+
+Production-like Compose and operator docs: [`deploy/production/README.md`](../../deploy/production/README.md).
