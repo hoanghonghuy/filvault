@@ -229,7 +229,7 @@ Giá trị `:root` / light trước khi ghi đè theme. Dark: xem `[data-theme='
 | `overlay` | `rgba(17,24,39,0.45)` | Backdrop bottom sheet / modal |
 
 **Rules**
-- Primary constructive action trên Files mobile = **FAB accent** (Upload); desktop ≥768px = toolbar button.
+- Primary constructive action trên Files mobile = **FAB accent** (Upload); tablet/desktop ≥768px = toolbar button (FAB ẩn).
 - Confirm nguy hiểm = danger text + secondary “Cancel”.
 - Storage bar fill = accent; ≥90% quota → warning; ≥100% → danger.
 
@@ -307,13 +307,13 @@ Component: `OverviewView.vue`. Logo F / wordmark → `/`.
 - Height ≥44px; border `{hairline}`; focus ring 2px `{accent}`.
 
 ### List row (Files / Trash / Search / Shared)
-- Full-width tap row; mobile → `⋯` action sheet; desktop ≥768 có thể inline 1–2 action.
+- Full-width tap row; mobile → `⋯` action sheet; tablet/desktop ≥768 có thể inline 1–2 action.
 
 ### Photo grid
 - `auto-fill`, min cell ~108–120px; `PhotoThumb` + thumbnail URL — **không** `<img>` original trong grid.
 
 ### Upload progress / FAB / Toast / Empty / Storage bar
-- Giữ contract Phase 1; FAB shadow dùng `color-mix` với `var(--accent)`; ẩn FAB ≥768px (toolbar thay thế).
+- FAB shadow dùng `color-mix` với `var(--accent)`; ẩn FAB từ tablet upward (`≥768px`, toolbar thay thế).
 
 ### Bottom sheet / Action sheet / Confirm
 - Backdrop `{overlay}`; focus trap; stacked full-width buttons trong confirm.
@@ -322,29 +322,35 @@ Component: `OverviewView.vue`. Logo F / wordmark → `/`.
 
 ## 7. Layout & Responsive Shell
 
+Source of truth: `lib/shellNav.ts` (`SHELL_BREAKPOINTS`, `SHELL_NAV_WIDTH`), `AppShell.vue`, CSS tokens `--bp-tablet` / `--bp-desktop` / `--nav-rail-w` / `--nav-sidebar-w` trong `main.css`.
+
 ### 7.1 Breakpoints (shell chung — khớp responsive-shell #48 / #6)
 
-| Breakpoint | CSS | Nav | Header | Upload |
-|------------|-----|-----|--------|--------|
-| **Mobile** | `max-width: 767px` | Bottom nav (5 tab) | Compact header (F + title + chat + avatar) | FAB |
-| **Tablet** | `768px–1023px` | Side rail 220px, sticky | Ẩn mobile header | Toolbar |
-| **Desktop** | `min-width: 1024px` | Side rail persistent | Ẩn mobile header | Toolbar primary |
+| Form factor | Viewport | Nav chrome | Page header | Upload |
+|-------------|----------|------------|-------------|--------|
+| **Mobile** | `≤767px` (`max-width: 767px`) | Bottom nav (5 tab) | Compact header (F + title + chat + avatar) | FAB |
+| **Tablet** | `768px–1023px` | **80px icon rail** (`--nav-rail-w` / `SHELL_NAV_WIDTH.rail`), sticky; icons only (labels visually hidden) | **Giữ** compact page header | Toolbar (FAB ẩn) |
+| **Desktop** | `≥1024px` (`min-width: 1024px`) | **220px expanded sidebar** (`--nav-sidebar-w` / `SHELL_NAV_WIDTH.sidebar`) với labels + profile block | **Ẩn** mobile header; title trong page content | Toolbar primary |
 
 ```text
-Mobile (≤767)                          Tablet/Desktop (≥768)
-┌─────────────────────┐               ┌──────┬──────────────────┐
-│ [F] Filvault  [chat]│               │ Side │ (no mobile hdr)  │
-│     Page title      │               │ nav  │ Storage (nếu có) │
-│ Storage (compact)   │               │ 5    │ Page title in    │
-│ Main (scroll)       │               │ tabs │ main             │
-│ [FAB]               │               │      │                  │
-│ Bottom nav (5)      │               └──────┴──────────────────┘
-└─────────────────────┘
+Mobile (≤767)                    Tablet (768–1023)              Desktop (≥1024)
+┌─────────────────────┐         ┌─┬──────────────────┐         ┌────────┬──────────────┐
+│ [F] Filvault [chat] │         │F│ [F] title [chat] │         │ F Filv │ (no mobile   │
+│     Page title      │         │█│ Storage          │         │ Home   │  header)     │
+│ Storage             │         │█│ Main             │         │ Files  │ Storage      │
+│ Main                │         │█│                  │         │ …      │ Main + title │
+│ [FAB]               │         │█│                  │         │ avatar │ in view      │
+│ Bottom nav (5)      │         │P│                  │         └────────┴──────────────┘
+└─────────────────────┘         └─┴──────────────────┘
+ 80px rail = icons only           header KEPT                 220px sidebar + labels
+ bottom nav + safe-area pad       bottom nav hidden            bottom nav hidden
 ```
+
+**Không** gộp tablet với desktop: tablet là **icon rail 80px + header**, desktop là **sidebar 220px không header**.
 
 ### 7.2 Top-level shell navigation (`SHELL_NAV`)
 
-Bottom nav **mobile** và side nav **tablet/desktop** (cùng 5 mục):
+Cùng 5 destinations trên bottom nav (mobile) và side nav (tablet rail / desktop sidebar):
 
 1. **Home** (`/`) — Overview  
 2. **Files** — browser + search + upload + vault entry  
@@ -357,9 +363,9 @@ Bottom nav **mobile** và side nav **tablet/desktop** (cùng 5 mục):
 Auth / verify: full-screen card, không shell.
 
 ### 7.3 Spacing
-- Page padding: 16px mobile; 24px desktop (`≥768`).
+- Page padding: 16px mobile (`--space-md`); tablet `md` + `lg` horizontal; desktop 24px (`--space-lg`).
 - Content max-width: `1100px`.
-- `padding-bottom` main ≥ bottom-nav + FAB + safe-area (mobile only).
+- `padding-bottom` shell-main ≥ `--bottom-nav-h` + `env(safe-area-inset-bottom)` — **mobile only** (tablet/desktop: `padding-bottom: 0`).
 
 ---
 
@@ -427,6 +433,7 @@ Không multi-layer card stack hàng loạt.
 
 ### Don't
 - Đừng viết “no dark mode” — đã ship.
+- Đừng mô tả tablet (768–1023) như sidebar 220px — tablet là **80px icon rail + page header**.
 - Đừng hardcode accent shell (`#0084ff`, teal rgba) khi có `var(--accent)`.
 - Đừng dùng accent cho destructive/success.
 - Đừng `<img>` original trong Photos grid.
@@ -441,8 +448,9 @@ Không multi-layer card stack hàng loạt.
 ```text
 Follow DESIGN.md (Filvault). Cal.com-like utility UI, semantic tokens via CSS variables,
 selectable color themes + light/dark (useTheme), mobile-first shell:
-Home/Files/Photos/Shared/Settings bottom nav ≤767, side rail ≥768,
-avatar → Profile, chat → bare /chat, FAB upload on Files (mobile only),
+≤767 bottom nav (5 tabs) + header; 768–1023 80px icon rail + header;
+≥1024 220px sidebar, no mobile header. SHELL_BREAKPOINTS / SHELL_NAV_WIDTH in shellNav.ts.
+avatar → Profile, chat → bare /chat, FAB upload on Files (mobile ≤767 only),
 bottom sheets not prompt/confirm, component states per §4,
 danger/success/warning never replaced by accent, touch ≥44px.
 Chat may use --chat-accent; shell must use var(--accent).
@@ -456,9 +464,9 @@ Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8
 
 1. Tokens → CSS variables: `src/assets/main.css` (`:root`, `[data-theme='dark']`, `[data-color-theme='…']`).
 2. Theme logic: `src/lib/theme.ts` (`useTheme`, `THEMES`).
-3. Shell: `AppShell.vue` + `lib/shellNav.ts`.
+3. Shell: `AppShell.vue` + `lib/shellNav.ts` (`SHELL_BREAKPOINTS`, `SHELL_NAV_WIDTH`, `isShellNavActive`).
 4. Shared: `BottomSheet`, `ActionSheet`, `ConfirmSheet`, `UploadFab`, `EmptyState`, `ToastHost`, `MediaLightbox`.
-5. Tests contract: `theme.test.ts`, `dark-mode.test.ts`, `vault-view.test.ts`, `chat.test.ts`, `shellNav.test.ts`.
+5. Tests contract: `AppShell.test.ts`, `shellNav.test.ts`, `theme.test.ts`, `dark-mode.test.ts`, `vault-view.test.ts`, `chat.test.ts`.
 6. Không thêm UI library nặng trừ khi duyệt — CSS + Vue SFC.
 
 ### Follow-up debt (GitHub issues riêng — không giấu trong prose)
@@ -471,4 +479,4 @@ Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8
 
 ---
 
-*Chốt hướng visual: **A — Cal.com-like** (2026-08-17). Cập nhật contract sản phẩm hiện tại: 2026-09-09 (#8).*
+*Chốt hướng visual: **A — Cal.com-like** (2026-08-17). Cập nhật contract sản phẩm hiện tại: 2026-09-09 (#8). Shell 3 form-factor: 2026-09-09 (#48 / #54 reconcile).*

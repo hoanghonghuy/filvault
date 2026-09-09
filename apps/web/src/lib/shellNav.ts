@@ -1,7 +1,7 @@
 import type { BrowserFile, TimelineGroup, TimelineItem } from '@/api/types'
 
 /**
- * Responsive shell breakpoints (DESIGN.md §8).
+ * Responsive shell breakpoints (DESIGN.md §7).
  * - Mobile: 0–767px — header + bottom nav, FAB above nav.
  * - Tablet: 768–1023px — compact icon rail + page header (no bottom nav).
  * - Desktop: ≥1024px — expanded side nav; titles live in page content.
