@@ -85,8 +85,8 @@ export async function moveFileToTrash(page: Page, fileName: string): Promise<voi
 export async function moveFolderToTrash(page: Page, folderName: string): Promise<void> {
   const folderCard = page.getByRole('button', { name: folderName, exact: true })
   await folderCard.getByRole('button', { name: /^Folder actions$/ }).click()
-  await page.getByRole('button', { name: /^Move to trash$/ }).click()
-  await page.getByRole('button', { name: /^Move to trash$/ }).last().click()
+  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
+  await page.getByRole('dialog').last().getByRole('button', { name: /^Move to trash$/ }).click()
   await expect(folderCard).toHaveCount(0)
 }
 
