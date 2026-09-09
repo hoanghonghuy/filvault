@@ -388,7 +388,7 @@ Không multi-layer card stack hàng loạt.
 |---------|-------|-------|---------------|---------|
 | **Auth** | `/login`, `/register`, `/verify-email` | Bare | Auth card, ink CTA, `.error` | Không nav |
 | **Overview** | `/` | Full | Cards, recent lists, quota | Shortcuts Chat/Trash |
-| **Files** | `/files` | Full | List row, FAB, filter sheet, upload queue, batch bar | MIME icons = category (b) |
+| **Files** | `/files` | Full | List row, FAB, search bar, sort ActionSheet, `SearchFilterSheet`, filter chips, upload queue, batch bar | Search/filter URL-sync (`filesSearchState`); MIME icons = category (b); xem §9.4 |
 | **Vault** | `/vault` | Full | PIN sheets, `MediaLightbox`, `--success`/`--warning` lock | Auto-lock on hidden |
 | **Photos** | `/photos`, `/photos/albums/:id` | Full | Photo grid, albums, lightbox | Thumb only in grid |
 | **Shared with me** | `/shared` | Full | List row, presign download | |
@@ -418,6 +418,16 @@ Không multi-layer card stack hàng loạt.
 ### 9.3 Sharing (đã ship)
 
 - Share link sheet, public page, shared-with-me, activity log trong Settings — theo spec 09.
+
+### 9.4 Files — search & filter (đã ship, #21 / #58)
+
+- **Sort** (icon `sort`, ActionSheet) và **search filters** (icon `sliders`, `SearchFilterSheet`) là hai affordance tách biệt; ARIA label i18n (`sortFilesAria` / `searchFiltersAria`).
+- Filter sheet (`SearchFilterSheet` trên `BottomSheet`): type (`all` / `image` / `video` / `document` / `archive` / `folder`), sort (`relevance` / `name` / `date` / `size`), order (`asc` / `desc`), date range `from`/`to`, optional folder scope (`folderId`).
+- Validate date range trước Apply — `from > to` → inline `role="alert"`; không gọi API.
+- Active filter chips map 1:1 với applied state (`getActiveFilterChipKeys`); mỗi chip removable; **Clear filters** reset filter state nhưng **giữ** search query `q`.
+- URL sync (`filesSearchState.ts`): `q`, `type`, `sort`, `order`, `from`, `to`, `sfolderId` — refresh / back / forward khôi phục trạng thái.
+- Empty search: copy theo nguyên nhân (query only, filters only, hoặc cả hai) + recovery (`clearSearch`, `clearFilters`).
+- Browse mode: sort local (`updatedAt` / `name` / `size`); search mode: API query qua `buildSearchApiQueryString`.
 
 ---
 
