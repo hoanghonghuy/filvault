@@ -1,0 +1,211 @@
+# Production-like reference stack for Filvault (#42).
+# Uses the same API/Web Dockerfiles as local dev with FILVAULT_ENV=production validation.
+#
+# Quick start (after cloning):
+#   ./deploy/production/postgres/generate-certs.sh
+#   ./deploy/production/generate-env.sh
+#   echo '127.0.0.1 filvault.local' | sudo tee -a /etc/hosts
+#   make prod-like-up
+#
+# See deploy/production/README.md for the full operator contract.
+
+name: filvault-prod-like
+
+services:
+  postgres:
+    container_name: filvault-prod-postgres
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: filvault
+      POSTGRES_PASSWORD: ${FILVAULT_POSTGRES_PASSWORD}
+      POSTGRES_DB: filvault
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/certs/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/certs/server.key
+    volumes:
+      - filvault_prod_postgres_data:/var/lib/postgresql/data
+      - ./deploy/production/postgres/certs:/var/lib/postgresql/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U filvault -d filvault"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    container_name: filvault-prod-minio
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${FILVAULT_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${FILVAULT_S3_SECRET_KEY}
+    volumes:
+      - filvault_prod_minio_data:/data
+
+  minio-init:
+    container_name: filvault-prod-minio-init
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      FILVAULT_S3_ACCESS_KEY: ${FILVAULT_S3_ACCESS_KEY}
+      FILVAULT_S3_SECRET_KEY: ${FILVAULT_S3_SECRET_KEY}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 5
+        mc alias set local http://minio:9000 "$$FILVAULT_S3_ACCESS_KEY" "$$FILVAULT_S3_SECRET_KEY"
+        mc mb --ignore-existing local/filvault
+        mc anonymous set none local/filvault
+    restart: "no"
+
+  mailpit:
+    container_name: filvault-prod-mailpit
+    image: axllent/mailpit:v1.21
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
+
+  migrate:
+    container_name: filvault-prod-migrate
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    entrypoint: ["migrate"]
+    environment:
+      FILVAULT_DATABASE_URL: ${FILVAULT_DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    container_name: filvault-prod-api
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment:
+      FILVAULT_ENV: production
+      GIN_MODE: release
+      FILVAULT_METADATA_STORE: postgres
+      FILVAULT_OBJECT_STORE: s3
+      FILVAULT_DATABASE_URL: ${FILVAULT_DATABASE_URL}
+      FILVAULT_S3_ENDPOINT: ${FILVAULT_S3_ENDPOINT}
+      FILVAULT_S3_PUBLIC_ENDPOINT: ${FILVAULT_S3_PUBLIC_ENDPOINT}
+      FILVAULT_S3_BUCKET: ${FILVAULT_S3_BUCKET}
+      FILVAULT_S3_REGION: ${FILVAULT_S3_REGION}
+      FILVAULT_S3_ACCESS_KEY: ${FILVAULT_S3_ACCESS_KEY}
+      FILVAULT_S3_SECRET_KEY: ${FILVAULT_S3_SECRET_KEY}
+      FILVAULT_INVITE_CODE: ${FILVAULT_INVITE_CODE}
+      FILVAULT_JWT_SECRET: ${FILVAULT_JWT_SECRET}
+      FILVAULT_HTTP_ADDR: ${FILVAULT_HTTP_ADDR:-:8080}
+      FILVAULT_MAILER: ${FILVAULT_MAILER}
+      FILVAULT_SMTP_HOST: ${FILVAULT_SMTP_HOST}
+      FILVAULT_SMTP_PORT: ${FILVAULT_SMTP_PORT:-1025}
+      FILVAULT_SMTP_FROM: ${FILVAULT_SMTP_FROM}
+      FILVAULT_CORS_ALLOWED_ORIGINS: ${FILVAULT_CORS_ALLOWED_ORIGINS}
+      FILVAULT_TRUSTED_PROXIES: ${FILVAULT_TRUSTED_PROXIES}
+      FILVAULT_DEFAULT_TRASH_AUTO_DELETE: ${FILVAULT_DEFAULT_TRASH_AUTO_DELETE:-false}
+      FILVAULT_DEFAULT_TRASH_RETENTION_DAYS: ${FILVAULT_DEFAULT_TRASH_RETENTION_DAYS:-30}
+      FILVAULT_LIVEKIT_URL: ${FILVAULT_LIVEKIT_URL:-}
+      FILVAULT_LIVEKIT_PUBLIC_URL: ${FILVAULT_LIVEKIT_PUBLIC_URL:-}
+      FILVAULT_LIVEKIT_API_KEY: ${FILVAULT_LIVEKIT_API_KEY:-}
+      FILVAULT_LIVEKIT_API_SECRET: ${FILVAULT_LIVEKIT_API_SECRET:-}
+      FILVAULT_SEED_DEV_USER: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    container_name: filvault-prod-worker
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    entrypoint: ["worker"]
+    environment:
+      FILVAULT_ENV: production
+      FILVAULT_METADATA_STORE: postgres
+      FILVAULT_OBJECT_STORE: s3
+      FILVAULT_DATABASE_URL: ${FILVAULT_DATABASE_URL}
+      FILVAULT_S3_ENDPOINT: ${FILVAULT_S3_ENDPOINT}
+      FILVAULT_S3_PUBLIC_ENDPOINT: ${FILVAULT_S3_PUBLIC_ENDPOINT}
+      FILVAULT_S3_BUCKET: ${FILVAULT_S3_BUCKET}
+      FILVAULT_S3_REGION: ${FILVAULT_S3_REGION}
+      FILVAULT_S3_ACCESS_KEY: ${FILVAULT_S3_ACCESS_KEY}
+      FILVAULT_S3_SECRET_KEY: ${FILVAULT_S3_SECRET_KEY}
+      FILVAULT_JWT_SECRET: ${FILVAULT_JWT_SECRET}
+      FILVAULT_INVITE_CODE: ${FILVAULT_INVITE_CODE}
+      FILVAULT_MAILER: ${FILVAULT_MAILER}
+      FILVAULT_SMTP_HOST: ${FILVAULT_SMTP_HOST}
+      FILVAULT_SMTP_PORT: ${FILVAULT_SMTP_PORT:-1025}
+      FILVAULT_SMTP_FROM: ${FILVAULT_SMTP_FROM}
+      FILVAULT_CORS_ALLOWED_ORIGINS: ${FILVAULT_CORS_ALLOWED_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    container_name: filvault-prod-web
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+        NGINX_CONF: nginx.production.conf
+    depends_on:
+      api:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  edge:
+    container_name: filvault-prod-edge
+    image: caddy:2.9-alpine
+    environment:
+      FILVAULT_PUBLIC_HOST: ${FILVAULT_PUBLIC_HOST:-filvault.local}
+    ports:
+      - "${FILVAULT_PUBLIC_PORT:-8443}:443"
+    volumes:
+      - ./deploy/production/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  livekit:
+    container_name: filvault-prod-livekit
+    profiles: ["livekit"]
+    image: livekit/livekit-server:v1.8
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${FILVAULT_LIVEKIT_API_KEY}: ${FILVAULT_LIVEKIT_API_SECRET}"
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+
+volumes:
+  filvault_prod_postgres_data:
+    name: filvault_prod_postgres_data
+  filvault_prod_minio_data:
+    name: filvault_prod_minio_data

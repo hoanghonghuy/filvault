@@ -294,6 +294,27 @@ func TestLoad_ProductionRejectsLocalhostCORS(t *testing.T) {
 	}
 }
 
+func TestLoad_ParsesTrustedProxies(t *testing.T) {
+	setEnv(t, map[string]string{
+		"FILVAULT_ENV":            "development",
+		"FILVAULT_DATABASE_URL":   "postgres://filvault:replace-with-local-postgres-password@127.0.0.1:5435/filvault?sslmode=disable",
+		"FILVAULT_JWT_SECRET":     "replace-with-local-jwt-secret-min-32-chars",
+		"FILVAULT_OBJECT_STORE":   "s3",
+		"FILVAULT_S3_ENDPOINT":    "http://127.0.0.1:9002",
+		"FILVAULT_S3_ACCESS_KEY":  "filvault",
+		"FILVAULT_S3_SECRET_KEY":  "replace-with-local-s3-secret-key",
+		"FILVAULT_TRUSTED_PROXIES": "10.0.0.0/8, 172.16.0.0/12",
+	})
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(cfg.TrustedProxies) != 2 || cfg.TrustedProxies[0] != "10.0.0.0/8" || cfg.TrustedProxies[1] != "172.16.0.0/12" {
+		t.Fatalf("TrustedProxies = %#v", cfg.TrustedProxies)
+	}
+}
+
 func TestIsUnsafeSecret(t *testing.T) {
 	cases := []struct {
 		value string
