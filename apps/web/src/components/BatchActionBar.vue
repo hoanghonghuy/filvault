@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import Icon from '@/components/AppIcon.vue'
 import { useI18n } from '@/lib/i18n'
+import { useUiStore } from '@/stores/ui'
 
-defineProps<{
+const props = defineProps<{
   selectedCount: number
+  selectedFileCount: number
+  selectedFolderCount: number
   totalCount: number
 }>()
 
@@ -20,10 +23,50 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const ui = useUiStore()
+
+const hasFiles = computed(() => props.selectedFileCount > 0)
+const hasFolders = computed(() => props.selectedFolderCount > 0)
+const isMixed = computed(() => hasFiles.value && hasFolders.value)
+const canUseFileActions = computed(() => hasFiles.value)
+const hasSelection = computed(() => props.selectedCount > 0)
+
+const countDetail = computed(() => {
+  if (!isMixed.value) return ''
+  return t.value.selectionFilesFolders
+    .replace('{files}', String(props.selectedFileCount))
+    .replace('{folders}', String(props.selectedFolderCount))
+})
+
+function fileScopedLabel(singleKey: keyof typeof t.value, pluralKey: keyof typeof t.value): string {
+  if (!hasFiles.value) return t.value.filesOnlyDisabled
+  if (props.selectedFolderCount > 0) {
+    const template = t.value[pluralKey] as string
+    return template.replace('{n}', String(props.selectedFileCount))
+  }
+  return t.value[singleKey] as string
+}
+
+const downloadLabel = computed(() => fileScopedLabel('downloadSelected', 'downloadNFiles'))
+const favoriteLabel = computed(() => fileScopedLabel('addToFavorites', 'favoriteNFiles'))
+const vaultLabel = computed(() => fileScopedLabel('vaultMoveToVault', 'vaultNFiles'))
+
+async function openMoreActions() {
+  if (!canUseFileActions.value) return
+  const action = await ui.openActionSheet(t.value.moreActions, [
+    { id: 'download', label: downloadLabel.value, icon: 'download' },
+    { id: 'favorite', label: favoriteLabel.value, icon: 'star' },
+    { id: 'vault', label: vaultLabel.value, icon: 'lock' },
+  ])
+  if (action === 'download') emit('download')
+  else if (action === 'favorite') emit('favorite')
+  else if (action === 'vault') emit('vault')
+}
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close')
 }
+
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
@@ -32,98 +75,110 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   <aside
     class="batch-bar"
     role="toolbar"
-    aria-label="Selection actions"
+    :aria-label="t.selectItems"
   >
-      <div class="batch-left">
-        <button
-          type="button"
-          class="btn-icon"
-          :aria-label="t.closeSelection"
-          @click="emit('close')"
-        >
-          <Icon name="close" :size="20" />
-        </button>
-        <span class="batch-count" aria-live="polite">
-          {{ selectedCount }} {{ t.selected }}
-        </span>
-      </div>
+    <div class="batch-left">
+      <button
+        type="button"
+        class="btn-icon"
+        :aria-label="t.closeSelection"
+        @click="emit('close')"
+      >
+        <Icon name="close" :size="20" />
+      </button>
+      <span class="batch-count" aria-live="polite">
+        <span class="batch-count-main">{{ selectedCount }} {{ t.selected }}</span>
+        <span v-if="countDetail" class="batch-count-detail">{{ countDetail }}</span>
+      </span>
+    </div>
 
-      <div class="batch-actions">
-        <button
-          v-if="totalCount > 0 && selectedCount < totalCount"
-          type="button"
-          class="btn-text"
-          @click="emit('select-all')"
-        >
-          {{ t.selectAll }}
-        </button>
-        <button
-          v-else-if="totalCount > 0"
-          type="button"
-          class="btn-text"
-          @click="emit('clear-selection')"
-        >
-          {{ t.deselectAll }}
-        </button>
+    <div class="batch-actions">
+      <button
+        v-if="totalCount > 0 && selectedCount < totalCount"
+        type="button"
+        class="btn-text"
+        @click="emit('select-all')"
+      >
+        {{ t.selectAll }}
+      </button>
+      <button
+        v-else-if="totalCount > 0"
+        type="button"
+        class="btn-text"
+        @click="emit('clear-selection')"
+      >
+        {{ t.deselectAll }}
+      </button>
 
-        <div class="divider" aria-hidden="true" />
+      <div class="divider" aria-hidden="true" />
 
-        <button
-          type="button"
-          class="btn-icon"
-          :title="t.downloadSelected"
-          :aria-label="t.downloadSelected"
-          :disabled="selectedCount === 0"
-          @click="emit('download')"
-        >
-          <Icon name="download" :size="20" />
-        </button>
+      <button
+        type="button"
+        class="btn-icon file-only-action"
+        :title="downloadLabel"
+        :aria-label="downloadLabel"
+        :disabled="!canUseFileActions"
+        @click="emit('download')"
+      >
+        <Icon name="download" :size="20" />
+      </button>
 
-        <button
-          type="button"
-          class="btn-icon"
-          :title="t.addToFavorites"
-          :aria-label="t.addToFavorites"
-          :disabled="selectedCount === 0"
-          @click="emit('favorite')"
-        >
-          <Icon name="star" :size="20" />
-        </button>
+      <button
+        type="button"
+        class="btn-icon file-only-action"
+        :title="favoriteLabel"
+        :aria-label="favoriteLabel"
+        :disabled="!canUseFileActions"
+        @click="emit('favorite')"
+      >
+        <Icon name="star" :size="20" />
+      </button>
 
-        <button
-          type="button"
-          class="btn-icon"
-          :title="t.moveSelected"
-          :aria-label="t.moveSelected"
-          :disabled="selectedCount === 0"
-          @click="emit('move')"
-        >
-          <Icon name="move" :size="20" />
-        </button>
+      <button
+        type="button"
+        class="btn-icon"
+        :title="t.moveSelected"
+        :aria-label="t.moveSelected"
+        :disabled="!hasSelection"
+        @click="emit('move')"
+      >
+        <Icon name="move" :size="20" />
+      </button>
 
-        <button
-          type="button"
-          class="btn-icon"
-          :title="t.vaultMoveToVault"
-          :aria-label="t.vaultMoveToVault"
-          :disabled="selectedCount === 0"
-          @click="emit('vault')"
-        >
-          <Icon name="lock" :size="20" />
-        </button>
+      <button
+        type="button"
+        class="btn-icon file-only-action"
+        :title="vaultLabel"
+        :aria-label="vaultLabel"
+        :disabled="!canUseFileActions"
+        @click="emit('vault')"
+      >
+        <Icon name="lock" :size="20" />
+      </button>
 
-        <button
-          type="button"
-          class="btn-icon danger"
-          :title="t.moveToTrash"
-          :aria-label="t.moveToTrash"
-          :disabled="selectedCount === 0"
-          @click="emit('delete')"
-        >
-          <Icon name="trash" :size="20" />
-        </button>
-      </div>
-    </aside>
+      <button
+        type="button"
+        class="btn-icon danger"
+        :title="t.moveToTrash"
+        :aria-label="t.moveToTrash"
+        :disabled="!hasSelection"
+        @click="emit('delete')"
+      >
+        <Icon name="trash" :size="20" />
+      </button>
+
+      <button
+        v-if="canUseFileActions"
+        type="button"
+        class="btn-icon more-menu-btn"
+        :title="t.moreActions"
+        :aria-label="t.moreActions"
+        @click="openMoreActions"
+      >
+        <Icon name="more" :size="20" />
+      </button>
+    </div>
+  </aside>
 </template>
 
 <style scoped>
@@ -162,18 +217,38 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .batch-count {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.batch-count-main {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--ink);
+  white-space: nowrap;
+}
+
+.batch-count-detail {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .batch-actions {
   display: flex;
   align-items: center;
   gap: var(--space-xxs);
+  flex-shrink: 0;
 }
 
 .btn-icon {
@@ -195,6 +270,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   background: var(--surface-soft);
 }
 
+.btn-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .btn-icon:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -204,11 +284,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   color: var(--danger);
 }
 
-.btn-icon.danger:hover {
+.btn-icon.danger:hover:not(:disabled) {
   background: var(--danger-soft);
 }
 
-.btn-icon:active,
+.btn-icon:active:not(:disabled),
 .btn-text:active {
   transform: scale(0.97);
 }
@@ -222,6 +302,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-text:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .divider {
@@ -229,6 +316,28 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   height: 20px;
   margin: 0 var(--space-xxs);
   background: var(--hairline);
+  flex-shrink: 0;
+}
+
+.more-menu-btn {
+  display: inline-flex;
+}
+
+@media (max-width: 767px) {
+  .file-only-action {
+    display: none;
+  }
+
+  .btn-text {
+    font-size: 0.8125rem;
+    padding: 0 var(--space-xxs);
+  }
+}
+
+@media (min-width: 768px) {
+  .more-menu-btn {
+    display: none;
+  }
 }
 
 .action-bar-enter-active,
