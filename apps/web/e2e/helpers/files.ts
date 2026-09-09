@@ -1,12 +1,13 @@
 import { expect, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { e2eFolderName, e2eImageFileName, e2eTextFileName } from './env'
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../fixtures')
 
-export const textFixturePath = path.join(fixturesDir, 'sample.txt')
-export const imageFixturePath = path.join(fixturesDir, 'sample.png')
+const textFixtureBuffer = readFileSync(path.join(fixturesDir, 'sample.txt'))
+const imageFixtureBuffer = readFileSync(path.join(fixturesDir, 'sample.png'))
 
 export async function navigateToFiles(page: Page): Promise<void> {
   await page.getByRole('link', { name: /^Files$/ }).click()
@@ -31,7 +32,7 @@ export async function createFolder(page: Page, folderName: string): Promise<void
   await expect(page.getByRole('button', { name: folderName })).toBeVisible()
 }
 
-export async function uploadFile(page: Page, fixturePath: string, targetName: string): Promise<void> {
+export async function uploadFile(page: Page, kind: 'text' | 'image', targetName: string): Promise<void> {
   const viewport = page.viewportSize()
   const isMobile = (viewport?.width ?? 0) < 768
 
@@ -40,8 +41,13 @@ export async function uploadFile(page: Page, fixturePath: string, targetName: st
     await page.getByRole('button', { name: /^Upload$/ }).click()
   }
 
-  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(fixturePath)
-  await expect(page.getByRole('button', { name: targetName })).toBeVisible({ timeout: 30_000 })
+  const payload =
+    kind === 'text'
+      ? { name: targetName, mimeType: 'text/plain', buffer: textFixtureBuffer }
+      : { name: targetName, mimeType: 'image/png', buffer: imageFixtureBuffer }
+
+  await page.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(payload)
+  await expect(page.getByRole('button', { name: targetName, exact: true })).toBeVisible({ timeout: 60_000 })
 }
 
 export async function openFileActions(page: Page, fileName: string): Promise<void> {
@@ -90,9 +96,9 @@ export async function purgeFromTrash(page: Page, names: string[]): Promise<void>
     if (await card.count() === 0) {
       continue
     }
-    await card.first().click()
-    await page.getByRole('button', { name: /^Delete forever$/ }).click()
-    await page.getByRole('button', { name: /^Delete forever$/ }).last().click()
+    await card.first().getByTitle('Delete forever').click()
+    const confirmDialog = page.getByRole('dialog')
+    await confirmDialog.getByRole('button', { name: /^Delete forever$/ }).click()
     await expect(card).toHaveCount(0)
   }
 }

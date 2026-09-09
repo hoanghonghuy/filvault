@@ -5,13 +5,11 @@ import {
   cleanupSmokeArtifacts,
   createFolder,
   downloadFile,
-  imageFixturePath,
   moveFileToTrash,
   moveFolderToTrash,
   navigateToFiles,
   previewFile,
   purgeFromTrash,
-  textFixturePath,
   uploadFile,
 } from './helpers/files'
 
@@ -29,8 +27,8 @@ test.describe('critical path', () => {
     await navigateToFiles(page)
     await createFolder(page, e2eFolderName)
 
-    await uploadFile(page, textFixturePath, e2eTextFileName)
-    await uploadFile(page, imageFixturePath, e2eImageFileName)
+    await uploadFile(page, 'text', e2eTextFileName)
+    await uploadFile(page, 'image', e2eImageFileName)
 
     await previewFile(page, e2eImageFileName)
     await downloadFile(page, e2eTextFileName)

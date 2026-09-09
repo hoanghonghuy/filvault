@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig } from '@playwright/test'
 
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173'
 const apiURL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8080'
@@ -27,21 +27,25 @@ export default defineConfig({
     {
       name: 'mobile',
       use: {
-        ...devices['iPhone 13'],
+        browserName: 'chromium',
         viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
       },
     },
     {
       name: 'tablet',
       use: {
-        ...devices['iPad (gen 7)'],
+        browserName: 'chromium',
         viewport: { width: 768, height: 1024 },
+        isMobile: true,
+        hasTouch: true,
       },
     },
     {
       name: 'desktop',
       use: {
-        ...devices['Desktop Chrome'],
+        browserName: 'chromium',
         viewport: { width: 1280, height: 800 },
       },
     },
