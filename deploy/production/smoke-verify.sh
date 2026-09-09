@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Production-like smoke verification for PR #46 / issue #42.
+# Production-like infrastructure smoke (#42): TLS, migrate gate, volumes, probes.
+# Full core release path (auth, upload, restart persistence): make prod-like-release-smoke (#43).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -59,4 +60,5 @@ echo "readyz with minio stopped: $READY_WHEN_DOWN"
 echo "healthz with minio stopped: $HEALTH_WHEN_DOWN"
 echo
 
-echo "=== SMOKE VERIFY COMPLETE ==="
+echo "=== SMOKE VERIFY COMPLETE (infra) ==="
+echo "Next: make prod-like-release-smoke  # core release path + app restart persistence (#43)"

@@ -77,6 +77,36 @@ Stop:
 make prod-like-down
 ```
 
+## Release smoke (#43)
+
+One documented command verifies the **core release path** against this stack:
+
+```bash
+make prod-like-release-smoke
+```
+
+Coverage: edge reachable → register/login (deterministic smoke user) → browse Files → upload fixture → download checksum → **restart `api`/`web`/`worker` only** (Postgres/MinIO volumes intact) → confirm metadata + object persist → logout/cleanup.
+
+| Command | Purpose |
+|---------|---------|
+| `make prod-like-smoke-verify` | Infra/probes smoke (#42): TLS, migrate gate, volumes, `/healthz`/`/readyz` |
+| `make prod-like-release-smoke` | Full release gate (#43) |
+| `make prod-like-rollback-verify` | Post-rollback recovery checks |
+
+Forced failure (prove non-zero exit + diagnostics):
+
+```bash
+./deploy/production/release-smoke.sh --fail-at=download
+```
+
+Static self-check (no Docker):
+
+```bash
+./deploy/production/release-smoke.sh --self-check
+```
+
+Rollback/recovery policy and explicit verification steps: [`rollback-recovery.md`](rollback-recovery.md).
+
 ## Configuration contract
 
 All secrets and URLs are injected via `deploy/production/.env` (or your secret manager). **`FILVAULT_ENV=production` rejects documented placeholders** (see `apps/api/internal/platform/config/validate.go`).
@@ -139,4 +169,4 @@ Replace MinIO/Postgres/Mailpit with managed services by pointing the same env va
 
 AWS (or other clouds) may be documented later as deployment targets — not required for this baseline.
 
-Refs: #4 (epic), #41 (health/readiness), #42 (this baseline), #43 (future release smoke).
+Refs: #4 (epic), #41 (health/readiness), #42 (this baseline), #43 (release smoke + rollback runbook).
