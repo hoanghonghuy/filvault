@@ -20,10 +20,13 @@ describe('media lightbox contract', () => {
   })
 
   it('loads preview URLs through the existing file download endpoint', () => {
-    for (const view of [photos, album]) {
+    const vault = readSrc('./VaultView.vue')
+    for (const view of [photos, album, vault]) {
       expect(view).toContain('MediaLightbox')
-      expect(view).toMatch(/api<DownloadURL>\(`\/files\/\$\{[^}]+\.id\}\/download`\)/)
     }
+    expect(photos).toMatch(/api<DownloadURL>\(`\/files\/\$\{[^}]+\.id\}\/download`\)/)
+    expect(album).toMatch(/api<DownloadURL>\(`\/files\/\$\{[^}]+\.id\}\/download`\)/)
+    expect(vault).toMatch(/api<\{ downloadUrl: string \}>\(`\/files\/\$\{file\.id\}\/download`\)/)
   })
 
   it('opens an action sheet before previewing Photos and Album thumbnails', () => {

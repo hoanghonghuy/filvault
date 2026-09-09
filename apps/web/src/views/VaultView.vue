@@ -7,9 +7,9 @@ import { useI18n } from '@/lib/i18n'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
-import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import MediaLightbox from '@/components/MediaLightbox.vue'
 import type { VaultFile } from '@/api/types'
 
 const router = useRouter()
@@ -51,8 +51,6 @@ const fileActionOpen = ref(false)
 // In-app preview
 const previewOpen = ref(false)
 const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
-const previewDisplayUrl = ref('')
-const previewHeicLoading = ref(false)
 
 const totalVaultSize = computed(() => {
   return vault.files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0)
@@ -66,7 +64,7 @@ function onVisibilityChange() {
       hiddenTimeout = setTimeout(() => {
         if (vault.isUnlocked) {
           vault.lock()
-          ui.showToast('Kho cá nhân đã tự động khóa', 'info')
+          ui.showToast(t.value.vaultAutoLockedToast, 'info')
         }
       }, 2 * 60 * 1000)
     }
@@ -115,7 +113,7 @@ async function handleSetup() {
     setupPin.value = ''
     confirmSetupPin.value = ''
   } catch (e) {
-    setupError.value = formatApiError(e, 'Không thể thiết lập mật khẩu kho')
+    setupError.value = formatApiError(e, t.value.vaultSetupFailed)
   }
 }
 
@@ -128,13 +126,13 @@ async function handleUnlock() {
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     unlockPin.value = ''
   } catch (e) {
-    unlockError.value = formatApiError(e, 'Mật khẩu kho không chính xác')
+    unlockError.value = formatApiError(e, t.value.vaultUnlockFailed)
   }
 }
 
 function handleLockNow() {
   vault.lock()
-  ui.showToast('Kho cá nhân đã được khóa', 'info')
+  ui.showToast(t.value.vaultLockedToast, 'info')
 }
 
 async function handleChangePin() {
@@ -157,7 +155,7 @@ async function handleChangePin() {
     newPin.value = ''
     confirmNewPin.value = ''
   } catch (e) {
-    changePinError.value = formatApiError(e, 'Không thể đổi mật khẩu kho')
+    changePinError.value = formatApiError(e, t.value.vaultChangePinFailed)
   } finally {
     changingPin.value = false
   }
@@ -166,7 +164,7 @@ async function handleChangePin() {
 async function handleResetPin() {
   resetPinError.value = ''
   if (!accountPassword.value) {
-    resetPinError.value = 'Vui lòng nhập mật khẩu tài khoản'
+    resetPinError.value = t.value.vaultResetPasswordRequired
     return
   }
   if (resetNewPin.value.trim().length < 4) {
@@ -187,7 +185,7 @@ async function handleResetPin() {
     resetNewPin.value = ''
     confirmResetNewPin.value = ''
   } catch (e) {
-    resetPinError.value = formatApiError(e, 'Mật khẩu tài khoản không đúng hoặc có lỗi xảy ra')
+    resetPinError.value = formatApiError(e, t.value.vaultResetFailed)
   } finally {
     resettingPin.value = false
   }
@@ -212,30 +210,9 @@ async function previewMediaFile(file: VaultFile) {
     const out = await api<{ downloadUrl: string }>(`/files/${file.id}/download`)
     previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
     previewOpen.value = true
-    if (isHeic(file.name, file.mimeType)) {
-      previewHeicLoading.value = true
-      previewDisplayUrl.value = ''
-      try {
-        const resolved = await getHeicDisplayUrl(out.downloadUrl)
-        previewDisplayUrl.value = resolved
-      } catch {
-        previewDisplayUrl.value = out.downloadUrl
-      } finally {
-        previewHeicLoading.value = false
-      }
-    } else {
-      previewDisplayUrl.value = out.downloadUrl
-    }
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Không thể xem trước tệp'), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultPreviewFailed), 'error')
   }
-}
-
-function closePreview() {
-  previewOpen.value = false
-  previewFile.value = null
-  previewDisplayUrl.value = ''
-  previewHeicLoading.value = false
 }
 
 async function removeSelectedFileFromVault() {
@@ -246,7 +223,7 @@ async function removeSelectedFileFromVault() {
     await vault.removeFromVault([f.id])
     ui.showToast(t.value.vaultMoveOutSuccess, 'success')
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Không thể chuyển tệp ra ngoài'), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultMoveOutFailed), 'error')
   }
 }
 
@@ -255,9 +232,9 @@ async function deleteSelectedFile() {
   const f = selectedFile.value
   fileActionOpen.value = false
   const ok = await ui.confirm({
-    title: 'Xóa tệp khỏi kho cá nhân?',
-    message: `"${f.name}" sẽ được chuyển vào Thùng rác.`,
-    confirmLabel: 'Xóa tệp',
+    title: t.value.vaultDeleteTitle,
+    message: `"${f.name}" ${t.value.vaultDeleteMessage}`,
+    confirmLabel: t.value.vaultDeleteConfirm,
     danger: true,
   })
   if (!ok) return
@@ -265,9 +242,9 @@ async function deleteSelectedFile() {
   try {
     await api(`/files/${f.id}`, { method: 'DELETE' })
     await vault.loadFiles()
-    ui.showToast('Đã xóa tệp', 'success')
+    ui.showToast(t.value.vaultFileDeleted, 'success')
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Xóa tệp thất bại'), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultDeleteFailed), 'error')
   }
 }
 
@@ -282,7 +259,7 @@ function formatDate(iso: string): string {
   <div class="vault-page">
     <!-- Top Header -->
     <header class="vault-header">
-      <button type="button" class="back-btn" :title="t.back" aria-label="Quay lại" @click="router.back()">
+      <button type="button" class="back-btn" :title="t.back" :aria-label="t.back" @click="router.back()">
         <Icon name="arrow-left" :size="20" />
       </button>
       <div class="header-titles">
@@ -303,7 +280,7 @@ function formatDate(iso: string): string {
           type="button"
           class="lock-btn"
           :title="t.vaultLockNow"
-          aria-label="Khóa kho ngay"
+          :aria-label="t.vaultLockNowAria"
           @click="handleLockNow"
         >
           <Icon name="lock" :size="16" />
@@ -329,7 +306,7 @@ function formatDate(iso: string): string {
             <input
               v-model="setupPin"
               :type="showSetupPin ? 'text' : 'password'"
-              placeholder="Nhập mã PIN hoặc mật khẩu (tối thiểu 4 ký tự)"
+              :placeholder="t.vaultPinPlaceholder"
               maxlength="32"
               required
               autofocus
@@ -337,10 +314,11 @@ function formatDate(iso: string): string {
             <button
               type="button"
               class="eye-btn"
-              :aria-label="showSetupPin ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+              :aria-label="showSetupPin ? t.vaultHideCredential : t.vaultShowCredential"
+              :aria-pressed="showSetupPin"
               @click="showSetupPin = !showSetupPin"
             >
-              <Icon :name="showSetupPin ? 'eye' : 'eye'" :size="18" />
+              <Icon :name="showSetupPin ? 'eye-off' : 'eye'" :size="18" />
             </button>
           </div>
         </label>
@@ -351,7 +329,7 @@ function formatDate(iso: string): string {
             <input
               v-model="confirmSetupPin"
               :type="showSetupPin ? 'text' : 'password'"
-              placeholder="Nhập lại mật khẩu"
+              :placeholder="t.vaultPinConfirmPlaceholder"
               maxlength="32"
               required
             />
@@ -359,7 +337,7 @@ function formatDate(iso: string): string {
         </label>
 
         <button type="submit" class="btn primary submit-btn" :disabled="vault.loading">
-          {{ vault.loading ? 'Đang tạo…' : t.vaultCreateAndEnter }}
+          {{ vault.loading ? t.vaultCreating : t.vaultCreateAndEnter }}
         </button>
       </form>
     </div>
@@ -380,7 +358,7 @@ function formatDate(iso: string): string {
             <input
               v-model="unlockPin"
               :type="showUnlockPin ? 'text' : 'password'"
-              placeholder="Nhập mật khẩu kho cá nhân"
+              :placeholder="t.vaultUnlockPlaceholder"
               maxlength="32"
               required
               autofocus
@@ -388,10 +366,11 @@ function formatDate(iso: string): string {
             <button
               type="button"
               class="eye-btn"
-              :aria-label="showUnlockPin ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+              :aria-label="showUnlockPin ? t.vaultHideCredential : t.vaultShowCredential"
+              :aria-pressed="showUnlockPin"
               @click="showUnlockPin = !showUnlockPin"
             >
-              <Icon :name="showUnlockPin ? 'eye' : 'eye'" :size="18" />
+              <Icon :name="showUnlockPin ? 'eye-off' : 'eye'" :size="18" />
             </button>
           </div>
         </label>
@@ -413,7 +392,7 @@ function formatDate(iso: string): string {
       <!-- Toolbar -->
       <div class="vault-toolbar">
         <div class="vault-meta-info">
-          <span class="file-count">{{ vault.files.length }} tệp</span>
+          <span class="file-count">{{ vault.files.length }} {{ t.vaultFilesUnit }}</span>
           <span class="dot-sep">•</span>
           <span class="total-size">{{ formatBytes(totalVaultSize) }}</span>
         </div>
@@ -435,7 +414,7 @@ function formatDate(iso: string): string {
         <p class="empty-desc">{{ t.vaultEmptyDesc }}</p>
         <button type="button" class="btn primary" @click="router.push('/files')">
           <Icon name="folder" :size="18" />
-          <span>Đi tới Tệp của tôi</span>
+          <span>{{ t.vaultGoToMyFiles }}</span>
         </button>
       </div>
 
@@ -463,7 +442,7 @@ function formatDate(iso: string): string {
           <button
             type="button"
             class="more-btn"
-            aria-label="Thao tác tệp"
+            :aria-label="t.vaultFileActions"
             @click.stop="openFileMenu(file)"
           >
             <Icon name="more" :size="20" />
@@ -475,7 +454,7 @@ function formatDate(iso: string): string {
     <!-- Bottom Sheet: Single File Actions -->
     <BottomSheet
       :open="fileActionOpen"
-      :title="selectedFile?.name || 'Thao tác tệp'"
+      :title="selectedFile?.name || t.vaultFileActions"
       @close="fileActionOpen = false"
     >
       <div class="actions-menu">
@@ -541,7 +520,7 @@ function formatDate(iso: string): string {
         <div class="modal-actions">
           <button type="button" class="btn text-btn" @click="changePinOpen = false">{{ t.cancel }}</button>
           <button type="submit" class="btn primary" :disabled="changingPin">
-            {{ changingPin ? 'Đang lưu…' : 'Lưu mật khẩu mới' }}
+            {{ changingPin ? t.saving : t.vaultSaveNewPassword }}
           </button>
         </div>
       </form>
@@ -575,54 +554,20 @@ function formatDate(iso: string): string {
         <div class="modal-actions">
           <button type="button" class="btn text-btn" @click="resetPinOpen = false">{{ t.cancel }}</button>
           <button type="submit" class="btn primary" :disabled="resettingPin">
-            {{ resettingPin ? 'Đang xử lý…' : t.vaultResetAndEnter }}
+            {{ resettingPin ? t.vaultProcessing : t.vaultResetAndEnter }}
           </button>
         </div>
       </form>
     </BottomSheet>
 
-    <!-- Preview Modal -->
-    <div v-if="previewOpen && previewFile" class="preview-backdrop" @click="closePreview">
-      <div class="preview-dialog" @click.stop>
-        <header class="preview-header">
-          <span class="preview-filename">
-            {{ previewFile.name }}
-            <span v-if="isHeic(previewFile.name, previewFile.mimeType)" class="heic-tag">HEIC</span>
-          </span>
-          <button type="button" class="close-btn" aria-label="Đóng" @click="closePreview">
-            <Icon name="close" :size="20" />
-          </button>
-        </header>
-
-        <div class="preview-body">
-          <div v-if="previewHeicLoading" class="preview-heic-loading">
-            <div class="heic-spinner" />
-            <p>{{ t.heicConverting }}</p>
-          </div>
-          <img
-            v-else-if="previewFile.mimeType.startsWith('image/')"
-            :src="previewDisplayUrl || previewFile.url"
-            :alt="previewFile.name"
-            class="preview-img"
-          />
-          <video
-            v-else-if="previewFile.mimeType.startsWith('video/')"
-            :src="previewFile.url"
-            controls
-            autoplay
-            class="preview-video"
-          />
-          <div v-else class="preview-fallback">
-            <Icon :name="mimeIcon(previewFile.mimeType)" :size="48" />
-            <p>{{ t.previewUnavailable }}</p>
-            <button type="button" class="btn primary" @click="downloadFile(previewFile.id)">
-              <Icon name="download" :size="18" />
-              <span>{{ t.download }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <MediaLightbox
+      :open="previewOpen"
+      :name="previewFile?.name ?? ''"
+      :mime-type="previewFile?.mimeType ?? ''"
+      :url="previewFile?.url ?? ''"
+      @download="previewFile ? downloadFile(previewFile.id) : undefined"
+      @close="previewOpen = false"
+    />
   </div>
 </template>
 
@@ -646,14 +591,14 @@ function formatDate(iso: string): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border: none;
   border-radius: var(--radius-full, 9999px);
   background: var(--surface-soft);
   color: var(--ink);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--duration-short) var(--ease-standard);
 }
 
 .back-btn:hover {
@@ -686,20 +631,21 @@ function formatDate(iso: string): string {
 }
 
 .status-badge.unlocked {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
 }
 
 .status-badge.locked {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
 }
 
 .lock-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  min-height: var(--touch-min);
+  padding: 0 14px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -707,7 +653,9 @@ function formatDate(iso: string): string {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    border-color var(--duration-short) var(--ease-standard);
 }
 
 .lock-btn:hover {
@@ -742,12 +690,12 @@ function formatDate(iso: string): string {
 }
 
 .shield-icon-box {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.25));
-  color: #6366f1;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
 }
 
 .lock-icon-box {
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.15), rgba(15, 118, 110, 0.25));
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
 }
 
@@ -808,13 +756,15 @@ function formatDate(iso: string): string {
 
 .eye-btn {
   position: absolute;
-  right: 10px;
+  right: 4px;
   background: none;
   border: none;
   color: var(--muted);
   cursor: pointer;
-  padding: 6px;
-  display: flex;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
@@ -823,8 +773,8 @@ function formatDate(iso: string): string {
   margin: 0;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 13px;
   font-weight: 500;
 }
@@ -848,7 +798,8 @@ function formatDate(iso: string): string {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 6px 10px;
+  min-height: var(--touch-min);
+  padding: 0 10px;
 }
 
 .link-btn:hover {
@@ -899,9 +850,12 @@ function formatDate(iso: string): string {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 6px 10px;
+  min-height: var(--touch-min);
+  padding: 0 10px;
   border-radius: var(--radius-md);
-  transition: all 0.15s ease;
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard);
 }
 
 .text-btn:hover {
@@ -983,23 +937,23 @@ function formatDate(iso: string): string {
 }
 
 .file-icon-box.image {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
 }
 
 .file-icon-box.video {
-  background: rgba(139, 92, 246, 0.12);
-  color: #8b5cf6;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
 }
 
 .file-icon-box.doc {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--primary-cta) 12%, transparent);
+  color: var(--primary-cta);
 }
 
 .file-icon-box.archive {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
 }
 
 .file-info {
@@ -1026,11 +980,11 @@ function formatDate(iso: string): string {
 }
 
 .more-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
@@ -1072,7 +1026,7 @@ function formatDate(iso: string): string {
 }
 
 .sheet-row.danger {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .modal-form {
@@ -1094,121 +1048,5 @@ function formatDate(iso: string): string {
   justify-content: flex-end;
   gap: var(--space-sm);
   margin-top: var(--space-sm);
-}
-
-/* Preview Backdrop */
-.preview-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-md);
-}
-
-.preview-dialog {
-  display: flex;
-  flex-direction: column;
-  max-width: 90vw;
-  max-height: 90vh;
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.preview-filename {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 80vw;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px;
-}
-
-.preview-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-md);
-  overflow: auto;
-}
-
-.preview-img {
-  max-width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
-  border-radius: var(--radius-md);
-}
-
-.preview-video {
-  max-width: 100%;
-  max-height: 70vh;
-  border-radius: var(--radius-md);
-}
-
-.preview-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-xl);
-  color: var(--muted);
-}
-
-.heic-tag {
-  display: inline-block;
-  padding: 1px 6px;
-  margin-left: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  vertical-align: middle;
-}
-
-.preview-heic-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-xl);
-  color: var(--fg-soft, var(--ink));
-  font-size: 14px;
-}
-
-.heic-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid rgba(128, 128, 128, 0.2);
-  border-top-color: var(--accent, #3b82f6);
-  border-radius: 50%;
-  animation: heic-spin 0.8s linear infinite;
-}
-
-@keyframes heic-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>
