@@ -153,26 +153,34 @@ Rules:
 
 | Trục | DOM / storage | Mô tả |
 |------|---------------|-------|
-| **Appearance** (light/dark) | `data-theme="dark"` trên `<html>`; `localStorage.filvault.theme` = `dark` \| `light` | Đảo semantic surface/text tokens qua `[data-theme='dark']` trong `main.css` |
-| **Color theme** (accent palette) | `data-color-theme="<id>"`; `localStorage.filvault.colorTheme` | Ghi đè `--accent`, `--accent-hover`, `--accent-soft`, `--primary-cta`, sidebar/header tints |
+| **AppearanceMode** (`system` \| `light` \| `dark`) | `data-theme="dark"` trên `<html>` khi resolved dark; `localStorage.filvault.appearanceMode` | Đảo semantic surface/text tokens qua `[data-theme='dark']` trong `main.css`. `system` theo `prefers-color-scheme` (reactive khi app mở). |
+| **Color theme** (accent palette) | `data-color-theme="<id>"`; `localStorage.filvault.colorTheme` | Ghi đè `--accent`, `--accent-hover`, `--accent-soft`, `--primary-cta`, sidebar/header tints — **không** điều khiển light/dark appearance. |
 
-**Contract:** mọi toggle appearance (Settings, Theme Center) phải đi qua `useTheme()` (`setDarkMode`, `setFollowSystemDark`) — không mutate DOM/localStorage rời rạc.
+**Contract (#59):** mọi thay đổi appearance (Settings, Theme Center, Chat quick toggle) phải đi qua `useTheme()` — không mutate `document.documentElement.dataset` hay `localStorage` rời rạc.
 
-Bootstrap trước Vue mount: `main.ts` đọc `filvault.theme` + `filvault.colorTheme` và gán dataset.
+| API (`useTheme()`) | Role |
+|--------------------|------|
+| `appearanceMode` | `system` \| `light` \| `dark` (persisted) |
+| `resolvedIsDark` / `isDarkMode` | Computed: appearance hiện tại sau resolve `system` |
+| `setAppearanceMode(mode)` | Canonical setter — Settings / Theme Center radiogroup |
+| `toggleResolvedAppearance()` | Chat quick toggle: flip resolved light ↔ dark |
+| `currentColorTheme`, `applyColorTheme(id)` | Accent palette only |
+
+Bootstrap trước Vue mount: inline script trong `index.html` + `hydrateAppearance()` trong `main.ts` (migrate legacy `filvault.theme`, `filvault.followSystemDark`, `colorTheme=dark`).
 
 ### 2.2 Color themes có sẵn
 
-Định nghĩa trong `lib/theme.ts`, CSS trong `main.css` (`[data-color-theme='…']` + cặp dark):
+Định nghĩa trong `lib/theme.ts`, CSS trong `main.css` (`[data-color-theme='…']` + cặp dark appearance):
 
 | Category | IDs |
 |----------|-----|
-| Colors | `default`, `cyan`, `teal`, `sage`, `sunshine`, `peach`, `lavender`, `pearl`, `pebble`, `dark`, `material` |
+| Colors | `default`, `cyan`, `teal`, `sage`, `sunshine`, `peach`, `lavender`, `pearl`, `pebble`, `material` |
 | Seasonal | `spring`, `summer`, `autumn`, `winter` |
 
-- Chọn theme `dark` → tự bật appearance dark.
-- `followSystemDark` (`localStorage.filvault.followSystemDark`) lắng nghe `prefers-color-scheme` và gọi `setDarkMode`.
+- **`dark` không còn là color-theme option** — legacy `colorTheme=dark` migrate về accent `default`; appearance dark giữ qua `appearanceMode`.
+- Appearance và accent **độc lập**: có thể dùng `lavender` accent trên light hoặc dark.
 
-UI: **Settings** (toggle nhanh) + **Theme Center** (`/settings/theme`, `ThemeView.vue`).
+UI: **Settings** (appearance radiogroup `system`/`light`/`dark`) + **Theme Center** (`/settings/theme`, `ThemeView.vue` — appearance + accent grid).
 
 ### 2.3 Semantic tokens — quy tắc bất biến
 
@@ -393,7 +401,7 @@ Không multi-layer card stack hàng loạt.
 | **Photos** | `/photos`, `/photos/albums/:id` | Full | Photo grid, albums, lightbox | Thumb only in grid |
 | **Shared with me** | `/shared` | Full | List row, presign download | |
 | **Trash** | `/trash` | Full | Optimistic restore/delete | Entry: Settings/Overview |
-| **Settings** | `/settings` | Full | Cards, toggles, activity, share links | Dark toggle → `useTheme()` |
+| **Settings** | `/settings` | Full | Cards, appearance radiogroup, activity, share links | `setAppearanceMode` → `useTheme()` |
 | **Theme** | `/settings/theme` | Full | Theme grid, follow-system | Preview = product mock (xem follow-up) |
 | **Profile** | `/profile` | Full | Form, avatar upload | Avatar in nav footer |
 | **Chat** | `/chat`, `/chat/:id` | **Bare** (`meta.bare`) | Bubbles, composer, call modal | Breakpoint riêng §9.1 |
@@ -437,7 +445,7 @@ Không multi-layer card stack hàng loạt.
 - Mobile-first: thiết kế 375px trước.
 - Sheet thay `prompt`/`confirm`.
 - Touch target ≥44px.
-- `useTheme()` cho appearance; `applyColorTheme()` cho palette.
+- `useTheme()` cho appearance (`setAppearanceMode`) và accent (`applyColorTheme`).
 - Photos: thumbnail + presign cho original.
 - Test light + dark + một accent theme trước merge UI.
 
@@ -470,7 +478,7 @@ Khi monetization sẵn sàng: thêm entitlement source, gate theme/affordance th
 
 ```text
 Follow DESIGN.md (Filvault). Cal.com-like utility UI, semantic tokens via CSS variables,
-selectable color themes + light/dark (useTheme), mobile-first shell:
+AppearanceMode system/light/dark + selectable accent color themes (useTheme), mobile-first shell:
 ≤767 bottom nav (5 tabs) + header; 768–1023 80px icon rail + header;
 ≥1024 220px sidebar, no mobile header. SHELL_BREAKPOINTS / SHELL_NAV_WIDTH in shellNav.ts.
 avatar → Profile, chat → bare /chat, FAB upload on Files (mobile ≤767 only),
@@ -487,7 +495,7 @@ Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8
 ## 13. Implementation notes (`apps/web`)
 
 1. Tokens → CSS variables: `src/assets/main.css` (`:root`, `[data-theme='dark']`, `[data-color-theme='…']`).
-2. Theme logic: `src/lib/theme.ts` (`useTheme`, `THEMES`).
+2. Theme logic: `src/lib/theme.ts` (`AppearanceMode`, `useTheme`, `hydrateAppearance`, `THEMES`); bootstrap inline trong `index.html`.
 3. Shell: `AppShell.vue` + `lib/shellNav.ts` (`SHELL_BREAKPOINTS`, `SHELL_NAV_WIDTH`, `isShellNavActive`).
 4. Shared: `BottomSheet`, `ActionSheet`, `ConfirmSheet`, `UploadFab`, `EmptyState`, `ToastHost`, `MediaLightbox`.
 5. Tests contract: `AppShell.test.ts`, `shellNav.test.ts`, `theme.test.ts`, `dark-mode.test.ts`, `vault-view.test.ts`, `chat.test.ts`.
@@ -499,8 +507,7 @@ Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8
 - Chat: giảm hardcode `#0084ff` ngoài `--chat-accent` contract.
 - Theme Center: tab Icons/Display chưa ship; preview mock calendar → Filvault surfaces.
 - `EmojiPicker` / `CallModal` fallback colors.
-- Đồng bộ ChatView appearance toggle với `useTheme()`.
 
 ---
 
-*Chốt hướng visual: **A — Cal.com-like** (2026-08-17). Cập nhật contract sản phẩm hiện tại: 2026-09-09 (#8). Shell 3 form-factor: 2026-09-09 (#48 / #54 reconcile).*
+*Chốt hướng visual: **A — Cal.com-like** (2026-08-17). Cập nhật contract sản phẩm hiện tại: 2026-09-09 (#8). Shell 3 form-factor: 2026-09-09 (#48 / #54). AppearanceMode unified: 2026-09-09 (#59).*

@@ -14,11 +14,21 @@ import { THEMES, useTheme, type ThemeDef } from '@/lib/theme'
 const auth = useAuthStore()
 const ui = useUiStore()
 const { locale, t } = useI18n()
-const { currentColorTheme, applyColorTheme, isDarkMode, setDarkMode } = useTheme()
+const { appearanceMode, currentColorTheme, resolvedIsDark, applyColorTheme, setAppearanceMode } = useTheme()
 const fallbackTheme = THEMES[0] as ThemeDef
 const currentThemeDef = computed<ThemeDef>(
   () => THEMES.find((item) => item.id === currentColorTheme.value) ?? fallbackTheme,
 )
+
+const appearanceModes = [
+  { id: 'system' as const, labelKey: 'appearanceModeSystem' },
+  { id: 'light' as const, labelKey: 'appearanceModeLight' },
+  { id: 'dark' as const, labelKey: 'appearanceModeDark' },
+]
+
+function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
+  setAppearanceMode(mode)
+}
 
 const storageUsed = computed(() => auth.user?.storageUsed ?? 0)
 const storageQuota = computed(() => auth.user?.storageQuota ?? 10 * 1024 * 1024 * 1024)
@@ -36,10 +46,6 @@ const trashAutoDeleteEnabled = ref(auth.user?.trashAutoDeleteEnabled ?? false)
 const trashRetentionDays = ref(auth.user?.trashRetentionDays ?? 30)
 const error = ref('')
 const savingSettings = ref(false)
-function toggleDarkMode() {
-  setDarkMode(!isDarkMode.value)
-}
-
 // Persisted in localStorage under filvault.locale
 function chooseLocale(next: Locale) {
   setLocale(next)
@@ -302,12 +308,30 @@ onMounted(() => {
 
     <section class="card section">
       <h2 class="section-title">{{ t.appearance }}</h2>
-      <label class="toggle-row">
-        <input :checked="isDarkMode" type="checkbox" class="switch-input" @change="toggleDarkMode" />
-        <span class="switch-track" aria-hidden="true"></span>
-        <span class="toggle-label">{{ t.darkMode }}</span>
-      </label>
-      <p class="field-hint">{{ t.darkModeHint }}</p>
+      <p class="field-hint appearance-mode-label">{{ t.appearanceModeLabel }}</p>
+      <div class="appearance-mode-row" role="radiogroup" :aria-label="t.appearanceModeLabel">
+        <button
+          v-for="mode in appearanceModes"
+          :key="mode.id"
+          type="button"
+          class="btn appearance-mode-btn"
+          :class="{ ink: appearanceMode === mode.id }"
+          role="radio"
+          :aria-checked="appearanceMode === mode.id"
+          @click="chooseAppearanceMode(mode.id)"
+        >
+          {{ (t as any)[mode.labelKey] }}
+        </button>
+      </div>
+      <p class="field-hint">
+        {{
+          appearanceMode === 'system'
+            ? t.appearanceModeSystemHint
+            : resolvedIsDark
+              ? t.appearanceModeDarkHint
+              : t.appearanceModeLightHint
+        }}
+      </p>
       <div class="language-row" aria-label="Language">
         <button
           type="button"
@@ -631,10 +655,20 @@ onMounted(() => {
   color: var(--ink);
 }
 
-.language-row {
+.language-row,
+.appearance-mode-row {
   display: flex;
   gap: var(--space-xs);
   margin-top: var(--space-sm);
+}
+
+.appearance-mode-label {
+  margin-bottom: 0;
+}
+
+.appearance-mode-btn {
+  flex: 1;
+  min-width: 0;
 }
 
 .save-btn {
