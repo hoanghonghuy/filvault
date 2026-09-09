@@ -121,6 +121,24 @@ describe('filter chips', () => {
     ).toEqual(['type', 'folderId', 'from', 'to', 'sort', 'order'])
   })
 
+  it('shows order chip for relevance+asc (active order independent of sort)', () => {
+    expect(
+      getActiveFilterChipKeys({ ...DEFAULT_SEARCH_FILTERS, order: 'asc' }),
+    ).toEqual(['order'])
+    expect(hasActiveSearchFilters({ ...DEFAULT_SEARCH_FILTERS, order: 'asc' })).toBe(true)
+  })
+
+  it('omits order chip for relevance+desc defaults', () => {
+    expect(getActiveFilterChipKeys(DEFAULT_SEARCH_FILTERS)).toEqual([])
+    expect(hasActiveSearchFilters(DEFAULT_SEARCH_FILTERS)).toBe(false)
+  })
+
+  it('shows sort and order chips for non-relevance+asc', () => {
+    expect(
+      getActiveFilterChipKeys({ ...DEFAULT_SEARCH_FILTERS, sort: 'name', order: 'asc' }),
+    ).toEqual(['sort', 'order'])
+  })
+
   it('removes individual filters predictably', () => {
     const base = {
       type: 'image' as const,
@@ -138,6 +156,12 @@ describe('filter chips', () => {
       order: 'desc',
     })
     expect(removeSearchFilter(base, 'order').order).toBe('desc')
+  })
+
+  it('clearing order chip resets to desc even when sort is relevance', () => {
+    const filters = { ...DEFAULT_SEARCH_FILTERS, order: 'asc' as const }
+    expect(removeSearchFilter(filters, 'order')).toEqual(DEFAULT_SEARCH_FILTERS)
+    expect(getActiveFilterChipKeys(removeSearchFilter(filters, 'order'))).toEqual([])
   })
 })
 

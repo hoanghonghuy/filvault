@@ -129,7 +129,7 @@ export function getActiveFilterChipKeys(filters: SearchFilters): FilesSearchChip
   if (filters.from) chips.push('from')
   if (filters.to) chips.push('to')
   if (filters.sort !== 'relevance') chips.push('sort')
-  if (filters.sort !== 'relevance' && filters.order !== 'desc') chips.push('order')
+  if (filters.order !== 'desc') chips.push('order')
   return chips
 }
 
