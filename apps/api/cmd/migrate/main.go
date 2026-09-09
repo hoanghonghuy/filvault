@@ -41,6 +41,9 @@ func main() {
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		fatal("migrate: %v", err)
 	}
+	if err := postgres.SchemaReady(ctx, pool); err != nil {
+		fatal("schema ready: %v", err)
+	}
 	fmt.Println("migrate: ok")
 }
 

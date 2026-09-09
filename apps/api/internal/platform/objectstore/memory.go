@@ -19,6 +19,10 @@ func NewMemory() *Memory {
 	return &Memory{objects: map[string]ObjectStat{}}
 }
 
+func (m *Memory) CheckReady(context.Context) error {
+	return nil
+}
+
 func (m *Memory) CreateUploadURL(_ context.Context, key string, opts UploadOptions) (PresignedURL, error) {
 	exp := opts.Expires
 	if exp <= 0 {
