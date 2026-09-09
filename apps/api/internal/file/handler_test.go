@@ -171,6 +171,68 @@ func TestFilePatch_PendingInvalidState(t *testing.T) {
 	assertAPIError(t, code, body, http.StatusConflict, "INVALID_STATE")
 }
 
+func TestAbortUploadSession_DeletesPending(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	code, body := postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":        "pending.jpg",
+		"size":        64,
+		"contentType": "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	userID := decodeUserID(t, engine, token)
+	objectKey := file.ObjectKey(userID, session.FileID)
+	objs.PutObject(objectKey, objectstore.ObjectStat{Size: 64, ContentType: "image/jpeg"})
+
+	code, body = deleteAuth(t, engine, "/api/v1/files/"+session.FileID+"/upload-session", token)
+	if code != http.StatusNoContent {
+		t.Fatalf("abort status=%d body=%s", code, body)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/files/"+session.FileID, token)
+	assertAPIError(t, code, body, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestAbortUploadSession_Idempotent(t *testing.T) {
+	engine, mem, objs := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+	fileID, _ := uploadReady(t, engine, objs, token, "ready.jpg", nil)
+
+	code, body := deleteAuth(t, engine, "/api/v1/files/"+fileID+"/upload-session", token)
+	if code != http.StatusNoContent {
+		t.Fatalf("abort ready status=%d body=%s", code, body)
+	}
+
+	code, body = postAuth(t, engine, "/api/v1/files/upload-sessions", token, map[string]any{
+		"name":        "pending.jpg",
+		"size":        64,
+		"contentType": "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+
+	code, body = deleteAuth(t, engine, "/api/v1/files/"+session.FileID+"/upload-session", token)
+	if code != http.StatusNoContent {
+		t.Fatalf("abort pending status=%d body=%s", code, body)
+	}
+	code, body = deleteAuth(t, engine, "/api/v1/files/"+session.FileID+"/upload-session", token)
+	if code != http.StatusNoContent {
+		t.Fatalf("abort repeat status=%d body=%s", code, body)
+	}
+}
+
 func TestComplete_WithoutUploadFails(t *testing.T) {
 	engine, mem, _ := newEngine(t)
 	token := registerVerified(t, engine, mem, uniqueEmail())

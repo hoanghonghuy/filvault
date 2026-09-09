@@ -53,10 +53,16 @@ jobs:
 
       - name: Wait for Postgres
         run: |
+          streak=0
           for i in $(seq 1 30); do
-            if docker compose exec -T postgres pg_isready -U filvault -d filvault >/dev/null 2>&1; then
-              echo "postgres ready after ${i}s"
-              exit 0
+            if docker compose exec -T postgres psql -U filvault -d filvault -c 'SELECT 1' >/dev/null 2>&1; then
+              streak=$((streak + 1))
+              if [ "$streak" -ge 2 ]; then
+                echo "postgres ready after ${i}s (2 consecutive SQL probes succeeded)"
+                exit 0
+              fi
+            else
+              streak=0
             fi
             sleep 1
           done

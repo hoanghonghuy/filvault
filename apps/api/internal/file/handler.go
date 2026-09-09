@@ -27,6 +27,7 @@ func (h *Handler) RegisterRoutes(g *gin.RouterGroup, middleware ...gin.HandlerFu
 	g.PUT("/files/:id/favorite", append(middleware, h.setFavorite)...)
 	g.DELETE("/files/:id/favorite", append(middleware, h.unsetFavorite)...)
 	g.POST("/files/:id/complete", append(middleware, h.complete)...)
+	g.DELETE("/files/:id/upload-session", append(middleware, h.abortUploadSession)...)
 	g.GET("/files/:id", append(middleware, h.get)...)
 	g.GET("/files/:id/download", append(middleware, h.download)...)
 	g.GET("/files/:id/versions", append(middleware, h.listVersions)...)
@@ -74,6 +75,28 @@ func (h *Handler) createSession(c *gin.Context) {
 		"uploadUrl": session.UploadURL,
 		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339Nano),
 	})
+}
+
+func (h *Handler) abortUploadSession(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		httpx.Error(c, apperr.Unauthorized)
+		return
+	}
+	id, ok := httpx.ParamULID(c, "id")
+	if !ok {
+		return
+	}
+	err := h.svc.AbortPending(c.Request.Context(), userID, id)
+	if err != nil {
+		if err == apperr.NotFound || err == apperr.InvalidState {
+			c.Status(http.StatusNoContent)
+			return
+		}
+		httpx.Error(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) complete(c *gin.Context) {
