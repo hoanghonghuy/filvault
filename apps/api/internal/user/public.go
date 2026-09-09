@@ -9,8 +9,12 @@ type Public struct {
 	EmailVerified          bool      `json:"emailVerified"`
 	StorageUsed            int64     `json:"storageUsed"`
 	StorageQuota           int64     `json:"storageQuota"`
+	ImageThumbnailsEnabled bool      `json:"imageThumbnailsEnabled"`
+	VideoThumbnailsEnabled bool      `json:"videoThumbnailsEnabled"`
 	TrashAutoDeleteEnabled bool      `json:"trashAutoDeleteEnabled"`
 	TrashRetentionDays     int       `json:"trashRetentionDays"`
+	ActiveStatusEnabled    bool      `json:"activeStatusEnabled"`
+	AvatarURL              string    `json:"avatarUrl,omitempty"`
 	CreatedAt              time.Time `json:"createdAt"`
 }
 
@@ -22,8 +26,12 @@ func PublicFrom(u User) Public {
 		EmailVerified:          u.EmailVerified(),
 		StorageUsed:            u.StorageUsed,
 		StorageQuota:           u.StorageQuota,
+		ImageThumbnailsEnabled: u.ImageThumbnailsEnabled,
+		VideoThumbnailsEnabled: u.VideoThumbnailsEnabled,
 		TrashAutoDeleteEnabled: u.TrashAutoDeleteEnabled,
 		TrashRetentionDays:     u.TrashRetentionDays,
+		ActiveStatusEnabled:    u.ActiveStatusEnabled,
+		AvatarURL:              u.AvatarURL,
 		CreatedAt:              u.CreatedAt.UTC(),
 	}
 }

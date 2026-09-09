@@ -7,15 +7,18 @@ import (
 
 	"filvault/internal/apperr"
 	"filvault/internal/auth"
+	"filvault/internal/platform/config"
+	"filvault/internal/platform/objectstore"
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo    Repository
+	objects objectstore.ObjectStore
+	now     func() time.Time
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo, now: time.Now}
+func NewService(repo Repository, objects objectstore.ObjectStore) *Service {
+	return &Service{repo: repo, objects: objects, now: time.Now}
 }
 
 func (s *Service) Timeline(ctx context.Context, ownerID string, before *time.Time, limit int) (Timeline, error) {
@@ -33,6 +36,9 @@ func (s *Service) Timeline(ctx context.Context, ownerID string, before *time.Tim
 	if len(items) > limit {
 		items = items[:limit]
 		nextBefore = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if err := s.attachThumbnails(ctx, ownerID, items); err != nil {
+		return Timeline{}, err
 	}
 	return Timeline{Groups: groupByUTCDate(items), NextBefore: nextBefore}, nil
 }
@@ -57,7 +63,42 @@ func (s *Service) CreateAlbum(ctx context.Context, ownerID, name string) (Album,
 }
 
 func (s *Service) ListAlbums(ctx context.Context, ownerID string) ([]Album, error) {
-	return s.repo.ListAlbums(ctx, ownerID)
+	albums, err := s.repo.ListAlbums(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachCovers(ctx, ownerID, albums); err != nil {
+		return nil, err
+	}
+	return albums, nil
+}
+
+// attachCovers presigns pinned or auto-selected image covers in place.
+func (s *Service) attachCovers(ctx context.Context, ownerID string, albums []Album) error {
+	if len(albums) == 0 || s.objects == nil {
+		return nil
+	}
+	prefs, err := s.repo.GetThumbnailPrefs(ctx, ownerID)
+	if err != nil {
+		return err
+	}
+	if !prefs.ImageEnabled {
+		return nil
+	}
+	for i := range albums {
+		a := &albums[i]
+		if a.CoverObjectKey == "" || !strings.HasPrefix(a.CoverMime, "image/") {
+			continue
+		}
+		url, err := s.objects.CreateDownloadURL(ctx, a.CoverObjectKey, objectstore.DownloadOptions{
+			Expires: config.ThumbnailPresignTTL,
+		})
+		if err != nil {
+			return err
+		}
+		a.CoverURL = url.URL
+	}
+	return nil
 }
 
 func (s *Service) GetAlbum(ctx context.Context, ownerID, albumID string) (AlbumDetail, error) {
@@ -72,7 +113,51 @@ func (s *Service) GetAlbum(ctx context.Context, ownerID, albumID string) (AlbumD
 	if err != nil {
 		return AlbumDetail{}, err
 	}
-	return AlbumDetail{Album: *a, Items: items}, nil
+	if err := s.attachThumbnails(ctx, ownerID, items); err != nil {
+		return AlbumDetail{}, err
+	}
+	detail := AlbumDetail{Album: *a, Items: items}
+	if a.CoverObjectKey != "" && strings.HasPrefix(a.CoverMime, "image/") && s.objects != nil {
+		prefs, err := s.repo.GetThumbnailPrefs(ctx, ownerID)
+		if err != nil {
+			return AlbumDetail{}, err
+		}
+		if prefs.ImageEnabled {
+			url, err := s.objects.CreateDownloadURL(ctx, a.CoverObjectKey, objectstore.DownloadOptions{
+				Expires: config.ThumbnailPresignTTL,
+			})
+			if err != nil {
+				return AlbumDetail{}, err
+			}
+			detail.CoverURL = url.URL
+		}
+	}
+	return detail, nil
+}
+
+func (s *Service) attachThumbnails(ctx context.Context, ownerID string, items []TimelineItem) error {
+	if s.objects == nil || len(items) == 0 {
+		return nil
+	}
+	prefs, err := s.repo.GetThumbnailPrefs(ctx, ownerID)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		isImage := strings.HasPrefix(items[i].MimeType, "image/")
+		isVideo := strings.HasPrefix(items[i].MimeType, "video/")
+		if (isImage && !prefs.ImageEnabled) || (isVideo && !prefs.VideoEnabled) {
+			continue
+		}
+		url, err := s.objects.CreateDownloadURL(ctx, items[i].ObjectKey, objectstore.DownloadOptions{
+			Expires: config.ThumbnailPresignTTL,
+		})
+		if err != nil {
+			return err
+		}
+		items[i].ThumbnailURL = url.URL
+	}
+	return nil
 }
 
 func (s *Service) PatchAlbum(ctx context.Context, ownerID, albumID, name string) (Album, error) {
@@ -138,6 +223,34 @@ func (s *Service) RemoveAlbumItem(ctx context.Context, ownerID, albumID, fileID 
 		return apperr.NotFound
 	}
 	return s.repo.RemoveAlbumItem(ctx, albumID, fileID)
+}
+
+// SetAlbumCover pins an album item as the cover. The file must already be a
+// media item of this album; otherwise the store rejects with VALIDATION_ERROR.
+func (s *Service) SetAlbumCover(ctx context.Context, ownerID, albumID, fileID string) error {
+	a, err := s.repo.GetAlbum(ctx, ownerID, albumID)
+	if err != nil {
+		return err
+	}
+	if a == nil {
+		return apperr.NotFound
+	}
+	if _, err := s.repo.GetPhotoFile(ctx, ownerID, fileID); err != nil {
+		return err
+	}
+	return s.repo.SetAlbumCover(ctx, ownerID, albumID, fileID)
+}
+
+// RemoveAlbumCover un-pins the cover; the effective cover falls back to auto.
+func (s *Service) RemoveAlbumCover(ctx context.Context, ownerID, albumID string) error {
+	a, err := s.repo.GetAlbum(ctx, ownerID, albumID)
+	if err != nil {
+		return err
+	}
+	if a == nil {
+		return apperr.NotFound
+	}
+	return s.repo.ClearAlbumCover(ctx, ownerID, albumID, "")
 }
 
 func groupByUTCDate(items []TimelineItem) []TimelineGroup {

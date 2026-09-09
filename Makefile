@@ -1,10 +1,18 @@
 GO ?= $(HOME)/.local/go/bin/go
 COMPOSE ?= docker compose
-DSN ?= postgres://filvault:filvault@127.0.0.1:5435/filvault?sslmode=disable
-export PATH := $(HOME)/.local/go/bin:$(PATH)
 
-.PHONY: compose-up compose-down up down migrate migrate-down seed test run-api dev-api dev-web \
-	lint-api typecheck-api lint-web typecheck-web ci-api ci-web
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
+FILVAULT_POSTGRES_PASSWORD ?= replace-with-local-postgres-password
+DSN ?= postgres://filvault:$(FILVAULT_POSTGRES_PASSWORD)@127.0.0.1:5435/filvault?sslmode=disable
+export PATH := $(HOME)/.local/go/bin:$(PATH)
+export FILVAULT_POSTGRES_PASSWORD
+
+.PHONY: compose-up compose-down up down prod-up migrate migrate-down seed test run-api dev-api dev-web \
+	lint-api typecheck-api lint-web typecheck-web ci-api ci-web cli-build cli-test
 
 compose-up:
 	$(COMPOSE) up -d postgres minio minio-init
@@ -24,6 +32,9 @@ compose-down:
 up:
 	$(COMPOSE) up -d --build
 
+prod-up:
+	$(COMPOSE) up -d --build migrate api worker web
+
 down:
 	$(COMPOSE) down
 
@@ -34,16 +45,16 @@ migrate-down: compose-up
 	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" $(GO) run ./cmd/migrate -down
 
 seed: migrate
-	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" $(GO) run ./cmd/seed
+	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" $(GO) run ./cmd/seed
 
 test: compose-up
 	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" $(GO) test ./... -count=1 -p 1
 
 run-api: seed
-	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" FILVAULT_JWT_SECRET="dev-jwt-secret" FILVAULT_S3_ENDPOINT="http://127.0.0.1:9002" FILVAULT_S3_ACCESS_KEY="filvault" FILVAULT_S3_SECRET_KEY="filvaultsecret" $(GO) run ./cmd/api
+	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" $(GO) run ./cmd/api
 
 dev-api: seed
-	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" FILVAULT_INVITE_CODE="dev-invite" FILVAULT_JWT_SECRET="dev-jwt-secret" FILVAULT_S3_ENDPOINT="http://127.0.0.1:9002" FILVAULT_S3_ACCESS_KEY="filvault" FILVAULT_S3_SECRET_KEY="filvaultsecret" $(GO) run ./cmd/api
+	cd apps/api && FILVAULT_DATABASE_URL="$(DSN)" $(GO) run ./cmd/api
 
 dev-web:
 	cd apps/web && npm run dev
@@ -63,3 +74,9 @@ typecheck-web:
 ci-api: lint-api typecheck-api test
 
 ci-web: lint-web typecheck-web
+
+cli-build:
+	cd apps/cli && $(GO) build -o ../../bin/filvault ./cmd/filvault
+
+cli-test:
+	cd apps/cli && $(GO) test ./... -count=1

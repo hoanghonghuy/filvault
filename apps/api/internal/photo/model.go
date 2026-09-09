@@ -5,11 +5,13 @@ import "time"
 const DefaultTimelineLimit = 50
 
 type TimelineItem struct {
-	ID        string
-	Name      string
-	MimeType  string
-	SizeBytes int64
-	CreatedAt time.Time
+	ID           string
+	Name         string
+	MimeType     string
+	SizeBytes    int64
+	CreatedAt    time.Time
+	ObjectKey    string
+	ThumbnailURL string
 }
 
 type TimelineGroup struct {
@@ -23,15 +25,24 @@ type Timeline struct {
 }
 
 type Album struct {
-	ID        string
-	OwnerID   string
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ItemCount int
+	ID             string
+	OwnerID        string
+	Name           string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ItemCount      int
+	CoverFileID    string
+	CoverURL       string
+	CoverObjectKey string
+	CoverMime      string
 }
 
 type AlbumDetail struct {
 	Album
 	Items []TimelineItem
+}
+
+type ThumbnailPrefs struct {
+	ImageEnabled bool
+	VideoEnabled bool
 }

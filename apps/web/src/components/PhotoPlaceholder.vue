@@ -30,11 +30,19 @@ const isVideo = (mime: string) => mime.startsWith('video/')
   background: var(--surface-soft);
   text-align: center;
   cursor: pointer;
+  transition:
+    background-color var(--motion-press) var(--ease-standard),
+    border-color var(--motion-press) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 
 .placeholder:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.placeholder:active {
+  transform: scale(0.97);
 }
 
 @media (hover: hover) {
@@ -68,5 +76,15 @@ const isVideo = (mime: string) => mime.startsWith('video/')
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placeholder {
+    transition: none;
+  }
+
+  .placeholder:active {
+    transform: none;
+  }
 }
 </style>

@@ -1,26 +1,74 @@
 <script setup lang="ts">
-import { computed, provide, ref } from 'vue'
+import { computed, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useChatStore } from '@/stores/chat'
 import StorageBar from '@/components/StorageBar.vue'
 import Icon from '@/components/AppIcon.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import GlobalConfirm from '@/components/GlobalConfirm.vue'
 import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
-import { HOME_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
+import CallModal from '@/components/CallModal.vue'
+import { HOME_PATH, PROFILE_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
+import { userInitials } from '@/lib/userInitials'
+import { useI18n } from '@/lib/i18n'
 
 const auth = useAuthStore()
+const chatStore = useChatStore()
 const route = useRoute()
 const storageBarRef = ref<InstanceType<typeof StorageBar> | null>(null)
+const { t } = useI18n()
+
+watch(
+  () => auth.isAuthenticated && auth.isVerified,
+  (authed) => {
+    if (authed) {
+      chatStore.connectEvents()
+    } else {
+      chatStore.stopEvents()
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  chatStore.stopEvents()
+})
 
 provide('reloadStorage', async () => {
   await storageBarRef.value?.reload()
 })
 
-const pageTitle = computed(() => pageTitleForRoute(route.path, route.name))
-const showShell = computed(() => auth.isAuthenticated && auth.isVerified)
+const pageTitle = computed(() =>
+  pageTitleForRoute(route.path, route.name, {
+    overview: t.value.navOverview,
+    files: t.value.navFiles,
+    photos: t.value.navPhotos,
+    trash: t.value.navTrash,
+    settings: t.value.navSettings,
+    profile: t.value.profile,
+    album: t.value.album,
+    chat: t.value.chat,
+    shared: t.value.sharedWithMe,
+    vault: t.value.vaultTitle,
+  }),
+)
+const showShell = computed(() => auth.isAuthenticated && auth.isVerified && !route.meta.bare)
 const storageVisible = computed(() => showStorageBar(route.path))
+const avatarInitials = computed(() =>
+  userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
+)
+const profileLabel = computed(
+  () => `Open profile for ${auth.user?.displayName || auth.user?.email || 'account'}`,
+)
+const navLabels = computed<Record<string, string>>(() => ({
+  '/': t.value.navHome,
+  '/files': t.value.navFiles,
+  '/photos': t.value.navPhotos,
+  '/shared': t.value.navShared,
+  '/settings': t.value.navSettings,
+}))
 </script>
 
 <template>
@@ -28,6 +76,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
   <GlobalConfirm />
   <GlobalPrompt />
   <GlobalActionSheet />
+  <CallModal />
 
   <div v-if="showShell" class="shell">
     <aside class="side-nav" aria-label="Main navigation">
@@ -42,12 +91,17 @@ const storageVisible = computed(() => showStorageBar(route.path))
           :to="item.to"
           class="side-link"
         >
+          <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="20" />
-          <span>{{ item.label }}</span>
+          <span>{{ navLabels[item.to] }}</span>
         </RouterLink>
       </nav>
       <div class="side-user">
-        <span class="user-name">{{ auth.user?.displayName }}</span>
+        <RouterLink :to="PROFILE_PATH" class="side-profile" :aria-label="profileLabel">
+          <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" :alt="avatarInitials" class="avatar avatar-img" />
+          <span v-else class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
+          <span class="user-name">{{ auth.user?.displayName }}</span>
+        </RouterLink>
       </div>
     </aside>
 
@@ -60,10 +114,21 @@ const storageVisible = computed(() => showStorageBar(route.path))
           <p class="header-brand-name">Filvault</p>
           <h1 class="header-title">{{ pageTitle }}</h1>
         </div>
+        <RouterLink to="/chat" class="header-chat-btn" :aria-label="t.chat">
+          <Icon name="chat" :size="20" />
+        </RouterLink>
+        <RouterLink :to="PROFILE_PATH" class="header-profile" :aria-label="profileLabel">
+          <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" :alt="avatarInitials" class="avatar avatar-img" />
+          <span v-else class="avatar" aria-hidden="true">{{ avatarInitials }}</span>
+        </RouterLink>
       </header>
       <StorageBar v-show="storageVisible" ref="storageBarRef" />
       <main class="main">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </main>
     </div>
 
@@ -75,9 +140,10 @@ const storageVisible = computed(() => showStorageBar(route.path))
           class="bottom-link"
         >
         <span class="bottom-icon">
+          <span class="nav-indicator" aria-hidden="true" />
           <Icon :name="item.icon" :size="24" />
         </span>
-        <span class="bottom-label">{{ item.shortLabel }}</span>
+        <span class="bottom-label">{{ navLabels[item.to] }}</span>
       </RouterLink>
     </nav>
   </div>
@@ -111,7 +177,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
   gap: var(--space-sm);
   min-height: var(--header-h);
   padding: calc(var(--space-xs) + env(safe-area-inset-top)) var(--space-md) var(--space-xs);
-  background: var(--canvas);
+  background: var(--header-bg, var(--canvas));
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -154,10 +220,78 @@ const storageVisible = computed(() => showStorageBar(route.path))
 
 .header-text {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 1px;
+}
+
+.header-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: transparent;
+  text-decoration: none;
+  transition: transform var(--duration-short) var(--ease-standard),
+    background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard);
+}
+
+.header-chat-btn:hover {
+  background: rgba(0, 132, 255, 0.1);
+  color: #0084ff;
+  transform: scale(1.05);
+}
+
+.header-chat-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  margin-right: -6px;
+  border-radius: var(--radius-md);
+}
+
+.header-profile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-profile.router-link-active .avatar {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.avatar-img {
+  object-fit: cover;
+  padding: 0;
 }
 
 .header-brand-name {
@@ -188,6 +322,24 @@ const storageVisible = computed(() => showStorageBar(route.path))
   padding: var(--space-md);
 }
 
+.page-enter-active {
+  transition: opacity var(--duration-medium) var(--ease-standard),
+    transform var(--duration-medium) var(--ease-standard);
+}
+
+.page-leave-active {
+  transition: opacity var(--duration-short) var(--ease-standard);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
 .bottom-nav {
   position: fixed;
   left: 0;
@@ -199,7 +351,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
   justify-content: space-between;
   min-height: var(--bottom-nav-h);
   padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
-  background: var(--canvas);
+  background: var(--header-bg, var(--canvas));
   border-top: 1px solid var(--hairline);
 }
 
@@ -218,6 +370,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
+  transition: color var(--motion-press) var(--ease-standard);
 }
 
 .bottom-link:focus-visible {
@@ -226,13 +379,17 @@ const storageVisible = computed(() => showStorageBar(route.path))
   border-radius: var(--radius-md);
 }
 
+.bottom-link:active .bottom-icon {
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
+}
+
 .bottom-link.router-link-active {
   color: var(--accent);
 }
 
-.bottom-link.router-link-active .bottom-icon {
-  background: var(--accent-soft);
-  border-radius: var(--radius-md);
+.bottom-link.router-link-active .nav-indicator {
+  transform: translateX(-50%) scaleX(1);
 }
 
 .bottom-icon {
@@ -242,6 +399,29 @@ const storageVisible = computed(() => showStorageBar(route.path))
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+}
+
+/* Sliding active indicator — background pill under the icon.
+   z-index 0 keeps it in the positioned layer but below the icon,
+   which gets position: relative to paint above it. */
+.nav-indicator {
+  position: absolute;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform var(--duration-medium) var(--ease-emphasized-decelerate);
+  z-index: 0;
+}
+
+.bottom-icon > svg {
+  position: relative;
+}
+
+.bottom-link {
+  position: relative;
 }
 
 .bottom-label {
@@ -269,7 +449,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
     width: 220px;
     flex-shrink: 0;
     padding: var(--space-lg) var(--space-md);
-    background: var(--canvas);
+    background: var(--sidebar-bg, var(--canvas));
     border-right: 1px solid var(--hairline);
     overflow-y: auto;
   }
@@ -304,6 +484,7 @@ const storageVisible = computed(() => showStorageBar(route.path))
   }
 
   .side-link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -313,7 +494,9 @@ const storageVisible = computed(() => showStorageBar(route.path))
     color: var(--muted);
     font-size: 14px;
     font-weight: 600;
-    transition: background-color 150ms ease, color 150ms ease;
+    transition:
+      background-color var(--motion-press) var(--ease-standard),
+      color var(--motion-press) var(--ease-standard);
   }
 
   .side-link:hover {
@@ -331,13 +514,50 @@ const storageVisible = computed(() => showStorageBar(route.path))
     background: var(--accent-soft);
   }
 
+  .side-link .nav-indicator {
+    left: 0;
+    width: 3px;
+    height: 20px;
+    transform: translateX(0) scaleY(0);
+  }
+
+  .side-link.router-link-active .nav-indicator {
+    transform: translateX(0) scaleY(1);
+  }
+
   .side-user {
     padding-top: var(--space-md);
     border-top: 1px solid var(--hairline-soft);
   }
 
+  .side-profile {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-height: var(--touch-min);
+    padding: 0 var(--space-sm);
+    margin: 0 calc(var(--space-sm) * -1);
+    border-radius: var(--radius-md);
+    color: inherit;
+  }
+
+  .side-profile:hover {
+    background: var(--surface-soft);
+  }
+
+  .side-profile:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .side-profile.router-link-active .avatar {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
   .user-name {
     font-size: 0.875rem;
+    font-weight: 600;
     color: var(--muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -358,6 +578,12 @@ const storageVisible = computed(() => showStorageBar(route.path))
 
   .main {
     padding: var(--space-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-link {
+    transition: none;
   }
 }
 </style>

@@ -3,15 +3,21 @@ package photo
 import "strings"
 
 var photoMIMEs = map[string]struct{}{
-	"image/jpeg":      {},
-	"image/png":       {},
-	"image/gif":       {},
-	"image/webp":      {},
-	"image/heic":      {},
-	"image/heif":      {},
-	"video/mp4":       {},
-	"video/quicktime": {},
-	"video/webm":      {},
+	"image/jpeg":          {},
+	"image/pjpeg":         {},
+	"image/png":           {},
+	"image/x-png":         {},
+	"image/gif":           {},
+	"image/webp":          {},
+	"image/heic":          {},
+	"image/heif":          {},
+	"image/heic-sequence": {},
+	"image/heif-sequence": {},
+	"image/x-heic":        {},
+	"image/x-heif":        {},
+	"video/mp4":           {},
+	"video/quicktime":     {},
+	"video/webm":          {},
 }
 
 func IsPhotoMime(mime string) bool {

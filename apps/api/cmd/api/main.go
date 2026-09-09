@@ -8,9 +8,6 @@ import (
 
 	"filvault/internal/app"
 	"filvault/internal/platform/config"
-	"filvault/internal/platform/objectstore"
-	"filvault/internal/platform/postgres"
-	"filvault/internal/trash"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,34 +31,15 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := postgres.Migrate(ctx, pool); err != nil {
-		slog.Error("migrate", "err", err)
-		os.Exit(1)
-	}
-
 	engine, err := app.New(cfg, pool)
 	if err != nil {
 		slog.Error("object store", "err", err)
 		os.Exit(1)
 	}
 
-	tickerCtx, tickerCancel := context.WithCancel(context.Background())
-	defer tickerCancel()
-	trashSvc := app.NewTrashService(pool, mustObjectStore(cfg))
-	trash.StartTicker(tickerCtx, trashSvc, trash.DefaultTickerInterval)
-
 	slog.Info("api listening", "addr", cfg.HTTPAddr)
 	if err := engine.Run(cfg.HTTPAddr); err != nil {
 		slog.Error("http", "err", err)
 		os.Exit(1)
 	}
-}
-
-func mustObjectStore(cfg config.Config) objectstore.ObjectStore {
-	obj, err := objectstore.NewFromConfig(cfg)
-	if err != nil {
-		slog.Error("object store", "err", err)
-		os.Exit(1)
-	}
-	return obj
 }

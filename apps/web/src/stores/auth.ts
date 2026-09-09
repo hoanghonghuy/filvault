@@ -89,6 +89,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateActiveStatus(enabled: boolean): Promise<void> {
+    const updated = await api<User>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ activeStatusEnabled: enabled }),
+    })
+    user.value = updated
+  }
+
+  async function updateAvatar(avatarUrl: string): Promise<void> {
+    const updated = await api<User>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ avatarUrl }),
+    })
+    user.value = updated
+  }
+
   return {
     user,
     loading,
@@ -100,6 +116,8 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     resendVerification,
     verifyEmail,
+    updateActiveStatus,
+    updateAvatar,
     bootstrap,
   }
 })

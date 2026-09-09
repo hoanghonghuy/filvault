@@ -1,14 +1,16 @@
 import type { BrowserFile, TimelineGroup, TimelineItem } from '@/api/types'
 
 export const HOME_PATH = '/'
+export const PROFILE_PATH = '/profile'
 
 export const RECENT_FILE_LIMIT = 5
 export const RECENT_PHOTO_LIMIT = 6
 
 export const SHELL_NAV = [
+  { to: '/', label: 'Home', shortLabel: 'Home', icon: 'home' },
   { to: '/files', label: 'Files', shortLabel: 'Files', icon: 'folder' },
   { to: '/photos', label: 'Photos', shortLabel: 'Photos', icon: 'photos' },
-  { to: '/trash', label: 'Trash', shortLabel: 'Trash', icon: 'trash' },
+  { to: '/shared', label: 'Shared', shortLabel: 'Shared', icon: 'share' },
   { to: '/settings', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
 ] as const
 
@@ -16,15 +18,25 @@ export const SHELL_NAV = [
 export const OVERVIEW_DESTINATIONS = [
   { to: '/files', label: 'My Files', hint: 'Browse and upload', icon: 'folder' },
   { to: '/photos', label: 'Photos', hint: 'Timeline and albums', icon: 'photos' },
+  { to: '/shared', label: 'Shared with me', hint: 'Items shared to you', icon: 'users' },
+  { to: '/chat', label: 'Chat', hint: 'Messages and video calls', icon: 'chat' },
 ] as const
 
-export function pageTitleForRoute(path: string, routeName?: string | symbol | null): string {
-  if (path === '/' || path === '') return 'Overview'
-  if (routeName === 'album') return 'Album'
-  if (path === '/files' || path.startsWith('/files/')) return 'My Files'
-  if (path === '/photos' || path.startsWith('/photos/')) return 'Photos'
-  if (path === '/trash') return 'Trash'
-  if (path === '/settings') return 'Settings'
+export function pageTitleForRoute(
+  path: string,
+  routeName?: string | symbol | null,
+  titles?: Partial<Record<'overview' | 'album' | 'files' | 'vault' | 'photos' | 'chat' | 'trash' | 'shared' | 'settings' | 'profile', string>>,
+): string {
+  if (path === '/' || path === '') return titles?.overview ?? 'Overview'
+  if (routeName === 'album') return titles?.album ?? 'Album'
+  if (path === '/files' || path.startsWith('/files/')) return titles?.files ?? 'My Files'
+  if (path === '/vault' || path.startsWith('/vault/')) return titles?.vault ?? 'Personal Vault'
+  if (path === '/photos' || path.startsWith('/photos/')) return titles?.photos ?? 'Photos'
+  if (path === '/chat' || path.startsWith('/chat/')) return titles?.chat ?? 'Chat'
+  if (path === '/trash') return titles?.trash ?? 'Trash'
+  if (path === '/shared') return titles?.shared ?? 'Shared with me'
+  if (path === '/settings') return titles?.settings ?? 'Settings'
+  if (path === '/profile') return titles?.profile ?? 'Profile'
   return 'Filvault'
 }
 

@@ -78,6 +78,75 @@ func TestTrash_SoftDeleteRestorePermanent(t *testing.T) {
 	}
 }
 
+func TestTrash_PurgeChatAttachmentKeepsUnavailableMessage(t *testing.T) {
+	engine, mem, objs, pool := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	_, body := postAuth(t, engine, "/api/v1/chat/conversations", token, map[string]any{"title": "Retention"})
+	var conv struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &conv)
+
+	code, body := postAuth(t, engine, "/api/v1/chat/attachments/upload-sessions", token, map[string]any{
+		"conversationId": conv.ID,
+		"name":           "retained.jpg",
+		"size":           128,
+		"contentType":    "image/jpeg",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("session status=%d body=%s", code, body)
+	}
+	var session struct {
+		FileID string `json:"fileId"`
+	}
+	decodeJSON(t, body, &session)
+	code, body = getAuth(t, engine, "/api/v1/users/me", token)
+	if code != http.StatusOK {
+		t.Fatalf("me status=%d body=%s", code, body)
+	}
+	var me struct {
+		ID string `json:"id"`
+	}
+	decodeJSON(t, body, &me)
+	userID := me.ID
+	objs.PutObject("users/"+userID+"/files/"+session.FileID, objectstore.ObjectStat{Size: 128, ContentType: "image/jpeg"})
+
+	code, body = postAuth(t, engine, "/api/v1/chat/attachments/"+session.FileID+"/complete", token, map[string]any{
+		"conversationId": conv.ID,
+		"body":           "keep this history",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("complete status=%d body=%s", code, body)
+	}
+
+	code, _ = deleteAuth(t, engine, "/api/v1/files/"+session.FileID, token)
+	if code != http.StatusNoContent {
+		t.Fatalf("soft delete status=%d", code)
+	}
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token)
+	if code != http.StatusOK || !contains(body, "retained.jpg") || !contains(body, `"availability":"trashed"`) {
+		t.Fatalf("trashed attachment should remain unavailable: status=%d body=%s", code, body)
+	}
+
+	code, _ = deleteAuth(t, engine, "/api/v1/trash/files/"+session.FileID, token)
+	if code != http.StatusNoContent {
+		t.Fatalf("permanent delete status=%d", code)
+	}
+
+	code, body = getAuth(t, engine, "/api/v1/chat/conversations/"+conv.ID+"/messages", token)
+	if code != http.StatusOK || !contains(body, "retained.jpg") || !contains(body, `"availability":"purged"`) {
+		t.Fatalf("purged attachment should remain unavailable: status=%d body=%s", code, body)
+	}
+	var remainingFiles int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM files WHERE id = $1`, session.FileID).Scan(&remainingFiles); err != nil {
+		t.Fatalf("count purged file: %v", err)
+	}
+	if remainingFiles != 0 {
+		t.Fatalf("purged file row still exists: %d", remainingFiles)
+	}
+}
+
 func TestTrash_AutoCleanup(t *testing.T) {
 	engine, mem, objs, pool := newEngine(t)
 	token := registerVerified(t, engine, mem, uniqueEmail())

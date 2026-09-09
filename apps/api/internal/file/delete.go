@@ -3,6 +3,7 @@ package file
 import (
 	"context"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 )
 
@@ -21,5 +22,6 @@ func (s *Service) Delete(ctx context.Context, ownerID, fileID string) error {
 	if f.Status != StatusReady {
 		return apperr.InvalidState
 	}
+	s.activity.Record(ctx, ownerID, activity.TypeFileTrashed, f.Name)
 	return s.repo.SoftDelete(ctx, ownerID, fileID, s.now().UTC())
 }

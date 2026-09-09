@@ -9,6 +9,7 @@ const (
 	MaxFileSizeBytes          int64 = 104857600 // 100 MiB
 	UploadPresignTTL                = 15 * time.Minute
 	DownloadPresignTTL              = 5 * time.Minute
+	ThumbnailPresignTTL             = 1 * time.Hour
 
 	AccessTokenTTL  = 15 * time.Minute
 	RefreshTokenTTL = 7 * 24 * time.Hour
@@ -33,7 +34,14 @@ type Config struct {
 	S3AccessKey               string
 	S3SecretKey               string
 	S3PublicEndpoint          string
+	DefaultImageThumbnails    bool
+	DefaultVideoThumbnails    bool
 	DefaultTrashAutoDelete    bool
 	DefaultTrashRetentionDays int
+	PublicShareRateLimitPerMin int
 	CORSAllowedOrigins        []string
+	LiveKitURL                string
+	LiveKitPublicURL          string
+	LiveKitAPIKey             string
+	LiveKitAPISecret          string
 }

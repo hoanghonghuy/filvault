@@ -26,6 +26,13 @@ func (s *Store) GetAliveFolderByID(ctx context.Context, ownerID, id string) (*fo
 	return s.scanFolder(s.pool.QueryRow(ctx, folderSelectAlive+` AND owner_id = $1 AND id = $2`, ownerID, id))
 }
 
+func (s *Store) GetAliveFolderByName(ctx context.Context, ownerID string, parentID *string, name string) (*folder.Folder, error) {
+	if parentID == nil {
+		return s.scanFolder(s.pool.QueryRow(ctx, folderSelectAlive+` AND owner_id = $1 AND parent_id IS NULL AND name = $2`, ownerID, name))
+	}
+	return s.scanFolder(s.pool.QueryRow(ctx, folderSelectAlive+` AND owner_id = $1 AND parent_id = $2 AND name = $3`, ownerID, *parentID, name))
+}
+
 func (s *Store) UpdateFolder(ctx context.Context, f folder.Folder) error {
 	_, err := s.pool.Exec(ctx, `
 		UPDATE folders
@@ -81,7 +88,7 @@ func (s *Store) CountAliveFolderChildren(ctx context.Context, ownerID, folderID 
 	}
 	err = s.pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM files
-		WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY'
+		WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 	`, ownerID, folderID).Scan(&files)
 	return subfolders, files, err
 }
@@ -93,14 +100,14 @@ func (s *Store) ListAliveFilesInFolder(ctx context.Context, ownerID string, fold
 		rows, err = s.pool.Query(ctx, `
 			SELECT id, name, mime_type, size_bytes, updated_at
 			FROM files
-			WHERE owner_id = $1 AND folder_id IS NULL AND deleted_at IS NULL AND status = 'READY'
+			WHERE owner_id = $1 AND folder_id IS NULL AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 			ORDER BY name
 		`, ownerID)
 	} else {
 		rows, err = s.pool.Query(ctx, `
 			SELECT id, name, mime_type, size_bytes, updated_at
 			FROM files
-			WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY'
+			WHERE owner_id = $1 AND folder_id = $2 AND deleted_at IS NULL AND status = 'READY' AND is_vault = FALSE
 			ORDER BY name
 		`, ownerID, *folderID)
 	}
@@ -178,6 +185,10 @@ func (r folderRepo) Create(ctx context.Context, f folder.Folder) error {
 
 func (r folderRepo) GetAliveByID(ctx context.Context, ownerID, id string) (*folder.Folder, error) {
 	return r.store.GetAliveFolderByID(ctx, ownerID, id)
+}
+
+func (r folderRepo) GetAliveByName(ctx context.Context, ownerID string, parentID *string, name string) (*folder.Folder, error) {
+	return r.store.GetAliveFolderByName(ctx, ownerID, parentID, name)
 }
 
 func (r folderRepo) Update(ctx context.Context, f folder.Folder) error {

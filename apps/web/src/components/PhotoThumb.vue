@@ -1,0 +1,191 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import Icon from '@/components/AppIcon.vue'
+import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
+
+const props = defineProps<{
+  mimeType: string
+  name: string
+  thumbnailUrl?: string
+}>()
+
+const emit = defineEmits<{
+  click: []
+}>()
+
+const failed = ref(false)
+const isVideo = props.mimeType.startsWith('video/')
+const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
+const heicThumbUrl = ref<string>('')
+
+const displaySrc = computed(() => {
+  if (isHeicMedia.value && heicThumbUrl.value) {
+    return heicThumbUrl.value
+  }
+  return props.thumbnailUrl
+})
+
+async function loadHeicThumb() {
+  if (isHeicMedia.value && props.thumbnailUrl && !failed.value) {
+    try {
+      const url = await getHeicDisplayUrl(props.thumbnailUrl, 0.5)
+      heicThumbUrl.value = url
+    } catch {
+      // If conversion fails, let standard <img> try or fallback
+    }
+  }
+}
+
+watch(() => props.thumbnailUrl, loadHeicThumb)
+onMounted(loadHeicThumb)
+
+function handleError() {
+  failed.value = true
+}
+</script>
+
+<template>
+  <button type="button" class="photo-thumb" :title="name" @click="emit('click')">
+    <template v-if="(displaySrc || (thumbnailUrl && !isHeicMedia)) && !failed">
+      <img
+        v-if="!isVideo"
+        :src="displaySrc || thumbnailUrl"
+        :alt="name"
+        loading="lazy"
+        decoding="async"
+        @error="handleError"
+      />
+      <video
+        v-else
+        :src="thumbnailUrl"
+        :aria-label="name"
+        muted
+        playsinline
+        preload="metadata"
+        @error="handleError"
+      />
+      <span v-if="isVideo" class="media-badge">
+        <Icon name="video" :size="14" />
+      </span>
+      <span v-if="isHeicMedia" class="heic-badge">HEIC</span>
+    </template>
+    <span v-else class="fallback" :class="{ video: isVideo }">
+      <Icon :name="isVideo ? 'video' : 'image'" :size="28" />
+      <span class="name">{{ name }}</span>
+      <span v-if="isHeicMedia" class="heic-badge fallback-badge">HEIC</span>
+    </span>
+  </button>
+</template>
+
+<style scoped>
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-press) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+.photo-thumb:hover {
+  border-color: var(--accent);
+}
+
+.photo-thumb:active {
+  transform: scale(0.97);
+}
+
+.photo-thumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+img,
+video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-badge {
+  position: absolute;
+  right: var(--space-xs);
+  bottom: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: rgba(17, 24, 39, 0.72);
+  color: var(--on-ink);
+}
+
+.heic-badge {
+  position: absolute;
+  left: var(--space-xs);
+  bottom: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs, 4px);
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  backdrop-filter: blur(4px);
+}
+
+.heic-badge.fallback-badge {
+  position: static;
+  margin-top: 2px;
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  color: var(--accent);
+}
+
+.fallback.video {
+  color: var(--muted);
+}
+
+.name {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+  word-break: break-all;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-thumb {
+    transition: none;
+  }
+
+  .photo-thumb:active {
+    transform: none;
+  }
+}
+</style>

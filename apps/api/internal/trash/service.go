@@ -4,20 +4,27 @@ import (
 	"context"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/file"
 	"filvault/internal/folder"
 )
 
 type Service struct {
-	repo    Repository
-	quota   QuotaStore
-	objects ObjectStore
-	now     func() time.Time
+	repo     Repository
+	quota    QuotaStore
+	objects  ObjectStore
+	activity ActivityRecorder
+	now      func() time.Time
 }
 
-func NewService(repo Repository, quota QuotaStore, objects ObjectStore) *Service {
-	return &Service{repo: repo, quota: quota, objects: objects, now: time.Now}
+// ActivityRecorder records lifecycle events; failures never break trash ops.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
+}
+
+func NewService(repo Repository, quota QuotaStore, objects ObjectStore, activity ActivityRecorder) *Service {
+	return &Service{repo: repo, quota: quota, objects: objects, activity: activity, now: time.Now}
 }
 
 func (s *Service) List(ctx context.Context, ownerID string) (List, error) {
@@ -63,7 +70,11 @@ func (s *Service) RestoreFile(ctx context.Context, ownerID, fileID string) error
 	if exists {
 		return apperr.Conflict
 	}
-	return s.repo.RestoreFile(ctx, ownerID, fileID)
+	if err := s.repo.RestoreFile(ctx, ownerID, fileID); err != nil {
+		return err
+	}
+	s.activity.Record(ctx, ownerID, activity.TypeFileRestored, f.Name)
+	return nil
 }
 
 func (s *Service) RestoreFolder(ctx context.Context, ownerID, folderID string) error {
@@ -87,21 +98,23 @@ func (s *Service) RestoreFolder(ctx context.Context, ownerID, folderID string) e
 	if exists {
 		return apperr.Conflict
 	}
+	s.activity.Record(ctx, ownerID, activity.TypeFolderRestored, f.Name)
 	return s.repo.RestoreFolder(ctx, ownerID, folderID)
 }
 
 func (s *Service) PermanentDeleteFile(ctx context.Context, ownerID, fileID string) error {
 	f, err := s.getTrashedFile(ctx, ownerID, fileID)
+	if err != nil && err != apperr.NotFound {
+		return err
+	}
+	_, err = s.repo.PurgeFile(ctx, ownerID, fileID)
 	if err != nil {
 		return err
 	}
-	_ = s.objects.Delete(ctx, f.ObjectKey)
-	if f.Status == file.StatusReady && f.SizeBytes > 0 {
-		if err := s.quota.AddStorageUsed(ctx, ownerID, -f.SizeBytes); err != nil {
-			return err
-		}
+	if f != nil {
+		s.activity.Record(ctx, ownerID, activity.TypePurged, f.Name)
 	}
-	return s.repo.DeleteFileRow(ctx, ownerID, fileID)
+	return nil
 }
 
 func (s *Service) PermanentDeleteFolder(ctx context.Context, ownerID, folderID string) error {

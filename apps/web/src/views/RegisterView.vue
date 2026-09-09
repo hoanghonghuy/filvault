@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import { formatAuthError } from '@/api/errors'
@@ -7,6 +7,12 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+onMounted(() => {
+  if (auth.isAuthenticated) {
+    void router.replace(auth.isVerified ? '/' : '/verify-email')
+  }
+})
 
 const email = ref('')
 const password = ref('')
@@ -25,7 +31,7 @@ async function submit() {
       displayName: displayName.value.trim(),
       inviteCode: inviteCode.value.trim(),
     })
-    await router.push('/verify-email')
+    await router.replace('/verify-email')
   } catch (e) {
     error.value = formatAuthError(e, 'Registration failed. Check your details and try again.')
   } finally {

@@ -1,32 +1,45 @@
 <script setup lang="ts">
 import BottomSheet from '@/components/BottomSheet.vue'
+import Icon from '@/components/AppIcon.vue'
 
 defineProps<{
   open: boolean
   name: string
+  favorited?: boolean
 }>()
 
 const emit = defineEmits<{
   view: []
   download: []
+  favorite: []
   close: []
+  'after-leave': []
 }>()
 </script>
 
 <template>
-  <BottomSheet :open="open" :title="name" @close="emit('close')">
+  <BottomSheet :open="open" :title="name" @close="emit('close')" @after-leave="emit('after-leave')">
     <div class="actions">
       <button type="button" class="btn block ink" @click="emit('view')">View</button>
       <button type="button" class="btn block" @click="emit('download')">Download</button>
+      <button type="button" class="btn block favorite-action" @click="emit('favorite')">
+        <Icon :name="favorited ? 'star-filled' : 'star'" :size="18" class="star-icon" />
+        {{ favorited ? 'Remove from favorites' : 'Add to favorites' }}
+      </button>
       <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
     </div>
   </BottomSheet>
 </template>
 
 <style scoped>
-.actions {
+.favorite-action {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: var(--space-xs);
+}
+
+.star-icon {
+  color: var(--warning);
 }
 </style>

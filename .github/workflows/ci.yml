@@ -37,7 +37,7 @@ jobs:
           echo "postgres did not become ready"
           exit 1
 
-      - name: Migrate
+      - name: Migrate (pre-deploy)
         working-directory: apps/api
         run: go run ./cmd/migrate
         env:
@@ -58,7 +58,7 @@ jobs:
           FILVAULT_DATABASE_URL: ${{ env.DSN }}
 
   web:
-    name: Web — lint, typecheck
+    name: Web — lint, typecheck, test, build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -80,3 +80,32 @@ jobs:
 
       - name: Typecheck
         run: npm run type-check
+
+      - name: Test
+        run: npm run test -- --run
+
+      - name: Build
+        run: npm run build-only
+
+  cli:
+    name: CLI — lint, typecheck, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+          cache-dependency-path: apps/cli/go.sum
+
+      - name: Lint
+        run: go vet ./...
+
+      - name: Typecheck
+        run: go build -o /dev/null ./...
+
+      - name: Test
+        run: go test ./... -count=1

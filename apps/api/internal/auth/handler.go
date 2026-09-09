@@ -222,11 +222,47 @@ func (h *Handler) patchMe(c *gin.Context) {
 		}
 		displayName = &n
 	}
-	if autoDelete == nil && retentionDays == nil && displayName == nil {
+	var imageThumbnails *bool
+	if v, ok := raw["imageThumbnailsEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		imageThumbnails = &enabled
+	}
+	var videoThumbnails *bool
+	if v, ok := raw["videoThumbnailsEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		videoThumbnails = &enabled
+	}
+	var activeStatus *bool
+	if v, ok := raw["activeStatusEnabled"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(v, &enabled); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		activeStatus = &enabled
+	}
+	var avatarURL *string
+	if v, ok := raw["avatarUrl"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			httpx.Validation(c)
+			return
+		}
+		avatarURL = &s
+	}
+	if autoDelete == nil && retentionDays == nil && displayName == nil && imageThumbnails == nil && videoThumbnails == nil && activeStatus == nil && avatarURL == nil {
 		httpx.Validation(c)
 		return
 	}
-	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays)
+	u, err := h.svc.PatchMe(c.Request.Context(), userID, displayName, autoDelete, retentionDays, imageThumbnails, videoThumbnails, activeStatus, avatarURL)
 	if err != nil {
 		httpx.Error(c, err)
 		return

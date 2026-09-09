@@ -29,11 +29,8 @@ type s3Store struct {
 func newS3(cfg config.Config) (*s3Store, error) {
 	accessKey := cfg.S3AccessKey
 	secretKey := cfg.S3SecretKey
-	if accessKey == "" {
-		accessKey = "minioadmin"
-	}
-	if secretKey == "" {
-		secretKey = "minioadmin"
+	if accessKey == "" || secretKey == "" {
+		return nil, fmt.Errorf("S3 credentials are required")
 	}
 
 	client, err := buildS3Client(cfg.S3Endpoint, cfg.S3Region, accessKey, secretKey)

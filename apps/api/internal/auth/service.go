@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/platform/config"
 	"filvault/internal/platform/mailer"
@@ -14,12 +15,18 @@ import (
 )
 
 type Service struct {
-	cfg    config.Config
-	repo   Repository
-	tokens *Tokens
-	mailer mailer.Mailer
-	now    func() time.Time
-	dummy  string
+	cfg      config.Config
+	repo     Repository
+	tokens   *Tokens
+	mailer   mailer.Mailer
+	activity ActivityRecorder
+	now      func() time.Time
+	dummy    string
+}
+
+// ActivityRecorder records security events; failures never break auth flows.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
 }
 
 type Session struct {
@@ -28,14 +35,15 @@ type Session struct {
 	RefreshToken string
 }
 
-func NewService(cfg config.Config, repo Repository, tokens *Tokens, mailer mailer.Mailer) *Service {
+func NewService(cfg config.Config, repo Repository, tokens *Tokens, mailer mailer.Mailer, activity ActivityRecorder) *Service {
 	return &Service{
-		cfg:    cfg,
-		repo:   repo,
-		tokens: tokens,
-		mailer: mailer,
-		now:    time.Now,
-		dummy:  dummyPasswordHash(),
+		cfg:      cfg,
+		repo:     repo,
+		tokens:   tokens,
+		mailer:   mailer,
+		activity: activity,
+		now:      time.Now,
+		dummy:    dummyPasswordHash(),
 	}
 }
 
@@ -69,8 +77,11 @@ func (s *Service) Register(ctx context.Context, email, password, displayName, in
 		PasswordHash:           hash,
 		StorageUsed:            0,
 		StorageQuota:           config.DefaultStorageQuotaBytes,
+		ImageThumbnailsEnabled: s.cfg.DefaultImageThumbnails,
+		VideoThumbnailsEnabled: s.cfg.DefaultVideoThumbnails,
 		TrashAutoDeleteEnabled: s.cfg.DefaultTrashAutoDelete,
 		TrashRetentionDays:     s.cfg.DefaultTrashRetentionDays,
+		ActiveStatusEnabled:    true,
 		CreatedAt:              now,
 		UpdatedAt:              now,
 	}
@@ -146,7 +157,17 @@ func (s *Service) Me(ctx context.Context, userID string) (user.User, error) {
 	return *u, nil
 }
 
-func (s *Service) PatchMe(ctx context.Context, userID string, displayName *string, autoDelete *bool, retentionDays *int) (user.User, error) {
+func (s *Service) PatchMe(
+	ctx context.Context,
+	userID string,
+	displayName *string,
+	autoDelete *bool,
+	retentionDays *int,
+	imageThumbnails *bool,
+	videoThumbnails *bool,
+	activeStatus *bool,
+	avatarURL *string,
+) (user.User, error) {
 	u, err := s.Me(ctx, userID)
 	if err != nil {
 		return user.User{}, err
@@ -176,7 +197,38 @@ func (s *Service) PatchMe(ctx context.Context, userID string, displayName *strin
 			return user.User{}, err
 		}
 	}
+	if imageThumbnails != nil || videoThumbnails != nil {
+		imageEnabled := u.ImageThumbnailsEnabled
+		videoEnabled := u.VideoThumbnailsEnabled
+		if imageThumbnails != nil {
+			imageEnabled = *imageThumbnails
+		}
+		if videoThumbnails != nil {
+			videoEnabled = *videoThumbnails
+		}
+		if err := s.repo.UpdateThumbnailSettings(ctx, userID, imageEnabled, videoEnabled); err != nil {
+			return user.User{}, err
+		}
+	}
+	if activeStatus != nil {
+		if err := s.repo.UpdateActiveStatus(ctx, userID, *activeStatus); err != nil {
+			return user.User{}, err
+		}
+	}
+	if avatarURL != nil {
+		if err := s.repo.UpdateAvatar(ctx, userID, strings.TrimSpace(*avatarURL)); err != nil {
+			return user.User{}, err
+		}
+	}
 	return s.Me(ctx, userID)
+}
+
+func (s *Service) VerifyPassword(ctx context.Context, userID, password string) (bool, error) {
+	u, err := s.Me(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return verifyPassword(u.PasswordHash, password), nil
 }
 
 func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) (Session, error) {
@@ -201,6 +253,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, n
 	if err := s.repo.RevokeAllRefreshTokensForUser(ctx, userID, now); err != nil {
 		return Session{}, err
 	}
+	s.activity.Record(ctx, userID, activity.TypePasswordChanged, "")
 	u.PasswordHash = hash
 	return s.issueSession(ctx, u, now)
 }

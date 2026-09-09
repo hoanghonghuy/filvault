@@ -12,8 +12,12 @@ type User struct {
 	VerificationExpiresAt  *time.Time
 	StorageUsed            int64
 	StorageQuota           int64
+	ImageThumbnailsEnabled bool
+	VideoThumbnailsEnabled bool
 	TrashAutoDeleteEnabled bool
 	TrashRetentionDays     int
+	ActiveStatusEnabled    bool
+	AvatarURL              string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }

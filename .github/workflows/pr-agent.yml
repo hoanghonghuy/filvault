@@ -1,4 +1,4 @@
-name: AI PR Review
+name: Review PR with PR-Agent
 
 # ============================================================
 # MASTER TEMPLATE — GENERIC AI PR REVIEW
@@ -154,6 +154,7 @@ jobs:
       # ========================================================
 
       - name: Build trusted PR context
+        id: pr_context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
 
         env:
@@ -177,6 +178,26 @@ jobs:
               core.setFailed('Cannot determine PR number')
               return
             }
+
+            const { data: pr } =
+              await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: prNumber,
+              })
+
+            if (!pr.head?.sha) {
+              core.setFailed(
+                'Cannot determine PR head commit'
+              )
+
+              return
+            }
+
+            core.setOutput(
+              'head_sha',
+              pr.head.sha
+            )
 
             const trustedAssociations = new Set([
               'OWNER',
@@ -454,7 +475,388 @@ jobs:
           PY
 
       # ========================================================
-      # 3. BUILD OVERVIEW INPUT
+      # 3. BUILD BOUNDED IMPACT CONTEXT
+      # ========================================================
+      #
+      # Không cố đọc toàn bộ repository. Chỉ lấy references,
+      # contracts, và tests liên quan đến identifiers thay đổi
+      # từ PR head SHA, với giới hạn chặt để tránh nhiễu/token
+      # bloat. Đây là supplemental context, không phải source
+      # of truth thay cho PR diff.
+      # ========================================================
+
+      # Checkout the precise head commit so impact references
+      # never come from the default branch or a stale checkout.
+      - name: Checkout PR head for impact analysis
+        uses: actions/checkout@v4
+
+        with:
+          ref: ${{ steps.pr_context.outputs.head_sha }}
+          fetch-depth: 1
+          clean: false
+
+      - name: Build bounded PR impact context
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+
+        env:
+          PR_HEAD_SHA: >-
+            ${{ steps.pr_context.outputs.head_sha }}
+
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+
+            const prNumber =
+              context.payload.pull_request?.number ??
+              context.payload.issue?.number
+
+            const ref = process.env.PR_HEAD_SHA
+
+            if (!prNumber || !ref) {
+              core.setFailed(
+                'Cannot determine PR number or head commit'
+              )
+
+              return
+            }
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner,
+                repo,
+                pull_number: prNumber,
+                per_page: 100,
+              }
+            )
+
+            const workspace =
+              process.env.GITHUB_WORKSPACE
+
+            const changedPaths = new Set(
+              files.map(file => file.filename)
+            )
+
+            const identifierPattern =
+              /\b[A-Za-z_][A-Za-z0-9_]{2,}\b/g
+
+            const ignoredIdentifiers = new Set([
+              'const',
+              'else',
+              'enum',
+              'false',
+              'for',
+              'func',
+              'function',
+              'if',
+              'import',
+              'interface',
+              'let',
+              'map',
+              'new',
+              'nil',
+              'null',
+              'package',
+              'private',
+              'protected',
+              'public',
+              'return',
+              'struct',
+              'switch',
+              'true',
+              'type',
+              'undefined',
+              'var',
+            ])
+
+            const identifierCounts = new Map()
+
+            const registerIdentifiers = line => {
+              for (
+                const identifier
+                of line.match(
+                  identifierPattern
+                ) || []
+              ) {
+                if (
+                  ignoredIdentifiers.has(
+                    identifier
+                  ) ||
+                  identifier.length < 4
+                ) {
+                  continue
+                }
+
+                identifierCounts.set(
+                  identifier,
+                  (identifierCounts.get(identifier) || 0) +
+                    1
+                )
+              }
+            }
+
+            for (const file of files) {
+              const patch = file.patch || ''
+
+              for (
+                const line of patch.split('\n')
+              ) {
+                if (
+                  (
+                    !line.startsWith('+') &&
+                    !line.startsWith('-')
+                  ) ||
+                  line.startsWith('+++') ||
+                  line.startsWith('---')
+                ) {
+                  continue
+                }
+
+                registerIdentifiers(line)
+              }
+            }
+
+            const identifiers = [
+              ...identifierCounts.entries(),
+            ]
+              .sort(
+                ([leftName], [rightName]) =>
+                  Number(
+                    /^[A-Z]/.test(rightName)
+                  ) -
+                  Number(
+                    /^[A-Z]/.test(leftName)
+                  ) ||
+                  rightName.length - leftName.length ||
+                  leftName.localeCompare(rightName)
+              )
+              .slice(0, 12)
+              .map(([identifier]) => identifier)
+
+            const { execFileSync } =
+              require('child_process')
+
+            const trackedPaths = execFileSync(
+              'git',
+              ['ls-files'],
+              {
+                cwd: workspace,
+                encoding: 'utf8',
+              }
+            )
+              .split('\n')
+              .filter(Boolean)
+
+            const candidatePaths = new Set()
+
+            for (const filePath of trackedPaths) {
+              if (
+                changedPaths.has(filePath) ||
+                candidatePaths.size >= 30
+              ) {
+                continue
+              }
+
+              let referencesChangedIdentifier = false
+
+              for (const identifier of identifiers) {
+                try {
+                  execFileSync(
+                    'rg',
+                    [
+                      '--quiet',
+                      '--fixed-strings',
+                      identifier,
+                      '--',
+                      filePath,
+                    ],
+                    {
+                      cwd: workspace,
+                      stdio: 'ignore',
+                    }
+                  )
+
+                  referencesChangedIdentifier = true
+                  break
+                } catch {
+                  // rg exits 1 when an identifier is absent.
+                }
+              }
+
+              if (referencesChangedIdentifier) {
+                candidatePaths.add(filePath)
+              }
+            }
+
+            const maxFiles = 24
+            const maxCharsPerFile = 4000
+            const maxTotalChars = 48000
+            let remainingChars = maxTotalChars
+            let inspectedFiles = 0
+            const excerpts = []
+
+            for (
+              const filePath
+              of [...candidatePaths]
+                .filter(
+                  filePath =>
+                    !changedPaths.has(filePath)
+                )
+                .slice(0, maxFiles)
+            ) {
+              if (remainingChars <= 0) {
+                break
+              }
+
+              try {
+                const content = fs.readFileSync(
+                  path.join(workspace, filePath),
+                  'utf8'
+                )
+
+                const lines = content.split('\n')
+                const matchedLineNumbers = []
+
+                for (
+                  let index = 0;
+                  index < lines.length &&
+                  matchedLineNumbers.length < 5;
+                  index += 1
+                ) {
+                  if (
+                    identifiers.some(identifier =>
+                      lines[index].includes(identifier)
+                    )
+                  ) {
+                    matchedLineNumbers.push(index)
+                  }
+                }
+
+                if (matchedLineNumbers.length === 0) {
+                  continue
+                }
+
+                const excerptLines = new Set()
+
+                for (
+                  const lineNumber
+                  of matchedLineNumbers
+                ) {
+                  for (
+                    let index = Math.max(
+                      0,
+                      lineNumber - 5
+                    );
+                    index <= Math.min(
+                      lines.length - 1,
+                      lineNumber + 5
+                    );
+                    index += 1
+                  ) {
+                    excerptLines.add(index)
+                  }
+                }
+
+                const excerpt = [...excerptLines]
+                  .sort((left, right) => left - right)
+                  .map(index =>
+                    `${index + 1}: ${lines[index]}`
+                  )
+                  .join('\n')
+                  .slice(
+                    0,
+                    Math.min(
+                      maxCharsPerFile,
+                      remainingChars
+                    )
+                  )
+
+                if (!excerpt) {
+                  continue
+                }
+
+                excerpts.push(
+                  `## ${filePath}\n\n\`\`\`\n${excerpt}\n\`\`\``
+                )
+
+                remainingChars -= excerpt.length
+                inspectedFiles += 1
+              } catch (error) {
+                core.warning(
+                  `Could not load ${filePath}: ${error.message}`
+                )
+
+                continue
+              }
+            }
+
+            const output = [
+              '# Bounded PR Impact Context',
+              '',
+              'This is automatically collected supplemental context from the PR head commit.',
+              'It is intentionally bounded and may be incomplete.',
+              'Treat the actual PR diff as the source of truth; do not report a concern unless it is supported by the changed code and this context.',
+              '',
+              `Changed files: ${files.length}`,
+              `Identifiers sampled from added lines: ${identifiers.join(', ') || '(none)'}`,
+              `Relevant unchanged files included: ${inspectedFiles}`,
+              '',
+              excerpts.length > 0
+                ? excerpts.join('\n\n')
+                : 'No bounded impact excerpts were found.',
+            ]
+
+            fs.writeFileSync(
+              path.join(
+                workspace,
+                '.pr-agent-impact-context.md'
+              ),
+              output.join('\n'),
+              'utf8'
+            )
+
+            const trustedContextPath = path.join(
+              workspace,
+              '.pr-agent-context.md'
+            )
+
+            const trustedContext = fs.existsSync(
+              trustedContextPath
+            )
+              ? fs.readFileSync(
+                  trustedContextPath,
+                  'utf8'
+                )
+              : '# Additional PR Review Context\n\nNo additional human context was provided.\n'
+
+            fs.writeFileSync(
+              path.join(
+                workspace,
+                '.pr-agent-review-context.md'
+              ),
+              [
+                trustedContext.trim(),
+                '',
+                '---',
+                '',
+                output.join('\n'),
+                '',
+              ].join('\n'),
+              'utf8'
+            )
+
+            core.info(
+              `Prepared bounded impact context from ${inspectedFiles} unchanged file(s)`
+            )
+
+      # ========================================================
+      # 4. BUILD OVERVIEW INPUT
       # ========================================================
 
       - name: Build PR overview context
@@ -635,7 +1037,7 @@ jobs:
             )
 
       # ========================================================
-      # 4. ACTUAL CODE REVIEW
+      # 5. ACTUAL CODE REVIEW
       # ========================================================
 
       - name: Run PR Agent review
@@ -645,16 +1047,19 @@ jobs:
         uses: The-PR-Agent/pr-agent@1eea001187afc7cbbdd055f6bc1347917e7b509a
 
         with:
-          artifact_path: .pr-agent-context.md
+          artifact_path: .pr-agent-review-context.md
 
           artifact_instructions: >-
-            This artifact contains optional requirements
-            supplied by trusted collaborators. Use it
-            only as supplemental context. Review
+            This artifact combines optional requirements
+            from trusted collaborators with bounded,
+            automatically collected impact context from
+            the exact PR head commit. It may be
+            incomplete and is supplemental only. Review
             correctness primarily from the actual
             pull-request changes relative to the PR
-            target branch and relevant surrounding
-            source code.
+            target branch and use the context only to
+            confirm realistic impact on callers,
+            implementations, contracts, or tests.
 
         env:
           GITHUB_TOKEN: >-
@@ -752,96 +1157,87 @@ jobs:
           # ====================================================
 
           pr_reviewer.extra_instructions: >-
-            Review the actual changes introduced by this
-            pull request relative to its real target
-            branch.
+            Write ALL human-facing review output in Vietnamese.
 
-            Use unchanged surrounding code only when
-            necessary to understand the impact of
-            changed lines.
+            This includes issue_header, issue_content, relevant_tests,
+            security_concerns, explanations, warnings, and recommendations.
 
-            Do not report pre-existing problems
-            unrelated to this pull request.
+            Keep source code, identifiers, function names, class names,
+            variable names, file paths, API names, library names, commands,
+            and error messages in their original language.
 
-            Infer the technology stack and change type
-            from the changed code. Apply only review
-            checks relevant to that change.
+            Do not translate technical identifiers.
 
-            Prioritize correctness first, then security,
-            data integrity, concurrency, backward
-            compatibility, reliability, performance,
-            maintainability, and meaningful test
-            coverage.
+            Review the actual changes introduced by this pull request
+            relative to its real target branch.
 
-            For correctness, look for concrete behavior
-            regressions, incorrect conditions, edge
-            cases, missing validation, null or zero-value
-            handling, boundary errors, state
-            inconsistencies, incorrect asynchronous
-            behavior, broken error handling, and misuse
-            of APIs or libraries.
+            Use unchanged surrounding code only when necessary to understand
+            the impact of changed lines.
 
-            For security, look for concrete
-            authentication or authorization failures,
-            broken access control, IDOR, injection, XSS
-            or CSRF when relevant, unsafe file or path
-            handling, secret exposure, insecure
-            configuration, privilege escalation,
-            insufficient validation, and
-            sensitive-data exposure.
+            Do not report pre-existing problems unrelated to this pull request.
 
-            When persistent state is changed, consider
-            transaction boundaries, atomicity, rollback
-            behavior, race conditions, uniqueness,
-            consistency, migrations, and concurrent
-            writes.
+            Infer the technology stack and change type from the changed code.
+            Apply only review checks relevant to that change.
 
-            When APIs or public contracts change,
-            consider request and response compatibility,
-            validation, status codes, versioning, error
-            contracts, and backward compatibility.
+            Prioritize correctness first, then security, data integrity,
+            concurrency, backward compatibility, reliability, performance,
+            maintainability, and meaningful test coverage.
 
-            For frontend changes, consider state
-            consistency, stale asynchronous results,
-            navigation behavior, accessibility, unsafe
-            rendering, loading and error states, and
-            user-visible regressions.
+            For correctness, look for concrete behavior regressions,
+            incorrect conditions, edge cases, missing validation, null or
+            zero-value handling, boundary errors, state inconsistencies,
+            incorrect asynchronous behavior, broken error handling, and
+            misuse of APIs or libraries.
 
-            For backend changes, consider authorization,
-            validation, transactions, resource cleanup,
-            timeouts, retries, idempotency, and data
-            consistency.
+            For security, look for concrete authentication or authorization
+            failures, broken access control, IDOR, injection, XSS or CSRF
+            when relevant, unsafe file or path handling, secret exposure,
+            insecure configuration, privilege escalation, insufficient
+            validation, and sensitive-data exposure.
 
-            For infrastructure, CI, deployment, or
-            configuration changes, consider least
-            privilege, secret handling, environment
-            isolation, destructive operations,
-            reproducibility, rollback safety, and
+            When persistent state is changed, consider transaction boundaries,
+            atomicity, rollback behavior, race conditions, uniqueness,
+            consistency, migrations, and concurrent writes.
+
+            When APIs or public contracts change, consider request and
+            response compatibility, validation, status codes, versioning,
+            error contracts, and backward compatibility.
+
+            For frontend changes, consider state consistency, stale
+            asynchronous results, navigation behavior, accessibility,
+            unsafe rendering, loading and error states, and user-visible
+            regressions.
+
+            For backend changes, consider authorization, validation,
+            transactions, resource cleanup, timeouts, retries, idempotency,
+            and data consistency.
+
+            For infrastructure, CI, deployment, or configuration changes,
+            consider least privilege, secret handling, environment isolation,
+            destructive operations, reproducibility, rollback safety, and
             accidental production impact.
 
-            Do not report cosmetic style, naming, or
-            formatting preferences unless they create a
-            concrete correctness, security, reliability,
-            performance, or significant maintenance
-            risk.
+            Do not report cosmetic style, naming, or formatting preferences
+            unless they create a concrete correctness, security, reliability,
+            performance, or significant maintenance risk.
 
-            Every reported issue must describe a
-            realistic failure scenario and explain why
-            it matters.
+            Every reported issue must describe a realistic failure scenario,
+            explain why it matters, and suggest a concrete fix when possible.
 
-            Only report issues supported by the changed
-            code and relevant surrounding context.
+            Only report issues supported by the changed code and relevant
+            surrounding context.
 
-            Every reportable issue MUST appear in
-            key_issues_to_review with the exact relevant
-            file and the narrowest accurate changed-line
+            Every reportable issue MUST appear in key_issues_to_review with
+            the exact relevant file and the narrowest accurate changed-line
             range.
 
-            If evidence is insufficient, do not report
-            the issue.
+            If evidence is insufficient, do not report the issue.
 
-            An empty key_issues_to_review list is correct
-            when no clear issue is found.
+            An empty key_issues_to_review list is correct when no clear issue
+            is found.
+
+            Before returning the final structured review, verify that every
+            human-facing text field is written in Vietnamese.
 
       # ========================================================
       # 5. REVIEWER-ORIENTED PR OVERVIEW
@@ -1450,7 +1846,7 @@ jobs:
           PY
 
       # ========================================================
-      # 6. PUBLISH
+      # 7. PUBLISH
       # ========================================================
       #
       # No issue:
@@ -2513,7 +2909,7 @@ jobs:
 
 
             const overviewBody = [
-              '## AI PR Review',
+              '## 🤖 Đánh giá PR bằng AI',
 
               '',
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import { formatAuthError } from '@/api/errors'
@@ -9,6 +9,12 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+
+onMounted(() => {
+  if (auth.isAuthenticated) {
+    void router.replace(auth.isVerified ? '/' : '/verify-email')
+  }
+})
 
 const email = ref('')
 const password = ref('')
@@ -21,10 +27,10 @@ async function submit() {
   try {
     await auth.login(email.value.trim(), password.value)
     if (!auth.isVerified) {
-      await router.push('/verify-email')
+      await router.replace('/verify-email')
       return
     }
-    await router.push(safeInternalPath(route.query.redirect))
+    await router.replace(safeInternalPath(route.query.redirect, '/'))
   } catch (e) {
     error.value = formatAuthError(e, 'Sign in failed. Try again.')
   } finally {

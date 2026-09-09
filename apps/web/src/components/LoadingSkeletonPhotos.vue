@@ -115,5 +115,12 @@ const photoCount = computed(() => (props.variant === 'initial' ? 8 : 6))
     background-position: -200% 0;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--hairline);
+  }
+}
 </style>
 

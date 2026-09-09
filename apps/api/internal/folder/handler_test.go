@@ -147,6 +147,57 @@ func TestFolders_CreateBrowserRenameMoveDelete(t *testing.T) {
 	}
 }
 
+func TestFolders_GetOrCreate(t *testing.T) {
+	engine, mem := newEngine(t)
+	token := registerVerified(t, engine, mem, uniqueEmail())
+
+	// First call creates the folder.
+	code, body := postAuth(t, engine, "/api/v1/folders/get-or-create", token, map[string]any{
+		"name": "Photos",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("get-or-create create status=%d body=%s", code, body)
+	}
+	var f folderResp
+	decodeJSON(t, body, &f)
+	if f.Name != "Photos" || f.ParentID != nil {
+		t.Fatalf("folder=%+v", f)
+	}
+
+	// Second call with the same name returns the existing folder (200).
+	code, body = postAuth(t, engine, "/api/v1/folders/get-or-create", token, map[string]any{
+		"name": "Photos",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("get-or-create existing status=%d body=%s", code, body)
+	}
+	var f2 folderResp
+	decodeJSON(t, body, &f2)
+	if f2.ID != f.ID {
+		t.Fatalf("expected same folder id, got %s vs %s", f2.ID, f.ID)
+	}
+
+	// Nested under a parent.
+	code, body = postAuth(t, engine, "/api/v1/folders/get-or-create", token, map[string]any{
+		"name":     "2026",
+		"parentId": f.ID,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("get-or-create child status=%d body=%s", code, body)
+	}
+	var child folderResp
+	decodeJSON(t, body, &child)
+	if child.ParentID == nil || *child.ParentID != f.ID {
+		t.Fatalf("child parent=%v", child.ParentID)
+	}
+
+	// Empty name is rejected.
+	code, body = postAuth(t, engine, "/api/v1/folders/get-or-create", token, map[string]any{
+		"name": "   ",
+	})
+	assertAPIError(t, code, body, http.StatusBadRequest, "VALIDATION_ERROR")
+}
+
 func TestFolders_InvalidULID(t *testing.T) {
 	engine, mem := newEngine(t)
 	token := registerVerified(t, engine, mem, uniqueEmail())

@@ -67,6 +67,14 @@ touch:
   preferred-target: 48px
   fab-size: 56px
 
+motion:
+  ease-standard: cubic-bezier(0.2, 0, 0, 1)
+  ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1)
+  ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15)
+  duration-short: 100ms
+  duration-medium: 200ms
+  duration-long: 300ms
+
 breakpoints:
   mobile: 0–767px
   tablet: 768–1023px
@@ -89,7 +97,43 @@ Filvault là **personal cloud** (My Files + Photos trên cùng một kho). UI ph
 
 **Tone:** calm utility, confident hierarchy, mobile-first.  
 **Density:** list/file rows hơi dày (Cal.com product fragment feel); Photos grid thoáng hơn.  
-**Motion:** ngắn (150–250ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast — không decorative.
+**Motion:** ngắn (100–300ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast, và phản hồi nhấn trên row/ô ảnh — không decorative, không trượt cả trang khi đổi tab.
+
+### Motion tokens (Material 3)
+
+| Token | Value | Dùng cho |
+|-------|-------|----------|
+| `--ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Mọi transition mặc định |
+| `--ease-emphasized-decelerate` | `cubic-bezier(0.05, 0.7, 0.1, 1)` | Sheet/trang đi vào |
+| `--ease-emphasized-accelerate` | `cubic-bezier(0.3, 0, 0.8, 0.15)` | Sheet/trang rời đi |
+| `--duration-short` | `100ms` | Press state, hover màu |
+| `--duration-medium` | `200ms` | Fade, item move, toast ra |
+| `--duration-long` | `300ms` | Sheet slide-up, toast vào |
+
+### Motion tokens Filvault (nhấn/sheet/toast)
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--motion-press` | 150ms | Nút, FAB, row, ô ảnh |
+| `--motion-enter` | 250ms | Sheet / toast vào màn |
+| `--motion-exit` | 200ms | Sheet / toast ra (nhanh hơn vào) |
+
+Rules:
+- Chỉ animate `transform` + `opacity`; cấm `transition: all`.
+- Vào chậm hơn ra (enter ≥ leave duration) — cảm giác phản hồi nhanh.
+- Press feedback: `.btn` scale 0.97, `.row.tappable` scale 0.98 khi `:active`.
+- Mọi motion phải được vô hiệu hoá bởi global `prefers-reduced-motion` guard trong `main.css`.
+- Route change: `<Transition name="page" mode="out-in">` trong `AppShell` — fade-out 100ms, fade-in + translateY(8px) 200ms.
+- List/grid thay đổi (xóa, move, search): `<TransitionGroup name="row">` — item rời đi scale-fade 100ms, item còn lại trượt vào chỗ (`move`) 200ms.
+- Grid Photos / album list xuất hiện lần đầu: class `.appear` + stagger từ `lib/motion.ts` (`cellDelay`, 30ms/cell, tối đa 240ms).
+- Bottom/side nav: indicator pill trượt bằng `transform: scale` (200ms emphasized-decelerate) — không animate layout.
+- FAB: hover nâng shadow, press scale 0.94 + hạ shadow (100ms).
+- Optimistic UI cho thao tác phá hủy (delete/restore): gỡ row khỏi list **trước** khi gọi API để TransitionGroup chạy move animation; lỗi thì `loadBrowser()`/`load()` rollback kèm error alert. Toast chỉ hiện khi API thành công.
+- Router: luôn có `scrollBehavior` — reset về đầu trang khi điều hướng, khôi phục vị trí khi back/forward (`savedPosition`).
+- Logout và mọi action thoát app phải đi qua confirm sheet.
+- Bottom sheet bắt buộc có focus trap (Tab loop trong panel) + trả focus về trigger khi đóng.
+- Upload: progress bar component (`UploadProgress`, `role="progressbar"` + `aria-live="polite"`), fill animate bằng `transform: scaleX` — không animate `width`. Files hỗ trợ drag & drop với overlay "Drop files to upload".
+- Component dùng `<Transition>`: `BottomSheet`, `ToastHost`.
 
 **Key characteristics**
 - Canvas trắng (`{colors.canvas}`), surface phụ xám rất nhạt (`{colors.surface-soft}` / `{colors.surface-card}`).
@@ -199,7 +243,7 @@ Hub sau login. **Không** lặp 4 tab nav (Files/Photos/Trash/Settings đã ở 
 Recent files              See all
   rows (hoặc 1 dòng empty + link)
 Recent photos             See all
-  placeholder grid (không <img> original)
+  PhotoThumb grid (thumbnailUrl; fallback mime icon — không <img> original)
 ```
 
 | Token | Value | Ghi chú |
@@ -232,8 +276,12 @@ Component: `OverviewView.vue`. Logo F / wordmark → `/`.
 
 ### Photo grid
 - `auto-fill`, min cell ~108–120px mobile; gap `{spacing.xs}`–`{spacing.sm}`.
-- Cell = **placeholder** theo mime (không `<img>` original — spec Phase 1).
+- Cell = `PhotoThumb`: `thumbnailUrl` khi có (server thumb), không thì icon theo mime — **không** `<img>` original.
 - Tap → sheet: Xem / Tải / Thêm vào album / Xóa (nếu context cho phép).
+
+### Upload progress (Files)
+- Khi đang upload: `LinearProgress` (track hairline 4px, fill accent) + label + % — không chỉ text “Uploading… N%”.
+- `role="progressbar"` + `aria-valuenow` / min / max.
 
 ### Bottom sheet / Action sheet
 - Backdrop `{overlay}`; sheet bg canvas; top radius `{rounded.xl}`; drag handle 32×4px muted.
@@ -272,16 +320,17 @@ Mobile (<768)                         Tablet/Desktop (≥768)
 └─────────────────────┘               FAB → toolbar button
 ```
 
-Mobile header: mark 32px (ô **F** là nút Home, chạm ≥44px) + tên app caption muted + page title ink. Bấm **F** (mobile) hoặc wordmark sidebar (desktop) → `/` Overview. Title Files = “My Files”. Header ẩn ≥768 — title nằm trong view. Overview **không** thêm tab thứ 5 vào bottom nav.
+Mobile header: mark 32px (ô **F** là nút Home, chạm ≥44px) + tên app caption muted + page title ink + **avatar initials** (phải, chạm ≥44px → `/profile`). Bấm **F** (mobile) hoặc wordmark sidebar (desktop) → `/` Overview. Title Files = “My Files”. Header ẩn ≥768 — title nằm trong view; avatar nằm đáy side nav. Overview **không** thêm tab thứ 5 vào bottom nav.
 
 ### Top-level destinations (đúng M3: 3–5, chỉ navigation)
-**Home / Overview** — vào bằng logo (ô F / wordmark), không phải tab.
+**Home / Overview** — vào bằng logo (ô F / wordmark), không phải tab.  
+**Profile** — vào bằng avatar (header mobile / side-nav desktop), không phải tab.
 
 Bottom / side nav (4):
 1. **Files** — browser + search + upload  
 2. **Photos** — timeline + albums  
 3. **Trash**  
-4. **Settings**
+4. **Settings** — trash prefs, media preview prefs (không chứa account)
 
 Auth / verify: full-screen card giữa, không bottom nav.
 
@@ -316,7 +365,7 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 - Mobile-first: thiết kế 375px trước, mở rộng lên.
 - Thay `window.prompt` / `confirm` bằng sheet.
 - Touch target ≥44px (ưu tiên 48px).
-- Photos: placeholder + presign on demand (spec 07).
+- Photos: `PhotoThumb` + thumbnail URL / mime fallback; xem original qua presign on demand (spec 07).
 - Một việc chính mỗi màn; overflow vào sheet.
 - Báo lỗi API bằng copy ngắn + code ẩn trong detail nếu cần (`QUOTA_EXCEEDED`, `409`).
 
@@ -352,11 +401,58 @@ Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
 | Login / Register | Form ink CTA | auth |
 | Verify email | OTP 6 số + resend | verify / resend |
 | Overview (`/`) | Greeting + quota, 2 destination cards (Files/Photos), recent files/photos | me, browser, photos/timeline |
-| Files | Browser, search, create folder, upload, rename/move/delete file & folder | browser, folders, files, search |
+| Files | Browser, search + filter sheet, create folder, upload (progress bar + drag & drop), rename/move/delete file & folder | browser, folders, files, search |
 | Photos | Timeline (+ load more), albums CRUD, add/remove items, open/download | photos/* |
 | Album detail | Grid + manage | albums/:id, items |
-| Trash | Restore / delete forever | trash, restore |
-| Settings | displayName, trash prefs, password, logout | users/me, password |
+| Trash | Restore / delete forever (optimistic UI) | trash, restore |
+| Settings | trash prefs, thumbnail prefs | users/me |
+| Profile (`/profile`) | avatar initials, displayName, password, logout | users/me, password |
+
+---
+
+## 9a. Surface mới Phase 2 (spec 09)
+
+### FilterSheet (Files search)
+- `BottomSheet` title "Filter"; các nhóm option dạng pill chọn 1: Type (All/Image/Video/Doc/Archive/Folder), Sort (Relevance/Name/Date/Size), Date range (2 input date).
+- Nút "Apply" ink full-width; "Reset" ghost bên trái. State filter sống ở query string (`?q=&type=...`) để share/reload giữ được.
+
+### Album cover
+- Card album: khung ảnh bìa 1:1 radius-lg phía trên tên; trống → icon photos trên `surface-card`.
+- Set/Remove cover nằm trong action sheet item (icon `image` / `restore`), không có nút riêng ngoài grid.
+
+### Share link
+- Action sheet file thêm "Share link" (icon `share`) → `ShareSheet`: chọn hạn (segmented Forever/1h/24h/7d) → tạo → hiển thị URL + nút Copy + "Revoke link" danger.
+- Settings section "Shared links": list tên file + hạn + revoke (confirm trước khi thu hồi).
+
+### Favorites
+- Icon sao: outline khi chưa, fill `warning` (#d97706) khi đã — điểm màu thứ hai duy nhất được phép.
+- Files root: segment "Favorites | All" trên list; Overview ưu tiên section Favorites khi có dữ liệu.
+
+### Public share page
+- Canvas `surface-soft`, card trắng radius-xl max-width 420px giữa màn: brand mark F, tên file (truncate 2 dòng), meta loại · size, nút Download ink full-width, caption "Shared via Filvault".
+- Lỗi (token sai/hết hạn/thu hồi): cùng layout, icon alert, message chung "This link is not available" — không phân biệt nguyên nhân.
+
+### Activity log
+- List trong Settings: icon theo type + targetName (1 dòng truncate) + thời gian tương đối muted; "Load more" pattern như timeline.
+
+### Shared with me (S5)
+- Entry từ Overview: card thứ 3 trong destinations (icon `users`), **không** thêm tab bottom nav.
+- `/shared`: list dòng = icon loại + tên + "by {owner} · {thời gian tương đối}"; file → download qua presign; folder → browse 1 cấp ngay trong trang (nút Back về list). Empty state icon `users` "Nothing shared with you yet".
+- Owner share theo email: action sheet file "Share with user" → sheet input email; email lạ vẫn thành công (toast "Invitation sent").
+
+> **Trạng thái (2026-08-23): toàn bộ surface §9a đã implement** — S1 filter, S2 album cover, S3 favorites, S4 share link + public page, S5 shared-with-me + share user nội bộ, S6 activity log. Chi tiết hợp đồng: spec [09](docs/spec/09-phase-2-features.md), tiến độ [10](docs/spec/10-phase-2-status.md).
+
+### Chat (`/chat` — bare surface, spec 11)
+- **Surface riêng hoàn toàn**: không dùng shell Filvault (không bottom nav/side nav/header/storage bar). Route có `meta: { bare: true }`; `AppShell` bỏ chrome khi route bare. Truy cập trực tiếp bằng URL `/chat`.
+- Layout full-screen kiểu Messenger: rail hội thoại (trái) + thread (giữa) + media panel (phải, ≥1024px).
+- Mobile `<768`: master–detail — hiện rail HOẶC thread, không xếp dọc; nút Back (≥44px) quay lại rail.
+- Rail: header "Chats" + brand mark F (link về `/`) + contact picker tạo direct chat bằng email đã xác minh + list peer (avatar tròn chữ đầu, tên, preview sender, unread badge, ngày muted).
+- Thread: header avatar + peer name + connection state; search pill; incoming bubble bên trái, outgoing bubble bên phải; sender action sheet sửa/gỡ trong 15 phút; hiển thị `Edited`, `Message removed`, pending/failed/retry.
+- Composer: pill "Aa" + attachment queue (preview/remove/cancel/retry) + send ink; gửi text có `clientMessageId` để retry không tạo tin trùng.
+- Media panel/gallery: mọi ảnh/video/file gửi vào direct chat tự động hiện trong shared album của conversation; có entry trên desktop/tablet/mobile, mở từ Chat hoặc Photos theo quyền của hai member.
+- Attachment bị sender Trash/Purge thì hiện unavailable hoặc bị ẩn đồng bộ ở Chat và shared album; không nới quyền download generic của Vault.
+- Realtime: REST write + SSE receive, trạng thái Reconnecting và Latest; hỗ trợ reconnect/backfill, tôn trọng `prefers-reduced-motion`, focus return và live region hẹp.
+- Touch targets ≥44px; focus ring accent 2px; safe-area top/bottom; motion theo token chung.
 
 ---
 
@@ -367,7 +463,7 @@ Khi generate / sửa UI:
 ```text
 Follow DESIGN.md (Filvault). Cal.com-like light utility UI, teal accent #0d9488,
 Plus Jakarta Sans, mobile-first bottom nav (Files/Photos/Trash/Settings),
-FAB upload on Files, bottom sheets instead of prompt/confirm,
+avatar → Profile (not a 5th tab), FAB upload on Files, bottom sheets instead of prompt/confirm,
 no original <img> in Photos grid, touch targets ≥44px, no purple/dark-mode.
 ```
 

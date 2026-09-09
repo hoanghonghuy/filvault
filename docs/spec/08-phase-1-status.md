@@ -22,14 +22,19 @@ Go: `~/.local/go/bin/go` (Makefile đã trỏ). Core **không** import AWS SDK. 
 
 **CI:** lint / typecheck / test (BE + FE) + workflow AI review PR (2026-08-18).
 
-→ **Việc tiếp theo không phải deploy/AWS.** Làm **smoke test tay** xuyên suốt. Chỉ khi smoke test xanh mới bàn Phase 2.
+→ **Việc tiếp theo không phải deploy/AWS.** Smoke API xuyên suốt đã xong (2026-08-23, cuối trang); còn **smoke tay phần UI**. Feature Phase 2 web đã Done — xem [10-phase-2-status.md](10-phase-2-status.md); không nhầm với cửa deploy/RDS.
 
 ### Bắt đầu từ đây
 
 1. `make up` → mở `http://localhost:5173`.
 2. Đăng nhập `dev@filvault.com` / `Dev1234@`.
-3. Smoke test tay (checklist dưới). Ghi lệch spec / bug nếu thấy.
-4. Chỉ khi bước 3 xong mới bàn Phase 2 (Terraform, RDS, S3 AWS thật).
+3. Smoke tay phần UI (checklist dưới; phần API đã smoke đủ 2026-08-23). Ghi lệch spec / bug nếu thấy.
+4. Feature Phase 2 web: [10-phase-2-status.md](10-phase-2-status.md) — đã Done cả 6 slice. Deploy/AWS: bàn riêng sau smoke Phase 1.
+
+> Lưu ý (2026-08-23): container `api`/`web` cũ build từ image 17/08 **đã được rebuild** bằng
+> `docker compose up -d --build api web` — hiện đang chạy code Phase 2 mới nhất; API smoke lại
+> xanh trên bản này (activity, share-links, shares, favorites). CLI `bin/filvault.exe` cũng đã
+> rebuild sau fix piped-login. Nếu pull code mới, luôn chạy lại lệnh compose trên trước khi smoke UI.
 
 ---
 
@@ -111,23 +116,52 @@ Các màn còn lại đã siết UI/UX (2026-08-17): icon nav (side + bottom), i
 
 ## Còn lại trước khi sang Phase 2
 
-- [ ] Smoke test tay xuyên suốt với `dev@filvault.com` (checklist dưới)
+- [ ] Smoke **phần UI thuần** (click nav, FAB, progress bar — xem ghi chú dưới; API đã smoke đủ 2026-08-23)
 - [ ] Chứng minh một lần với **AWS S3 thật** (không chặn DoD local; làm ở cửa Phase 2 cũng được)
 
-### Smoke test tay (chưa chạy)
+### Smoke API xuyên suốt — đã chạy (2026-08-23)
 
-Đăng nhập `dev@filvault.com` / `Dev1234@`, rồi tick từng dòng khi làm:
+Chạy trên stack thật (`make up`: Postgres + MinIO + API + web), bằng user tạm
+`smoke-p1-*@filvault.local` (đăng ký → đọc mã verify từ log mailer console → verify),
+không đụng dữ liệu user dev. Kết quả:
 
-- [ ] Login thành công; chưa verify không vào được kho (thử register + verify nếu cần)
-- [ ] Ô **F** trên header (mobile) / wordmark sidebar (desktop) về Overview `/`
-- [ ] Files: tạo folder, upload file allowlist (kèm progress), rename, move, download, search tên
-- [ ] Upload ngoài allowlist / quá 100 MiB bị từ chối
-- [ ] Ảnh/video vừa hiện Files vừa hiện Photos (timeline); PDF không vào Photos
-- [ ] Photos: placeholder grid (không `<img>` original); mở/tải qua presign
-- [ ] Album: tạo, thêm/gỡ ảnh, `itemCount` đúng, xóa album không xóa file
-- [ ] Delete → Trash → Restore; xóa vĩnh viễn mất object + giảm quota
-- [ ] Settings: đổi displayName, đổi mật khẩu, trash prefs, logout
+- Auth: register trả session `emailVerified=false`; vault chặn 403 khi chưa verify
+  (`GET /storage`, `PATCH /users/me`); mã 6 số từ mailer console verify được 204;
+  login sau verify `emailVerified=true`.
+- Files/folders: tạo folder, upload allowlist vào folder, browser hiện đúng,
+  rename, move về root (`folderId=null`), presign download có `expiresAt`,
+  search theo tên.
+- Từ chối hợp lệ: `.exe` ngoài allowlist → 400; >100 MiB → 413; mime lệch extension
+  → 400; trùng tên sibling trong cùng folder → 409; folder không rỗng xóa → 409.
+- Photos: jpg + video mp4 vào timeline; PDF không vào timeline và bị từ chối khi thêm
+  album (400). Thumbnail theo prefs: mặc định bật → item có presigned
+  `thumbnailUrl`; tắt `imageThumbnailsEnabled` → item không còn URL (placeholder grid);
+  bật lại → có lại. Không bao giờ expose original qua grid.
+- Album: tạo, thêm jpg, từ chối PDF, `itemCount` đúng khi thêm/gỡ, xóa album
+  không ảnh hưởng file (file vẫn READY).
+- Trash/quota: soft delete → có trong `/trash`, quota vẫn tính; restore
+  (`POST /files/:id/restore`) → READY + rời trash; purge
+  (`DELETE /trash/files/:id`) → file 404 + quota giảm đúng số byte object.
+- Settings: đổi displayName, trash prefs (auto-delete + retention), đổi mật khẩu
+  (sai current → 401; đổi xong token mới, mật khẩu cũ login 401, refresh token cũ
+  của phiên trước password change hoạt động), logout thu hồi refresh token
+  (refresh sau logout → 401).
+- Ownership: user B đọc/rename/delete file của A đều 404 uniform (không dò ID).
+- Search filters (spec 09 §1.2): `type=image|document` tách đúng jpg/pdf;
+  `sort=size&order=asc` đúng thứ tự; `type` lạ → 400.
+
+Lệch spec phát hiện khi smoke: không có. Route restore là `POST /files/:id/restore`
+(không nằm dưới `/trash/*`) — đã khớp spec 04, chỉ note để khỏi nhầm.
+
+### Smoke test tay phần UI (còn lại)
+
+Phần chỉ kiểm tra được bằng mắt/tương tác (API tương ứng bên dưới mỗi dòng đã PASS ở trên):
+
+- [ ] Progress bar upload chạy rồi ẩn (API upload-complete PASS)
+- [ ] Ô **F** header mobile / wordmark sidebar desktop về Overview `/`
 - [ ] Mobile shell: bottom nav + FAB; desktop: side nav
+- [ ] Mở ảnh/video từ Photos xem được nội dung qua presign (URL presign PASS)
+- [ ] Đăng nhập lại bằng UI với `dev@filvault.com / Dev1234@` sau toàn bộ flow trên
 
 ### Test API tối thiểu — đã có
 
@@ -150,6 +184,6 @@ Không phải nợ. Không nhét vào công việc tiếp theo.
 ## Việc tiếp theo cho người nhận
 
 1. `make up` → login `dev@filvault.com` / `Dev1234@`.
-2. Chạy hết checklist **Smoke test tay** ở trên; ghi bug nếu lệch spec / `DESIGN.md`.
+2. Smoke API xuyên suốt đã xong (2026-08-23, xem trên). Chạy nốt **Smoke test tay phần UI**; ghi bug nếu lệch spec / `DESIGN.md`.
 3. Lệch spec → sửa spec (và ADR nếu đổi kiến trúc), không code xong rồi viết ngược.
-4. Smoke test xanh → mới bàn Phase 2.
+4. Phase 2 feature (S1–S6) đã Done — xem [10-phase-2-status.md](10-phase-2-status.md); smoke Phase 2 đã chạy kèm ở đó. Deploy/AWS vẫn tách khỏi checklist feature.

@@ -17,5 +17,23 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/filvault': {
+        target: 'http://localhost:9002',
+        changeOrigin: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const presignedHost = req.headers['x-presigned-host']
+            if (presignedHost && typeof presignedHost === 'string') {
+              proxyReq.setHeader('host', presignedHost)
+            }
+          })
+        },
+      },
+    },
   },
 })

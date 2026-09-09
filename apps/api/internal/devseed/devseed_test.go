@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/auth"
 	"filvault/internal/devseed"
 	"filvault/internal/platform/config"
@@ -14,6 +15,17 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// nopRepo swallows activity events in tests that do not assert on them.
+type nopRepo struct{}
+
+func (nopRepo) Append(context.Context, activity.Event) error { return nil }
+
+func (nopRepo) List(context.Context, string, time.Time, int) ([]activity.Event, error) {
+	return nil, nil
+}
+
+func (nopRepo) DeleteOlderThan(context.Context, time.Time) (int64, error) { return 0, nil }
 
 func TestEnsureDevUser_CreatesVerifiedUser(t *testing.T) {
 	pool := testPool(t)
@@ -49,7 +61,7 @@ func TestEnsureDevUser_CreatesVerifiedUser(t *testing.T) {
 		InviteCode:                "dev-invite",
 		DefaultTrashAutoDelete:    false,
 		DefaultTrashRetentionDays: config.DefaultTrashRetentionDays,
-	}, store, auth.NewTokens("test-jwt"), mailer.NewMemory())
+	}, store, auth.NewTokens("test-jwt"), mailer.NewMemory(), activity.NewRecorder(nopRepo{}))
 
 	session, err := svc.Login(ctx, email, "filvault-dev")
 	if err != nil {

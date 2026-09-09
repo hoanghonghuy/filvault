@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   HOME_PATH,
   OVERVIEW_DESTINATIONS,
+  PROFILE_PATH,
+  SHELL_NAV,
   pageTitleForRoute,
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
@@ -9,15 +11,27 @@ import {
 } from './shellNav'
 import type { BrowserFile, TimelineGroup } from '@/api/types'
 
+describe('SHELL_NAV', () => {
+  it('has 5 destinations: Home, Files, Photos, Shared, Settings', () => {
+    expect(SHELL_NAV.map((item) => item.to)).toEqual(['/', '/files', '/photos', '/shared', '/settings'])
+  })
+})
+
 describe('HOME_PATH', () => {
   it('is the app overview', () => {
     expect(HOME_PATH).toBe('/')
   })
 })
 
+describe('PROFILE_PATH', () => {
+  it('is a dedicated account route outside bottom nav', () => {
+    expect(PROFILE_PATH).toBe('/profile')
+  })
+})
+
 describe('OVERVIEW_DESTINATIONS', () => {
-  it('exposes Files and Photos only', () => {
-    expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos'])
+  it('exposes Files, Photos, Shared with me and Chat', () => {
+    expect(OVERVIEW_DESTINATIONS.map((item) => item.to)).toEqual(['/files', '/photos', '/shared', '/chat'])
   })
 })
 
@@ -32,6 +46,7 @@ describe('showStorageBar', () => {
     expect(showStorageBar('/photos')).toBe(true)
     expect(showStorageBar('/photos/albums/01ABC')).toBe(true)
     expect(showStorageBar('/trash')).toBe(true)
+    expect(showStorageBar('/shared')).toBe(true)
     expect(showStorageBar('/settings')).toBe(true)
   })
 })
@@ -53,7 +68,9 @@ describe('pageTitleForRoute', () => {
   it('maps the other shell destinations', () => {
     expect(pageTitleForRoute('/photos')).toBe('Photos')
     expect(pageTitleForRoute('/trash')).toBe('Trash')
+    expect(pageTitleForRoute('/shared')).toBe('Shared with me')
     expect(pageTitleForRoute('/settings')).toBe('Settings')
+    expect(pageTitleForRoute('/profile')).toBe('Profile')
   })
 })
 

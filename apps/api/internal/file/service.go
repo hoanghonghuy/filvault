@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"filvault/internal/activity"
 	"filvault/internal/apperr"
 	"filvault/internal/auth"
 	"filvault/internal/folder"
@@ -14,29 +15,39 @@ import (
 )
 
 type Service struct {
-	repo    Repository
-	folders folder.Repository
-	quota   QuotaStore
-	objects objectstore.ObjectStore
-	now     func() time.Time
+	repo     Repository
+	folders  folder.Repository
+	quota    QuotaStore
+	objects  objectstore.ObjectStore
+	activity ActivityRecorder
+	now      func() time.Time
 }
 
-func NewService(repo Repository, folders folder.Repository, quota QuotaStore, objects objectstore.ObjectStore) *Service {
+// ActivityRecorder records lifecycle events; failures never break uploads.
+type ActivityRecorder interface {
+	Record(ctx context.Context, ownerID, eventType, targetName string)
+}
+
+func NewService(repo Repository, folders folder.Repository, quota QuotaStore, objects objectstore.ObjectStore, activity ActivityRecorder) *Service {
 	return &Service{
-		repo:    repo,
-		folders: folders,
-		quota:   quota,
-		objects: objects,
-		now:     time.Now,
+		repo:     repo,
+		folders:  folders,
+		quota:    quota,
+		objects:  objects,
+		activity: activity,
+		now:      time.Now,
 	}
 }
 
-func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, contentType string, size int64, folderID *string) (UploadSession, error) {
+func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, contentType string, size int64, folderID *string, replaceFileID *string) (UploadSession, error) {
 	if err := ValidateUpload(name, contentType, size); err != nil {
 		return UploadSession{}, err
 	}
 	if folderID != nil && *folderID == "" {
 		folderID = nil
+	}
+	if replaceFileID != nil && *replaceFileID == "" {
+		replaceFileID = nil
 	}
 	if folderID != nil {
 		f, err := s.folders.GetAliveByID(ctx, ownerID, *folderID)
@@ -55,12 +66,31 @@ func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, conten
 		return UploadSession{}, apperr.QuotaExceeded
 	}
 	displayName := strings.TrimSpace(name)
-	exists, err := s.repo.ExistsAliveByName(ctx, ownerID, folderID, displayName, "")
-	if err != nil {
-		return UploadSession{}, err
-	}
-	if exists {
-		return UploadSession{}, apperr.Conflict
+
+	if replaceFileID != nil {
+		target, err := s.repo.GetByID(ctx, ownerID, *replaceFileID)
+		if err != nil {
+			return UploadSession{}, err
+		}
+		if target == nil || target.DeletedAt != nil || target.Status != StatusReady {
+			return UploadSession{}, apperr.NotFound
+		}
+		if target.Name != displayName {
+			return UploadSession{}, apperr.Validation
+		}
+	} else {
+		existing, err := s.repo.GetAliveByName(ctx, ownerID, folderID, displayName)
+		if err != nil {
+			return UploadSession{}, err
+		}
+		if existing != nil {
+			if existing.Status == StatusReady {
+				return UploadSession{}, apperr.Conflict
+			}
+			// Clean up previous incomplete/abandoned/failed upload session for this name
+			_ = s.objects.Delete(ctx, existing.ObjectKey)
+			_ = s.repo.DeleteRow(ctx, ownerID, existing.ID)
+		}
 	}
 
 	now := s.now().UTC()
@@ -81,6 +111,7 @@ func (s *Service) CreateUploadSession(ctx context.Context, ownerID, name, conten
 		CreatedAt:       now,
 		UpdatedAt:       now,
 		UploadExpiresAt: &expires,
+		ReplacesFileID:  replaceFileID,
 	}
 	if err := s.repo.Create(ctx, f); err != nil {
 		return UploadSession{}, err
@@ -130,21 +161,27 @@ func (s *Service) Complete(ctx context.Context, ownerID, fileID string) (File, e
 		return File{}, apperr.QuotaExceeded
 	}
 
-	rec := *f
-	rec.Status = StatusReady
-	rec.SizeBytes = stat.Size
-	if stat.ContentType != "" {
-		rec.MimeType = stat.ContentType
+	// Replace flow: archive the old file, update the target, drop the PENDING row atomically.
+	if f.ReplacesFileID != nil {
+		rec, err := s.repo.CompleteReplaceUpload(ctx, ownerID, fileID, *f.ReplacesFileID, stat.Size, stat.ContentType, now)
+		if err != nil {
+			if errors.Is(err, apperr.QuotaExceeded) {
+				_ = s.markFailed(ctx, *f)
+			}
+			return File{}, err
+		}
+		return *rec, nil
 	}
-	rec.UploadExpiresAt = nil
-	rec.UpdatedAt = now
-	if err := s.repo.Update(ctx, rec); err != nil {
+
+	rec, err := s.repo.CompleteUpload(ctx, ownerID, fileID, stat.Size, stat.ContentType, now)
+	if err != nil {
+		if errors.Is(err, apperr.QuotaExceeded) {
+			_ = s.markFailed(ctx, *f)
+		}
 		return File{}, err
 	}
-	if err := s.quota.AddStorageUsed(ctx, ownerID, stat.Size); err != nil {
-		return File{}, err
-	}
-	return rec, nil
+	s.activity.Record(ctx, ownerID, activity.TypeFileUploaded, rec.Name)
+	return *rec, nil
 }
 
 func (s *Service) Get(ctx context.Context, ownerID, fileID string) (File, error) {
@@ -167,6 +204,39 @@ func (s *Service) DownloadURL(ctx context.Context, ownerID, fileID string) (Down
 		return DownloadURL{}, apperr.NotFound
 	}
 	presigned, err := s.objects.CreateDownloadURL(ctx, f.ObjectKey, objectstore.DownloadOptions{
+		Expires: config.DownloadPresignTTL,
+	})
+	if err != nil {
+		return DownloadURL{}, err
+	}
+	return DownloadURL{URL: presigned.URL, ExpiresAt: presigned.ExpiresAt}, nil
+}
+
+// ListVersions returns archived versions of a file, newest first.
+func (s *Service) ListVersions(ctx context.Context, ownerID, fileID string) ([]FileVersion, error) {
+	f, err := s.Get(ctx, ownerID, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if f.Status != StatusReady {
+		return nil, apperr.NotFound
+	}
+	return s.repo.ListVersions(ctx, fileID)
+}
+
+// DownloadVersionURL returns a presigned URL for an archived version.
+func (s *Service) DownloadVersionURL(ctx context.Context, ownerID, fileID, versionID string) (DownloadURL, error) {
+	if _, err := s.Get(ctx, ownerID, fileID); err != nil {
+		return DownloadURL{}, err
+	}
+	v, err := s.repo.GetVersion(ctx, fileID, versionID)
+	if err != nil {
+		return DownloadURL{}, err
+	}
+	if v == nil {
+		return DownloadURL{}, apperr.NotFound
+	}
+	presigned, err := s.objects.CreateDownloadURL(ctx, v.ObjectKey, objectstore.DownloadOptions{
 		Expires: config.DownloadPresignTTL,
 	})
 	if err != nil {
@@ -209,4 +279,44 @@ func (s *Service) markFailed(ctx context.Context, f File) error {
 	f.Status = StatusFailed
 	f.UpdatedAt = now
 	return s.repo.Update(ctx, f)
+}
+
+// SetFavorite marks an alive file as favorite; idempotent.
+func (s *Service) SetFavorite(ctx context.Context, ownerID, fileID string) error {
+	f, err := s.getAliveFile(ctx, ownerID, fileID)
+	if err != nil {
+		return err
+	}
+	return s.repo.AddFavorite(ctx, ownerID, f.ID, s.now().UTC())
+}
+
+// UnsetFavorite removes the favorite mark; idempotent.
+func (s *Service) UnsetFavorite(ctx context.Context, ownerID, fileID string) error {
+	f, err := s.getAliveFile(ctx, ownerID, fileID)
+	if err != nil {
+		return err
+	}
+	return s.repo.RemoveFavorite(ctx, ownerID, f.ID)
+}
+
+// ListFavorites returns favorited files, newest favorite first.
+func (s *Service) ListFavorites(ctx context.Context, ownerID string, limit int) ([]FavoriteFile, error) {
+	if limit <= 0 {
+		limit = DefaultFavoritesLimit
+	}
+	if limit > MaxFavoritesLimit {
+		limit = MaxFavoritesLimit
+	}
+	return s.repo.ListFavorites(ctx, ownerID, limit)
+}
+
+func (s *Service) getAliveFile(ctx context.Context, ownerID, fileID string) (*File, error) {
+	f, err := s.repo.GetByID(ctx, ownerID, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil || f.DeletedAt != nil || f.Status != StatusReady {
+		return nil, apperr.NotFound
+	}
+	return f, nil
 }

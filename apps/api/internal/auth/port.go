@@ -27,6 +27,9 @@ type Repository interface {
 	RevokeRefreshToken(ctx context.Context, hash string, at time.Time) error
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID string, at time.Time) error
 	UpdateTrashSettings(ctx context.Context, userID string, enabled bool, retentionDays int) error
+	UpdateThumbnailSettings(ctx context.Context, userID string, imageEnabled, videoEnabled bool) error
 	UpdateDisplayName(ctx context.Context, userID, displayName string) error
 	UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error
+	UpdateActiveStatus(ctx context.Context, userID string, enabled bool) error
+	UpdateAvatar(ctx context.Context, userID, avatarURL string) error
 }

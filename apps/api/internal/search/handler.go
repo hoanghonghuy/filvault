@@ -39,17 +39,59 @@ func (h *Handler) search(c *gin.Context) {
 		httpx.Error(c, apperr.Unauthorized)
 		return
 	}
-	q := c.Query("q")
-	limit := DefaultLimit
+	q := Query{Text: c.Query("q")}
+
+	typeName, err := ParseType(c.Query("type"))
+	if err != nil {
+		httpx.Validation(c)
+		return
+	}
+	q.Type = typeName
+
+	folderID, ok := httpx.QueryULID(c, "folderId")
+	if !ok {
+		return
+	}
+	q.FolderID = folderID
+
+	from, err := ParseDateOnly(c.Query("from"))
+	if err != nil {
+		httpx.Validation(c)
+		return
+	}
+	q.From = from
+	to, err := ParseDateOnly(c.Query("to"))
+	if err != nil {
+		httpx.Validation(c)
+		return
+	}
+	q.To = to
+
+	sort, err := ParseSort(c.Query("sort"))
+	if err != nil {
+		httpx.Validation(c)
+		return
+	}
+	q.Sort = sort
+
+	order, err := ParseOrder(c.Query("order"))
+	if err != nil {
+		httpx.Validation(c)
+		return
+	}
+	q.Order = order
+
+	q.Limit = DefaultLimit
 	if raw := c.Query("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
-		if err != nil || n <= 0 {
+		if err != nil || n <= 0 || n > MaxLimit {
 			httpx.Validation(c)
 			return
 		}
-		limit = n
+		q.Limit = n
 	}
-	out, err := h.svc.Search(c.Request.Context(), userID, q, limit)
+
+	out, err := h.svc.Search(c.Request.Context(), userID, q)
 	if err != nil {
 		httpx.Error(c, err)
 		return
@@ -75,6 +117,7 @@ func publicResult(r Result) gin.H {
 			"name":      f.Name,
 			"mimeType":  f.MimeType,
 			"sizeBytes": f.SizeBytes,
+			"createdAt": f.CreatedAt.UTC().Format(time.RFC3339Nano),
 			"updatedAt": f.UpdatedAt.UTC().Format(time.RFC3339Nano),
 		})
 	}

@@ -8,12 +8,12 @@ import (
 )
 
 type Item struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	Type      string     `json:"type"` // "file" | "folder"
-	SizeBytes *int64     `json:"sizeBytes,omitempty"`
-	MimeType  *string    `json:"mimeType,omitempty"`
-	DeletedAt time.Time  `json:"deletedAt"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"` // "file" | "folder"
+	SizeBytes *int64    `json:"sizeBytes,omitempty"`
+	MimeType  *string   `json:"mimeType,omitempty"`
+	DeletedAt time.Time `json:"deletedAt"`
 }
 
 type List struct {
