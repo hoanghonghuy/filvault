@@ -9,6 +9,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+func (s *s3Store) CheckReady(ctx context.Context) error {
+	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(s.bucket),
+	})
+	if err != nil {
+		return fmt.Errorf("head bucket: %w", err)
+	}
+	return nil
+}
+
 func (s *s3Store) CreateUploadURL(ctx context.Context, key string, opts UploadOptions) (PresignedURL, error) {
 	exp := opts.Expires
 	if exp <= 0 {

@@ -25,6 +25,8 @@ type DownloadOptions struct {
 }
 
 type ObjectStore interface {
+	// CheckReady verifies the store is reachable for serving authenticated traffic.
+	CheckReady(ctx context.Context) error
 	CreateUploadURL(ctx context.Context, key string, opts UploadOptions) (PresignedURL, error)
 	CreateDownloadURL(ctx context.Context, key string, opts DownloadOptions) (PresignedURL, error)
 	Head(ctx context.Context, key string) (ObjectStat, error)
