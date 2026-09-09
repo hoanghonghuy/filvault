@@ -29,7 +29,7 @@ export async function createFolder(page: Page, folderName: string): Promise<void
     await mobileFab(page).click()
     await clickActionSheetItem(page, /^New folder$/)
   } else {
-    await page.locator('.files-page .desktop-only').getByRole('button', { name: /^New folder$/ }).click()
+    await page.locator('.files-sub-bar').getByRole('button', { name: /^New folder$/ }).click()
   }
 
   const dialog = topDialog(page)
