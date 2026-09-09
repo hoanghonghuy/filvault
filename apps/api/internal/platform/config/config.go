@@ -45,4 +45,6 @@ type Config struct {
 	LiveKitPublicURL          string
 	LiveKitAPIKey             string
 	LiveKitAPISecret          string
+	// TrustedProxies lists CIDR ranges allowed to set X-Forwarded-For (reverse-proxy hops).
+	TrustedProxies []string
 }

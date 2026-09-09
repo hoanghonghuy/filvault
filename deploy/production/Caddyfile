@@ -1,0 +1,12 @@
+# TLS terminates here. Upstream web nginx serves the SPA and proxies /api and /filvault.
+# Set FILVAULT_PUBLIC_HOST (default filvault.local) and map it to the host running Compose.
+
+{$FILVAULT_PUBLIC_HOST:filvault.local} {
+	tls internal
+
+	# Forward client IP and scheme to the web tier (see FILVAULT_TRUSTED_PROXIES on API).
+	reverse_proxy web:80 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}

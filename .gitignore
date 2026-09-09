@@ -1,6 +1,10 @@
 .env
 .env.*
 !.env.example
+!deploy/production/.env.example
+
+deploy/production/.env
+deploy/production/postgres/certs/
 
 bin/
 dist/

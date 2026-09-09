@@ -42,6 +42,7 @@ func Load() (Config, error) {
 		LiveKitPublicURL:           getenv("FILVAULT_LIVEKIT_PUBLIC_URL", "ws://localhost:7880"),
 		LiveKitAPIKey:              os.Getenv("FILVAULT_LIVEKIT_API_KEY"),
 		LiveKitAPISecret:           os.Getenv("FILVAULT_LIVEKIT_API_SECRET"),
+		TrustedProxies:             parseCSV(os.Getenv("FILVAULT_TRUSTED_PROXIES")),
 	}
 	if days := os.Getenv("FILVAULT_DEFAULT_TRASH_RETENTION_DAYS"); days != "" {
 		n, err := strconv.Atoi(days)

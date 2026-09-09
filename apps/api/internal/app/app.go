@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"time"
 
 	"filvault/internal/activity"
@@ -31,7 +32,22 @@ func New(cfg config.Config, pool *pgxpool.Pool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewWithDeps(cfg, pool, mailer.New(cfg), obj), nil
+	engine := NewWithDeps(cfg, pool, mailer.New(cfg), obj)
+	if err := applyTrustedProxies(engine, cfg.TrustedProxies); err != nil {
+		return nil, err
+	}
+	return engine, nil
+}
+
+func applyTrustedProxies(engine *gin.Engine, cidrs []string) error {
+	if len(cidrs) == 0 {
+		return nil
+	}
+	if err := engine.SetTrustedProxies(cidrs); err != nil {
+		return fmt.Errorf("FILVAULT_TRUSTED_PROXIES: %w", err)
+	}
+	engine.ForwardedByClientIP = true
+	return nil
 }
 
 func NewWithMailer(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer) *gin.Engine {

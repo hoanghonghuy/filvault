@@ -18,6 +18,19 @@ make seed          # tạo tài khoản dev (khi chạy API trên host, không q
 
 Sau `make up`: web `http://localhost:5173`, API `http://localhost:8080`, MinIO `http://localhost:9002`.
 
+## Production-like runtime (#42)
+
+Reference stack với `FILVAULT_ENV=production`, TLS ở edge proxy, migrate trước traffic, và contract `/healthz` + `/readyz` (#41):
+
+```bash
+./deploy/production/postgres/generate-certs.sh
+./deploy/production/generate-env.sh
+echo '127.0.0.1 filvault.local' | sudo tee -a /etc/hosts
+make prod-like-up
+```
+
+Chi tiết operator: [`deploy/production/README.md`](deploy/production/README.md). Health/readiness: [`docs/ops/health-readiness-migration.md`](docs/ops/health-readiness-migration.md).
+
 ## Tài khoản dev (test xuyên suốt)
 
 `make up` (Docker) và `make dev-api` (API trên host) **tự tạo** tài khoản dev sau migrate — không cần chạy `make seed` riêng.
