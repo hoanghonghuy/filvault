@@ -33,7 +33,6 @@ const changePinOpen = ref(false)
 const currentPin = ref('')
 const newPin = ref('')
 const confirmNewPin = ref('')
-const showChangePins = ref(false)
 const changePinError = ref('')
 const changingPin = ref(false)
 
@@ -42,7 +41,6 @@ const resetPinOpen = ref(false)
 const accountPassword = ref('')
 const resetNewPin = ref('')
 const confirmResetNewPin = ref('')
-const showResetPins = ref(false)
 const resetPinError = ref('')
 const resettingPin = ref(false)
 
@@ -87,7 +85,7 @@ onMounted(async () => {
     if (vault.isUnlocked) {
       await vault.loadFiles()
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'

@@ -17,7 +17,7 @@ import BatchActionBar from '@/components/BatchActionBar.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import { usePullToRefresh } from '@/lib/usePullToRefresh'
 import { useLongPress } from '@/lib/useLongPress'
-import { mimeIcon, mimeLabel, resolveContentType } from '@/lib/mimeIcon'
+import { mimeIcon, resolveContentType } from '@/lib/mimeIcon'
 import type {
   Browser,
   DownloadURL,
