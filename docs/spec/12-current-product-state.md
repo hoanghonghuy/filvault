@@ -72,7 +72,7 @@ make dev-web            # Vue :5173 (Node ^22)
 | **Secrets & config hardening** | Có ([#13](https://github.com/hoanghonghuy/filvault/pull/13)) | — | Một phần — xem [#3](https://github.com/hoanghonghuy/filvault/issues/3) |
 | **Health / readiness / migration gate** | Có ([#45](https://github.com/hoanghonghuy/filvault/pull/45) / [#41](https://github.com/hoanghonghuy/filvault/issues/41); runtime [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42)) | — | Contract trên `develop` |
 | **Production deploy & release smoke** | Baseline runtime [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42) | — | Epic [#4](https://github.com/hoanghonghuy/filvault/issues/4); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** — chờ external Docker runtime evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) draft) |
-| **Repository release integrity** — protected `develop`/`main`, required PR CI | Có — ruleset [Protect integration branches](https://github.com/hoanghonghuy/filvault/rules/22665159) (`22665159`) | [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (docs/verification + AC còn lại) | Enforced trên `develop`/`main`; issue mở đến khi human đóng |
+| **Repository release integrity** — protected `develop`/`main`, required PR CI + review-thread resolution | Có — ruleset [Protect integration branches](https://github.com/hoanghonghuy/filvault/rules/22665159) (`22665159`) | [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (handoff doc + human close) | Enforced trên `develop`/`main`; issue mở đến khi human đóng |
 
 Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành chức năng** (chi tiết lịch sử: [08](08-phase-1-status.md), [10](10-phase-2-status.md)). Điều đó **không** có nghĩa sản phẩm đã production-ready.
 
@@ -87,11 +87,11 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 | Health `/healthz`, readiness `/readyz`, migration gate | Đã merge | [#45](https://github.com/hoanghonghuy/filvault/pull/45), [`docs/ops/health-readiness-migration.md`](../ops/health-readiness-migration.md) |
 | Production runtime (TLS edge, reverse proxy, env contract) | **Đã merge** | [#46](https://github.com/hoanghonghuy/filvault/pull/46) / [#42](https://github.com/hoanghonghuy/filvault/issues/42) (`17bad79`) |
 | Release smoke + persistence restart + rollback runbook | **PARKED** | [#43](https://github.com/hoanghonghuy/filvault/issues/43) — external Docker runtime evidence; PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (draft) |
-| Protected integration branches + required PR quality gates | **Enforced** | Ruleset [22665159](https://github.com/hoanghonghuy/filvault/rules/22665159); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (merge-policy docs + verification AC) |
+| Protected integration branches + required PR quality gates + review-thread resolution | **Enforced** | Ruleset [22665159](https://github.com/hoanghonghuy/filvault/rules/22665159); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (handoff doc #39/#47 + human close) |
 | Browser E2E critical path | Chưa | [#7](https://github.com/hoanghonghuy/filvault/issues/7) |
 | Design system đồng bộ surfaces hiện tại | Chưa | [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) (draft); shell-language recon với AppShell three-form-factor (#48) |
 
-**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41 và #42 đã merge; branch protection enforced (ruleset `22665159`, [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS verify/close); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** on external Docker evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49)) (+ [#7](https://github.com/hoanghonghuy/filvault/issues/7) E2E, design backlog).
+**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41 và #42 đã merge; branch protection + review-thread resolution enforced (ruleset `22665159`, [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS until handoff lands + human close); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** on external Docker evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49)) (+ [#7](https://github.com/hoanghonghuy/filvault/issues/7) E2E, design backlog).
 
 ---
 
@@ -101,13 +101,14 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 
 | Quy tắc | Chi tiết |
 |---|---|
-| Luồng merge | Task branch → PR → required CI xanh → merge (không push trực tiếp implementation lên `develop`/`main`) |
+| Luồng merge | Task branch → PR → required CI xanh → unresolved review threads resolved → merge (không push trực tiếp implementation lên `develop`/`main`) |
 | Required status checks (strict / up-to-date) | `Security — secret scan`, `API — lint, typecheck, test`, `Web — lint, typecheck, test, build`, `CLI — lint, typecheck, test` |
+| Review thread resolution | **Enforced** — unresolved PR review conversations block merge (`required_review_thread_resolution`) |
 | Không required | PR Agent (skipped), GitGuardian (optional dashboard), approving-review count (PM comment gates thay APPROVED reviews) |
 | Chặn | Force-push (`non_fast_forward`), xóa nhánh |
 | Bypass | Repository Admin — emergency only |
 
-Tra [#50](https://github.com/hoanghonghuy/filvault/issues/50) cho verification record và merge-policy docs; issue IN_PROGRESS đến khi human đóng AC còn lại.
+[#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS until handoff doc lands (PR [#47](https://github.com/hoanghonghuy/filvault/pull/47) / [#39](https://github.com/hoanghonghuy/filvault/issues/39)) and human closes the issue; ruleset contract above is already enforced.
 
 ---
 
@@ -138,7 +139,7 @@ Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** is
 
 ### Issue backlog (theo ref — tra GitHub cho trạng thái hiện tại)
 
-Nhóm **release / repository integrity:** [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** → PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (external Docker runtime evidence); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (ruleset `22665159` enforced — docs/verification AC); epic [#4](https://github.com/hoanghonghuy/filvault/issues/4); [#7](https://github.com/hoanghonghuy/filvault/issues/7) (E2E)
+Nhóm **release / repository integrity:** [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** → PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) (external Docker runtime evidence); [#50](https://github.com/hoanghonghuy/filvault/issues/50) IN_PROGRESS (ruleset `22665159` enforced incl. review-thread resolution — close after handoff #47); epic [#4](https://github.com/hoanghonghuy/filvault/issues/4); [#7](https://github.com/hoanghonghuy/filvault/issues/7) (E2E)
 
 Nhóm **shell & cross-cutting:** [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) (shell-language recon: ≤767 bottom nav; 768–1023 80px icon rail + page header; ≥1024 220px expanded sidebar — contract #48); [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#17](https://github.com/hoanghonghuy/filvault/issues/17), [#35](https://github.com/hoanghonghuy/filvault/issues/35)
 
@@ -153,7 +154,7 @@ Nhóm **PM / handoff:** [#39](https://github.com/hoanghonghuy/filvault/issues/39
 - Production runtime baseline ([#42](https://github.com/hoanghonghuy/filvault/issues/42) / [#46](https://github.com/hoanghonghuy/filvault/pull/46)) — **đã merge** trên `develop` (`17bad79`).
 - Vault UX polish ([#18](https://github.com/hoanghonghuy/filvault/issues/18) / [#44](https://github.com/hoanghonghuy/filvault/pull/44)) — **đã merge** trên `develop`.
 - Deploy/AWS “sau Phase 2” — baseline runtime xong; release smoke ([#43](https://github.com/hoanghonghuy/filvault/issues/43)) **PARKED** on external Docker evidence trong epic [#4](https://github.com/hoanghonghuy/filvault/issues/4).
-- Branch protection / required CI ([#50](https://github.com/hoanghonghuy/filvault/issues/50)) — **đã enforced** qua ruleset `22665159`; không tái cấu hình thủ công trừ khi đổi contract.
+- Branch protection / required CI / review-thread resolution ([#50](https://github.com/hoanghonghuy/filvault/issues/50)) — **đã enforced** qua ruleset `22665159`; không tái cấu hình thủ công trừ khi đổi contract. Issue #50 vẫn mở đến khi handoff doc land + human đóng.
 - Responsive AppShell / shell navigation ([#6](https://github.com/hoanghonghuy/filvault/issues/6) / [#48](https://github.com/hoanghonghuy/filvault/pull/48)) — **đã merge** trên `develop` (`48b16cb`).
 
 ---
