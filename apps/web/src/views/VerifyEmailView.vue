@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import { formatAuthError } from '@/api/errors'
+import { useResendCooldown } from '@/lib/useResendCooldown'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -19,8 +20,15 @@ const message = ref('')
 const error = ref('')
 const verifying = ref(false)
 const resending = ref(false)
+const { remainingSeconds, active: resendCooldownActive, start: startResendCooldown } = useResendCooldown(60)
 
-const busy = computed(() => verifying.value || resending.value)
+const requestBusy = computed(() => verifying.value || resending.value)
+const resendDisabled = computed(() => requestBusy.value || resendCooldownActive.value)
+const resendLabel = computed(() => {
+  if (resending.value) return 'Sending…'
+  if (resendCooldownActive.value) return `Resend in ${remainingSeconds.value}s`
+  return 'Resend code'
+})
 
 function onCodeInput(event: Event) {
   const input = event.target as HTMLInputElement
@@ -28,13 +36,14 @@ function onCodeInput(event: Event) {
 }
 
 async function resend() {
-  if (!auth.user?.email || busy.value) return
+  if (!auth.user?.email || resendDisabled.value) return
   error.value = ''
   message.value = ''
   resending.value = true
   try {
     await auth.resendVerification(auth.user.email)
     message.value = 'A new code was sent. It expires in 15 minutes.'
+    startResendCooldown()
   } catch (e) {
     error.value = formatAuthError(e, 'Could not resend code. Try again.')
   } finally {
@@ -43,7 +52,7 @@ async function resend() {
 }
 
 async function submit() {
-  if (!auth.user?.email || busy.value) return
+  if (!auth.user?.email || requestBusy.value) return
   error.value = ''
   message.value = ''
   verifying.value = true
@@ -76,23 +85,33 @@ async function submit() {
             required
             autocomplete="one-time-code"
             enterkeyhint="done"
-            :disabled="busy"
+            :disabled="requestBusy"
             :aria-invalid="error ? true : undefined"
             @input="onCodeInput"
           />
           <span class="field-hint">Code expires in 15 minutes.</span>
         </label>
 
-        <output v-if="message" class="auth-notice">{{ message }}</output>
+        <output v-if="message" class="auth-notice" role="status" aria-live="polite">{{ message }}</output>
         <div v-if="error" id="auth-error" class="auth-alert" role="alert">{{ error }}</div>
 
         <div class="auth-actions">
-          <button class="btn ink block" type="submit" :disabled="busy" :aria-busy="verifying">
+          <button class="btn ink block" type="submit" :disabled="requestBusy" :aria-busy="verifying">
             {{ verifying ? 'Verifying…' : 'Verify email' }}
           </button>
-          <button class="btn block" type="button" :disabled="busy" :aria-busy="resending" @click="resend">
-            {{ resending ? 'Sending…' : 'Resend code' }}
+          <button
+            class="btn block"
+            type="button"
+            :disabled="resendDisabled"
+            :aria-busy="resending"
+            :aria-describedby="resendCooldownActive ? 'resend-cooldown-status' : undefined"
+            @click="resend"
+          >
+            {{ resendLabel }}
           </button>
+          <span v-if="resendCooldownActive" id="resend-cooldown-status" class="field-hint">
+            You can request another code in {{ remainingSeconds }} seconds. You can still verify the current code now.
+          </span>
         </div>
       </form>
     </template>
