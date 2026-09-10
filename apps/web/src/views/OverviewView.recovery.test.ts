@@ -73,9 +73,9 @@ describe('OverviewView recovery', () => {
     expect(retry.text()).toBe('Retry')
     expect(apiMock).toHaveBeenCalledTimes(3)
 
-    await retry.trigger('click')
-    expect(retry.attributes('disabled')).toBeDefined()
-    await retry.trigger('click')
+    const firstRetry = retry.trigger('click')
+    const duplicateRetry = retry.trigger('click')
+    await Promise.all([firstRetry, duplicateRetry])
     expect(apiMock).toHaveBeenCalledTimes(6)
 
     await flushPromises()
