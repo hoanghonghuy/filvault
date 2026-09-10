@@ -1,6 +1,6 @@
 # Filvault — Trạng thái sản phẩm & bàn giao (hiện tại)
 
-Cập nhật: **2026-09-10** (`develop` @ `d6ac27d` — post [#59](https://github.com/hoanghonghuy/filvault/pull/59) / [#15](https://github.com/hoanghonghuy/filvault/issues/15) canonical appearance; trước đó [#58](https://github.com/hoanghonghuy/filvault/pull/58) / [#21](https://github.com/hoanghonghuy/filvault/issues/21) Files search/filter).  
+Cập nhật: **2026-09-10** (`develop` @ `571a678` — post [#60](https://github.com/hoanghonghuy/filvault/pull/60) / [#33](https://github.com/hoanghonghuy/filvault/issues/33) Chat composer uploads + a11y; trước đó [#59](https://github.com/hoanghonghuy/filvault/pull/59) / [#15](https://github.com/hoanghonghuy/filvault/issues/15) canonical appearance).  
 **Nguồn sự thật duy nhất** cho trạng thái sản phẩm, mục tiêu release và việc nên làm tiếp.
 
 > Các checklist Phase 1/2 ([08](08-phase-1-status.md), [10](10-phase-2-status.md)) chỉ còn giá trị **lịch sử** — không dùng phần “việc tiếp theo” ở đó.
@@ -63,7 +63,7 @@ make dev-web            # Vue :5173 (Node ^22)
 | **Upload queue** — hàng đợi per-file, retry | Có ([#12](https://github.com/hoanghonghuy/filvault/pull/12)) | — | Chưa |
 | **Photos & albums** — timeline, album, cover, favorites | Có (Phase 2 S2–S3) | [#23](https://github.com/hoanghonghuy/filvault/issues/23), [#29](https://github.com/hoanghonghuy/filvault/issues/29) | Chưa |
 | **Sharing** — public link, share user nội bộ, Shared with me | Có (Phase 2 S4–S5) | [#25](https://github.com/hoanghonghuy/filvault/issues/25), [#24](https://github.com/hoanghonghuy/filvault/issues/24), [#32](https://github.com/hoanghonghuy/filvault/issues/32) | Chưa |
-| **Chat & calls** — direct message, attachment, SSE, video call (LiveKit) | Có (C1–C7 + ADR 0005) | [#33](https://github.com/hoanghonghuy/filvault/issues/33) IN_PROGRESS, [#30](https://github.com/hoanghonghuy/filvault/issues/30) | Chưa |
+| **Chat & calls** — direct message, attachment, SSE, video call (LiveKit) | Có (C1–C7 + ADR 0005; composer decoupled from uploads + a11y [#60](https://github.com/hoanghonghuy/filvault/pull/60) / [#33](https://github.com/hoanghonghuy/filvault/issues/33)) | [#30](https://github.com/hoanghonghuy/filvault/issues/30) | Chưa |
 | **Vault** — khu vực file cá nhân (`/vault`) | Có (routing [#37](https://github.com/hoanghonghuy/filvault/pull/37); UX media/a11y [#44](https://github.com/hoanghonghuy/filvault/pull/44) / [#18](https://github.com/hoanghonghuy/filvault/issues/18)) | Cross-cutting: [#29](https://github.com/hoanghonghuy/filvault/issues/29) (MediaLightbox) | Chưa |
 | **Themes & settings** — AppearanceMode system/light/dark, accent themes, Theme Center | Có (canonical appearance [#59](https://github.com/hoanghonghuy/filvault/pull/59) / [#15](https://github.com/hoanghonghuy/filvault/issues/15); free-only UI [#56](https://github.com/hoanghonghuy/filvault/pull/56) / [#17](https://github.com/hoanghonghuy/filvault/issues/17)) | [#14](https://github.com/hoanghonghuy/filvault/issues/14), [#34](https://github.com/hoanghonghuy/filvault/issues/34), [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (MERGEABLE vs `develop`; `auth.user` canonicality đã xử lý — PATCH response only, unsaved edits giữ trong SettingsView-local refs; chờ human review/merge) | Chưa |
 | **Trash & activity** | Có | [#26](https://github.com/hoanghonghuy/filvault/issues/26) | Chưa |
@@ -92,7 +92,7 @@ Phase 1 API slices 0–9 và Phase 2 web slices S1–S6 **đã hoàn thành ch�
 | Browser E2E critical path (`Web — E2E critical path`) | **Đã merge** + **required** on ruleset | [#55](https://github.com/hoanghonghuy/filvault/pull/55) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) |
 | Design system đồng bộ surfaces hiện tại | Chưa | [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) open (MERGEABLE vs `develop`; shell-language recon với AppShell three-form-factor contract #48; chờ human Designer/QA visual matrix: auth/files/photos/settings-theme/chat/vault × mobile/tablet/desktop × light/dark × one high-chroma accent) |
 
-**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41, #42, #7/#55 (E2E), #21/#58 (Files search/filter) và #15/#59 (canonical appearance) đã merge; branch protection + 5 required checks + review-thread resolution enforced (ruleset `22665159`, [#50](https://github.com/hoanghonghuy/filvault/issues/50) closed); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** on Docker-host runtime evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) draft).
+**Epic điều phối production:** [#4](https://github.com/hoanghonghuy/filvault/issues/4) — #41, #42, #7/#55 (E2E), #21/#58 (Files search/filter), #15/#59 (canonical appearance) và #33/#60 (Chat composer) đã merge; branch protection + 5 required checks + review-thread resolution enforced (ruleset `22665159`, [#50](https://github.com/hoanghonghuy/filvault/issues/50) closed); [#43](https://github.com/hoanghonghuy/filvault/issues/43) **PARKED** on Docker-host runtime evidence (PR [#49](https://github.com/hoanghonghuy/filvault/pull/49) draft).
 
 ---
 
@@ -115,7 +115,7 @@ Ruleset contract above enforced via [#50](https://github.com/hoanghonghuy/filvau
 
 ## Backlog đang mở
 
-Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** issue/PR, không duplicate checklist mutable. Snapshot: `develop` @ `d6ac27d` (2026-09-10).
+Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** issue/PR, không duplicate checklist mutable. Snapshot: `develop` @ `571a678` (2026-09-10).
 
 ### PR đang mở (ưu tiên review/merge)
 
@@ -123,13 +123,14 @@ Tra GitHub để lấy trạng thái mới nhất — doc chỉ giữ **ref** is
 |---|---|---|
 | [#57](https://github.com/hoanghonghuy/filvault/pull/57) | [#36](https://github.com/hoanghonghuy/filvault/issues/36) | Settings section-scoped save (MERGEABLE vs `develop`; `auth.user` canonicality đã xử lý; chờ human review/merge) |
 | [#54](https://github.com/hoanghonghuy/filvault/pull/54) | [#8](https://github.com/hoanghonghuy/filvault/issues/8) | DESIGN.md reconcile (MERGEABLE vs `develop`; chờ human Designer/QA visual matrix — không self-merge) |
-| [#49](https://github.com/hoanghonghuy/filvault/pull/49) | [#43](https://github.com/hoanghonghuy/filvault/issues/43) | Release smoke — **PARKED** (draft; behind `develop`; đang/ cần reconcile; Docker-host evidence gate — CI xanh không đủ để undraft) |
+| [#49](https://github.com/hoanghonghuy/filvault/pull/49) | [#43](https://github.com/hoanghonghuy/filvault/issues/43) | Release smoke — **PARKED** (draft; behind `develop`; cần reconcile; Docker-host evidence gate — CI xanh không đủ để undraft) |
 | [#47](https://github.com/hoanghonghuy/filvault/pull/47) | [#39](https://github.com/hoanghonghuy/filvault/issues/39) | Handoff doc này (draft; chờ PM undraft) |
 
 ### Đã merge gần đây (tham chiếu, không làm lại)
 
 | PR | Issue | Nội dung |
 |---|---|---|
+| [#60](https://github.com/hoanghonghuy/filvault/pull/60) | [#33](https://github.com/hoanghonghuy/filvault/issues/33) | Chat composer decoupled from attachment uploads + desktop a11y hardening |
 | [#59](https://github.com/hoanghonghuy/filvault/pull/59) | [#15](https://github.com/hoanghonghuy/filvault/issues/15) | Canonical appearance — AppearanceMode system/light/dark tách accent themes; theme service |
 | [#58](https://github.com/hoanghonghuy/filvault/pull/58) | [#21](https://github.com/hoanghonghuy/filvault/issues/21) | Coherent Files search & filters UX |
 | [#55](https://github.com/hoanghonghuy/filvault/pull/55) | [#7](https://github.com/hoanghonghuy/filvault/issues/7) | Playwright E2E critical-path smoke (mobile/tablet/desktop) |
@@ -149,7 +150,7 @@ Nhóm **release / repository integrity:** [#43](https://github.com/hoanghonghuy/
 
 Nhóm **shell & cross-cutting:** [#8](https://github.com/hoanghonghuy/filvault/issues/8) IN_PROGRESS → PR [#54](https://github.com/hoanghonghuy/filvault/pull/54) (MERGEABLE vs `develop`; shell-language recon: ≤767 bottom nav; 768–1023 80px icon rail + page header; ≥1024 220px expanded sidebar — contract #48; chờ human Designer/QA visual matrix); [#16](https://github.com/hoanghonghuy/filvault/issues/16), [#35](https://github.com/hoanghonghuy/filvault/issues/35)
 
-Nhóm **theo surface (design):** [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (MERGEABLE vs `develop`; `auth.user` canonicality đã xử lý — removed `mergeUserAfterSectionSave`, `auth.user` = PATCH response only, unsaved edits trong SettingsView-local refs; chờ human review/merge); [#33](https://github.com/hoanghonghuy/filvault/issues/33) IN_PROGRESS; READY P1 design backlog — tra GitHub (#14, #16, #22–#34, …)
+Nhóm **theo surface (design):** [#36](https://github.com/hoanghonghuy/filvault/issues/36) IN_PROGRESS → PR [#57](https://github.com/hoanghonghuy/filvault/pull/57) (MERGEABLE vs `develop`; `auth.user` canonicality đã xử lý — removed `mergeUserAfterSectionSave`, `auth.user` = PATCH response only, unsaved edits trong SettingsView-local refs; chờ human review/merge); READY P1 design backlog — tra GitHub (#14, #16, #22–#34, …)
 
 Nhóm **PM / handoff:** [#39](https://github.com/hoanghonghuy/filvault/issues/39) IN_PROGRESS → PR [#47](https://github.com/hoanghonghuy/filvault/pull/47) (draft; chờ PM undraft)
 
@@ -159,7 +160,8 @@ Nhóm **PM / handoff:** [#39](https://github.com/hoanghonghuy/filvault/issues/39
 - Smoke tay Phase 1 UI như “việc tiếp theo” duy nhất — đã lệch thời; dùng [#43](https://github.com/hoanghonghuy/filvault/issues/43) / [#7](https://github.com/hoanghonghuy/filvault/issues/7) cho QA release.
 - Browser E2E critical path ([#7](https://github.com/hoanghonghuy/filvault/issues/7) / [#55](https://github.com/hoanghonghuy/filvault/pull/55)) — **đã merge** trên `develop`; `Web — E2E critical path` là required check trên ruleset.
 - Files search & filter UX ([#21](https://github.com/hoanghonghuy/filvault/issues/21) / [#58](https://github.com/hoanghonghuy/filvault/pull/58)) — **đã merge** trên `develop`.
-- Canonical appearance ([#15](https://github.com/hoanghonghuy/filvault/issues/15) / [#59](https://github.com/hoanghonghuy/filvault/pull/59)) — **đã merge** trên `develop` (`d6ac27d`); AppearanceMode system/light/dark tách accent themes.
+- Canonical appearance ([#15](https://github.com/hoanghonghuy/filvault/issues/15) / [#59](https://github.com/hoanghonghuy/filvault/pull/59)) — **đã merge** trên `develop`; AppearanceMode system/light/dark tách accent themes.
+- Chat composer uploads + a11y ([#33](https://github.com/hoanghonghuy/filvault/issues/33) / [#60](https://github.com/hoanghonghuy/filvault/pull/60)) — **đã merge** trên `develop` (`571a678`).
 - Production runtime baseline ([#42](https://github.com/hoanghonghuy/filvault/issues/42) / [#46](https://github.com/hoanghonghuy/filvault/pull/46)) — **đã merge** trên `develop` (`17bad79`).
 - Vault UX polish ([#18](https://github.com/hoanghonghuy/filvault/issues/18) / [#44](https://github.com/hoanghonghuy/filvault/pull/44)) — **đã merge** trên `develop`.
 - Deploy/AWS “sau Phase 2” — baseline runtime xong; release smoke ([#43](https://github.com/hoanghonghuy/filvault/issues/43)) **PARKED** on external Docker evidence trong epic [#4](https://github.com/hoanghonghuy/filvault/issues/4).
