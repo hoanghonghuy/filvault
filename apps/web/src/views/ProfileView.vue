@@ -261,7 +261,7 @@ async function logout() {
             :disabled="updatingAvatar"
             @click="triggerAvatarPick"
           >
-            <Icon name="camera" :size="15" />
+            <Icon name="camera" :size="18" />
           </button>
           <input
             ref="avatarInputRef"
@@ -353,10 +353,10 @@ async function logout() {
 
 .avatar-action-btn {
   position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 28px;
-  height: 28px;
+  right: -12px;
+  bottom: -12px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent, #ffffff);
@@ -366,23 +366,42 @@ async function logout() {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  transition: transform var(--duration-short) var(--ease-standard);
+  transition:
+    transform var(--duration-short) var(--ease-standard),
+    opacity var(--duration-short) var(--ease-standard);
 }
 
-.avatar-action-btn:hover {
-  transform: scale(1.1);
+.avatar-action-btn:not(:disabled):hover {
+  transform: scale(1.06);
+}
+
+.avatar-action-btn:focus-visible,
+.remove-avatar-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.avatar-action-btn:disabled,
+.remove-avatar-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .remove-avatar-btn {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  margin: 2px 0 -6px calc(-1 * var(--space-xs));
+  padding: 0 var(--space-xs);
   border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--danger, #ef4444);
-  font-size: 12px;
+  font-size: 0.8125rem;
+  line-height: 1.25;
   cursor: pointer;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .sr-only {
@@ -413,6 +432,7 @@ async function logout() {
 
 .identity-copy {
   min-width: 0;
+  flex: 1;
 }
 
 .identity-name {
@@ -442,6 +462,12 @@ async function logout() {
   display: none;
 }
 
+@media (max-width: 359px) {
+  .identity-row {
+    gap: var(--space-sm);
+  }
+}
+
 @media (min-width: 768px) {
   .save-btn {
     width: auto;
@@ -449,6 +475,12 @@ async function logout() {
 
   .desktop-only {
     display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-action-btn {
+    transition: none;
   }
 }
 </style>
