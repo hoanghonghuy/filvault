@@ -7,10 +7,14 @@ import { ref } from 'vue'
 import SharedWithMeView from './SharedWithMeView.vue'
 import { api } from '@/api/client'
 
-vi.mock('@/api/client', () => ({
-  api: vi.fn<(...args: unknown[]) => unknown>(),
-  formatBytes: (bytes: number) => `${bytes} B`,
-}))
+vi.mock('@/api/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    api: vi.fn<typeof actual.api>(),
+    formatBytes: (bytes: number) => `${bytes} B`,
+  }
+})
 
 vi.mock('@/stores/ui', () => ({
   useUiStore: () => ({
