@@ -61,6 +61,7 @@ function onSearchSubmit() {
 const bothFailed = computed(() => Boolean(filesError.value && photosError.value))
 
 async function load() {
+  if (loading.value) return
   loading.value = true
   filesError.value = ''
   photosError.value = ''
@@ -144,8 +145,18 @@ onMounted(load)
       </div>
     </section>
 
-    <!-- Error alert if both failed -->
-    <p v-if="bothFailed" class="error" role="alert">Could not load overview. Try again later.</p>
+    <!-- Error recovery if both core sources failed -->
+    <div v-if="bothFailed" class="error overview-error" role="alert">
+      <span>Could not load overview. Try again later.</span>
+      <button
+        type="button"
+        class="overview-retry"
+        :disabled="loading"
+        @click="load"
+      >
+        {{ t.retry }}
+      </button>
+    </div>
 
     <!-- Skeleton Loading -->
     <div v-if="loading" class="overview-loading" aria-busy="true" aria-live="polite">
@@ -383,6 +394,38 @@ onMounted(load)
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.overview-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+}
+
+.overview-retry {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.overview-retry:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.overview-retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* TeraBox Content Tabs */
