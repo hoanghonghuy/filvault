@@ -22,16 +22,3 @@ export function logoutConfirmationOptions(locale: Locale): ConfirmOptions {
     danger: true,
   }
 }
-
-/**
- * Settings historically built this confirmation inline in English. Keep this
- * narrow compatibility check while the caller migrates to confirmLogout(), so
- * both account surfaces immediately share the localized contract.
- */
-export function isLegacyLogoutConfirmation(options: ConfirmOptions): boolean {
-  return (
-    options.title === logoutCopy.en.title &&
-    options.message === logoutCopy.en.message &&
-    options.confirmLabel === logoutCopy.en.confirmLabel
-  )
-}
