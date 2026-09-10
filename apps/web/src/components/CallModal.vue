@@ -358,10 +358,7 @@ onUnmounted(() => {
   background: rgba(10, 14, 23, 0.9);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  padding-top: max(var(--space-md), env(safe-area-inset-top));
-  padding-right: max(var(--space-md), env(safe-area-inset-right));
-  padding-bottom: max(var(--space-md), env(safe-area-inset-bottom));
-  padding-left: max(var(--space-md), env(safe-area-inset-left));
+  padding: var(--space-md);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -773,13 +770,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 767px) and (orientation: landscape) {
-  .call-overlay {
-    padding-top: max(8px, env(safe-area-inset-top));
-    padding-right: max(8px, env(safe-area-inset-right));
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
-    padding-left: max(8px, env(safe-area-inset-left));
-  }
-
   .call-active-room {
     border-radius: 16px;
   }
