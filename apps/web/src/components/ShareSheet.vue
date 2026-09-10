@@ -58,12 +58,7 @@ const fullUrl = computed(() => (props.existing ? window.location.origin + props.
 watch(
   () => props.open,
   (open) => {
-    if (open) {
-      selectedTTL.value = null
-      creating.value = false
-      copying.value = false
-      revoking.value = false
-    }
+    if (open) selectedTTL.value = null
   },
 )
 
