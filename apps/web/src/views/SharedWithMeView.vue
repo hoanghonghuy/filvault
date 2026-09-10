@@ -18,6 +18,13 @@ interface ShareLinkInfo {
   createdAt: string
 }
 
+type BrowseMode = 'root' | 'child'
+
+interface RetryFolderTarget {
+  id: string
+  mode: BrowseMode
+}
+
 const ui = useUiStore()
 const { t } = useI18n()
 
@@ -27,6 +34,10 @@ const error = ref('')
 const shares = ref<IncomingShare[]>([])
 const shareLinks = ref<ShareLinkInfo[]>([])
 const browsing = ref<SharedBrowser | null>(null)
+const browseStack = ref<SharedBrowser[]>([])
+const folderLoading = ref(false)
+const folderError = ref('')
+const retryFolderTarget = ref<RetryFolderTarget | null>(null)
 const viewMode = ref<'list' | 'grid'>('list')
 
 function toggleViewMode() {
@@ -91,13 +102,67 @@ function getFileTypeColor(name?: string): string {
   return '#0084ff'
 }
 
-async function browseFolder(share: IncomingShare) {
-  error.value = ''
+async function openSharedFolder(folderId: string, mode: BrowseMode) {
+  if (folderLoading.value) return
+
+  folderLoading.value = true
+  folderError.value = ''
+  if (mode === 'root') error.value = ''
+
   try {
-    browsing.value = await api<SharedBrowser>(`/shared/folders/${share.resourceId}`)
+    const next = await api<SharedBrowser>(`/shared/folders/${folderId}`)
+    if (mode === 'root') {
+      browseStack.value = [next]
+    } else {
+      browseStack.value = [...browseStack.value, next]
+    }
+    browsing.value = next
+    retryFolderTarget.value = null
   } catch (e) {
-    error.value = formatApiError(e, 'Could not open folder')
+    const message = formatApiError(e, 'Could not open folder')
+    retryFolderTarget.value = { id: folderId, mode }
+    if (mode === 'root') error.value = message
+    else folderError.value = message
+  } finally {
+    folderLoading.value = false
   }
+}
+
+async function browseFolder(share: IncomingShare) {
+  await openSharedFolder(share.resourceId, 'root')
+}
+
+function openChildFolder(folderId: string) {
+  void openSharedFolder(folderId, 'child')
+}
+
+function retryFolderNavigation() {
+  const target = retryFolderTarget.value
+  if (!target) return
+  void openSharedFolder(target.id, target.mode)
+}
+
+function goBackFromFolder() {
+  if (folderLoading.value) return
+  folderError.value = ''
+  retryFolderTarget.value = null
+
+  if (browseStack.value.length <= 1) {
+    browseStack.value = []
+    browsing.value = null
+    return
+  }
+
+  browseStack.value = browseStack.value.slice(0, -1)
+  browsing.value = browseStack.value.at(-1) ?? null
+}
+
+function goToBrowseIndex(index: number) {
+  if (folderLoading.value || index < 0 || index >= browseStack.value.length - 1) return
+  folderError.value = ''
+  retryFolderTarget.value = null
+  browseStack.value = browseStack.value.slice(0, index + 1)
+  browsing.value = browseStack.value.at(-1) ?? null
 }
 
 async function downloadFile(fileId: string, name: string) {
@@ -222,16 +287,47 @@ onMounted(load)
 
     <Transition name="page">
       <section v-if="browsing" class="browse" aria-label="Shared folder contents">
-        <button type="button" class="back-btn" @click="browsing = null">
+        <button type="button" class="back-btn" :disabled="folderLoading" @click="goBackFromFolder">
           <Icon name="arrow-left" :size="18" />
-          {{ t.allSharedItems || 'Tất cả mục chia sẻ' }}
+          {{ browseStack.length > 1 ? t.back : t.allSharedItems || 'Tất cả mục chia sẻ' }}
         </button>
+
+        <nav v-if="browseStack.length" class="browse-path" aria-label="Shared folder path">
+          <template v-for="(entry, index) in browseStack" :key="entry.folder?.id ?? index">
+            <button
+              v-if="index < browseStack.length - 1"
+              type="button"
+              class="browse-path-link"
+              :disabled="folderLoading"
+              @click="goToBrowseIndex(index)"
+            >
+              {{ entry.folder?.name }}
+            </button>
+            <span v-else class="browse-path-current" aria-current="page">{{ entry.folder?.name }}</span>
+            <span v-if="index < browseStack.length - 1" class="browse-path-separator" aria-hidden="true">/</span>
+          </template>
+        </nav>
+
         <h2 class="folder-name">{{ browsing.folder?.name }}</h2>
+
+        <p v-if="folderError" class="browse-error" role="alert">
+          {{ folderError }}
+          <button type="button" class="retry-btn" :disabled="folderLoading" @click="retryFolderNavigation">
+            {{ t.retry }}
+          </button>
+        </p>
+        <p v-if="folderLoading" class="browse-status" role="status" aria-live="polite">
+          {{ t.loading }}
+        </p>
+
         <div class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
-          <div
+          <button
             v-for="f in browsing.folders"
             :key="'d-' + f.id"
-            class="share-item-card static"
+            type="button"
+            class="share-item-card tappable folder-card"
+            :disabled="folderLoading"
+            @click="openChildFolder(f.id)"
           >
             <div class="share-icon-badge folder-badge">
               <Icon name="folder" :size="22" />
@@ -240,7 +336,8 @@ onMounted(load)
               <span class="share-item-title">{{ f.name }}</span>
               <span class="share-item-sub">{{ t.folder }}</span>
             </div>
-          </div>
+            <Icon name="chevron-right" :size="18" class="folder-chevron" />
+          </button>
           <div
             v-for="f in browsing.files"
             :key="'f-' + f.id"
@@ -260,7 +357,12 @@ onMounted(load)
               <span class="share-item-title">{{ f.name }}</span>
               <span class="share-item-sub">{{ formatBytes(f.sizeBytes) }}</span>
             </div>
-            <button class="share-action-btn" type="button" aria-label="Download">
+            <button
+              class="share-action-btn"
+              type="button"
+              :aria-label="t.download"
+              @click.stop="downloadFile(f.id, f.name)"
+            >
               <Icon name="download" :size="18" />
             </button>
           </div>
@@ -274,7 +376,9 @@ onMounted(load)
     <template v-if="!browsing">
       <p v-if="error" class="error" role="alert">
         {{ error }}
-        <button type="button" class="retry-btn" @click="load">{{ t.retry }}</button>
+        <button type="button" class="retry-btn" @click="retryFolderTarget ? retryFolderNavigation() : load()">
+          {{ t.retry }}
+        </button>
       </p>
 
       <div v-if="loading" class="shares-container">
@@ -511,6 +615,31 @@ onMounted(load)
   cursor: default;
 }
 
+.folder-card {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.folder-card:focus-visible,
+.back-btn:focus-visible,
+.browse-path-link:focus-visible,
+.share-action-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.folder-card:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.folder-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
 .share-icon-badge {
   width: 44px;
   height: 44px;
@@ -575,6 +704,7 @@ onMounted(load)
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: var(--touch-min);
   background: transparent;
   border: none;
   color: var(--accent);
@@ -582,13 +712,73 @@ onMounted(load)
   font-weight: 600;
   cursor: pointer;
   padding: 4px 0;
+  margin-bottom: 4px;
+}
+
+.back-btn:disabled,
+.browse-path-link:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.browse-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
   margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.browse-path-link {
+  max-width: min(40vw, 220px);
+  min-height: 32px;
+  padding: 4px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.browse-path-current {
+  max-width: min(55vw, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.browse-path-separator {
+  color: var(--muted);
 }
 
 .folder-name {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.browse-error,
+.browse-status {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.browse-error {
+  color: var(--danger);
+}
+
+.browse-status {
+  color: var(--muted);
 }
 
 .empty-inline {
@@ -604,6 +794,7 @@ onMounted(load)
 
 .retry-btn {
   margin-left: 6px;
+  min-height: var(--touch-min);
   background: none;
   border: none;
   color: var(--accent);
@@ -623,6 +814,14 @@ onMounted(load)
 @media (min-width: 768px) {
   .desktop-only {
     display: block;
+  }
+
+  .browse-path-link {
+    max-width: 260px;
+  }
+
+  .browse-path-current {
+    max-width: 420px;
   }
 }
 </style>
