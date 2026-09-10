@@ -117,6 +117,7 @@ export interface TimelineItem {
   sizeBytes: number
   createdAt: string
   thumbnailUrl?: string
+  isFavorite?: boolean
 }
 
 export interface TimelineGroup {
