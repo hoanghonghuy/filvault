@@ -265,11 +265,6 @@ onMounted(load)
         </p>
       </div>
     </section>
-
-    <!-- Floating Action Button (FAB) -->
-    <RouterLink to="/files" class="overview-fab" title="Mở Tệp" aria-label="Mở Tệp">
-      <Icon name="plus" :size="24" />
-    </RouterLink>
   </div>
 </template>
 
@@ -538,30 +533,6 @@ onMounted(load)
   color: var(--danger);
 }
 
-/* TeraBox Floating Action Button */
-.overview-fab {
-  position: fixed;
-  right: 20px;
-  bottom: 84px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--accent, #0084ff);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 132, 255, 0.4);
-  z-index: 50;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  touch-action: manipulation;
-}
-
-.overview-fab:active {
-  transform: scale(0.92);
-}
-
 /* Skeletons */
 .overview-loading {
   display: flex;
@@ -611,11 +582,6 @@ onMounted(load)
   .grid.photos {
     grid-template-columns: repeat(6, 1fr);
     gap: 8px;
-  }
-
-  .overview-fab {
-    bottom: 32px;
-    right: 32px;
   }
 }
 </style>
