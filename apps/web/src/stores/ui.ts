@@ -106,12 +106,10 @@ export const useUiStore = defineStore('ui', () => {
         open: true,
         title: options.title,
         label: options.label ?? '',
-        value: '',
+        value: options.initialValue ?? '',
         confirmLabel: options.confirmLabel ?? 'Save',
         cancelLabel: options.cancelLabel ?? 'Cancel',
-        initialValue: options.initialValue,
       }
-      promptState.value.value = options.initialValue ?? ''
     })
   }
 
@@ -122,11 +120,15 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function openActionSheet(title: string | undefined, items: ActionSheetItem[]): Promise<string | null> {
+    // Opening over a visible sheet swaps content in place: no leave transition
+    // fires, so the replaced caller settles immediately with null.
     if (actionSheetActiveResolve !== null) {
       const replaced = actionSheetActiveResolve
       actionSheetActiveResolve = null
       replaced(null)
     }
+    // Re-opening mid-leave cancels that leave (after-leave never fires),
+    // so settle the closing caller here as well to avoid a hang.
     if (actionSheetClosing !== null) {
       const closing = actionSheetClosing
       actionSheetClosing = null
@@ -143,6 +145,7 @@ export const useUiStore = defineStore('ui', () => {
     const resolve = actionSheetActiveResolve
     actionSheetActiveResolve = null
     actionSheetState.value = { ...actionSheetState.value, open: false }
+    // Hold the result until the leave transition reports completion.
     actionSheetClosing = { id: id ?? null, resolve }
   }
 
