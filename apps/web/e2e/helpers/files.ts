@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type Response } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +15,22 @@ const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../
 
 const textFixtureBuffer = readFileSync(path.join(fixturesDir, 'sample.txt'))
 const imageFixtureBuffer = readFileSync(path.join(fixturesDir, 'sample.png'))
+
+function waitForTrashMutation(page: Page, resource: 'files' | 'folders'): Promise<Response> {
+  return page.waitForResponse((response) => {
+    if (response.request().method() !== 'DELETE') return false
+    const pathname = new URL(response.url()).pathname
+    return pathname.includes(`/${resource}/`)
+  })
+}
+
+async function expectSuccessfulTrashMutation(mutation: Promise<Response>): Promise<void> {
+  const response = await mutation
+  expect(
+    response.ok(),
+    `Move-to-trash request failed: ${response.status()} ${response.request().method()} ${new URL(response.url()).pathname}`,
+  ).toBeTruthy()
+}
 
 export async function navigateToFiles(page: Page): Promise<void> {
   await page.getByRole('link', { name: /^Files$/ }).click()
@@ -84,7 +100,11 @@ export async function downloadFile(page: Page, fileName: string): Promise<void> 
 export async function moveFileToTrash(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
   await clickActionSheetItem(page, /^Move to trash$/)
+
+  const mutation = waitForTrashMutation(page, 'files')
   await confirmDialog(page, /^Move to trash$/)
+  await expectSuccessfulTrashMutation(mutation)
+
   await expect(page.getByRole('button', { name: fileName, exact: true })).toHaveCount(0)
 }
 
@@ -92,7 +112,11 @@ export async function moveFolderToTrash(page: Page, folderName: string): Promise
   const folderCard = page.getByRole('button', { name: folderName, exact: true })
   await folderCard.getByRole('button', { name: /^Folder actions$/ }).click()
   await clickActionSheetItem(page, /^Move to trash$/)
+
+  const mutation = waitForTrashMutation(page, 'folders')
   await confirmDialog(page, /^Move to trash$/)
+  await expectSuccessfulTrashMutation(mutation)
+
   await expect(folderCard).toHaveCount(0)
 }
 
