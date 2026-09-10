@@ -30,6 +30,7 @@ import {
 import { useI18n } from '@/lib/i18n'
 import { useTheme } from '@/lib/theme'
 import { generateUUID } from '@/lib/uuid'
+import type { UploadItemStatus } from '@/lib/uploadQueue'
 import { useLongPress } from '@/lib/useLongPress'
 import { resolveWallpaperTheme, type WallpaperTheme } from '@/lib/wallpaperPalette'
 import type { ChatAttachment, ChatConversation, ChatMessage, DownloadURL, Timeline, TimelineItem, UploadSession } from '@/api/types'
@@ -52,7 +53,7 @@ const searchQuery = ref('')
 const searchResults = ref<ChatMessage[] | null>(null)
 const media = ref<ChatAttachment[]>([])
 const loading = ref(false)
-const sending = ref(false)
+const sendingText = ref(false)
 const error = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const pendingMessage = ref<ChatMessage | null>(null)
@@ -890,7 +891,6 @@ function handleClickOutsideStickerPicker(event: MouseEvent | PointerEvent) {
 }
 
 const threadSearchOpen = ref(false)
-const uploadProgress = ref<number | null>(null)
 const isMobile = ref(
   typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 767px)').matches || window.matchMedia('(pointer: coarse)').matches
@@ -1005,6 +1005,80 @@ function resetInfoWidth() {
   }
 }
 
+const RESIZE_STEP = 16
+
+function clampRailWidth(width: number): number {
+  const availableWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const maxAllowedRail = Math.max(
+    MIN_RAIL_WIDTH,
+    Math.min(MAX_RAIL_WIDTH, availableWidth - (desktopInfoOpen.value ? infoWidth.value : 0) - 300),
+  )
+  return Math.max(MIN_RAIL_WIDTH, Math.min(maxAllowedRail, Math.round(width)))
+}
+
+function clampInfoWidth(width: number): number {
+  const availableWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const maxAllowedInfo = Math.max(
+    MIN_INFO_WIDTH,
+    Math.min(MAX_INFO_WIDTH, availableWidth - railWidth.value - 300),
+  )
+  return Math.max(MIN_INFO_WIDTH, Math.min(maxAllowedInfo, Math.round(width)))
+}
+
+function persistRailWidth() {
+  try {
+    localStorage.setItem('filvault.chat.railWidth', String(railWidth.value))
+  } catch {
+    // ignore
+  }
+}
+
+function persistInfoWidth() {
+  try {
+    localStorage.setItem('filvault.chat.infoWidth', String(infoWidth.value))
+  } catch {
+    // ignore
+  }
+}
+
+function onRailResizerKeydown(e: KeyboardEvent) {
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    railWidth.value = clampRailWidth(railWidth.value + RESIZE_STEP)
+    persistRailWidth()
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    railWidth.value = clampRailWidth(railWidth.value - RESIZE_STEP)
+    persistRailWidth()
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    resetRailWidth()
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    railWidth.value = clampRailWidth(MAX_RAIL_WIDTH)
+    persistRailWidth()
+  }
+}
+
+function onInfoResizerKeydown(e: KeyboardEvent) {
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    infoWidth.value = clampInfoWidth(infoWidth.value + RESIZE_STEP)
+    persistInfoWidth()
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    infoWidth.value = clampInfoWidth(infoWidth.value - RESIZE_STEP)
+    persistInfoWidth()
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    resetInfoWidth()
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    infoWidth.value = clampInfoWidth(MAX_INFO_WIDTH)
+    persistInfoWidth()
+  }
+}
+
 type AttachmentUploadStatus = 'queued' | 'uploading' | 'failed' | 'canceled'
 type AttachmentUpload = {
   id: string
@@ -1025,6 +1099,71 @@ const activeAttachmentQueue = computed(() => {
     (entry) => entry.conversationId === selectedId.value && entry.status !== 'canceled',
   )
 })
+const MEDIA_TAB_IDS = ['media', 'file', 'link'] as const
+type MediaTabId = (typeof MEDIA_TAB_IDS)[number]
+
+function mapAttachmentStatusToProgress(status: AttachmentUploadStatus): UploadItemStatus {
+  if (status === 'canceled') return 'cancelled'
+  if (status === 'failed') return 'failed'
+  if (status === 'uploading') return 'uploading'
+  return 'queued'
+}
+
+const attachmentUploadProgressItems = computed(() =>
+  attachmentQueue.value
+    .filter((entry) => entry.status !== 'canceled')
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.file.name,
+      status: mapAttachmentStatusToProgress(entry.status),
+      progress: entry.progress ?? 0,
+      error: entry.error,
+    })),
+)
+
+const attachmentAggregateProgress = computed(() => {
+  const active = attachmentQueue.value.filter((entry) => entry.status !== 'canceled')
+  if (active.length === 0) return null
+  const uploading = active.find((entry) => entry.status === 'uploading')
+  if (uploading) return uploading.progress ?? 0
+  if (active.some((entry) => entry.status === 'queued')) return 0
+  return null
+})
+
+const hasActiveAttachmentUpload = computed(() =>
+  attachmentQueue.value.some((entry) => entry.status === 'uploading'),
+)
+
+function processNextInAttachmentQueue() {
+  if (hasActiveAttachmentUpload.value) return
+  const next = attachmentQueue.value.find((entry) => entry.status === 'queued')
+  if (next) void processAttachment(next.id)
+}
+
+function selectMediaTab(tabId: MediaTabId) {
+  activeMediaTab.value = tabId
+}
+
+function focusMediaTab(tabId: MediaTabId, groupPrefix = 'shared-media') {
+  void nextTick(() => {
+    document.getElementById(`${groupPrefix}-tab-${tabId}`)?.focus()
+  })
+}
+
+function onMediaTabKeydown(e: KeyboardEvent, tabId: MediaTabId, groupPrefix = 'shared-media') {
+  const idx = MEDIA_TAB_IDS.indexOf(tabId)
+  if (idx < 0) return
+  let nextIdx = idx
+  if (e.key === 'ArrowRight') nextIdx = (idx + 1) % MEDIA_TAB_IDS.length
+  else if (e.key === 'ArrowLeft') nextIdx = (idx - 1 + MEDIA_TAB_IDS.length) % MEDIA_TAB_IDS.length
+  else if (e.key === 'Home') nextIdx = 0
+  else if (e.key === 'End') nextIdx = MEDIA_TAB_IDS.length - 1
+  else return
+  e.preventDefault()
+  const nextTab = MEDIA_TAB_IDS[nextIdx]!
+  selectMediaTab(nextTab)
+  focusMediaTab(nextTab, groupPrefix)
+}
 const pendingMessageError = ref('')
 let activeSelection = 0
 function isMobileViewport() {
@@ -1836,7 +1975,7 @@ function attachmentLabel(attachment: ChatAttachment): string {
 }
 
 async function sendText() {
-  if (sending.value) return
+  if (sendingText.value) return
   if (!selectedId.value || !draft.value.trim()) return
   const conversationId = selectedId.value
   const body = draft.value.trim()
@@ -1853,7 +1992,7 @@ async function sendText() {
   pendingMessage.value = optimistic
   pendingMessageError.value = ''
   draft.value = ''
-  sending.value = true
+  sendingText.value = true
   if (typingTimer) clearTimeout(typingTimer)
   void chatStore.sendTyping(conversationId, false)
   await nextTick()
@@ -1874,7 +2013,7 @@ async function sendText() {
     pendingMessageError.value = formatApiError(e, 'Failed to send message')
     error.value = formatApiError(e, 'Failed to send message')
   } finally {
-    sending.value = false
+    sendingText.value = false
   }
 }
 
@@ -1943,17 +2082,16 @@ async function onAttachmentChange(event: Event) {
   draft.value = ''
   autoGrow()
   scrollToLatest({ smooth: true })
-  void processAttachment(item.id)
+  processNextInAttachmentQueue()
 }
 
 async function processAttachment(id: string) {
   const item = attachmentQueue.value.find((entry) => entry.id === id)
-  if (!item || item.status === 'uploading' || item.status === 'canceled') return
+  if (!item || item.status !== 'queued') return
+  if (hasActiveAttachmentUpload.value) return
   item.status = 'uploading'
   item.error = undefined
   item.progress = 0
-  sending.value = true
-  uploadProgress.value = 0
   try {
     const contentType = resolveContentType(item.file) || item.file.type || 'application/octet-stream'
     const session = await api<UploadSession>('/chat/attachments/upload-sessions', {
@@ -1966,7 +2104,6 @@ async function processAttachment(id: string) {
       }),
     })
     await uploadToPresigned(session.uploadUrl, item.file, contentType, (ratio) => {
-      uploadProgress.value = ratio
       item.progress = ratio
     }, item.controller.signal)
     const message = await api<ChatMessage>(`/chat/attachments/${session.fileId}/complete`, {
@@ -1983,33 +2120,35 @@ async function processAttachment(id: string) {
     scrollToLatest({ smooth: true })
     ui.showToast('Attachment sent')
   } catch (e) {
+    if (item.status !== 'uploading') return
     item.status = 'failed'
     item.error = formatApiError(e, 'Failed to send attachment')
   } finally {
-    uploadProgress.value = null
-    sending.value = attachmentQueue.value.some((entry) => entry.status === 'uploading')
+    processNextInAttachmentQueue()
   }
 }
 
 function retryUpload(id: string) {
   const item = attachmentQueue.value.find((entry) => entry.id === id)
-  if (!item) return
+  if (!item || item.status === 'uploading') return
   item.status = 'queued'
   item.error = undefined
   item.progress = 0
   item.controller = new AbortController()
-  void processAttachment(id)
+  processNextInAttachmentQueue()
 }
 
 function cancelUpload(id: string) {
   const item = attachmentQueue.value.find((entry) => entry.id === id)
   if (!item) return
+  const wasUploading = item.status === 'uploading'
   item.status = 'canceled'
   item.controller.abort()
   if (item.previewUrl && item.previewUrl.startsWith('blob:')) {
     URL.revokeObjectURL(item.previewUrl)
   }
   attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
+  if (wasUploading) processNextInAttachmentQueue()
 }
 
 async function openAttachment(attachmentId: string) {
@@ -2217,9 +2356,17 @@ watch(
         v-if="isDesktop"
         class="chat-resizer right-edge"
         :class="{ active: isResizingRail }"
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        :aria-valuenow="railWidth"
+        :aria-valuemin="MIN_RAIL_WIDTH"
+        :aria-valuemax="MAX_RAIL_WIDTH"
+        aria-label="Resize conversation list"
         title="Kéo để chỉnh độ rộng danh sách chat (Nhấp đúp để đặt lại)"
         @pointerdown.stop.prevent="startRailResize"
         @dblclick="resetRailWidth"
+        @keydown="onRailResizerKeydown"
       >
         <div class="resizer-handle-line" />
       </div>
@@ -2644,7 +2791,6 @@ watch(
                 <article
                   class="message-bubble pending outgoing has-pending-attachment"
                   :style="outgoingBubbleStyle({ senderId: auth.user?.id, body: item.body } as any)"
-                  aria-live="polite"
                 >
                   <p v-if="item.body" class="pending-attachment-body">{{ item.body }}</p>
 
@@ -2761,15 +2907,15 @@ watch(
         </div>
       </div>
 
-        <UploadProgress :progress="uploadProgress" class="sr-only" />
-        <ul v-if="attachmentQueue.length" class="attachment-queue sr-only" aria-live="polite">
-          <li v-for="item in attachmentQueue" :key="item.id" class="queue-item">
-            <span class="queue-name">{{ item.file.name }}</span>
-            <span class="queue-status">{{ item.status === 'failed' ? item.error : item.status }}</span>
-            <button v-if="item.status === 'failed'" type="button" class="message-action" @click="retryUpload(item.id)">Retry upload</button>
-            <button v-if="item.status === 'uploading' || item.status === 'queued'" type="button" class="message-action" @click="cancelUpload(item.id)">Cancel upload</button>
-          </li>
-        </ul>
+        <UploadProgress
+          v-if="attachmentUploadProgressItems.length"
+          class="sr-only"
+          :aggregate-progress="attachmentAggregateProgress"
+          :items="attachmentUploadProgressItems"
+          :label="t.attachment"
+          @retry="retryUpload"
+          @cancel="cancelUpload"
+        />
         <!-- Sticker Picker Drawer -->
         <div v-if="stickerPickerOpen" class="sticker-picker-drawer">
           <EmojiPicker
@@ -2781,7 +2927,7 @@ watch(
           />
         </div>
         <form class="chat-composer" @submit.prevent="sendText">
-          <button type="button" class="icon-btn attach-btn" aria-label="Attach file" :disabled="sending" @click="triggerAttachment">
+          <button type="button" class="icon-btn attach-btn" aria-label="Attach file" @click="triggerAttachment">
             <Icon name="plus" :size="18" />
           </button>
           <button
@@ -2801,7 +2947,7 @@ watch(
             v-model="draft"
             rows="1"
             placeholder="Aa"
-            :disabled="sending"
+            :disabled="sendingText"
             @input="onComposerInput"
             @keydown.enter="onComposerKeydown"
             @focus="stickerPickerOpen = false"
@@ -2811,7 +2957,7 @@ watch(
             type="button"
             class="like-btn"
             :aria-label="t.sendLike"
-            :disabled="sending"
+            :disabled="sendingText"
             @click="sendQuickLike"
           >
             <Icon name="thumb-up" :size="20" />
@@ -2822,7 +2968,7 @@ watch(
             type="submit"
             aria-label="Send"
             :class="{ active: Boolean(draft.trim()) }"
-            :disabled="!draft.trim() || sending"
+            :disabled="!draft.trim() || sendingText"
             @click.prevent="sendText"
           >
             <Icon name="send" :size="18" />
@@ -2853,36 +2999,45 @@ watch(
       <div class="media-panel-header">
         <h2>{{ t.sharedMedia }}</h2>
       </div>
-      <div class="media-panel-tabs" role="tablist">
+      <div class="media-panel-tabs" role="tablist" :aria-label="t.sharedMedia">
         <button
+          id="media-panel-tab-media"
           type="button"
           class="panel-tab-btn"
           :class="{ active: activeMediaTab === 'media' }"
           role="tab"
           :aria-selected="activeMediaTab === 'media'"
-          @click="activeMediaTab = 'media'"
+          aria-controls="media-panel-panel-media"
+          @click="selectMediaTab('media')"
+          @keydown="onMediaTabKeydown($event, 'media', 'media-panel')"
         >
           <span>{{ t.photosAndVideos }}</span>
           <span v-if="sharedPhotos.length" class="panel-tab-count">{{ sharedPhotos.length }}</span>
         </button>
         <button
+          id="media-panel-tab-file"
           type="button"
           class="panel-tab-btn"
           :class="{ active: activeMediaTab === 'file' }"
           role="tab"
           :aria-selected="activeMediaTab === 'file'"
-          @click="activeMediaTab = 'file'"
+          aria-controls="media-panel-panel-file"
+          @click="selectMediaTab('file')"
+          @keydown="onMediaTabKeydown($event, 'file', 'media-panel')"
         >
           <span>{{ t.files }}</span>
           <span v-if="sharedFiles.length" class="panel-tab-count">{{ sharedFiles.length }}</span>
         </button>
         <button
+          id="media-panel-tab-link"
           type="button"
           class="panel-tab-btn"
           :class="{ active: activeMediaTab === 'link' }"
           role="tab"
           :aria-selected="activeMediaTab === 'link'"
-          @click="activeMediaTab = 'link'"
+          aria-controls="media-panel-panel-link"
+          @click="selectMediaTab('link')"
+          @keydown="onMediaTabKeydown($event, 'link', 'media-panel')"
         >
           <span>{{ t.links }}</span>
           <span v-if="sharedLinks.length" class="panel-tab-count">{{ sharedLinks.length }}</span>
@@ -2890,7 +3045,14 @@ watch(
       </div>
 
       <!-- Photos & Videos -->
-      <div v-if="activeMediaTab === 'media'" class="panel-tab-body">
+      <div
+        v-if="activeMediaTab === 'media'"
+        id="media-panel-panel-media"
+        class="panel-tab-body"
+        role="tabpanel"
+        aria-labelledby="media-panel-tab-media"
+        tabindex="0"
+      >
         <div v-if="sharedPhotos.length" class="panel-media-grid">
           <button
             v-for="item in sharedPhotos"
@@ -2916,7 +3078,14 @@ watch(
       </div>
 
       <!-- Files -->
-      <div v-else-if="activeMediaTab === 'file'" class="panel-tab-body">
+      <div
+        v-else-if="activeMediaTab === 'file'"
+        id="media-panel-panel-file"
+        class="panel-tab-body"
+        role="tabpanel"
+        aria-labelledby="media-panel-tab-file"
+        tabindex="0"
+      >
         <div v-if="sharedFiles.length" class="panel-files-list">
           <button
             v-for="item in sharedFiles"
@@ -2937,7 +3106,14 @@ watch(
       </div>
 
       <!-- Links -->
-      <div v-else-if="activeMediaTab === 'link'" class="panel-tab-body">
+      <div
+        v-else-if="activeMediaTab === 'link'"
+        id="media-panel-panel-link"
+        class="panel-tab-body"
+        role="tabpanel"
+        aria-labelledby="media-panel-tab-link"
+        tabindex="0"
+      >
         <div v-if="sharedLinks.length" class="panel-links-list">
           <div
             v-for="item in sharedLinks"
@@ -2974,9 +3150,17 @@ watch(
       <div
         class="chat-resizer left-edge"
         :class="{ active: isResizingInfo }"
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        :aria-valuenow="infoWidth"
+        :aria-valuemin="MIN_INFO_WIDTH"
+        :aria-valuemax="MAX_INFO_WIDTH"
+        aria-label="Resize chat details panel"
         title="Kéo để chỉnh độ rộng thông tin đoạn chat (Nhấp đúp để đặt lại)"
         @pointerdown.stop.prevent="startInfoResize"
         @dblclick="resetInfoWidth"
+        @keydown="onInfoResizerKeydown"
       >
         <div class="resizer-handle-line" />
       </div>
@@ -3263,36 +3447,45 @@ watch(
 
         <!-- 3. MEDIA SUB-PAGE -->
         <div v-else-if="chatInfoCurrentView === 'media'" class="info-media-page">
-          <div class="info-tabs-header" role="tablist">
+          <div class="info-tabs-header" role="tablist" :aria-label="t.sharedMedia">
             <button
+              id="shared-media-tab-media"
               type="button"
               class="info-tab-btn"
               :class="{ active: activeMediaTab === 'media' }"
               role="tab"
               :aria-selected="activeMediaTab === 'media'"
-              @click="activeMediaTab = 'media'"
+              aria-controls="shared-media-panel-media"
+              @click="selectMediaTab('media')"
+              @keydown="onMediaTabKeydown($event, 'media')"
             >
               <span>{{ t.photosAndVideos }}</span>
               <span v-if="sharedPhotos.length" class="tab-badge">{{ sharedPhotos.length }}</span>
             </button>
             <button
+              id="shared-media-tab-file"
               type="button"
               class="info-tab-btn"
               :class="{ active: activeMediaTab === 'file' }"
               role="tab"
               :aria-selected="activeMediaTab === 'file'"
-              @click="activeMediaTab = 'file'"
+              aria-controls="shared-media-panel-file"
+              @click="selectMediaTab('file')"
+              @keydown="onMediaTabKeydown($event, 'file')"
             >
               <span>{{ t.files }}</span>
               <span v-if="sharedFiles.length" class="tab-badge">{{ sharedFiles.length }}</span>
             </button>
             <button
+              id="shared-media-tab-link"
               type="button"
               class="info-tab-btn"
               :class="{ active: activeMediaTab === 'link' }"
               role="tab"
               :aria-selected="activeMediaTab === 'link'"
-              @click="activeMediaTab = 'link'"
+              aria-controls="shared-media-panel-link"
+              @click="selectMediaTab('link')"
+              @keydown="onMediaTabKeydown($event, 'link')"
             >
               <span>{{ t.links }}</span>
               <span v-if="sharedLinks.length" class="tab-badge">{{ sharedLinks.length }}</span>
@@ -3300,7 +3493,14 @@ watch(
           </div>
 
           <!-- Media Tab -->
-          <div v-if="activeMediaTab === 'media'" class="tab-content">
+          <div
+            v-if="activeMediaTab === 'media'"
+            id="shared-media-panel-media"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="shared-media-tab-media"
+            tabindex="0"
+          >
             <div v-if="sharedPhotos.length" class="chat-info-media-grid">
               <button
                 v-for="item in sharedPhotos"
@@ -3318,7 +3518,14 @@ watch(
           </div>
 
           <!-- Files Tab -->
-          <div v-else-if="activeMediaTab === 'file'" class="tab-content">
+          <div
+            v-else-if="activeMediaTab === 'file'"
+            id="shared-media-panel-file"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="shared-media-tab-file"
+            tabindex="0"
+          >
             <div v-if="sharedFiles.length" class="chat-info-files-list">
               <button
                 v-for="item in sharedFiles"
@@ -3339,7 +3546,14 @@ watch(
           </div>
 
           <!-- Links Tab -->
-          <div v-else-if="activeMediaTab === 'link'" class="tab-content">
+          <div
+            v-else-if="activeMediaTab === 'link'"
+            id="shared-media-panel-link"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="shared-media-tab-link"
+            tabindex="0"
+          >
             <div v-if="sharedLinks.length" class="chat-info-links-list">
               <div
                 v-for="item in sharedLinks"
@@ -4176,36 +4390,45 @@ watch(
 
         <!-- 3. DEDICATED MEDIA SUB-PAGE (Messenger style) -->
         <div v-else-if="chatInfoCurrentView === 'media'" class="info-media-page">
-          <div class="info-tabs-header" role="tablist">
+          <div class="info-tabs-header" role="tablist" :aria-label="t.sharedMedia">
             <button
+              id="shared-media-tab-media"
               type="button"
               class="info-tab-btn"
               :class="{ active: activeMediaTab === 'media' }"
               role="tab"
               :aria-selected="activeMediaTab === 'media'"
-              @click="activeMediaTab = 'media'"
+              aria-controls="shared-media-panel-media"
+              @click="selectMediaTab('media')"
+              @keydown="onMediaTabKeydown($event, 'media')"
             >
               <span>{{ t.photosAndVideos }}</span>
               <span v-if="sharedPhotos.length" class="tab-badge">{{ sharedPhotos.length }}</span>
             </button>
             <button
+              id="shared-media-tab-file"
               type="button"
               class="info-tab-btn"
               :class="{ active: activeMediaTab === 'file' }"
               role="tab"
               :aria-selected="activeMediaTab === 'file'"
-              @click="activeMediaTab = 'file'"
+              aria-controls="shared-media-panel-file"
+              @click="selectMediaTab('file')"
+              @keydown="onMediaTabKeydown($event, 'file')"
             >
               <span>{{ t.files }}</span>
               <span v-if="sharedFiles.length" class="tab-badge">{{ sharedFiles.length }}</span>
             </button>
             <button
+              id="shared-media-tab-link"
               type="button"
               class="info-tab-btn"
               :class="{ active: activeMediaTab === 'link' }"
               role="tab"
               :aria-selected="activeMediaTab === 'link'"
-              @click="activeMediaTab = 'link'"
+              aria-controls="shared-media-panel-link"
+              @click="selectMediaTab('link')"
+              @keydown="onMediaTabKeydown($event, 'link')"
             >
               <span>{{ t.links }}</span>
               <span v-if="sharedLinks.length" class="tab-badge">{{ sharedLinks.length }}</span>
@@ -4213,7 +4436,14 @@ watch(
           </div>
 
           <!-- Media Tab (Photos & Videos) -->
-          <div v-if="activeMediaTab === 'media'" class="tab-content">
+          <div
+            v-if="activeMediaTab === 'media'"
+            id="shared-media-panel-media"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="shared-media-tab-media"
+            tabindex="0"
+          >
             <div v-if="sharedPhotos.length" class="chat-info-media-grid">
               <button
                 v-for="item in sharedPhotos"
@@ -4231,7 +4461,14 @@ watch(
           </div>
 
           <!-- Files Tab -->
-          <div v-else-if="activeMediaTab === 'file'" class="tab-content">
+          <div
+            v-else-if="activeMediaTab === 'file'"
+            id="shared-media-panel-file"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="shared-media-tab-file"
+            tabindex="0"
+          >
             <div v-if="sharedFiles.length" class="chat-info-files-list">
               <button
                 v-for="item in sharedFiles"
@@ -4252,7 +4489,14 @@ watch(
           </div>
 
           <!-- Links Tab -->
-          <div v-else-if="activeMediaTab === 'link'" class="tab-content">
+          <div
+            v-else-if="activeMediaTab === 'link'"
+            id="shared-media-panel-link"
+            class="tab-content"
+            role="tabpanel"
+            aria-labelledby="shared-media-tab-link"
+            tabindex="0"
+          >
             <div v-if="sharedLinks.length" class="chat-info-links-list">
               <div
                 v-for="item in sharedLinks"
@@ -6403,9 +6647,15 @@ img.avatar-img {
 }
 
 .chat-resizer:hover .resizer-handle-line,
-.chat-resizer.active .resizer-handle-line {
+.chat-resizer.active .resizer-handle-line,
+.chat-resizer:focus-visible .resizer-handle-line {
   width: 4px;
   background: var(--accent);
+}
+
+.chat-resizer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .chat-app.resizing-col {
