@@ -5,15 +5,37 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/oklog/ulid/v2"
 )
 
-// TimelineByType filters before applying the cursor/limit so pagination remains
-// truthful even when matching media is sparse among other timeline items.
-func (s *Service) TimelineByType(ctx context.Context, ownerID string, before *time.Time, limit int, mediaType string) (Timeline, error) {
-	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
-	if mediaType == "" {
-		return s.Timeline(ctx, ownerID, before, limit)
+func ParseTimelineCursor(raw string) (*TimelineCursor, error) {
+	if raw == "" {
+		return nil, nil
 	}
+	sep := strings.LastIndex(raw, "|")
+	if sep <= 0 || sep == len(raw)-1 {
+		return nil, errors.New("invalid timeline cursor")
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, raw[:sep])
+	if err != nil {
+		return nil, errors.New("invalid timeline cursor")
+	}
+	id := raw[sep+1:]
+	if _, err := ulid.ParseStrict(id); err != nil {
+		return nil, errors.New("invalid timeline cursor")
+	}
+	return &TimelineCursor{CreatedAt: createdAt, ID: id}, nil
+}
+
+func FormatTimelineCursor(item TimelineItem) string {
+	return item.CreatedAt.UTC().Format(time.RFC3339Nano) + "|" + item.ID
+}
+
+// TimelineByType filters before applying the composite cursor/limit so pagination
+// remains truthful even when matching media is sparse or timestamps collide.
+func (s *Service) TimelineByType(ctx context.Context, ownerID string, before *TimelineCursor, limit int, mediaType string) (Timeline, error) {
+	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
 	if mediaType != "image" && mediaType != "video" {
 		return Timeline{}, errors.New("unsupported timeline media type")
 	}
@@ -31,7 +53,7 @@ func (s *Service) TimelineByType(ctx context.Context, ownerID string, before *ti
 	var nextBefore string
 	if len(items) > limit {
 		items = items[:limit]
-		nextBefore = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)
+		nextBefore = FormatTimelineCursor(items[len(items)-1])
 	}
 	if err := s.attachThumbnails(ctx, ownerID, items); err != nil {
 		return Timeline{}, err
