@@ -22,6 +22,15 @@ vi.mock('@/api/errors', () => ({
   formatApiError: (_error: unknown, fallback: string) => fallback,
 }))
 
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    user: {
+      trashAutoDeleteEnabled: true,
+      trashRetentionDays: 30,
+    },
+  }),
+}))
+
 vi.mock('@/stores/ui', () => ({
   useUiStore: () => ({
     confirm: mocks.confirm,

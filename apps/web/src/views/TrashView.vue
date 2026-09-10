@@ -2,15 +2,18 @@
 import { computed, onMounted, ref } from 'vue'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
+import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import { runTrashPurge, type TrashPurgeTarget } from '@/lib/trashPurge'
+import { trashRetentionNotice } from '@/lib/trashRetention'
 import { useI18n } from '@/lib/i18n'
 import type { TrashList } from '@/api/types'
 
+const auth = useAuthStore()
 const ui = useUiStore()
 const { t, locale } = useI18n()
 const trash = ref<TrashList | null>(null)
@@ -19,6 +22,8 @@ const error = ref('')
 const emptyingTrash = ref(false)
 const purgeCompleted = ref(0)
 const purgeTotal = ref(0)
+
+const retentionNotice = computed(() => trashRetentionNotice(auth.user, locale.value))
 
 const trashBatchCopy = computed(() =>
   locale.value === 'vi'
@@ -201,10 +206,9 @@ onMounted(load)
   <div class="trash-page">
     <h1 class="page-title desktop-only">{{ t.trashTitle }}</h1>
 
-    <!-- TeraBox Trash Retention Banner -->
     <div class="trash-notice-banner">
       <Icon name="info" :size="18" class="notice-icon" />
-      <span>{{ t.trashRetentionNotice || 'Tệp trong thùng rác sẽ tự động xóa sau 30 ngày.' }}</span>
+      <span>{{ retentionNotice }}</span>
     </div>
 
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -218,7 +222,6 @@ onMounted(load)
       />
 
       <template v-else>
-        <!-- Action bar -->
         <div class="trash-toolbar">
           <span class="trash-count-text">{{ totalCount }} {{ t.results }}</span>
           <button
@@ -233,7 +236,6 @@ onMounted(load)
           </button>
         </div>
 
-        <!-- Folders -->
         <TransitionGroup v-if="trash?.folders.length" name="row" tag="section" class="trash-list">
           <h2 key="folders-title" class="section-title">{{ t.folders }}</h2>
           <div
@@ -274,7 +276,6 @@ onMounted(load)
           </div>
         </TransitionGroup>
 
-        <!-- Files -->
         <TransitionGroup v-if="trash?.files.length" name="row" tag="section" class="trash-list files-section">
           <h2 key="files-title" class="section-title">{{ t.files }}</h2>
           <div
@@ -341,6 +342,7 @@ onMounted(load)
   background: var(--accent-soft, rgba(0, 132, 255, 0.08));
   color: var(--ink);
   font-size: 13px;
+  line-height: 1.4;
   border: 1px solid var(--hairline);
 }
 
