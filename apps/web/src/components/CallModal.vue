@@ -89,7 +89,6 @@ if (typeof document !== 'undefined') {
   document.addEventListener('fullscreenchange', onFullscreenChange)
 }
 
-// Watch for connected state & room instance
 watch(
   [() => callStore.state, () => callStore.room],
   async ([state, room]) => {
@@ -101,17 +100,14 @@ watch(
     const activeRoom = room as Room
     await nextTick()
 
-    // Unlock autoplay if browser suspended Web Audio
     try {
       await activeRoom.startAudio()
     } catch {
       // Ignored if user hasn't interacted yet
     }
 
-    // Attach initial local video track
     attachLocalCamera(activeRoom)
 
-    // Attach initial remote video and audio tracks
     activeRoom.remoteParticipants.forEach((participant: RemoteParticipant) => {
       participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
         if (pub.track) {
@@ -125,7 +121,6 @@ watch(
     })
     updateRemoteVideoState(activeRoom)
 
-    // Listen to local track published / unpublished
     activeRoom.on(RoomEvent.LocalTrackPublished, (pub) => {
       if (pub.kind === Track.Kind.Video && localVideoRef.value) {
         pub.track?.attach(localVideoRef.value)
@@ -138,7 +133,6 @@ watch(
       }
     })
 
-    // Listen to remote tracks subscribed
     activeRoom.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
       if (track.kind === Track.Kind.Video) {
         if (remoteVideoRef.value) track.attach(remoteVideoRef.value)
@@ -168,7 +162,6 @@ watch(
   { immediate: true },
 )
 
-// Re-attach local video if camera is re-enabled
 watch(
   () => callStore.isCamEnabled,
   async (enabled) => {
@@ -190,10 +183,8 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="call-overlay" role="dialog" :aria-label="callTitle" aria-modal="true">
-      <!-- Offscreen audio element for remote audio tracks (never display: none to prevent browser mute) -->
       <audio ref="remoteAudioRef" autoplay playsinline class="offscreen-audio"></audio>
 
-      <!-- 1. Incoming Call Prompt -->
       <div v-if="callStore.state === 'incoming'" class="call-incoming-card">
         <div class="caller-avatar-pulse">
           <div class="avatar-circle">
@@ -226,7 +217,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 2. Outgoing Call Screen -->
       <div v-else-if="callStore.state === 'outgoing'" class="call-outgoing-card">
         <div class="caller-avatar-pulse outgoing">
           <div class="avatar-circle">
@@ -250,9 +240,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 3. Connected Call Screen -->
       <div v-else-if="callStore.state === 'connected'" class="call-active-room">
-        <!-- Call Header Bar -->
         <header class="call-header-bar">
           <div class="header-peer-info">
             <div class="status-indicator">
@@ -272,9 +260,7 @@ onUnmounted(() => {
           </button>
         </header>
 
-        <!-- Media Surface Area -->
         <div class="call-media-container" :class="{ 'audio-only': !callStore.isVideo || !hasRemoteVideo }">
-          <!-- Remote Video Element -->
           <video
             v-show="callStore.isVideo && hasRemoteVideo"
             ref="remoteVideoRef"
@@ -283,7 +269,6 @@ onUnmounted(() => {
             class="remote-video"
           ></video>
 
-          <!-- Audio-only / Camera off fallback presentation -->
           <div v-if="!callStore.isVideo || !hasRemoteVideo" class="audio-caller-display">
             <div class="avatar-circle large" :class="{ speaking: callStore.activeSpeaker && callStore.activeSpeaker !== auth.user?.id }">
               <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
@@ -295,7 +280,6 @@ onUnmounted(() => {
             </p>
           </div>
 
-          <!-- Local Video PiP (Picture in Picture) -->
           <div v-show="callStore.isVideo" class="local-video-wrapper">
             <video
               ref="localVideoRef"
@@ -312,13 +296,12 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Floating Controls Dock -->
         <div class="call-controls-dock">
-          <!-- Mic Toggle -->
           <button
             type="button"
             class="control-btn"
             :class="{ muted: !callStore.isMicEnabled }"
+            :aria-pressed="callStore.isMicEnabled"
             :aria-label="callStore.isMicEnabled ? 'Tắt mic' : 'Bật mic'"
             :title="callStore.isMicEnabled ? 'Tắt mic' : 'Bật mic'"
             @click="callStore.toggleMicrophone"
@@ -326,12 +309,12 @@ onUnmounted(() => {
             <Icon :name="callStore.isMicEnabled ? 'mic' : 'mic-off'" :size="22" />
           </button>
 
-          <!-- Camera Toggle (if video enabled) -->
           <button
             v-if="callStore.isVideo"
             type="button"
             class="control-btn"
             :class="{ muted: !callStore.isCamEnabled }"
+            :aria-pressed="callStore.isCamEnabled"
             :aria-label="callStore.isCamEnabled ? 'Tắt camera' : 'Bật camera'"
             :title="callStore.isCamEnabled ? 'Tắt camera' : 'Bật camera'"
             @click="callStore.toggleCamera"
@@ -339,7 +322,6 @@ onUnmounted(() => {
             <Icon :name="callStore.isCamEnabled ? 'camera' : 'camera-off'" :size="22" />
           </button>
 
-          <!-- Hangup / End Call -->
           <button
             type="button"
             class="control-btn btn-hangup"
@@ -352,7 +334,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 4. Call Ended Screen -->
       <div v-else-if="callStore.state === 'ended'" class="call-ended-card">
         <div class="avatar-circle">
           <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
@@ -382,7 +363,6 @@ onUnmounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Offscreen audio avoids Chromium/WebKit suppression of display:none elements */
 .offscreen-audio {
   position: fixed;
   top: -9999px;
@@ -393,7 +373,6 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-/* Incoming & Outgoing cards */
 .call-incoming-card,
 .call-outgoing-card,
 .call-ended-card {
@@ -553,7 +532,6 @@ onUnmounted(() => {
   box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
 }
 
-/* 3. Connected Call Room */
 .call-active-room {
   position: relative;
   width: 100%;
@@ -575,16 +553,16 @@ onUnmounted(() => {
 
 .call-header-bar {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(12px);
-  padding: 8px 16px;
+  padding: 8px 12px 8px 16px;
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
@@ -593,6 +571,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .status-indicator {
@@ -602,6 +581,7 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.3);
   padding: 3px 8px;
   border-radius: 12px;
+  flex: 0 0 auto;
 }
 
 .status-dot {
@@ -629,6 +609,9 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-action-btn {
@@ -636,16 +619,20 @@ onUnmounted(() => {
   border: none;
   color: #94a3b8;
   cursor: pointer;
-  padding: 4px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease;
+  touch-action: manipulation;
 }
 
 .header-action-btn:hover {
   color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .call-media-container {
@@ -681,8 +668,8 @@ onUnmounted(() => {
 
 .local-video-wrapper {
   position: absolute;
-  right: 16px;
-  bottom: 88px;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 64px);
   width: 110px;
   height: 150px;
   border-radius: 14px;
@@ -700,7 +687,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1); /* Mirror camera preview */
+  transform: scaleX(-1);
 }
 
 .cam-off-overlay {
@@ -722,10 +709,11 @@ onUnmounted(() => {
   text-align: center;
 }
 
-/* Floating Controls Dock */
 .call-controls-dock {
   position: absolute;
-  bottom: 24px;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
   display: flex;
   align-items: center;
@@ -745,6 +733,8 @@ onUnmounted(() => {
   justify-content: center;
   width: 50px;
   height: 50px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.14);
@@ -771,11 +761,41 @@ onUnmounted(() => {
 
 @media (max-width: 767px) {
   .local-video-wrapper {
-    top: 72px;
+    top: calc(max(16px, env(safe-area-inset-top)) + 56px);
     bottom: auto;
-    right: 12px;
+    right: max(12px, env(safe-area-inset-right));
     width: 90px;
     height: 125px;
+  }
+}
+
+@media (max-width: 767px) and (orientation: landscape) {
+  .call-active-room {
+    border-radius: 16px;
+  }
+
+  .call-header-bar {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+  }
+
+  .local-video-wrapper {
+    top: calc(max(8px, env(safe-area-inset-top)) + 52px);
+    right: max(8px, env(safe-area-inset-right));
+    width: 96px;
+    height: 72px;
+  }
+
+  .call-controls-dock {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    gap: 10px;
+    padding: 6px 12px;
+  }
+
+  .control-btn {
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -796,8 +816,37 @@ onUnmounted(() => {
   .local-video-wrapper {
     width: 150px;
     height: 200px;
-    right: 24px;
-    bottom: 96px;
+    right: max(24px, env(safe-area-inset-right));
+    bottom: calc(max(24px, env(safe-area-inset-bottom)) + 72px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-incoming-card,
+  .call-outgoing-card,
+  .call-ended-card,
+  .caller-avatar-pulse::before,
+  .caller-avatar-pulse::after,
+  .status-dot {
+    animation: none;
+  }
+
+  .caller-avatar-pulse::before,
+  .caller-avatar-pulse::after {
+    opacity: 0.35;
+  }
+
+  .avatar-circle.large,
+  .call-btn,
+  .header-action-btn,
+  .control-btn {
+    transition: none;
+  }
+
+  .avatar-circle.speaking,
+  .call-btn:active,
+  .control-btn:active {
+    transform: none;
   }
 }
 </style>
