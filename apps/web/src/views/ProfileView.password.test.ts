@@ -7,12 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProfileView from './ProfileView.vue'
 
 const mocks = vi.hoisted(() => ({
-  api: vi.fn(),
-  setTokens: vi.fn(),
-  loadMe: vi.fn(),
-  logout: vi.fn(),
-  updateAvatar: vi.fn(),
-  showToast: vi.fn(),
+  api: vi.fn<(path: string, options?: RequestInit) => Promise<unknown>>(),
+  setTokens: vi.fn<(accessToken: string, refreshToken: string) => void>(),
+  loadMe: vi.fn<() => Promise<void>>(),
+  logout: vi.fn<() => Promise<void>>(),
+  updateAvatar: vi.fn<(avatarUrl: string) => Promise<void>>(),
+  showToast: vi.fn<(message: string, variant?: string) => void>(),
 }))
 
 vi.mock('@/api/client', () => ({
@@ -63,8 +63,8 @@ vi.mock('@/lib/i18n', () => ({
 
 vi.mock('@/lib/heic', () => ({
   isHeic: () => false,
-  convertHeicBlobToJpeg: vi.fn(),
-  checkIsHeicBlob: vi.fn().mockResolvedValue(false),
+  convertHeicBlobToJpeg: vi.fn<(blob: Blob, quality?: number) => Promise<Blob>>(),
+  checkIsHeicBlob: vi.fn<(blob: Blob) => Promise<boolean>>().mockResolvedValue(false),
 }))
 
 function mountProfile() {
