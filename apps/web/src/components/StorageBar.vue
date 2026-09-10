@@ -1,57 +1,94 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { api, formatBytes } from '@/api/client'
-import type { StorageUsage } from '@/api/types'
+import { onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { formatBytes } from '@/api/client'
+import Icon from '@/components/AppIcon.vue'
+import { useI18n } from '@/lib/i18n'
+import { useStorageUsage } from '@/lib/useStorageUsage'
 
-const usage = ref<StorageUsage | null>(null)
+const { t } = useI18n()
+const storage = useStorageUsage(formatBytes)
 
-const fillClass = computed(() => {
-  if (!usage.value) return ''
-  const pct = (usage.value.usedBytes / usage.value.quotaBytes) * 100
-  if (pct >= 100) return 'danger'
-  if (pct >= 90) return 'warning'
-  return ''
+onMounted(() => {
+  void storage.reload()
 })
 
-async function reload() {
-  try {
-    usage.value = await api<StorageUsage>('/storage')
-  } catch {
-    usage.value = null
-  }
-}
-
-onMounted(reload)
-
-defineExpose({ reload })
+defineExpose({ reload: storage.reload })
 </script>
 
 <template>
-  <div v-if="usage" class="storage-bar">
-    <span class="label desktop-only">Storage</span>
-    <div
-      class="track"
-      role="progressbar"
-      :aria-valuenow="Math.round((usage.usedBytes / usage.quotaBytes) * 100)"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      :aria-label="`${formatBytes(usage.usedBytes)} of ${formatBytes(usage.quotaBytes)} used`"
-    >
+  <div class="storage-bar" :data-state="storage.state.value">
+    <template v-if="storage.state.value === 'loading'">
+      <span class="label">{{ t.storageLabel }}</span>
+      <p class="status-message muted" role="status">{{ t.storageLoading }}</p>
+    </template>
+
+    <template v-else-if="storage.state.value === 'usage-unavailable'">
+      <Icon name="info" :size="16" class="status-icon muted" aria-hidden="true" />
+      <p class="status-message muted" role="status">{{ t.storageUnavailable }}</p>
+      <button
+        type="button"
+        class="retry-btn"
+        data-testid="storage-retry"
+        @click="storage.reload()"
+      >
+        {{ t.retry }}
+      </button>
+    </template>
+
+    <template v-else>
+      <span class="label desktop-only">{{ t.storageLabel }}</span>
       <div
-        class="fill"
-        :class="fillClass"
-        :style="{ '--fill-ratio': Math.min(1, usage.usedBytes / usage.quotaBytes) }"
-      />
-    </div>
-    <div class="numbers" aria-hidden="true">{{ formatBytes(usage.usedBytes) }} / {{ formatBytes(usage.quotaBytes) }}</div>
+        class="track"
+        role="progressbar"
+        :aria-valuenow="storage.progressAria.value.valuenow"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-label="storage.progressAria.value.label"
+      >
+        <div
+          class="fill"
+          :class="storage.toneClass.value"
+          :style="{ '--fill-ratio': storage.fillRatio.value }"
+        />
+      </div>
+      <div class="numbers" aria-hidden="true">
+        {{ formatBytes(storage.usedBytes.value) }} / {{ formatBytes(storage.quotaBytes.value) }}
+      </div>
+
+      <div
+        v-if="storage.state.value === 'near-quota'"
+        class="status near-quota"
+        role="status"
+      >
+        <Icon name="alert" :size="14" class="status-icon" aria-hidden="true" />
+        <span class="status-text">{{ t.storageNearQuota }}</span>
+      </div>
+
+      <div
+        v-else-if="storage.state.value === 'full-quota'"
+        class="status full-quota"
+        role="status"
+      >
+        <Icon name="alert" :size="14" class="status-icon" aria-hidden="true" />
+        <span class="status-copy">
+          <span class="status-text">{{ t.storageFullQuota }}</span>
+          <span class="status-hint">{{ t.storageFullQuotaHint }}</span>
+        </span>
+        <RouterLink to="/trash" class="action-link" data-testid="storage-action">
+          {{ t.storageFreeUp }}
+        </RouterLink>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .storage-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs) var(--space-sm);
   padding: var(--space-xs) var(--space-md);
   background: var(--surface-soft);
   border-bottom: 1px solid var(--hairline);
@@ -67,8 +104,38 @@ defineExpose({ reload })
   display: none;
 }
 
+.status-message {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 8rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.retry-btn {
+  flex-shrink: 0;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.retry-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .track {
-  flex: 1;
+  flex: 1 1 5rem;
+  min-width: 4rem;
   height: 8px;
   background: var(--hairline);
   border-radius: var(--radius-pill);
@@ -100,8 +167,67 @@ defineExpose({ reload })
 
 .numbers {
   color: var(--muted);
+  flex-shrink: 0;
   white-space: nowrap;
   font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.status.near-quota {
+  color: var(--warning);
+}
+
+.status.full-quota {
+  color: var(--danger);
+}
+
+.status-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.status-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.status-text {
+  font-weight: 600;
+}
+
+.status-hint {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.action-link {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--danger-soft, rgba(239, 68, 68, 0.12));
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.action-link:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
 }
 
 @media (min-width: 768px) {
@@ -111,6 +237,15 @@ defineExpose({ reload })
 
   .numbers {
     font-size: 0.8125rem;
+  }
+
+  .status {
+    flex: 0 1 auto;
+    flex-basis: auto;
+  }
+
+  .status.full-quota {
+    flex: 1 1 auto;
   }
 }
 </style>

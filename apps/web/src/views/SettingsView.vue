@@ -10,6 +10,7 @@ import { userInitials } from '@/lib/userInitials'
 import type { ActivityEvent, ActivityEventType, ShareLinkInfo, User } from '@/api/types'
 import { setLocale, useI18n, type Locale } from '@/lib/i18n'
 import { THEMES, useTheme, type ThemeDef } from '@/lib/theme'
+import { useStorageUsage } from '@/lib/useStorageUsage'
 
 const auth = useAuthStore()
 const ui = useUiStore()
@@ -30,12 +31,7 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   setAppearanceMode(mode)
 }
 
-const storageUsed = computed(() => auth.user?.storageUsed ?? 0)
-const storageQuota = computed(() => auth.user?.storageQuota ?? 10 * 1024 * 1024 * 1024)
-const storagePercent = computed(() => {
-  if (!storageQuota.value) return 0
-  return Math.min(100, Math.round((storageUsed.value / storageQuota.value) * 100))
-})
+const storage = useStorageUsage(formatBytes)
 const avatarInitials = computed(() =>
   userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
 )
@@ -225,6 +221,7 @@ function relativeTime(iso: string): string {
 }
 
 onMounted(() => {
+  void storage.reload()
   loadShareLinks()
   loadActivity()
 })
@@ -266,14 +263,59 @@ onMounted(() => {
           <Icon name="cloud" :size="20" class="storage-cloud-icon" />
           <span class="storage-title">{{ t.myCloud }}</span>
         </div>
-        <span class="storage-stats-text">
-          <strong>{{ formatBytes(storageUsed) }}</strong> / {{ formatBytes(storageQuota) }}
+        <span v-if="storage.state.value === 'loading'" class="storage-stats-text muted">
+          {{ t.storageLoading }}
+        </span>
+        <span v-else-if="storage.state.value === 'usage-unavailable'" class="storage-stats-text muted">
+          {{ t.storageUnavailable }}
+        </span>
+        <span v-else class="storage-stats-text">
+          <strong>{{ formatBytes(storage.usedBytes.value) }}</strong> / {{ formatBytes(storage.quotaBytes.value) }}
         </span>
       </div>
 
-      <div class="storage-bar-track">
-        <div class="storage-bar-fill" :style="{ width: `${storagePercent}%` }"></div>
-      </div>
+      <template v-if="storage.state.value === 'usage-unavailable'">
+        <p class="storage-status muted">{{ t.storageUnavailableHint }}</p>
+        <button type="button" class="btn storage-retry-btn" @click="storage.reload()">
+          {{ t.retry }}
+        </button>
+      </template>
+      <template v-else-if="storage.state.value !== 'loading'">
+        <div
+          class="storage-bar-track"
+          role="progressbar"
+          :aria-valuenow="storage.progressAria.value.valuenow"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-label="storage.progressAria.value.label"
+        >
+          <div
+            class="storage-bar-fill"
+            :class="storage.toneClass.value"
+            :style="{ width: `${storage.percent.value}%` }"
+          />
+        </div>
+        <p
+          v-if="storage.state.value === 'near-quota'"
+          class="storage-status warning"
+          role="status"
+        >
+          <Icon name="alert" :size="14" aria-hidden="true" />
+          <span>{{ t.storageNearQuota }} — {{ t.storageNearQuotaHint }}</span>
+        </p>
+        <div
+          v-else-if="storage.state.value === 'full-quota'"
+          class="storage-status full"
+          role="status"
+        >
+          <Icon name="alert" :size="14" aria-hidden="true" />
+          <div class="storage-status-copy">
+            <strong>{{ t.storageFullQuota }}</strong>
+            <span class="muted">{{ t.storageFullQuotaHint }}</span>
+          </div>
+          <RouterLink to="/trash" class="storage-action-link">{{ t.storageFreeUp }}</RouterLink>
+        </div>
+      </template>
 
       <div class="storage-shortcuts-grid">
         <RouterLink to="/files" class="shortcut-item">
@@ -834,8 +876,57 @@ onMounted(() => {
 .storage-bar-fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, #0284c7 0%, #0d9488 100%);
+  background: var(--accent);
   transition: width var(--duration-medium) var(--ease-standard);
+}
+
+.storage-bar-fill.warning {
+  background: var(--warning);
+}
+
+.storage-bar-fill.danger {
+  background: var(--danger);
+}
+
+.storage-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-md);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.storage-status.warning {
+  color: var(--warning);
+}
+
+.storage-status.full {
+  color: var(--danger);
+}
+
+.storage-status-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.storage-action-link {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 4px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--danger-soft, rgba(239, 68, 68, 0.12));
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.storage-retry-btn {
+  margin-bottom: var(--space-md);
 }
 
 .storage-shortcuts-grid {
