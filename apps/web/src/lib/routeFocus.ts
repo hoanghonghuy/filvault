@@ -2,6 +2,7 @@ type AfterEachHook = (to: unknown, from: unknown) => void
 
 type RouterLike = {
   afterEach: (hook: AfterEachHook) => (() => void) | void
+  isReady: () => Promise<unknown>
 }
 
 const MODAL_SELECTOR = '[aria-modal="true"]'
@@ -47,23 +48,23 @@ function focusPageTitle() {
 export function installRouteFocus(router: RouterLike): () => void {
   if (typeof document === 'undefined') return () => {}
 
-  let initialized = false
+  let disposed = false
   let frame = 0
+  let removeHook: (() => void) | void
 
-  const removeHook = router.afterEach(() => {
-    if (!initialized) {
-      initialized = true
-      return
-    }
-
-    if (frame) cancelAnimationFrame(frame)
-    frame = requestAnimationFrame(() => {
-      frame = 0
-      focusPageTitle()
+  void router.isReady().then(() => {
+    if (disposed) return
+    removeHook = router.afterEach(() => {
+      if (frame) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        focusPageTitle()
+      })
     })
   })
 
   return () => {
+    disposed = true
     if (frame) cancelAnimationFrame(frame)
     removeHook?.()
   }
