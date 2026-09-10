@@ -43,8 +43,8 @@ func NewService(repo Repository, objects ObjectStore, inviteMailer InviteMailer,
 // CreateResult reports whether the share row was created or only an invite
 // was mailed (anti-probing: both are 201 for the caller).
 type CreateResult struct {
-	Share    *Share
-	Invited  bool
+	Share     *Share
+	Invited   bool
 	OwnerName string
 }
 
@@ -211,27 +211,21 @@ func (s *Service) ownerDisplayName(ctx context.Context, ownerID string) string {
 	return u.DisplayName
 }
 
-// BrowseFolder lists the direct children of a folder shared with the recipient.
+// BrowseFolder lists the direct children of a folder that is either directly
+// shared with the recipient or is a descendant of one of their folder shares.
 func (s *Service) BrowseFolder(ctx context.Context, recipientID, folderID string) (folder.Browser, error) {
-	sh, err := s.repo.GetShareByRecipientResource(ctx, recipientID, ResourceFolder, folderID)
+	f, ownerID, allowed, err := s.sharedFolderAccess(ctx, recipientID, folderID)
 	if err != nil {
 		return folder.Browser{}, err
 	}
-	if sh == nil {
+	if !allowed || f == nil {
 		return folder.Browser{}, apperr.NotFound
 	}
-	f, err := s.repo.GetAliveFolderByID(ctx, sh.OwnerID, folderID)
+	folders, err := s.repo.ListAliveFolderChildren(ctx, ownerID, &folderID)
 	if err != nil {
 		return folder.Browser{}, err
 	}
-	if f == nil {
-		return folder.Browser{}, apperr.NotFound
-	}
-	folders, err := s.repo.ListAliveFolderChildren(ctx, sh.OwnerID, &folderID)
-	if err != nil {
-		return folder.Browser{}, err
-	}
-	files, err := s.repo.ListAliveFilesInFolder(ctx, sh.OwnerID, &folderID)
+	files, err := s.repo.ListAliveFilesInFolder(ctx, ownerID, &folderID)
 	if err != nil {
 		return folder.Browser{}, err
 	}
@@ -243,7 +237,7 @@ func (s *Service) BrowseFolder(ctx context.Context, recipientID, folderID string
 }
 
 // DownloadURL returns a presigned URL for a file shared with the recipient,
-// either directly or via a shared parent folder.
+// either directly or anywhere below a shared folder root.
 func (s *Service) DownloadURL(ctx context.Context, recipientID, fileID string) (DownloadURL, error) {
 	f, err := s.repo.GetFileByIDAny(ctx, fileID)
 	if err != nil {
@@ -276,16 +270,56 @@ func (s *Service) canAccessFile(ctx context.Context, recipientID string, f *file
 	if direct != nil {
 		return true, nil
 	}
-	if f.FolderID != nil {
-		viaFolder, err := s.repo.GetShareByRecipientResource(ctx, recipientID, ResourceFolder, *f.FolderID)
-		if err != nil {
-			return false, err
+	if f.FolderID == nil {
+		return false, nil
+	}
+	_, _, allowed, err := s.sharedFolderAccess(ctx, recipientID, *f.FolderID)
+	return allowed, err
+}
+
+// sharedFolderAccess resolves a requested folder only through owners who have
+// already shared a folder with the recipient. It then walks parents inside that
+// same owner boundary until it reaches the directly shared root. This avoids a
+// cross-owner folder lookup while allowing arbitrarily deep descendants.
+func (s *Service) sharedFolderAccess(ctx context.Context, recipientID, folderID string) (*folder.Folder, string, bool, error) {
+	shares, err := s.repo.ListSharesByRecipient(ctx, recipientID)
+	if err != nil {
+		return nil, "", false, err
+	}
+
+	for _, sh := range shares {
+		if sh.ResourceType != ResourceFolder {
+			continue
 		}
-		if viaFolder != nil {
-			return true, nil
+		candidate, err := s.repo.GetAliveFolderByID(ctx, sh.OwnerID, folderID)
+		if err != nil {
+			return nil, "", false, err
+		}
+		if candidate == nil {
+			continue
+		}
+
+		current := candidate
+		visited := make(map[string]struct{})
+		for current != nil {
+			if _, seen := visited[current.ID]; seen {
+				break
+			}
+			visited[current.ID] = struct{}{}
+			if current.ID == sh.ResourceID {
+				return candidate, sh.OwnerID, true, nil
+			}
+			if current.ParentID == nil {
+				break
+			}
+			current, err = s.repo.GetAliveFolderByID(ctx, sh.OwnerID, *current.ParentID)
+			if err != nil {
+				return nil, "", false, err
+			}
 		}
 	}
-	return false, nil
+
+	return nil, "", false, nil
 }
 
 func (s *Service) validateResource(ctx context.Context, ownerID, resourceType, resourceID string) error {
