@@ -8,6 +8,11 @@ type Hook = (to: unknown, from: unknown) => void
 
 function makeRouter() {
   let hook: Hook | null = null
+  let resolveReady: (() => void) | null = null
+  const readyPromise = new Promise<void>((resolve) => {
+    resolveReady = resolve
+  })
+
   return {
     router: {
       afterEach(next: Hook) {
@@ -16,6 +21,14 @@ function makeRouter() {
           hook = null
         }
       },
+      isReady() {
+        return readyPromise
+      },
+    },
+    ready: async () => {
+      resolveReady?.()
+      await readyPromise
+      await Promise.resolve()
     },
     navigate() {
       hook?.({}, {})
@@ -42,13 +55,17 @@ describe('installRouteFocus', () => {
     document.body.innerHTML = ''
   })
 
-  it('does not steal focus on initial navigation but focuses page title afterward', async () => {
+  it('does not steal focus during bootstrap redirects and focuses later route changes', async () => {
     const nav = document.querySelector<HTMLButtonElement>('#nav')!
     nav.focus()
-    const { router, navigate } = makeRouter()
+    const { router, ready, navigate } = makeRouter()
     const cleanup = installRouteFocus(router)
 
     navigate()
+    navigate()
+    expect(document.activeElement).toBe(nav)
+
+    await ready()
     expect(document.activeElement).toBe(nav)
 
     navigate()
@@ -65,9 +82,9 @@ describe('installRouteFocus', () => {
     const modalAction = document.querySelector<HTMLButtonElement>('#modal-action')!
     modalAction.focus()
 
-    const { router, navigate } = makeRouter()
+    const { router, ready, navigate } = makeRouter()
     const cleanup = installRouteFocus(router)
-    navigate()
+    await ready()
     navigate()
     await flushFrame()
 
@@ -81,9 +98,9 @@ describe('installRouteFocus', () => {
     modal.hidden = true
     document.body.append(modal)
 
-    const { router, navigate } = makeRouter()
+    const { router, ready, navigate } = makeRouter()
     const cleanup = installRouteFocus(router)
-    navigate()
+    await ready()
     navigate()
     await flushFrame()
 
@@ -97,9 +114,9 @@ describe('installRouteFocus', () => {
     title.style.display = 'none'
     nav.focus()
 
-    const { router, navigate } = makeRouter()
+    const { router, ready, navigate } = makeRouter()
     const cleanup = installRouteFocus(router)
-    navigate()
+    await ready()
     navigate()
     await flushFrame()
 
@@ -116,9 +133,9 @@ describe('installRouteFocus', () => {
     wrapper.style.display = 'none'
     nav.focus()
 
-    const { router, navigate } = makeRouter()
+    const { router, ready, navigate } = makeRouter()
     const cleanup = installRouteFocus(router)
-    navigate()
+    await ready()
     navigate()
     await flushFrame()
 
@@ -128,9 +145,9 @@ describe('installRouteFocus', () => {
 
   it('uses tabindex -1 only for programmatic focus and removes it after blur', async () => {
     const title = document.querySelector<HTMLElement>('.header-title')!
-    const { router, navigate } = makeRouter()
+    const { router, ready, navigate } = makeRouter()
     const cleanup = installRouteFocus(router)
-    navigate()
+    await ready()
     navigate()
     await flushFrame()
 
@@ -138,5 +155,18 @@ describe('installRouteFocus', () => {
     title.blur()
     expect(title.hasAttribute('tabindex')).toBe(false)
     cleanup()
+  })
+
+  it('does not install a late focus hook after cleanup', async () => {
+    const nav = document.querySelector<HTMLButtonElement>('#nav')!
+    nav.focus()
+    const { router, ready, navigate } = makeRouter()
+    const cleanup = installRouteFocus(router)
+    cleanup()
+    await ready()
+    navigate()
+    await flushFrame()
+
+    expect(document.activeElement).toBe(nav)
   })
 })
