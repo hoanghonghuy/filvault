@@ -8,20 +8,49 @@ import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
 import { isHeic, convertHeicBlobToJpeg, checkIsHeicBlob } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
+import PasswordInput from '@/components/PasswordInput.vue'
 import type { User } from '@/api/types'
 
 const auth = useAuthStore()
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const displayName = ref(auth.user?.displayName ?? '')
 const currentPassword = ref('')
 const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordError = ref('')
 const error = ref('')
 const savingProfile = ref(false)
 const changingPassword = ref(false)
 const updatingAvatar = ref(false)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
+
+const passwordCopy = computed(() =>
+  locale.value === 'vi'
+    ? {
+        confirm: 'Xác nhận mật khẩu mới',
+        requirement: 'Mật khẩu mới phải có ít nhất 8 ký tự.',
+        mismatch: 'Mật khẩu xác nhận không khớp.',
+        tooShort: 'Mật khẩu mới phải có ít nhất 8 ký tự.',
+        failed: 'Không thể đổi mật khẩu',
+      }
+    : {
+        confirm: 'Confirm new password',
+        requirement: 'New password must be at least 8 characters.',
+        mismatch: 'Password confirmation does not match.',
+        tooShort: 'New password must be at least 8 characters.',
+        failed: 'Password change failed',
+      },
+)
+
+const passwordSubmitDisabled = computed(
+  () =>
+    changingPassword.value ||
+    !currentPassword.value ||
+    !newPassword.value ||
+    !confirmPassword.value,
+)
 
 const initials = computed(() =>
   userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
@@ -210,7 +239,19 @@ async function saveProfile() {
 }
 
 async function changePassword() {
+  if (changingPassword.value) return
+
+  passwordError.value = ''
   error.value = ''
+  if (newPassword.value.length < 8) {
+    passwordError.value = passwordCopy.value.tooShort
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    passwordError.value = passwordCopy.value.mismatch
+    return
+  }
+
   changingPassword.value = true
   try {
     const tokens = await api<{ accessToken: string; refreshToken: string }>('/users/me/password', {
@@ -224,9 +265,10 @@ async function changePassword() {
     await auth.loadMe()
     currentPassword.value = ''
     newPassword.value = ''
+    confirmPassword.value = ''
     ui.showToast(t.value.changePassword, 'success')
   } catch (e) {
-    error.value = formatApiError(e, 'Password change failed')
+    passwordError.value = formatApiError(e, passwordCopy.value.failed)
   } finally {
     changingPassword.value = false
   }
@@ -298,15 +340,62 @@ async function logout() {
 
     <section class="card section" aria-labelledby="profile-password-heading">
       <h2 id="profile-password-heading" class="section-title">{{ t.password }}</h2>
-      <label class="field">
-        <span>{{ t.currentPassword }}</span>
-        <input v-model="currentPassword" type="password" autocomplete="current-password" />
-      </label>
-      <label class="field">
-        <span>{{ t.newPassword }}</span>
-        <input v-model="newPassword" type="password" minlength="8" autocomplete="new-password" />
-      </label>
-      <button class="btn ink save-btn" type="button" :disabled="changingPassword" @click="changePassword">
+      <div class="field">
+        <label class="field-label" for="profile-current-password">{{ t.currentPassword }}</label>
+        <PasswordInput
+          id="profile-current-password"
+          v-model="currentPassword"
+          name="current-password"
+          autocomplete="current-password"
+          :disabled="changingPassword"
+          required
+        />
+      </div>
+      <div class="field">
+        <label class="field-label" for="profile-new-password">{{ t.newPassword }}</label>
+        <PasswordInput
+          id="profile-new-password"
+          v-model="newPassword"
+          name="new-password"
+          autocomplete="new-password"
+          :disabled="changingPassword"
+          :aria-invalid="Boolean(passwordError)"
+          :aria-describedby="passwordError ? 'profile-password-requirement profile-password-error' : 'profile-password-requirement'"
+          :minlength="8"
+          required
+        />
+      </div>
+      <p id="profile-password-requirement" class="field-hint">{{ passwordCopy.requirement }}</p>
+      <div class="field">
+        <label class="field-label" for="profile-confirm-password">{{ passwordCopy.confirm }}</label>
+        <PasswordInput
+          id="profile-confirm-password"
+          v-model="confirmPassword"
+          name="confirm-password"
+          autocomplete="new-password"
+          :disabled="changingPassword"
+          :aria-invalid="Boolean(passwordError)"
+          :aria-describedby="passwordError ? 'profile-password-error' : undefined"
+          :minlength="8"
+          required
+        />
+      </div>
+      <p
+        v-if="passwordError"
+        id="profile-password-error"
+        class="error password-error"
+        role="alert"
+        aria-live="assertive"
+      >
+        {{ passwordError }}
+      </p>
+      <button
+        class="btn ink save-btn"
+        type="button"
+        :disabled="passwordSubmitDisabled"
+        :aria-busy="changingPassword ? 'true' : undefined"
+        @click="changePassword"
+      >
         {{ changingPassword ? t.changing : t.changePassword }}
       </button>
     </section>
@@ -402,6 +491,17 @@ async function logout() {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.field-hint {
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-sm);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.password-error {
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-sm);
 }
 
 .sr-only {
