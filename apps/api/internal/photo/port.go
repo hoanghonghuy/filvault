@@ -7,7 +7,7 @@ import (
 
 type Repository interface {
 	ListTimelineFiles(ctx context.Context, ownerID string, before *time.Time, limit int) ([]TimelineItem, error)
-	ListTimelineFilesByType(ctx context.Context, ownerID string, before *time.Time, limit int, mediaType string) ([]TimelineItem, error)
+	ListTimelineFilesByType(ctx context.Context, ownerID string, before *TimelineCursor, limit int, mediaType string) ([]TimelineItem, error)
 	GetPhotoFile(ctx context.Context, ownerID, fileID string) (*TimelineItem, error)
 	GetThumbnailPrefs(ctx context.Context, ownerID string) (ThumbnailPrefs, error)
 
