@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PasswordInput from './PasswordInput.vue'
@@ -53,12 +55,8 @@ describe('PasswordInput', () => {
   })
 
   it('uses the shared minimum touch target for the visibility button', () => {
-    const style = PasswordInput.__cssModules ? '' : wrapperSource()
-    expect(style).toContain('width: var(--touch-min)')
-    expect(style).toContain('height: var(--touch-min)')
+    const source = readFileSync(fileURLToPath(new URL('./PasswordInput.vue', import.meta.url)), 'utf-8')
+    expect(source).toMatch(/\.password-toggle\s*\{[^}]*width:\s*var\(--touch-min\)/s)
+    expect(source).toMatch(/\.password-toggle\s*\{[^}]*height:\s*var\(--touch-min\)/s)
   })
 })
-
-function wrapperSource() {
-  return `width: var(--touch-min); height: var(--touch-min);`
-}
