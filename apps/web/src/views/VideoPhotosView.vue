@@ -22,7 +22,6 @@ const error = ref('')
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
 const mediaItem = ref<TimelineItem | null>(null)
-const favoriteIds = ref<Set<string>>(new Set())
 
 async function loadVideoTimeline(before?: string) {
   const params = new URLSearchParams({ type: 'video' })
@@ -30,16 +29,11 @@ async function loadVideoTimeline(before?: string) {
   return api<Timeline>(`/photos/timeline/filter?${params}`)
 }
 
-async function loadFavorites() {
-  const out = await api<{ files: Array<{ id: string }> }>('/files/favorites?limit=100')
-  favoriteIds.value = new Set(out.files.map((file) => file.id))
-}
-
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [data] = await Promise.all([loadVideoTimeline(), loadFavorites()])
+    const data = await loadVideoTimeline()
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
@@ -93,18 +87,18 @@ async function download(item: TimelineItem) {
 }
 
 async function toggleFavorite(item: TimelineItem) {
-  const favorited = favoriteIds.value.has(item.id)
+  const wasFavorited = Boolean(item.isFavorite)
   error.value = ''
   try {
-    await api(`/files/${item.id}/favorite`, { method: favorited ? 'DELETE' : 'PUT' })
-    await loadFavorites()
+    await api(`/files/${item.id}/favorite`, { method: wasFavorited ? 'DELETE' : 'PUT' })
+    item.isFavorite = !wasFavorited
   } catch (e) {
     error.value = formatApiError(e, 'Failed to update favorite')
   }
 }
 
 async function openActions(item: TimelineItem) {
-  const favorited = favoriteIds.value.has(item.id)
+  const favorited = Boolean(item.isFavorite)
   const action = await ui.openActionSheet(item.name, [
     { id: 'view', label: t.value.preview, icon: 'eye' },
     { id: 'download', label: t.value.download, icon: 'download' },
