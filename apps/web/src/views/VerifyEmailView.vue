@@ -20,9 +20,10 @@ const message = ref('')
 const error = ref('')
 const verifying = ref(false)
 const resending = ref(false)
+const switchingEmail = ref(false)
 const { remainingSeconds, active: resendCooldownActive, start: startResendCooldown } = useResendCooldown(60)
 
-const requestBusy = computed(() => verifying.value || resending.value)
+const requestBusy = computed(() => verifying.value || resending.value || switchingEmail.value)
 const resendDisabled = computed(() => requestBusy.value || resendCooldownActive.value)
 const resendLabel = computed(() => {
   if (resending.value) return 'Sending…'
@@ -64,6 +65,15 @@ async function submit() {
   } finally {
     verifying.value = false
   }
+}
+
+async function useDifferentEmail() {
+  if (requestBusy.value) return
+  switchingEmail.value = true
+  error.value = ''
+  message.value = ''
+  await auth.logout()
+  await router.replace('/register')
 }
 </script>
 
@@ -113,7 +123,34 @@ async function submit() {
             You can request another code in {{ remainingSeconds }} seconds. You can still verify the current code now.
           </span>
         </div>
+
+        <div class="auth-recovery">
+          <p class="field-hint">Wrong email? You can sign out of this unverified session and register again.</p>
+          <button
+            class="btn block ghost"
+            type="button"
+            :disabled="requestBusy"
+            :aria-busy="switchingEmail"
+            @click="useDifferentEmail"
+          >
+            {{ switchingEmail ? 'Switching…' : 'Use a different email' }}
+          </button>
+        </div>
       </form>
     </template>
   </AuthCard>
 </template>
+
+<style scoped>
+.auth-recovery {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--hairline);
+}
+
+.auth-recovery .field-hint {
+  margin: 0;
+}
+</style>
