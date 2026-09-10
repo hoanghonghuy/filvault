@@ -52,6 +52,14 @@ describe('formatAuthError', () => {
     )
   })
 
+  it('allows localized known-code copy without changing code mapping semantics', () => {
+    expect(
+      formatAuthError(new ApiError('UNAUTHORIZED', 'Unauthorized', 401), 'fallback', {
+        unauthorized: 'Email hoặc mật khẩu không đúng.',
+      }),
+    ).toBe('Email hoặc mật khẩu không đúng.')
+  })
+
   it('uses caller fallback for verify/validation instead of generic API copy', () => {
     expect(
       formatAuthError(new ApiError('VALIDATION_ERROR', 'Invalid request', 400), 'Invalid or expired code. Try again.'),
