@@ -26,7 +26,7 @@ const router = createRouter({
     { path: '/overview', name: 'overview', redirect: '/' },
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/vault', name: 'vault', component: () => import('@/views/VaultView.vue'), meta: { auth: true, verified: true } },
-    { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
+    { path: '/photos', name: 'photos', component: () => import('@/views/PhotosRouteView.vue'), meta: { auth: true, verified: true } },
     {
       path: '/photos/preview/:id',
       name: 'photo-preview',

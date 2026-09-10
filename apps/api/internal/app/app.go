@@ -133,6 +133,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	fileHandlers.RegisterRoutes(v1, storage...)
 	trashHandlers.RegisterRoutes(v1, storage...)
 	photoHandlers.RegisterRoutes(v1, storage...)
+	photo.RegisterFilteredTimelineRoute(v1, photoSvc, storage...)
 	searchHandlers.RegisterRoutes(v1, storage...)
 	shareHandlers.RegisterRoutes(v1, storage...)
 	chatHandlers.RegisterRoutes(v1, storage...)
