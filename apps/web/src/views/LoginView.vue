@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
+import PasswordInput from '@/components/PasswordInput.vue'
 import { formatAuthError } from '@/api/errors'
 import { safeInternalPath } from '@/lib/safeInternalPath'
 import { useAuthStore } from '@/stores/auth'
@@ -62,16 +63,16 @@ async function submit() {
         </label>
         <label class="field">
           <span class="field-label">Password</span>
-          <input
+          <PasswordInput
             id="login-password"
             v-model="password"
             name="password"
-            type="password"
-            required
             autocomplete="current-password"
             enterkeyhint="go"
+            required
             :disabled="loading"
-            :aria-invalid="error ? true : undefined"
+            :aria-invalid="Boolean(error)"
+            :aria-describedby="error ? 'auth-error' : undefined"
           />
         </label>
 
