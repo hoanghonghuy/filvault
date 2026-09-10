@@ -49,8 +49,10 @@ function goBack() {
       <p class="body-copy">{{ copy.body }}</p>
 
       <div class="actions">
-        <RouterLink v-if="auth.isAuthenticated" to="/" class="btn ink">{{ copy.home }}</RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/files" class="btn ghost">{{ copy.files }}</RouterLink>
+        <template v-if="auth.isAuthenticated">
+          <RouterLink to="/" class="btn ink">{{ copy.home }}</RouterLink>
+          <RouterLink to="/files" class="btn ghost">{{ copy.files }}</RouterLink>
+        </template>
         <RouterLink v-else to="/login" class="btn ink">{{ copy.signIn }}</RouterLink>
         <button type="button" class="btn ghost" @click="goBack">{{ copy.back }}</button>
       </div>
