@@ -30,15 +30,15 @@ describe('media lightbox contract', () => {
     expect(vault).toMatch(/api<\{ downloadUrl: string \}>\(`\/files\/\$\{file\.id\}\/download`\)/)
   })
 
-  it('opens an action sheet before previewing Photos and Album thumbnails', () => {
-    expect(photos).toMatch(/@click="openMedia\(item\)"/)
-    expect(photos).not.toMatch(/@click="openLightbox\(item\)"/)
+  it('uses direct preview for Photos while Album thumbnails retain their contextual flow', () => {
+    expect(photos).toMatch(/@click="openLightbox\(item\)"/)
+    expect(photos).toMatch(/@click="openMediaActions\(item\)"/)
     expect(album).toMatch(/@click="openItemActions\(item\)"/)
     expect(album).not.toMatch(/@click="openLightbox\(item\)"/)
   })
 
-  it('keeps View as the only action that opens the lightbox', () => {
-    expect(photos).toMatch(/async function viewMedia\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
+  it('keeps action-sheet View wired to the lightbox', () => {
+    expect(photos).toMatch(/async function handleSheetAfterLeave\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
     expect(album).toMatch(/if \(action === 'view'\) \{[\s\S]*?openLightbox\(item\)/)
   })
 
