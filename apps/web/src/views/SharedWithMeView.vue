@@ -7,11 +7,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import { useI18n } from '@/lib/i18n'
-import type {
-  DownloadURL,
-  IncomingShare,
-  SharedBrowser,
-} from '@/api/types'
+import type { DownloadURL, IncomingShare, SharedBrowser } from '@/api/types'
 
 interface ShareLinkInfo {
   token: string
@@ -168,7 +164,6 @@ onMounted(load)
   <div class="shared-page">
     <h1 class="page-title desktop-only">{{ t.navShared || 'Chia sẻ' }}</h1>
 
-    <!-- TeraBox Segmented Tabs -->
     <div class="tabs-header">
       <div class="tabs-pill-list" role="tablist" aria-label="Shares views">
         <button
@@ -196,25 +191,35 @@ onMounted(load)
       </div>
     </div>
 
-    <!-- Sub-toolbar -->
     <div v-if="!browsing" class="shares-sub-bar">
-      <span class="sub-label">
-        <Icon name="filter" :size="15" />
-        {{ t.sortByTime || 'Sắp xếp theo thời gian' }}
-      </span>
-      <div class="sub-actions">
-        <button
-          type="button"
-          class="sub-icon-btn"
-          :title="viewMode === 'list' ? t.viewGrid : t.viewList"
-          @click="toggleViewMode"
+      <button
+        type="button"
+        class="sub-icon-btn"
+        :title="viewMode === 'list' ? t.viewGrid : t.viewList"
+        :aria-label="t.viewGrid"
+        :aria-pressed="viewMode === 'grid'"
+        @click="toggleViewMode"
+      >
+        <svg
+          v-if="viewMode === 'list'"
+          class="view-mode-glyph"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
         >
-          <Icon :name="viewMode === 'list' ? 'palette' : 'file'" :size="18" />
-        </button>
-      </div>
+          <rect x="4" y="4" width="6" height="6" rx="1" />
+          <rect x="14" y="4" width="6" height="6" rx="1" />
+          <rect x="4" y="14" width="6" height="6" rx="1" />
+          <rect x="14" y="14" width="6" height="6" rx="1" />
+        </svg>
+        <svg v-else class="view-mode-glyph" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 6h12M8 12h12M8 18h12" />
+          <circle cx="4" cy="6" r="1" />
+          <circle cx="4" cy="12" r="1" />
+          <circle cx="4" cy="18" r="1" />
+        </svg>
+      </button>
     </div>
 
-    <!-- Folder Browse View -->
     <Transition name="page">
       <section v-if="browsing" class="browse" aria-label="Shared folder contents">
         <button type="button" class="back-btn" @click="browsing = null">
@@ -246,7 +251,7 @@ onMounted(load)
               class="share-icon-badge"
               :style="{
                 background: `color-mix(in srgb, ${getFileTypeColor(f.name)} 14%, transparent)`,
-                color: getFileTypeColor(f.name)
+                color: getFileTypeColor(f.name),
               }"
             >
               <Icon :name="mimeIcon(f.mimeType)" :size="20" />
@@ -276,7 +281,6 @@ onMounted(load)
         <div v-for="i in 4" :key="i" class="skeleton sk-row" />
       </div>
 
-      <!-- Tab 1: My Shares (/share-links) -->
       <div v-else-if="shareTab === 'my-shares'">
         <EmptyState
           v-if="!shareLinks.length"
@@ -295,7 +299,7 @@ onMounted(load)
               class="share-icon-badge"
               :style="{
                 background: `color-mix(in srgb, ${getFileTypeColor(link.fileName)} 14%, transparent)`,
-                color: getFileTypeColor(link.fileName)
+                color: getFileTypeColor(link.fileName),
               }"
             >
               <Icon name="file" :size="20" />
@@ -316,7 +320,6 @@ onMounted(load)
         </div>
       </div>
 
-      <!-- Tab 2: Shared With Me (/shares/with-me) -->
       <div v-else-if="shareTab === 'with-me'">
         <EmptyState
           v-if="!shares.length"
@@ -334,10 +337,14 @@ onMounted(load)
             <div
               class="share-icon-badge"
               :class="{ 'folder-badge': share.resourceType === 'folder' }"
-              :style="share.resourceType === 'folder' ? {} : {
-                background: `color-mix(in srgb, ${getFileTypeColor(share.resourceName)} 14%, transparent)`,
-                color: getFileTypeColor(share.resourceName)
-              }"
+              :style="
+                share.resourceType === 'folder'
+                  ? {}
+                  : {
+                      background: `color-mix(in srgb, ${getFileTypeColor(share.resourceName)} 14%, transparent)`,
+                      color: getFileTypeColor(share.resourceName),
+                    }
+              "
             >
               <Icon :name="share.resourceType === 'folder' ? 'folder' : 'file'" :size="20" />
             </div>
@@ -369,7 +376,6 @@ onMounted(load)
   gap: var(--space-md);
 }
 
-/* TeraBox Tabs */
 .tabs-header {
   border-bottom: 1px solid var(--hairline);
   padding-bottom: 4px;
@@ -420,29 +426,19 @@ onMounted(load)
   font-weight: 600;
 }
 
-/* Sub-toolbar */
 .shares-sub-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  padding: 4px 0;
-}
-
-.sub-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-weight: 500;
+  justify-content: flex-end;
+  min-height: var(--touch-min);
 }
 
 .sub-icon-btn {
   background: transparent;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm, 8px);
-  width: 32px;
-  height: 32px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -450,7 +446,21 @@ onMounted(load)
   cursor: pointer;
 }
 
-/* Container & Cards */
+.sub-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.view-mode-glyph {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .shares-container {
   display: flex;
   flex-direction: column;
