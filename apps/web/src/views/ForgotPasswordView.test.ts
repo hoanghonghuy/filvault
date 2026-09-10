@@ -59,6 +59,22 @@ describe('ForgotPasswordView', () => {
     wrapper.unmount()
   })
 
+  it('clears a request-stage network error when entering an existing reset token', async () => {
+    apiMock.mockRejectedValueOnce(new Error('offline'))
+    const { wrapper } = await mountRecovery()
+
+    await wrapper.get<HTMLInputElement>('#recovery-email').setValue('user@example.com')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('Could not request a password reset')
+
+    await wrapper.get('button.token-ready-btn').trigger('click')
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.get('#recovery-token').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('validates password mismatch before calling reset API', async () => {
     const { wrapper } = await mountRecovery()
     await enterResetPhase(wrapper)
