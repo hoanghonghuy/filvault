@@ -9,6 +9,7 @@ import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import { runTrashPurge, type TrashPurgeTarget } from '@/lib/trashPurge'
+import { formatTrashItemDate, trashCopy } from '@/lib/trashCopy'
 import { trashRetentionNotice } from '@/lib/trashRetention'
 import { useI18n } from '@/lib/i18n'
 import type { TrashList } from '@/api/types'
@@ -24,22 +25,7 @@ const purgeCompleted = ref(0)
 const purgeTotal = ref(0)
 
 const retentionNotice = computed(() => trashRetentionNotice(auth.user, locale.value))
-
-const trashBatchCopy = computed(() =>
-  locale.value === 'vi'
-    ? {
-        deleting: (completed: number, total: number) => `Đang xóa ${completed}/${total}…`,
-        partial: (deleted: number, failed: number) =>
-          `Đã xóa vĩnh viễn ${deleted} mục; ${failed} mục không thể xóa.`,
-        failed: 'Không thể dọn sạch thùng rác',
-      }
-    : {
-        deleting: (completed: number, total: number) => `Deleting ${completed}/${total}…`,
-        partial: (deleted: number, failed: number) =>
-          `Permanently deleted ${deleted} items; ${failed} could not be deleted.`,
-        failed: 'Could not empty trash',
-      },
-)
+const copy = computed(() => trashCopy(locale.value))
 
 const isEmpty = computed(() => {
   if (!trash.value) return false
@@ -47,8 +33,8 @@ const isEmpty = computed(() => {
 })
 
 const emptyTrashLabel = computed(() => {
-  if (!emptyingTrash.value) return t.value.emptyTrash || 'Dọn sạch thùng rác'
-  return trashBatchCopy.value.deleting(purgeCompleted.value, purgeTotal.value)
+  if (!emptyingTrash.value) return t.value.emptyTrash
+  return copy.value.deleting(purgeCompleted.value, purgeTotal.value)
 })
 
 async function load() {
@@ -57,18 +43,17 @@ async function load() {
   try {
     trash.value = await api<TrashList>('/trash')
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load trash')
+    error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
     loading.value = false
   }
 }
 
-/** Optimistic UI: drop the row immediately so TransitionGroup animates the removal. */
 function removeFromLocal(id: string) {
-  const t = trash.value
-  if (!t) return
-  t.folders = t.folders.filter((folder) => folder.id !== id)
-  t.files = t.files.filter((file) => file.id !== id)
+  const current = trash.value
+  if (!current) return
+  current.folders = current.folders.filter((folder) => folder.id !== id)
+  current.files = current.files.filter((file) => file.id !== id)
 }
 
 async function restoreFile(id: string) {
@@ -77,7 +62,7 @@ async function restoreFile(id: string) {
     await api(`/files/${id}/restore`, { method: 'POST', body: '{}' })
     ui.showToast(t.value.fileRestored)
   } catch (e) {
-    error.value = formatApiError(e, 'Restore failed')
+    error.value = formatApiError(e, copy.value.restoreFailed)
     await load()
   }
 }
@@ -88,15 +73,15 @@ async function restoreFolder(id: string) {
     await api(`/folders/${id}/restore`, { method: 'POST', body: '{}' })
     ui.showToast(t.value.folderRestored)
   } catch (e) {
-    error.value = formatApiError(e, 'Restore failed')
+    error.value = formatApiError(e, copy.value.restoreFailed)
     await load()
   }
 }
 
 async function permanentDelete(type: 'files' | 'folders', id: string, name: string) {
   const ok = await ui.confirm({
-    title: `${t.value.deleteForever}?`,
-    message: `"${name}" will be permanently deleted. This cannot be undone.`,
+    title: copy.value.deleteConfirmTitle,
+    message: copy.value.deleteConfirmMessage(name),
     confirmLabel: t.value.deleteForever,
     danger: true,
   })
@@ -106,15 +91,15 @@ async function permanentDelete(type: 'files' | 'folders', id: string, name: stri
     await api(`/trash/${type}/${id}`, { method: 'DELETE' })
     ui.showToast(t.value.deleteForever)
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, copy.value.deleteFailed)
     await load()
   }
 }
 
 async function openFolderActions(folder: { id: string; name: string }) {
   const action = await ui.openActionSheet(folder.name, [
-    { id: 'restore', label: 'Restore', icon: 'restore' },
-    { id: 'delete', label: 'Delete forever', icon: 'trash', danger: true },
+    { id: 'restore', label: t.value.restore, icon: 'restore' },
+    { id: 'delete', label: t.value.deleteForever, icon: 'trash', danger: true },
   ])
   if (action === 'restore') await restoreFolder(folder.id)
   if (action === 'delete') await permanentDelete('folders', folder.id, folder.name)
@@ -122,8 +107,8 @@ async function openFolderActions(folder: { id: string; name: string }) {
 
 async function openFileActions(file: { id: string; name: string }) {
   const action = await ui.openActionSheet(file.name, [
-    { id: 'restore', label: 'Restore', icon: 'restore' },
-    { id: 'delete', label: 'Delete forever', icon: 'trash', danger: true },
+    { id: 'restore', label: t.value.restore, icon: 'restore' },
+    { id: 'delete', label: t.value.deleteForever, icon: 'trash', danger: true },
   ])
   if (action === 'restore') await restoreFile(file.id)
   if (action === 'delete') await permanentDelete('files', file.id, file.name)
@@ -132,14 +117,7 @@ async function openFileActions(file: { id: string; name: string }) {
 const totalCount = computed(() => (trash.value?.folders.length ?? 0) + (trash.value?.files.length ?? 0))
 
 function formatItemDate(iso?: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatTrashItemDate(iso, locale.value)
 }
 
 function getFileTypeColor(mimeType?: string): string {
@@ -156,9 +134,9 @@ async function emptyAllTrash() {
   if (emptyingTrash.value) return
 
   const ok = await ui.confirm({
-    title: t.value.emptyTrash || 'Dọn sạch thùng rác?',
-    message: 'Tất cả tệp và thư mục trong thùng rác sẽ bị xóa vĩnh viễn.',
-    confirmLabel: t.value.emptyTrash || 'Dọn sạch',
+    title: `${t.value.emptyTrash}?`,
+    message: copy.value.emptyConfirmMessage,
+    confirmLabel: t.value.emptyTrash,
     danger: true,
   })
   if (!ok || emptyingTrash.value) return
@@ -185,13 +163,13 @@ async function emptyAllTrash() {
 
     await load()
     if (result.failed > 0) {
-      error.value = trashBatchCopy.value.partial(result.deleted, result.failed)
+      error.value = copy.value.partial(result.deleted, result.failed)
     } else {
       ui.showToast(t.value.deleteForever)
     }
   } catch (e) {
     await load()
-    error.value = formatApiError(e, trashBatchCopy.value.failed)
+    error.value = formatApiError(e, copy.value.emptyFailed)
   } finally {
     emptyingTrash.value = false
     purgeCompleted.value = 0
@@ -288,7 +266,7 @@ onMounted(load)
               class="trash-icon-badge"
               :style="{
                 background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
-                color: getFileTypeColor(file.mimeType)
+                color: getFileTypeColor(file.mimeType),
               }"
             >
               <Icon :name="mimeIcon(file.mimeType ?? '')" :size="20" />
