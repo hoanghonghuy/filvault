@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Icon from '@/components/AppIcon.vue'
+import { useI18n } from '@/lib/i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -21,9 +22,13 @@ const props = withDefaults(
   },
 )
 
+const { locale } = useI18n()
 const model = defineModel<string>({ required: true })
 const revealed = ref(false)
-const toggleLabel = computed(() => (revealed.value ? 'Hide password' : 'Show password'))
+const toggleLabel = computed(() => {
+  if (locale.value === 'en') return revealed.value ? 'Hide password' : 'Show password'
+  return revealed.value ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
+})
 </script>
 
 <template>
