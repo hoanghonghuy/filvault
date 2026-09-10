@@ -5,6 +5,7 @@ import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
+import OverviewStorageCard from '@/components/OverviewStorageCard.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import {
@@ -30,14 +31,6 @@ const activeTab = ref<'recent' | 'favorites' | 'photos'>('recent')
 
 const recentFiles = computed(() => recentFilesFromBrowser(files.value))
 const recentPhotos = computed(() => recentPhotosFromTimeline(groups.value))
-
-const storageUsedFormatted = computed(() => formatBytes(auth.user?.storageUsed ?? 0))
-const storageQuotaFormatted = computed(() => formatBytes(auth.user?.storageQuota ?? 0))
-const storagePercent = computed(() => {
-  const u = auth.user
-  if (!u || !u.storageQuota) return 0
-  return Math.min(100, Math.max(0, Math.round((u.storageUsed / u.storageQuota) * 100)))
-})
 
 const quickCategories = computed(() => [
   { to: '/files', label: t.value.myFiles, icon: 'folder', color: '#f59e0b' },
@@ -132,37 +125,7 @@ onMounted(load)
       </form>
     </header>
 
-    <!-- TeraBox-style Cloud Storage Card -->
-    <section class="storage-card" aria-label="Thông tin dung lượng đám mây">
-      <div class="storage-head">
-        <div class="storage-title-wrap">
-          <span class="storage-cloud-badge">
-            <Icon name="cloud" :size="16" />
-          </span>
-          <span class="storage-card-title">{{ t.myCloud }}</span>
-        </div>
-        <RouterLink to="/settings" class="storage-manage-link">
-          {{ t.manageStorage }}
-          <Icon name="chevron-right" :size="14" />
-        </RouterLink>
-      </div>
-
-      <div class="storage-progress-track">
-        <div
-          class="storage-progress-fill"
-          :style="{ width: `${storagePercent}%` }"
-          role="progressbar"
-          :aria-valuenow="storagePercent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-        />
-      </div>
-
-      <div class="storage-meta">
-        <span class="storage-numbers">{{ storageUsedFormatted }} / {{ storageQuotaFormatted }}</span>
-        <span class="storage-percentage">{{ storagePercent }}%</span>
-      </div>
-    </section>
+    <OverviewStorageCard />
 
     <!-- TeraBox-style 8-icon 4-column Category Grid -->
     <section class="categories-section" aria-label="Danh mục tính năng">
@@ -375,86 +338,6 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* TeraBox Cloud Storage Card */
-.storage-card {
-  background: var(--surface-soft, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg, 16px);
-  padding: 14px 16px;
-  margin-bottom: var(--space-lg);
-}
-
-.storage-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.storage-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.storage-cloud-badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent-soft, rgba(0, 132, 255, 0.12));
-  color: var(--accent, #0084ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.storage-manage-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.storage-progress-track {
-  width: 100%;
-  height: 6px;
-  background: var(--hairline, rgba(255, 255, 255, 0.1));
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.storage-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent, #0084ff) 0%, #06b6d4 100%);
-  border-radius: 9999px;
-  transition: width 0.4s ease;
-}
-
-.storage-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.storage-numbers {
-  font-variant-numeric: tabular-nums;
-}
-
-.storage-percentage {
-  font-weight: 600;
-  color: var(--ink);
 }
 
 /* TeraBox 8-Icon 4-Column Category Grid */
