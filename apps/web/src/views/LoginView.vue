@@ -21,6 +21,7 @@ const copy = computed(() => locale.value === 'en' ? {
   password: 'Password',
   forgotPassword: 'Forgot password?',
   failed: 'Sign in failed. Try again.',
+  incorrectCredentials: 'Incorrect email or password.',
   signingIn: 'Signing in…',
   signIn: 'Sign in',
   noAccount: 'No account?',
@@ -33,6 +34,7 @@ const copy = computed(() => locale.value === 'en' ? {
   password: 'Mật khẩu',
   forgotPassword: 'Quên mật khẩu?',
   failed: 'Đăng nhập không thành công. Vui lòng thử lại.',
+  incorrectCredentials: 'Email hoặc mật khẩu không đúng.',
   signingIn: 'Đang đăng nhập…',
   signIn: 'Đăng nhập',
   noAccount: 'Chưa có tài khoản?',
@@ -62,7 +64,9 @@ async function submit() {
     }
     await router.replace(safeInternalPath(route.query.redirect, '/'))
   } catch (e) {
-    error.value = formatAuthError(e, copy.value.failed)
+    error.value = formatAuthError(e, copy.value.failed, {
+      unauthorized: copy.value.incorrectCredentials,
+    })
   } finally {
     loading.value = false
   }
