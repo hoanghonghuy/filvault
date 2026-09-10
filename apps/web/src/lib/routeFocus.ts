@@ -8,9 +8,14 @@ const MODAL_SELECTOR = '[aria-modal="true"]'
 const PAGE_TITLE_SELECTOR = '.header-title'
 
 function isVisible(element: HTMLElement): boolean {
-  if (element.hidden) return false
-  const style = window.getComputedStyle(element)
-  return style.display !== 'none' && style.visibility !== 'hidden'
+  let current: HTMLElement | null = element
+  while (current) {
+    if (current.hidden) return false
+    const style = window.getComputedStyle(current)
+    if (style.display === 'none' || style.visibility === 'hidden') return false
+    current = current.parentElement
+  }
+  return true
 }
 
 function hasOpenModal(): boolean {
