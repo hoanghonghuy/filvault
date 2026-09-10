@@ -1,10 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { useI18n } from '@/lib/i18n'
-import {
-  isLegacyLogoutConfirmation,
-  logoutConfirmationOptions,
-} from '@/lib/logoutConfirmation'
+import type { Locale } from '@/lib/i18n'
+import { logoutConfirmationOptions } from '@/lib/logoutConfirmation'
 
 export type ConfirmOptions = {
   title: string
@@ -38,7 +35,6 @@ type ActionSheetState = {
 }
 
 export const useUiStore = defineStore('ui', () => {
-  const { locale } = useI18n()
   const toastMessage = ref<string | null>(null)
   const toastType = ref<'success' | 'error' | 'info'>('info')
   let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -84,20 +80,17 @@ export const useUiStore = defineStore('ui', () => {
   function confirm(options: ConfirmOptions): Promise<boolean> {
     return new Promise((resolve) => {
       confirmResolve = resolve
-      const normalizedOptions = isLegacyLogoutConfirmation(options)
-        ? logoutConfirmationOptions(locale.value)
-        : options
       confirmState.value = {
         open: true,
         confirmLabel: 'Confirm',
         cancelLabel: 'Cancel',
-        ...normalizedOptions,
+        ...options,
       }
     })
   }
 
-  function confirmLogout(): Promise<boolean> {
-    return confirm(logoutConfirmationOptions(locale.value))
+  function confirmLogout(locale: Locale): Promise<boolean> {
+    return confirm(logoutConfirmationOptions(locale))
   }
 
   function resolveConfirm(value: boolean) {
@@ -113,10 +106,12 @@ export const useUiStore = defineStore('ui', () => {
         open: true,
         title: options.title,
         label: options.label ?? '',
-        value: options.initialValue ?? '',
+        value: '',
         confirmLabel: options.confirmLabel ?? 'Save',
         cancelLabel: options.cancelLabel ?? 'Cancel',
+        initialValue: options.initialValue,
       }
+      promptState.value.value = options.initialValue ?? ''
     })
   }
 
@@ -127,15 +122,11 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function openActionSheet(title: string | undefined, items: ActionSheetItem[]): Promise<string | null> {
-    // Opening over a visible sheet swaps content in place: no leave transition
-    // fires, so the replaced caller settles immediately with null.
     if (actionSheetActiveResolve !== null) {
       const replaced = actionSheetActiveResolve
       actionSheetActiveResolve = null
       replaced(null)
     }
-    // Re-opening mid-leave cancels that leave (after-leave never fires),
-    // so settle the closing caller here as well to avoid a hang.
     if (actionSheetClosing !== null) {
       const closing = actionSheetClosing
       actionSheetClosing = null
@@ -152,7 +143,6 @@ export const useUiStore = defineStore('ui', () => {
     const resolve = actionSheetActiveResolve
     actionSheetActiveResolve = null
     actionSheetState.value = { ...actionSheetState.value, open: false }
-    // Hold the result until the leave transition reports completion.
     actionSheetClosing = { id: id ?? null, resolve }
   }
 
