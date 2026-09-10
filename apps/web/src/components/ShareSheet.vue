@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useAttrs, watch } from 'vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import Icon from '@/components/AppIcon.vue'
 import type { ShareLinkTTL } from '@/api/types'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   open: boolean
@@ -15,11 +17,28 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  create: [ttl: ShareLinkTTL | null]
-  copy: [url: string]
-  revoke: []
   close: []
 }>()
+
+const attrs = useAttrs()
+
+type Listener = (...args: unknown[]) => unknown
+
+function getListener(name: 'onCreate' | 'onCopy' | 'onRevoke'): Listener | null {
+  const listener = attrs[name]
+  return typeof listener === 'function' ? (listener as Listener) : null
+}
+
+async function invokeListener(name: 'onCreate' | 'onCopy' | 'onRevoke', ...args: unknown[]) {
+  const listener = getListener(name)
+  if (!listener) return
+  try {
+    await listener(...args)
+  } catch {
+    // FilesView owns user-facing operation errors. The sheet still guarantees
+    // that its pending state settles even if a future listener throws.
+  }
+}
 
 const TTL_OPTIONS: Array<{ value: ShareLinkTTL | null; label: string }> = [
   { value: null, label: 'Forever' },
@@ -30,6 +49,9 @@ const TTL_OPTIONS: Array<{ value: ShareLinkTTL | null; label: string }> = [
 
 const selectedTTL = ref<ShareLinkTTL | null>(null)
 const creating = ref(false)
+const copying = ref(false)
+const revoking = ref(false)
+const busy = computed(() => creating.value || copying.value || revoking.value)
 
 const fullUrl = computed(() => (props.existing ? window.location.origin + props.existing.url : ''))
 
@@ -39,6 +61,8 @@ watch(
     if (open) {
       selectedTTL.value = null
       creating.value = false
+      copying.value = false
+      revoking.value = false
     }
   },
 )
@@ -66,8 +90,33 @@ function selectTtlByKeyboard(event: KeyboardEvent, index: number) {
 }
 
 async function onCreate() {
+  if (creating.value || !getListener('onCreate')) return
   creating.value = true
-  emit('create', selectedTTL.value)
+  try {
+    await invokeListener('onCreate', selectedTTL.value)
+  } finally {
+    creating.value = false
+  }
+}
+
+async function onCopy(url: string) {
+  if (copying.value || !getListener('onCopy')) return
+  copying.value = true
+  try {
+    await invokeListener('onCopy', url)
+  } finally {
+    copying.value = false
+  }
+}
+
+async function onRevoke() {
+  if (revoking.value || !getListener('onRevoke')) return
+  revoking.value = true
+  try {
+    await invokeListener('onRevoke')
+  } finally {
+    revoking.value = false
+  }
 }
 </script>
 
@@ -77,15 +126,30 @@ async function onCreate() {
       <p class="field-label">Anyone with this link can view and download</p>
       <div class="link-box">
         <span class="link-url">{{ fullUrl }}</span>
-        <button type="button" class="btn icon-only" aria-label="Copy link" @click="emit('copy', existing.url)">
+        <button
+          type="button"
+          class="btn icon-only"
+          :aria-label="copying ? 'Copying link…' : 'Copy link'"
+          :aria-busy="copying ? 'true' : undefined"
+          :disabled="busy"
+          @click="onCopy(existing.url)"
+        >
           <Icon name="copy" :size="18" />
         </button>
       </div>
       <p class="expiry muted">
         {{ existing.expiresAt ? `Expires ${new Date(existing.expiresAt).toLocaleString()}` : 'Never expires' }}
       </p>
-      <button type="button" class="btn block danger" @click="emit('revoke')">Revoke link</button>
-      <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
+      <button
+        type="button"
+        class="btn block danger"
+        :disabled="busy"
+        :aria-busy="revoking ? 'true' : undefined"
+        @click="onRevoke"
+      >
+        {{ revoking ? 'Revoking…' : 'Revoke link' }}
+      </button>
+      <button type="button" class="btn block ghost" :disabled="busy" @click="emit('close')">Close</button>
     </div>
 
     <div v-else class="create">
@@ -100,16 +164,23 @@ async function onCreate() {
           :class="{ active: selectedTTL === option.value }"
           :aria-checked="selectedTTL === option.value"
           :tabindex="selectedTTL === option.value ? 0 : -1"
+          :disabled="creating"
           @click="selectedTTL = option.value"
           @keydown="selectTtlByKeyboard($event, index)"
         >
           {{ option.label }}
         </button>
       </div>
-      <button type="button" class="btn block ink" :disabled="creating" @click="onCreate">
+      <button
+        type="button"
+        class="btn block ink"
+        :disabled="creating"
+        :aria-busy="creating ? 'true' : undefined"
+        @click="onCreate"
+      >
         {{ creating ? 'Creating…' : 'Create link' }}
       </button>
-      <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
+      <button type="button" class="btn block ghost" :disabled="creating" @click="emit('close')">Close</button>
     </div>
   </BottomSheet>
 </template>
