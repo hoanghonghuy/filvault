@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   logout: vi.fn<() => Promise<void>>(),
   updateAvatar: vi.fn<(avatarUrl: string) => Promise<void>>(),
   showToast: vi.fn<(message: string, variant?: string) => void>(),
+  confirmLogout: vi.fn<() => Promise<boolean>>(),
 }))
 
 vi.mock('@/api/client', () => ({
@@ -40,7 +41,10 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 vi.mock('@/stores/ui', () => ({
-  useUiStore: () => ({ showToast: mocks.showToast }),
+  useUiStore: () => ({
+    showToast: mocks.showToast,
+    confirmLogout: mocks.confirmLogout,
+  }),
 }))
 
 vi.mock('@/lib/i18n', () => ({
@@ -92,10 +96,16 @@ function changeButton(wrapper: ReturnType<typeof mountProfile>) {
   return wrapper.findAll('button').find((button) => button.text().includes('Change password'))!
 }
 
+function logoutButton(wrapper: ReturnType<typeof mountProfile>) {
+  return wrapper.findAll('button').find((button) => button.text() === 'Log out')!
+}
+
 describe('Profile password change', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.loadMe.mockResolvedValue(undefined)
+    mocks.logout.mockResolvedValue(undefined)
+    mocks.confirmLogout.mockResolvedValue(false)
   })
 
   it('blocks a mismatched confirmation before making the password request', async () => {
@@ -165,5 +175,26 @@ describe('Profile password change', () => {
 
     resolveRequest({ accessToken: 'access-2', refreshToken: 'refresh-2' })
     await flushPromises()
+  })
+
+  it('keeps the session when Profile logout confirmation is cancelled', async () => {
+    const wrapper = mountProfile()
+
+    await logoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(mocks.confirmLogout).toHaveBeenCalledTimes(1)
+    expect(mocks.logout).not.toHaveBeenCalled()
+  })
+
+  it('uses the canonical logout path only after confirmation', async () => {
+    mocks.confirmLogout.mockResolvedValueOnce(true)
+    const wrapper = mountProfile()
+
+    await logoutButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(mocks.confirmLogout).toHaveBeenCalledTimes(1)
+    expect(mocks.logout).toHaveBeenCalledTimes(1)
   })
 })
