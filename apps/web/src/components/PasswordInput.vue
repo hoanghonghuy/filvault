@@ -12,13 +12,12 @@ const props = withDefaults(
     disabled?: boolean
     ariaInvalid?: boolean
     ariaDescribedby?: string
+    enterkeyhint?: 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send'
   }>(),
   {
     required: false,
-    minlength: undefined,
     disabled: false,
     ariaInvalid: false,
-    ariaDescribedby: undefined,
   },
 )
 
@@ -30,21 +29,22 @@ const toggleLabel = computed(() => (revealed.value ? 'Hide password' : 'Show pas
 <template>
   <div class="password-control">
     <input
-      :id="id"
+      :id="props.id"
       v-model="model"
-      :name="name"
+      :name="props.name"
       :type="revealed ? 'text' : 'password'"
-      :required="required"
-      :minlength="minlength"
-      :autocomplete="autocomplete"
-      :disabled="disabled"
-      :aria-invalid="ariaInvalid ? true : undefined"
-      :aria-describedby="ariaDescribedby"
+      :required="props.required"
+      :minlength="props.minlength"
+      :autocomplete="props.autocomplete"
+      :disabled="props.disabled"
+      :aria-invalid="props.ariaInvalid ? true : undefined"
+      :aria-describedby="props.ariaDescribedby"
+      :enterkeyhint="props.enterkeyhint"
     />
     <button
       type="button"
       class="password-toggle"
-      :disabled="disabled"
+      :disabled="props.disabled"
       :aria-label="toggleLabel"
       :aria-pressed="revealed"
       :title="toggleLabel"
