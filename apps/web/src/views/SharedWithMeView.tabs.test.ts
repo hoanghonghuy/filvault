@@ -75,7 +75,7 @@ async function mountView() {
       stubs: {
         Icon: { template: '<span aria-hidden="true" />' },
         EmptyState: { template: '<div class="empty-stub" />' },
-        Transition: false,
+        Transition: { template: '<slot />' },
       },
     },
   })
