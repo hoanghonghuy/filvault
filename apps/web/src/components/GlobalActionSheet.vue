@@ -14,21 +14,20 @@ const actionLabelsById = computed<Record<string, string>>(() => ({
   open: t.value.open,
   rename: t.value.rename,
   move: t.value.move,
-  vault: t.value.vaultMoveToVault,
-  trash: t.value.moveToTrash,
   preview: t.value.preview,
   view: t.value.preview,
   download: t.value.download,
   restore: t.value.restore,
   add: t.value.addPhotos,
   'set-cover': t.value.setAsCover,
-  'remove-cover': t.value.removeCover,
+  'unset-cover': t.value.removeCover,
   remove: t.value.removeFromAlbum,
 }))
 
 // Transitional fallback for callers whose action id is context-dependent (for example
-// `delete` and `favorite`). New/unambiguous actions should localize by stable id so
-// changing English display copy cannot silently break locale switching.
+// `delete`, `favorite`, and batch actions with count-aware labels). New/unambiguous
+// actions should localize by stable id so changing English display copy cannot silently
+// break locale switching.
 const legacyActionLabels = computed<Record<string, string>>(() => ({
   'Move to vault': t.value.vaultMoveToVault,
   'Move to trash': t.value.moveToTrash,
