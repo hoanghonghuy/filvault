@@ -83,14 +83,14 @@ export function installCallModalFocusGuard(): () => void {
     if (event.key !== 'Tab') return
 
     const focusable = getFocusable(overlay)
-    if (focusable.length === 0) {
+    const first = focusable.at(0)
+    const last = focusable.at(-1)
+    if (!first || !last) {
       event.preventDefault()
       focusOverlayFallback(overlay)
       return
     }
 
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
     const current = document.activeElement
 
     if (!overlay.contains(current)) {
