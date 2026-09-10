@@ -1,7 +1,10 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { Locale } from '@/lib/i18n'
-import { logoutConfirmationOptions } from '@/lib/logoutConfirmation'
+import {
+  currentLogoutLocale,
+  isLegacyLogoutConfirmation,
+  logoutConfirmationOptions,
+} from '@/lib/logoutConfirmation'
 
 export type ConfirmOptions = {
   title: string
@@ -67,7 +70,7 @@ export const useUiStore = defineStore('ui', () => {
   // so every caller resumes only when the screen is clear for the next dialog.
   let actionSheetClosing: { id: string | null; resolve: (value: string | null) => void } | null = null
 
-  function showToast(message: string, type: 'success' | 'error' | 'info' = 'info', durationMs = 3000) {
+  function showToast(message: string, type: 'success' | 'error' | 'info'> = 'info', durationMs = 3000) {
     toastMessage.value = message
     toastType.value = type
     if (toastTimer) clearTimeout(toastTimer)
@@ -80,17 +83,20 @@ export const useUiStore = defineStore('ui', () => {
   function confirm(options: ConfirmOptions): Promise<boolean> {
     return new Promise((resolve) => {
       confirmResolve = resolve
+      const normalizedOptions = isLegacyLogoutConfirmation(options)
+        ? logoutConfirmationOptions(currentLogoutLocale())
+        : options
       confirmState.value = {
         open: true,
         confirmLabel: 'Confirm',
         cancelLabel: 'Cancel',
-        ...options,
+        ...normalizedOptions,
       }
     })
   }
 
-  function confirmLogout(locale: Locale): Promise<boolean> {
-    return confirm(logoutConfirmationOptions(locale))
+  function confirmLogout(): Promise<boolean> {
+    return confirm(logoutConfirmationOptions(currentLogoutLocale()))
   }
 
   function resolveConfirm(value: boolean) {
