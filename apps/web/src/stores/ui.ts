@@ -70,7 +70,7 @@ export const useUiStore = defineStore('ui', () => {
   // so every caller resumes only when the screen is clear for the next dialog.
   let actionSheetClosing: { id: string | null; resolve: (value: string | null) => void } | null = null
 
-  function showToast(message: string, type: 'success' | 'error' | 'info'> = 'info', durationMs = 3000) {
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'info', durationMs = 3000) {
     toastMessage.value = message
     toastType.value = type
     if (toastTimer) clearTimeout(toastTimer)
