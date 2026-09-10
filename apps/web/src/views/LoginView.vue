@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
@@ -21,6 +21,7 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const resetSucceeded = computed(() => route.query.reset === 'success')
 
 async function submit() {
   error.value = ''
@@ -44,6 +45,10 @@ async function submit() {
   <AuthCard title="Sign in" subtitle="Access your files and photos from any device.">
     <template #default="{ titleId }">
       <form :aria-labelledby="titleId" :aria-describedby="error ? 'auth-error' : undefined" @submit.prevent="submit">
+        <div v-if="resetSucceeded" class="auth-success" role="status">
+          Password reset complete. Sign in with your new password.
+        </div>
+
         <label class="field">
           <span class="field-label">Email</span>
           <input
@@ -62,7 +67,10 @@ async function submit() {
           />
         </label>
         <div class="field">
-          <label class="field-label" for="login-password">Password</label>
+          <div class="password-label-row">
+            <label class="field-label" for="login-password">Password</label>
+            <RouterLink class="forgot-link" to="/forgot-password">Forgot password?</RouterLink>
+          </div>
           <PasswordInput
             id="login-password"
             v-model="password"
@@ -92,3 +100,59 @@ async function submit() {
     </template>
   </AuthCard>
 </template>
+
+<style scoped>
+.password-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xxs);
+}
+
+.password-label-row .field-label {
+  margin: 0;
+}
+
+.forgot-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: right;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+.forgot-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.auth-success {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--success, #22863a);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+  .password-label-row {
+    align-items: flex-start;
+  }
+
+  .forgot-link {
+    max-width: 52%;
+  }
+}
+</style>
