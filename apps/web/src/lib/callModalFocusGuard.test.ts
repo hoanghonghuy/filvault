@@ -55,8 +55,8 @@ describe('installCallModalFocusGuard', () => {
     await flush()
 
     const buttons = overlay.querySelectorAll<HTMLButtonElement>('button')
-    const first = buttons[0]
-    const last = buttons[2]
+    const first = buttons.item(0)
+    const last = buttons.item(2)
 
     last.focus()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
