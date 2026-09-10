@@ -19,6 +19,8 @@ const router = useRouter()
 const ui = useUiStore()
 const { t } = useI18n()
 const photosPageRef = ref<HTMLElement | null>(null)
+const timelineTabRef = ref<HTMLButtonElement | null>(null)
+const albumsTabRef = ref<HTMLButtonElement | null>(null)
 
 const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
@@ -35,6 +37,21 @@ const pendingSheetAction = ref<'view' | 'download' | null>(null)
 const favoriteIds = ref<Set<string>>(new Set())
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
+
+function selectPhotoTab(tab: 'timeline' | 'albums', focus = false) {
+  activePhotoTab.value = tab
+  if (focus) {
+    requestAnimationFrame(() => (tab === 'timeline' ? timelineTabRef.value : albumsTabRef.value)?.focus())
+  }
+}
+
+function handleTabKeydown(event: KeyboardEvent) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  if (event.key === 'Home') return selectPhotoTab('timeline', true)
+  if (event.key === 'End') return selectPhotoTab('albums', true)
+  selectPhotoTab(activePhotoTab.value === 'timeline' ? 'albums' : 'timeline', true)
+}
 
 async function loadTimeline(before?: string) {
   const params = new URLSearchParams()
@@ -68,11 +85,8 @@ async function loadMore() {
     const merged = [...groups.value]
     for (const newGroup of data.groups) {
       const existing = merged.find((g) => g.date === newGroup.date)
-      if (existing) {
-        existing.items.push(...newGroup.items)
-      } else {
-        merged.push(newGroup)
-      }
+      if (existing) existing.items.push(...newGroup.items)
+      else merged.push(newGroup)
     }
     groups.value = merged
     nextBefore.value = data.nextBefore
@@ -116,10 +130,7 @@ async function renameAlbum(album: Album) {
   if (!name || name === album.name) return
   error.value = ''
   try {
-    await api(`/photos/albums/${album.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name }),
-    })
+    await api(`/photos/albums/${album.id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
     ui.showToast(t.value.renameAlbum)
     await load()
   } catch (e) {
@@ -145,7 +156,7 @@ async function deleteAlbum(id: string, name: string) {
   }
 }
 
-function openMedia(item: TimelineItem) {
+function openMediaActions(item: TimelineItem) {
   mediaItem.value = item
   mediaOpen.value = true
 }
@@ -175,8 +186,7 @@ async function loadFavorites() {
 }
 
 async function toggleFavoriteFromSheet() {
-  if (!mediaItem.value) return
-  await toggleFavorite(mediaItem.value)
+  if (mediaItem.value) await toggleFavorite(mediaItem.value)
 }
 
 async function viewMedia() {
@@ -242,9 +252,7 @@ async function downloadMedia() {
   }
 }
 
-const { pullDistance, isRefreshing, attachListeners } = usePullToRefresh(photosPageRef, {
-  onRefresh: load,
-})
+const { pullDistance, isRefreshing, attachListeners } = usePullToRefresh(photosPageRef, { onRefresh: load })
 
 onMounted(() => {
   void load()
@@ -259,65 +267,93 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="photosPageRef" class="photos-page">
-    <div v-if="pullDistance > 0 || isRefreshing" class="pull-refresh-bar" :style="{ height: `${pullDistance}px` }">
-      <span class="pull-icon" :class="{ spin: isRefreshing }">{{ isRefreshing ? '↻' : '↓' }}</span>
+    <div
+      v-if="pullDistance > 0 || isRefreshing"
+      class="pull-refresh-bar"
+      :style="{ height: `${pullDistance}px` }"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="pull-icon" :class="{ spin: isRefreshing }" aria-hidden="true">{{ isRefreshing ? '↻' : '↓' }}</span>
+      <span class="sr-only">{{ isRefreshing ? t.loading : 'Pull to refresh photos' }}</span>
     </div>
+
     <h1 class="page-title desktop-only">{{ t.photosTitle }}</h1>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
-    <!-- TeraBox Segmented Tabs -->
+
     <div class="tabs-header">
-      <div class="tabs-pill-list" role="tablist" aria-label="Photos views">
+      <div class="tabs-pill-list" role="tablist" aria-label="Photos views" @keydown="handleTabKeydown">
         <button
+          id="photos-tab-timeline"
+          ref="timelineTabRef"
           type="button"
           role="tab"
           class="tab-pill"
           :class="{ active: activePhotoTab === 'timeline' }"
           :aria-selected="activePhotoTab === 'timeline'"
-          @click="activePhotoTab = 'timeline'"
+          aria-controls="photos-panel-timeline"
+          :tabindex="activePhotoTab === 'timeline' ? 0 : -1"
+          @click="selectPhotoTab('timeline')"
         >
           {{ t.timeline }}
         </button>
         <button
+          id="photos-tab-albums"
+          ref="albumsTabRef"
           type="button"
           role="tab"
           class="tab-pill"
           :class="{ active: activePhotoTab === 'albums' }"
           :aria-selected="activePhotoTab === 'albums'"
-          @click="activePhotoTab = 'albums'"
+          aria-controls="photos-panel-albums"
+          :tabindex="activePhotoTab === 'albums' ? 0 : -1"
+          @click="selectPhotoTab('albums')"
         >
           {{ t.albums }} ({{ albums.length }})
         </button>
       </div>
     </div>
 
-    <!-- Timeline Tab -->
-    <div v-if="activePhotoTab === 'timeline'" class="timeline-container">
+    <div
+      v-if="activePhotoTab === 'timeline'"
+      id="photos-panel-timeline"
+      class="timeline-container"
+      role="tabpanel"
+      aria-labelledby="photos-tab-timeline"
+      tabindex="0"
+    >
       <section v-for="group in groups" :key="group.date" class="timeline-date-group" :aria-label="group.date">
         <div class="timeline-sticky-header">
           <h2 class="timeline-date-title">{{ group.date }}</h2>
           <span class="timeline-count-badge">{{ group.items.length }}</span>
         </div>
         <div class="grid photos">
-          <PhotoThumb
+          <div
             v-for="(item, index) in group.items"
             :key="item.id"
-            :mime-type="item.mimeType"
-            :name="item.name"
-            :thumbnail-url="item.thumbnailUrl"
-            class="appear"
+            class="photo-cell appear"
             :style="{ animationDelay: cellDelay(index) }"
-            @click="openMedia(item)"
-          />
+          >
+            <PhotoThumb
+              :mime-type="item.mimeType"
+              :name="item.name"
+              :thumbnail-url="item.thumbnailUrl"
+              @click="openLightbox(item)"
+            />
+            <button
+              type="button"
+              class="photo-more-btn"
+              :aria-label="`${t.albumMenu}: ${item.name}`"
+              @click="openMediaActions(item)"
+            >
+              <Icon name="more" :size="18" />
+            </button>
+          </div>
         </div>
       </section>
 
-      <EmptyState
-        v-if="groups.length === 0"
-        :title="t.noPhotos"
-        :description="t.noPhotosDesc"
-        icon="photos"
-      />
+      <EmptyState v-if="groups.length === 0" :title="t.noPhotos" :description="t.noPhotosDesc" icon="photos" />
 
       <div v-if="nextBefore" class="load-more">
         <LoadingSkeletonPhotos v-if="loadingMore" variant="more" />
@@ -327,8 +363,14 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Albums Tab -->
-    <div v-else-if="activePhotoTab === 'albums'" class="albums-container">
+    <div
+      v-else
+      id="photos-panel-albums"
+      class="albums-container"
+      role="tabpanel"
+      aria-labelledby="photos-tab-albums"
+      tabindex="0"
+    >
       <form class="album-form" @submit.prevent="createAlbum">
         <label class="field album-field">
           <span class="sr-only">{{ t.newAlbumName }}</span>
@@ -338,62 +380,50 @@ onBeforeUnmount(() => {
       </form>
 
       <div v-if="albums.length" class="albums-grid">
-        <div
-          v-for="(album, index) in albums"
-          :key="album.id"
-          class="album-card tappable appear"
-          :style="{ animationDelay: cellDelay(index) }"
-          @click="router.push(`/photos/albums/${album.id}`)"
-        >
-          <div class="album-cover" aria-hidden="true">
-            <img v-if="album.coverUrl" :src="album.coverUrl" alt="" loading="lazy" />
-            <Icon v-else-if="album.coverFileId" name="video" :size="24" />
-            <Icon v-else name="photos" :size="24" />
-          </div>
-          <div class="album-meta-row">
+        <article v-for="(album, index) in albums" :key="album.id" class="album-card appear" :style="{ animationDelay: cellDelay(index) }">
+          <RouterLink class="album-primary" :to="`/photos/albums/${album.id}`" :aria-label="`${album.name}, ${album.itemCount} ${t.photosTitle.toLowerCase()}`">
+            <div class="album-cover" aria-hidden="true">
+              <img v-if="album.coverUrl" :src="album.coverUrl" alt="" loading="lazy" />
+              <Icon v-else-if="album.coverFileId" name="video" :size="24" />
+              <Icon v-else name="photos" :size="24" />
+            </div>
             <div class="album-text-col">
               <span class="album-title">{{ album.name }}</span>
               <span class="album-sub">{{ album.itemCount }} {{ t.photosTitle.toLowerCase() }}</span>
             </div>
-            <button class="btn icon-only album-more-btn" type="button" :aria-label="t.albumMenu" @click.stop="openAlbumActions(album)">
-              <Icon name="more" :size="18" />
-            </button>
-          </div>
-        </div>
+          </RouterLink>
+          <button class="btn icon-only album-more-btn" type="button" :aria-label="`${t.albumMenu}: ${album.name}`" @click="openAlbumActions(album)">
+            <Icon name="more" :size="18" />
+          </button>
+        </article>
       </div>
-      <EmptyState
-        v-else
-        compact
-        :title="t.noAlbums"
-        :description="t.noAlbumsDesc"
-        icon="photos"
-      />
+      <EmptyState v-else compact :title="t.noAlbums" :description="t.noAlbumsDesc" icon="photos" />
     </div>
 
-      <PhotoMediaSheet
-        :open="mediaOpen"
-        :name="mediaItem?.name ?? ''"
-        :favorited="mediaItem ? isFavorited(mediaItem.id) : false"
-        @view="viewMedia"
-        @download="downloadMedia"
-        @favorite="toggleFavoriteFromSheet"
-        @close="mediaOpen = false"
-        @after-leave="handleSheetAfterLeave"
-      />
+    <PhotoMediaSheet
+      :open="mediaOpen"
+      :name="mediaItem?.name ?? ''"
+      :favorited="mediaItem ? isFavorited(mediaItem.id) : false"
+      @view="viewMedia"
+      @download="downloadMedia"
+      @favorite="toggleFavoriteFromSheet"
+      @close="mediaOpen = false"
+      @after-leave="handleSheetAfterLeave"
+    />
 
-      <MediaLightbox
-        :open="lightboxOpen"
-        :name="mediaItem?.name ?? ''"
-        :mime-type="mediaItem?.mimeType ?? ''"
-        :url="lightboxUrl"
-        :has-next="hasNextMedia"
-        :has-prev="hasPrevMedia"
-        @next="nextMedia"
-        @prev="prevMedia"
-        @download="downloadMedia"
-        @close="lightboxOpen = false"
-      />
-    </div>
+    <MediaLightbox
+      :open="lightboxOpen"
+      :name="mediaItem?.name ?? ''"
+      :mime-type="mediaItem?.mimeType ?? ''"
+      :url="lightboxUrl"
+      :has-next="hasNextMedia"
+      :has-prev="hasPrevMedia"
+      @next="nextMedia"
+      @prev="prevMedia"
+      @download="downloadMedia"
+      @close="lightboxOpen = false"
+    />
+  </div>
 </template>
 
 <style scoped>
@@ -409,49 +439,33 @@ onBeforeUnmount(() => {
 .pull-icon {
   font-size: 1.25rem;
   line-height: 1;
-  transition: transform var(--duration-short) var(--ease-standard);
 }
 
-.pull-icon.spin {
-  animation: spin 800ms linear infinite;
-}
+.pull-icon.spin { animation: spin 800ms linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* TeraBox Tabs */
 .tabs-header {
   margin-bottom: var(--space-md);
   border-bottom: 1px solid var(--hairline);
   padding-bottom: 4px;
 }
 
-.tabs-pill-list {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
+.tabs-pill-list { display: flex; align-items: center; gap: 16px; }
 .tab-pill {
   background: transparent;
   border: none;
-  padding: 6px 0;
+  padding: 8px 0;
+  min-height: 44px;
   font-size: 15px;
   font-weight: 600;
   color: var(--muted);
   cursor: pointer;
   position: relative;
-  transition: color 0.15s ease;
   display: inline-flex;
   align-items: center;
 }
-
-.tab-pill.active {
-  color: var(--ink);
-}
-
+.tab-pill.active { color: var(--ink); }
+.tab-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 .tab-pill.active::after {
   content: '';
   position: absolute;
@@ -463,11 +477,9 @@ onBeforeUnmount(() => {
   background: var(--accent);
 }
 
-/* Timeline */
-.timeline-date-group {
-  margin-bottom: var(--space-lg);
-}
-
+.timeline-container:focus-visible,
+.albums-container:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-sm); }
+.timeline-date-group { margin-bottom: var(--space-lg); }
 .timeline-sticky-header {
   position: sticky;
   top: 0;
@@ -479,77 +491,45 @@ onBeforeUnmount(() => {
   padding: 6px 0;
   margin-bottom: 8px;
 }
-
-.timeline-date-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  margin: 0;
+.timeline-date-title { font-size: 15px; font-weight: 600; color: var(--ink); margin: 0; }
+.timeline-count-badge { font-size: 12px; font-weight: 500; color: var(--muted); }
+.grid.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.photo-cell { position: relative; min-width: 0; }
+.photo-more-btn {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-short) var(--ease-standard);
 }
+.photo-cell:hover .photo-more-btn,
+.photo-more-btn:focus-visible { opacity: 1; }
+.photo-more-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.timeline-count-badge {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.grid.photos {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-}
-
-@media (min-width: 640px) {
-  .grid.photos {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .grid.photos {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-  }
-}
-
-/* Albums */
-.albums-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: var(--space-md);
-}
-
-@media (min-width: 768px) {
-  .albums-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .albums-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
+.albums-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: var(--space-md); }
 .album-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-lg, 16px);
   background: var(--surface-card, rgba(255, 255, 255, 0.04));
   border: 1px solid var(--hairline);
   overflow: hidden;
-  cursor: pointer;
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
-
-.album-card:active {
-  transform: scale(0.98);
-  border-color: var(--accent);
-}
-
+.album-card:focus-within { border-color: var(--accent); }
+.album-primary { color: inherit; text-decoration: none; min-width: 0; }
+.album-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: inherit; }
 .album-cover {
   width: 100%;
   aspect-ratio: 16 / 10;
@@ -560,25 +540,8 @@ onBeforeUnmount(() => {
   color: var(--muted);
   overflow: hidden;
 }
-
-.album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.album-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-}
-
-.album-text-col {
-  min-width: 0;
-  flex: 1;
-}
-
+.album-cover img { width: 100%; height: 100%; object-fit: cover; }
+.album-text-col { min-width: 0; padding: 10px 56px 10px 12px; }
 .album-title {
   display: block;
   font-size: 14px;
@@ -588,41 +551,29 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.album-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.album-more-btn { position: absolute; right: 6px; bottom: 5px; color: var(--muted); flex-shrink: 0; min-width: 44px; min-height: 44px; }
+.album-form { display: flex; gap: 8px; margin-bottom: var(--space-md); }
+.album-field { flex: 1; margin-bottom: 0; min-width: 0; }
+.load-more { margin-top: var(--space-md); }
+.desktop-only { display: none; }
 
-.album-sub {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
+@media (hover: none), (pointer: coarse) {
+  .photo-more-btn { opacity: 1; }
 }
-
-.album-more-btn {
-  color: var(--muted);
-  flex-shrink: 0;
-}
-
-.album-form {
-  display: flex;
-  gap: 8px;
-  margin-bottom: var(--space-md);
-}
-
-.album-field {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-.load-more {
-  margin-top: var(--space-md);
-}
-
-.desktop-only {
-  display: none;
-}
-
+@media (min-width: 640px) { .grid.photos { grid-template-columns: repeat(4, 1fr); gap: 6px; } }
 @media (min-width: 768px) {
-  .desktop-only {
-    display: block;
-  }
+  .albums-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .desktop-only { display: block; }
+}
+@media (min-width: 1024px) {
+  .grid.photos { grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .albums-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pull-refresh-bar,
+  .photo-more-btn,
+  .album-card { transition: none; }
+  .pull-icon.spin { animation: none; }
 }
 </style>
