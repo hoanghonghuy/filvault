@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Icon from '@/components/AppIcon.vue'
 import { useUiStore } from '@/stores/ui'
@@ -19,33 +19,78 @@ const appearanceModes = [
 
 const previewTheme = ref<ThemeDef | null>(null)
 const previewOpen = ref(false)
+const previewDialog = ref<HTMLElement | null>(null)
+const previewCloseButton = ref<HTMLButtonElement | null>(null)
+let previewOpener: HTMLElement | null = null
 
 const colorThemes = computed(() => THEMES.filter((item) => item.category === 'colors'))
 const seasonalThemes = computed(() => THEMES.filter((item) => item.category === 'seasonal'))
-
-function openPreview(theme: ThemeDef) {
-  previewTheme.value = theme
-  previewOpen.value = true
-}
-
-function closePreview() {
-  previewOpen.value = false
-}
-
-function applyTheme(theme: ThemeDef) {
-  applyColorTheme(theme.id)
-  ui.showToast(`${t.value.themeApplied}: ${themeName(theme)}`, 'success')
-  closePreview()
-}
 
 function themeName(theme: ThemeDef): string {
   const key = theme.nameKey as keyof typeof t.value
   return (t.value[key] as string) || theme.nameDefault
 }
 
+async function openPreview(theme: ThemeDef) {
+  previewOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  previewTheme.value = theme
+  previewOpen.value = true
+  await nextTick()
+  previewCloseButton.value?.focus()
+}
+
+async function closePreview() {
+  if (!previewOpen.value) return
+  previewOpen.value = false
+  await nextTick()
+  previewOpener?.focus()
+  previewOpener = null
+}
+
+function applyTheme(theme: ThemeDef) {
+  applyColorTheme(theme.id)
+  ui.showToast(`${t.value.themeApplied}: ${themeName(theme)}`, 'success')
+  void closePreview()
+}
+
 function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   setAppearanceMode(mode)
 }
+
+function handlePreviewKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    void closePreview()
+    return
+  }
+  if (event.key !== 'Tab' || !previewDialog.value) return
+
+  const focusable = Array.from(
+    previewDialog.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true')
+
+  if (focusable.length === 0) {
+    event.preventDefault()
+    previewDialog.value.focus()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first?.focus()
+  }
+}
+
+onBeforeUnmount(() => {
+  previewOpener = null
+})
 </script>
 
 <template>
@@ -54,9 +99,7 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
       <button type="button" class="btn icon-only back-btn" :aria-label="t.back" @click="router.back()">
         <Icon name="arrow-left" :size="22" />
       </button>
-
       <h1 class="theme-header-title">{{ t.themeTitle }}</h1>
-
       <div class="header-spacer" aria-hidden="true"></div>
     </header>
 
@@ -77,13 +120,7 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
         </button>
       </div>
       <p class="appearance-mode-hint">
-        {{
-          appearanceMode === 'system'
-            ? t.appearanceModeSystemHint
-            : resolvedIsDark
-              ? t.appearanceModeDarkHint
-              : t.appearanceModeLightHint
-        }}
+        {{ appearanceMode === 'system' ? t.appearanceModeSystemHint : resolvedIsDark ? t.appearanceModeDarkHint : t.appearanceModeLightHint }}
       </p>
       <p class="appearance-mode-hint color-theme-hint">{{ t.colorThemeAppearanceHint }}</p>
     </section>
@@ -97,13 +134,12 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
           type="button"
           class="swatch-item"
           :class="{ active: currentColorTheme === theme.id }"
+          :aria-pressed="currentColorTheme === theme.id"
           @click="openPreview(theme)"
         >
-          <div class="swatch-box" :style="{ background: theme.swatchGradient }">
-            <span v-if="currentColorTheme === theme.id" class="swatch-check" aria-hidden="true">
-              <Icon name="check" :size="14" />
-            </span>
-          </div>
+          <span class="swatch-box" :style="{ background: theme.swatchGradient }">
+            <span v-if="currentColorTheme === theme.id" class="swatch-check" aria-hidden="true"><Icon name="check" :size="14" /></span>
+          </span>
           <span class="swatch-label">{{ themeName(theme) }}</span>
         </button>
       </div>
@@ -118,13 +154,12 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
           type="button"
           class="seasonal-card"
           :class="{ active: currentColorTheme === theme.id }"
+          :aria-pressed="currentColorTheme === theme.id"
           @click="openPreview(theme)"
         >
-          <div class="seasonal-swatch-box" :style="{ background: theme.swatchGradient }">
-            <span v-if="currentColorTheme === theme.id" class="swatch-check" aria-hidden="true">
-              <Icon name="check" :size="14" />
-            </span>
-          </div>
+          <span class="seasonal-swatch-box" :style="{ background: theme.swatchGradient }">
+            <span v-if="currentColorTheme === theme.id" class="swatch-check" aria-hidden="true"><Icon name="check" :size="14" /></span>
+          </span>
           <span class="swatch-label">{{ themeName(theme) }}</span>
         </button>
       </div>
@@ -132,114 +167,80 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
 
     <Teleport to="body">
       <Transition name="preview-fade">
-        <div v-if="previewOpen && previewTheme" class="preview-overlay" role="dialog" aria-modal="true">
+        <div
+          v-if="previewOpen && previewTheme"
+          ref="previewDialog"
+          class="preview-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="theme-preview-title"
+          tabindex="-1"
+          @keydown="handlePreviewKeydown"
+        >
           <header class="preview-top-bar">
-            <button type="button" class="btn icon-only back-btn" :aria-label="t.back" @click="closePreview">
+            <button ref="previewCloseButton" type="button" class="btn icon-only back-btn" :aria-label="t.back" @click="closePreview">
               <Icon name="arrow-left" :size="22" />
             </button>
-            <h1 class="preview-header-title">{{ themeName(previewTheme) }}</h1>
-            <div class="header-spacer"></div>
+            <h2 id="theme-preview-title" class="preview-header-title">{{ themeName(previewTheme) }}</h2>
+            <div class="header-spacer" aria-hidden="true"></div>
           </header>
 
           <div class="preview-content-area">
-            <div class="mockup-frame" :style="{ background: previewTheme.previewBg }">
-              <div class="mockup-header-row">
-                <span class="mockup-month">tháng 9</span>
-                <span class="mockup-dots" aria-hidden="true">
+            <div class="storage-preview" :style="{ background: previewTheme.previewBg, '--preview-accent': previewTheme.todayAccent }">
+              <div class="storage-preview-shell">
+                <div class="storage-preview-brand">
+                  <span class="storage-preview-logo" aria-hidden="true"><Icon name="folder" :size="18" /></span>
+                  <strong>Filvault</strong>
+                  <span class="storage-preview-more" aria-hidden="true"><Icon name="more" :size="18" /></span>
+                </div>
+                <div class="storage-preview-search" aria-hidden="true">
+                  <Icon name="search" :size="15" />
+                  <span>{{ t.files }}</span>
+                </div>
+              </div>
+
+              <div class="storage-preview-body">
+                <div class="storage-preview-heading">
+                  <strong>{{ t.files }}</strong>
+                  <span class="storage-preview-chip">{{ themeName(previewTheme) }}</span>
+                </div>
+
+                <div class="storage-preview-grid" aria-hidden="true">
+                  <div class="storage-preview-folder selected-preview-item">
+                    <span class="preview-item-icon"><Icon name="folder" :size="20" /></span>
+                    <span>{{ t.folders }}</span>
+                  </div>
+                  <div class="storage-preview-media">
+                    <span class="preview-photo-shape"></span>
+                    <span class="preview-media-line"></span>
+                  </div>
+                </div>
+
+                <div class="storage-preview-file" aria-hidden="true">
+                  <span class="preview-file-icon"><Icon name="file" :size="19" /></span>
+                  <span class="preview-file-copy">
+                    <span class="preview-file-title">Filvault.pdf</span>
+                    <span class="preview-file-meta">2.4 MB</span>
+                  </span>
                   <Icon name="more" :size="18" />
-                </span>
-              </div>
-
-              <div class="mockup-week-row">
-                <span>Th 2</span>
-                <span>Th 3</span>
-                <span>Th 4</span>
-                <span>Th 5</span>
-                <span>Th 6</span>
-                <span>Th 7</span>
-                <span>CN</span>
-              </div>
-
-              <div class="mockup-dates-grid">
-                <span class="faded">31</span>
-                <span>1</span>
-                <span>2</span>
-                <span>3</span>
-                <span>4</span>
-                <span>5</span>
-                <span>6</span>
-                <span>7</span>
-                <span class="active-date-circle" :style="{ background: previewTheme.todayAccent, color: '#fff' }">
-                  8
-                </span>
-                <span>9</span>
-                <span>10</span>
-                <span class="highlight-date">11</span>
-                <span>12</span>
-                <span>13</span>
-                <span>14</span>
-                <span>15</span>
-                <span>16</span>
-                <span>17</span>
-                <span>18</span>
-                <span>19</span>
-                <span>20</span>
-                <span>21</span>
-                <span>22</span>
-                <span>23</span>
-                <span>24</span>
-                <span>25</span>
-                <span>26</span>
-                <span>27</span>
-              </div>
-
-              <div class="mockup-today-card">
-                <h3 class="mockup-today-title">{{ t.themePreviewToday }}</h3>
-                <div class="mockup-task-item">
-                  <span class="mockup-checkbox"></span>
-                  <span class="mockup-task-text">{{ t.themePreviewTask1 }}</span>
                 </div>
-                <div class="mockup-task-item">
-                  <span class="mockup-checkbox"></span>
-                  <span class="mockup-task-text">{{ t.themePreviewTask2 }}</span>
-                </div>
-                <div class="mockup-task-item">
-                  <span class="mockup-checkbox"></span>
-                  <span class="mockup-task-text">{{ t.themePreviewTask3 }}</span>
+
+                <div class="storage-preview-progress" aria-hidden="true">
+                  <span class="preview-progress-copy"><span>{{ t.files }}</span><span>68%</span></span>
+                  <span class="preview-progress-track"><span class="preview-progress-value"></span></span>
                 </div>
               </div>
 
-              <div class="mockup-fab" :style="{ background: previewTheme.todayAccent }">
-                <Icon name="plus" :size="20" />
-              </div>
-
-              <div class="mockup-bottom-nav">
-                <span class="nav-dot">
-                  <Icon name="check" :size="16" />
-                </span>
-                <span class="nav-dot active-pill" :style="{ background: previewTheme.todayAccent, color: '#fff' }">
-                  8
-                </span>
-                <span class="nav-dot">
-                  <Icon name="home" :size="16" />
-                </span>
-                <span class="nav-dot">
-                  <Icon name="folder" :size="16" />
-                </span>
-                <span class="nav-dot">
-                  <Icon name="settings" :size="16" />
-                </span>
+              <div class="storage-preview-nav" aria-hidden="true">
+                <span class="preview-nav-item active-preview-nav"><Icon name="folder" :size="18" /></span>
+                <span class="preview-nav-item"><Icon name="image" :size="18" /></span>
+                <span class="preview-nav-item"><Icon name="settings" :size="18" /></span>
               </div>
             </div>
           </div>
 
           <footer class="preview-footer-cta">
-            <button
-              type="button"
-              class="btn cta-apply-btn"
-              :style="{ background: previewTheme.accentColor }"
-              @click="applyTheme(previewTheme)"
-            >
+            <button type="button" class="btn cta-apply-btn" :style="{ background: previewTheme.accentColor }" @click="applyTheme(previewTheme)">
               {{ currentColorTheme === previewTheme.id ? t.themeInUse : t.themeApply }}
             </button>
           </footer>
@@ -250,474 +251,63 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
 </template>
 
 <style scoped>
-.theme-page {
-  padding-bottom: var(--space-xl);
-}
+.theme-page { padding-bottom: var(--space-xl); }
+.theme-header { display:grid; grid-template-columns:44px minmax(0,1fr) 44px; align-items:center; gap:var(--space-sm); margin-bottom:var(--space-md); padding:var(--space-xs) 0; }
+.back-btn { color:var(--ink); padding:8px; min-width:44px; min-height:44px; }
+.header-spacer { width:44px; height:44px; }
+.theme-header-title,.preview-header-title { margin:0; min-width:0; color:var(--ink); font-size:1.125rem; font-weight:700; line-height:1.3; text-align:center; overflow-wrap:anywhere; }
+.system-dark-card,.theme-section { margin-bottom:var(--space-md); padding:var(--space-md); background:var(--surface); border:1px solid var(--hairline); border-radius:var(--radius-xl); }
+.section-title { margin:0 0 var(--space-md); font-size:1rem; font-weight:700; color:var(--ink); }
+.appearance-mode-row { display:flex; gap:var(--space-xs); margin-top:var(--space-sm); }
+.appearance-mode-btn { flex:1; min-width:0; min-height:44px; border:1px solid var(--hairline); background:var(--surface-soft); color:var(--ink); border-radius:var(--radius-lg); padding:10px 8px; font-size:.875rem; font-weight:600; cursor:pointer; }
+.appearance-mode-btn.active { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+.appearance-mode-hint { margin:var(--space-sm) 0 0; font-size:.8125rem; color:var(--muted); line-height:1.45; }
+.color-theme-hint { margin-top:var(--space-xs); }
+.swatches-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--space-sm); }
+.swatch-item,.seasonal-card { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; min-height:44px; border:0; background:none; color:var(--ink); cursor:pointer; padding:4px; border-radius:var(--radius-lg); }
+.swatch-item:focus-visible,.seasonal-card:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.swatch-box { position:relative; width:100%; aspect-ratio:1; max-width:68px; border-radius:16px; box-shadow:0 2px 6px rgba(0,0,0,.08); }
+.swatch-check { position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:50%; background:#fff; color:#111827; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.swatch-label { font-size:.75rem; font-weight:500; color:var(--ink); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.seasonal-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-sm); }
+.seasonal-swatch-box { position:relative; width:100%; height:60px; border-radius:16px; box-shadow:0 2px 6px rgba(0,0,0,.08); }
 
-.theme-header {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-  padding: var(--space-xs) 0;
-}
+.preview-overlay { position:fixed; inset:0; z-index:1000; background:var(--canvas); display:flex; flex-direction:column; overflow-y:auto; padding:max(env(safe-area-inset-top),var(--space-xs)) max(env(safe-area-inset-right),var(--space-md)) max(env(safe-area-inset-bottom),var(--space-md)) max(env(safe-area-inset-left),var(--space-md)); }
+.preview-top-bar { display:grid; grid-template-columns:44px minmax(0,1fr) 44px; align-items:center; gap:var(--space-sm); min-height:56px; flex-shrink:0; }
+.preview-content-area { flex:1; display:flex; align-items:center; justify-content:center; padding:var(--space-sm) 0; }
+.storage-preview { --preview-accent:var(--accent); width:min(100%,720px); min-height:430px; border:1px solid rgba(17,24,39,.13); border-radius:28px; box-shadow:0 18px 50px rgba(0,0,0,.14); display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; color:#111827; }
+.storage-preview-shell { padding:16px; border-bottom:1px solid rgba(17,24,39,.09); background:rgba(255,255,255,.78); backdrop-filter:blur(10px); }
+.storage-preview-brand { display:grid; grid-template-columns:36px minmax(0,1fr) 32px; align-items:center; gap:10px; }
+.storage-preview-logo { width:36px; height:36px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:var(--preview-accent); color:#fff; }
+.storage-preview-more { display:flex; justify-content:center; color:#64748b; }
+.storage-preview-search { margin-top:12px; min-height:38px; border-radius:13px; background:rgba(255,255,255,.82); display:flex; align-items:center; gap:8px; padding:0 12px; color:#64748b; font-size:.8rem; }
+.storage-preview-body { padding:18px 16px; }
+.storage-preview-heading,.preview-progress-copy { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.storage-preview-chip { max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:5px 9px; border-radius:999px; background:var(--preview-accent); color:#fff; font-size:.7rem; font-weight:700; }
+.storage-preview-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:12px; margin-top:16px; }
+.storage-preview-folder,.storage-preview-media { min-height:110px; border-radius:18px; background:rgba(255,255,255,.82); border:1px solid rgba(17,24,39,.08); padding:14px; }
+.storage-preview-folder { display:flex; flex-direction:column; justify-content:space-between; font-size:.8rem; font-weight:700; }
+.selected-preview-item { outline:3px solid color-mix(in srgb,var(--preview-accent) 72%,white); outline-offset:-3px; }
+.preview-item-icon,.preview-file-icon { color:var(--preview-accent); }
+.storage-preview-media { display:flex; flex-direction:column; justify-content:flex-end; gap:10px; background:linear-gradient(145deg,color-mix(in srgb,var(--preview-accent) 24%,white),rgba(255,255,255,.9)); }
+.preview-photo-shape { width:54px; height:42px; border-radius:13px; background:var(--preview-accent); opacity:.78; }
+.preview-media-line { width:70%; height:8px; border-radius:999px; background:rgba(17,24,39,.16); }
+.storage-preview-file { margin-top:12px; min-height:62px; display:grid; grid-template-columns:36px minmax(0,1fr) 24px; align-items:center; gap:10px; padding:10px 12px; border-radius:16px; background:rgba(255,255,255,.82); border:1px solid rgba(17,24,39,.08); }
+.preview-file-copy { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.preview-file-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.8rem; font-weight:700; }
+.preview-file-meta { color:#64748b; font-size:.68rem; }
+.storage-preview-progress { margin-top:14px; padding:12px; border-radius:16px; background:rgba(255,255,255,.7); font-size:.72rem; font-weight:700; }
+.preview-progress-track { display:block; height:8px; margin-top:8px; border-radius:999px; overflow:hidden; background:rgba(17,24,39,.1); }
+.preview-progress-value { display:block; width:68%; height:100%; background:var(--preview-accent); border-radius:inherit; }
+.storage-preview-nav { min-height:56px; display:flex; align-items:center; justify-content:space-around; border-top:1px solid rgba(17,24,39,.09); background:rgba(255,255,255,.82); }
+.preview-nav-item { width:40px; height:34px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#64748b; }
+.active-preview-nav { background:var(--preview-accent); color:#fff; }
+.preview-footer-cta { padding:var(--space-sm) 0 0; flex-shrink:0; }
+.cta-apply-btn { width:100%; min-height:48px; border-radius:var(--radius-pill); font-size:1rem; font-weight:700; color:#fff; border:0; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.15); }
+.preview-fade-enter-active,.preview-fade-leave-active { transition:opacity var(--duration-medium) var(--ease-standard),transform var(--duration-medium) var(--ease-standard); }
+.preview-fade-enter-from,.preview-fade-leave-to { opacity:0; transform:translateY(20px); }
 
-.back-btn {
-  color: var(--ink);
-  padding: 8px;
-}
-
-.header-spacer {
-  width: 44px;
-  height: 44px;
-}
-
-.theme-header-title {
-  margin: 0;
-  min-width: 0;
-  color: var(--ink);
-  font-size: 1.125rem;
-  font-weight: 700;
-  line-height: 1.3;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-
-.system-dark-card {
-  margin-bottom: var(--space-md);
-  padding: var(--space-md);
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-xl);
-}
-
-.appearance-mode-row {
-  display: flex;
-  gap: var(--space-xs);
-  margin-top: var(--space-sm);
-}
-
-.appearance-mode-btn {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--hairline);
-  background: var(--surface-soft);
-  color: var(--ink);
-  border-radius: var(--radius-lg);
-  padding: 10px 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background var(--duration-short) var(--ease-standard),
-    border-color var(--duration-short) var(--ease-standard);
-}
-
-.appearance-mode-btn.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.appearance-mode-hint {
-  margin: var(--space-sm) 0 0;
-  font-size: 0.8125rem;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.color-theme-hint {
-  margin-top: var(--space-xs);
-}
-
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  min-height: 36px;
-}
-
-.toggle-label {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.switch-wrapper {
-  position: relative;
-  width: 44px;
-  height: 24px;
-}
-
-.switch-input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.switch-track {
-  position: relative;
-  display: block;
-  width: 44px;
-  height: 24px;
-  border-radius: var(--radius-pill);
-  background: var(--hairline);
-  transition: background-color var(--duration-short) var(--ease-standard);
-}
-
-.switch-track::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--canvas);
-  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.25);
-  transition: transform var(--duration-short) var(--ease-standard);
-}
-
-.switch-input:checked + .switch-track {
-  background: var(--accent);
-}
-
-.switch-input:checked + .switch-track::after {
-  transform: translateX(20px);
-}
-
-.theme-section {
-  margin-bottom: var(--space-md);
-  padding: var(--space-md);
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-xl);
-}
-
-.section-title {
-  margin: 0 0 var(--space-md);
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.swatches-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-sm);
-}
-
-.swatch-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-lg);
-  transition: transform var(--duration-short) var(--ease-standard);
-}
-
-.swatch-item:active {
-  transform: scale(0.95);
-}
-
-.swatch-box {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  max-width: 68px;
-  border-radius: 16px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.swatch-check {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #111827;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.swatch-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--ink);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 72px;
-}
-
-.seasonal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-sm);
-}
-
-@media (min-width: 600px) {
-  .seasonal-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.seasonal-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 4px;
-}
-
-.seasonal-swatch-box {
-  position: relative;
-  width: 100%;
-  height: 60px;
-  border-radius: 16px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: var(--canvas);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  padding: 0 var(--space-md) var(--space-md);
-}
-
-.preview-top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  flex-shrink: 0;
-}
-
-.preview-header-title {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.preview-content-area {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-sm) 0;
-}
-
-.mockup-frame {
-  width: 100%;
-  max-width: 330px;
-  border-radius: 28px;
-  border: 4px solid var(--hairline);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  padding: 20px 16px 16px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 480px;
-}
-
-.mockup-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.mockup-month {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #111827;
-}
-
-.mockup-dots {
-  color: #6b7280;
-}
-
-.mockup-week-row {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #9ca3af;
-  margin-bottom: 8px;
-}
-
-.mockup-dates-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 0.75rem;
-  row-gap: 8px;
-  color: #374151;
-  margin-bottom: 16px;
-}
-
-.mockup-dates-grid span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-}
-
-.mockup-dates-grid .faded {
-  color: #d1d5db;
-}
-
-.mockup-dates-grid .highlight-date {
-  color: #d97706;
-  font-weight: 700;
-}
-
-.active-date-circle {
-  width: 24px;
-  height: 24px;
-  margin: 0 auto;
-  border-radius: 50%;
-  font-weight: 700;
-}
-
-.mockup-today-card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-  margin-bottom: auto;
-}
-
-.mockup-today-title {
-  margin: 0 0 10px;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #111827;
-}
-
-.mockup-task-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.mockup-task-item:last-child {
-  margin-bottom: 0;
-}
-
-.mockup-checkbox {
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
-  border: 1.5px solid #d1d5db;
-  flex-shrink: 0;
-}
-
-.mockup-task-text {
-  font-size: 0.75rem;
-  color: #374151;
-  line-height: 1.3;
-}
-
-.mockup-fab {
-  position: absolute;
-  right: 20px;
-  bottom: 60px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-}
-
-.mockup-bottom-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding-top: 10px;
-  margin-top: 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.nav-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-}
-
-.nav-dot.active-pill {
-  width: 32px;
-  height: 24px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.preview-footer-cta {
-  padding: var(--space-sm) 0 var(--space-xs);
-  flex-shrink: 0;
-}
-
-.cta-apply-btn {
-  width: 100%;
-  min-height: 48px;
-  border-radius: var(--radius-pill);
-  font-size: 1rem;
-  font-weight: 700;
-  color: #ffffff;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  transition: transform var(--duration-short) var(--ease-standard);
-}
-
-.cta-apply-btn:active {
-  transform: scale(0.98);
-}
-
-.preview-fade-enter-active,
-.preview-fade-leave-active {
-  transition: opacity var(--duration-medium) var(--ease-standard), transform var(--duration-medium) var(--ease-standard);
-}
-
-.preview-fade-enter-from,
-.preview-fade-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
-}
+@media (min-width:600px) { .seasonal-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+@media (min-width:768px) { .storage-preview { grid-template-columns:190px 1fr; grid-template-rows:1fr; min-height:440px; } .storage-preview-shell { border-bottom:0; border-right:1px solid rgba(17,24,39,.09); } .storage-preview-brand { grid-template-columns:36px minmax(0,1fr); } .storage-preview-more { display:none; } .storage-preview-search { margin-top:24px; } .storage-preview-body { padding:26px; } .storage-preview-nav { flex-direction:column; justify-content:flex-start; gap:12px; padding-top:110px; border-top:0; border-right:1px solid rgba(17,24,39,.09); grid-column:1; grid-row:1; pointer-events:none; background:transparent; } }
+@media (prefers-reduced-motion:reduce) { .preview-fade-enter-active,.preview-fade-leave-active { transition:none; } .preview-fade-enter-from,.preview-fade-leave-to { transform:none; } }
 </style>
