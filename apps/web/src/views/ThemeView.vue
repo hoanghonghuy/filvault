@@ -17,7 +17,6 @@ const appearanceModes = [
   { id: 'dark' as const, labelKey: 'appearanceModeDark' },
 ]
 
-const activeTab = ref<'theme' | 'icons' | 'display'>('theme')
 const previewTheme = ref<ThemeDef | null>(null)
 const previewOpen = ref(false)
 
@@ -51,50 +50,16 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
 
 <template>
   <div class="theme-page">
-    <!-- Top Navigation Header -->
     <header class="theme-header">
       <button type="button" class="btn icon-only back-btn" :aria-label="t.back" @click="router.back()">
         <Icon name="arrow-left" :size="22" />
       </button>
 
-      <!-- Segmented Top Tabs -->
-      <div class="header-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          class="header-tab-pill"
-          :class="{ active: activeTab === 'theme' }"
-          :aria-selected="activeTab === 'theme'"
-          @click="activeTab = 'theme'"
-        >
-          {{ t.themeTabThemes }}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="header-tab-pill"
-          :class="{ active: activeTab === 'icons' }"
-          :aria-selected="activeTab === 'icons'"
-          @click="activeTab = 'icons'"
-        >
-          {{ t.themeTabIcons }}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="header-tab-pill"
-          :class="{ active: activeTab === 'display' }"
-          :aria-selected="activeTab === 'display'"
-          @click="activeTab = 'display'"
-        >
-          {{ t.themeTabDisplay }}
-        </button>
-      </div>
+      <h1 class="theme-header-title">{{ t.themeTitle }}</h1>
 
-      <div class="header-spacer"></div>
+      <div class="header-spacer" aria-hidden="true"></div>
     </header>
 
-    <!-- Appearance mode (shared with Settings) -->
     <section class="card system-dark-card">
       <h2 class="section-title">{{ t.appearanceModeLabel }}</h2>
       <div class="appearance-mode-row" role="radiogroup" :aria-label="t.appearanceModeLabel">
@@ -123,7 +88,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
       <p class="appearance-mode-hint color-theme-hint">{{ t.colorThemeAppearanceHint }}</p>
     </section>
 
-    <!-- Section 1: Color Palette (Dòng màu sắc) -->
     <section class="card theme-section">
       <h2 class="section-title">{{ t.themeColorPalette }}</h2>
       <div class="swatches-grid">
@@ -145,7 +109,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
       </div>
     </section>
 
-    <!-- Section 2: Seasonal Series (Loạt Mùa) -->
     <section class="card theme-section">
       <h2 class="section-title">{{ t.themeSeasonal }}</h2>
       <div class="seasonal-grid">
@@ -167,11 +130,9 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
       </div>
     </section>
 
-    <!-- Theme Live Preview Modal (Matching Photo 1) -->
     <Teleport to="body">
       <Transition name="preview-fade">
         <div v-if="previewOpen && previewTheme" class="preview-overlay" role="dialog" aria-modal="true">
-          <!-- Preview Header -->
           <header class="preview-top-bar">
             <button type="button" class="btn icon-only back-btn" :aria-label="t.back" @click="closePreview">
               <Icon name="arrow-left" :size="22" />
@@ -180,10 +141,8 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
             <div class="header-spacer"></div>
           </header>
 
-          <!-- Preview Mockup Card Frame -->
           <div class="preview-content-area">
             <div class="mockup-frame" :style="{ background: previewTheme.previewBg }">
-              <!-- Mockup Calendar / Header -->
               <div class="mockup-header-row">
                 <span class="mockup-month">tháng 9</span>
                 <span class="mockup-dots" aria-hidden="true">
@@ -191,7 +150,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
                 </span>
               </div>
 
-              <!-- Mini Day Names Matrix -->
               <div class="mockup-week-row">
                 <span>Th 2</span>
                 <span>Th 3</span>
@@ -202,7 +160,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
                 <span>CN</span>
               </div>
 
-              <!-- Mini Dates Grid -->
               <div class="mockup-dates-grid">
                 <span class="faded">31</span>
                 <span>1</span>
@@ -236,7 +193,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
                 <span>27</span>
               </div>
 
-              <!-- Mockup Today Checklist Card -->
               <div class="mockup-today-card">
                 <h3 class="mockup-today-title">{{ t.themePreviewToday }}</h3>
                 <div class="mockup-task-item">
@@ -253,12 +209,10 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
                 </div>
               </div>
 
-              <!-- Mockup FAB Button -->
               <div class="mockup-fab" :style="{ background: previewTheme.todayAccent }">
                 <Icon name="plus" :size="20" />
               </div>
 
-              <!-- Mockup Bottom Bar -->
               <div class="mockup-bottom-nav">
                 <span class="nav-dot">
                   <Icon name="check" :size="16" />
@@ -279,7 +233,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
             </div>
           </div>
 
-          <!-- Bottom Action CTA (Sử dụng) -->
           <footer class="preview-footer-cta">
             <button
               type="button"
@@ -302,9 +255,10 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
 }
 
 .theme-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-sm);
   margin-bottom: var(--space-md);
   padding: var(--space-xs) 0;
 }
@@ -315,44 +269,21 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
 }
 
 .header-spacer {
-  width: 36px;
+  width: 44px;
+  height: 44px;
 }
 
-.header-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.header-tab-pill {
-  border: none;
-  background: none;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 6px 4px;
-  cursor: pointer;
-  position: relative;
-  transition: color var(--duration-short) var(--ease-standard);
-}
-
-.header-tab-pill.active {
+.theme-header-title {
+  margin: 0;
+  min-width: 0;
   color: var(--ink);
+  font-size: 1.125rem;
   font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
-.header-tab-pill.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 20%;
-  right: 20%;
-  height: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-}
-
-/* Appearance mode card */
 .system-dark-card {
   margin-bottom: var(--space-md);
   padding: var(--space-md);
@@ -458,7 +389,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   transform: translateX(20px);
 }
 
-/* Theme Sections */
 .theme-section {
   margin-bottom: var(--space-md);
   padding: var(--space-md);
@@ -474,7 +404,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   color: var(--ink);
 }
 
-/* Swatches Grid */
 .swatches-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -536,7 +465,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   max-width: 72px;
 }
 
-/* Seasonal Grid */
 .seasonal-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -571,7 +499,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   justify-content: center;
 }
 
-/* Full Preview Overlay (Matching Photo 1) */
 .preview-overlay {
   position: fixed;
   inset: 0;
@@ -761,7 +688,6 @@ function chooseAppearanceMode(mode: 'system' | 'light' | 'dark') {
   font-weight: 700;
 }
 
-/* CTA Apply Button */
 .preview-footer-cta {
   padding: var(--space-sm) 0 var(--space-xs);
   flex-shrink: 0;
