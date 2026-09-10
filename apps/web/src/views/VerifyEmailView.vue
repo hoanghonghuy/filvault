@@ -109,7 +109,7 @@ async function submit() {
           >
             {{ resendLabel }}
           </button>
-          <span v-if="resendCooldownActive" id="resend-cooldown-status" class="field-hint" role="status" aria-live="polite">
+          <span v-if="resendCooldownActive" id="resend-cooldown-status" class="field-hint">
             You can request another code in {{ remainingSeconds }} seconds. You can still verify the current code now.
           </span>
         </div>
