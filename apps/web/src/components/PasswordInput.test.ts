@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PasswordInput from './PasswordInput.vue'
 
+const readSrc = (relativePath: string) =>
+  readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8')
+
 function mountInput(overrides: Record<string, unknown> = {}) {
   return mount(PasswordInput, {
     props: {
@@ -55,7 +58,7 @@ describe('PasswordInput', () => {
   })
 
   it('uses the shared minimum touch target for the visibility button', () => {
-    const source = readFileSync(fileURLToPath(new URL('./PasswordInput.vue', import.meta.url)), 'utf-8')
+    const source = readSrc('./PasswordInput.vue')
     expect(source).toMatch(/\.password-toggle\s*\{[^}]*width:\s*var\(--touch-min\)/s)
     expect(source).toMatch(/\.password-toggle\s*\{[^}]*height:\s*var\(--touch-min\)/s)
   })
