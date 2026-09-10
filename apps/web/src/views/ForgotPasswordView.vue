@@ -175,6 +175,7 @@ function startOver() {
             name="new-password"
             autocomplete="new-password"
             required
+            :minlength="8"
             :disabled="resetLoading"
             :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'password-recovery-error' : 'password-recovery-requirement'"
@@ -190,6 +191,7 @@ function startOver() {
             name="confirm-password"
             autocomplete="new-password"
             required
+            :minlength="8"
             :disabled="resetLoading"
             :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'password-recovery-error' : undefined"
