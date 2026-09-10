@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, RouterLink } from 'vue-router'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
@@ -9,6 +9,17 @@ import Icon from '@/components/AppIcon.vue'
 import { userInitials } from '@/lib/userInitials'
 import type { ActivityEvent, ActivityEventType, ShareLinkInfo, User } from '@/api/types'
 import { setLocale, useI18n, type Locale } from '@/lib/i18n'
+import {
+  buildPreviewPatchBody,
+  buildTrashPatchBody,
+  hasUnsavedExplicitSettings,
+  isPreviewSettingsDirty,
+  isTrashSettingsDirty,
+  previewSettingsFromUser,
+  trashSettingsFromUser,
+  type PreviewSettings,
+  type TrashSettings,
+} from '@/lib/settingsSections'
 import { THEMES, useTheme, type ThemeDef } from '@/lib/theme'
 
 const auth = useAuthStore()
@@ -44,36 +55,144 @@ const imageThumbnailsEnabled = ref(auth.user?.imageThumbnailsEnabled ?? true)
 const videoThumbnailsEnabled = ref(auth.user?.videoThumbnailsEnabled ?? true)
 const trashAutoDeleteEnabled = ref(auth.user?.trashAutoDeleteEnabled ?? false)
 const trashRetentionDays = ref(auth.user?.trashRetentionDays ?? 30)
+const savedTrashSettings = ref<TrashSettings>(trashSettingsFromUser(auth.user ?? createFallbackUser()))
+const savedPreviewSettings = ref<PreviewSettings>(previewSettingsFromUser(auth.user ?? createFallbackUser()))
+const trashError = ref('')
+const previewError = ref('')
+const trashSavedFeedback = ref(false)
+const previewSavedFeedback = ref(false)
+const savingTrashSettings = ref(false)
+const savingPreviewSettings = ref(false)
 const error = ref('')
-const savingSettings = ref(false)
+
+function createFallbackUser(): User {
+  return {
+    id: '',
+    email: '',
+    displayName: '',
+    emailVerified: true,
+    storageUsed: 0,
+    storageQuota: 10 * 1024 * 1024 * 1024,
+    imageThumbnailsEnabled: true,
+    videoThumbnailsEnabled: true,
+    trashAutoDeleteEnabled: false,
+    trashRetentionDays: 30,
+    createdAt: '1970-01-01T00:00:00.000Z',
+  }
+}
+
+const currentTrashSettings = computed<TrashSettings>(() => ({
+  trashAutoDeleteEnabled: trashAutoDeleteEnabled.value,
+  trashRetentionDays: trashRetentionDays.value,
+}))
+
+const currentPreviewSettings = computed<PreviewSettings>(() => ({
+  imageThumbnailsEnabled: imageThumbnailsEnabled.value,
+  videoThumbnailsEnabled: videoThumbnailsEnabled.value,
+}))
+
+const trashDirty = computed(() =>
+  isTrashSettingsDirty(currentTrashSettings.value, savedTrashSettings.value),
+)
+const previewDirty = computed(() =>
+  isPreviewSettingsDirty(currentPreviewSettings.value, savedPreviewSettings.value),
+)
+const hasUnsavedSettings = computed(() =>
+  hasUnsavedExplicitSettings(
+    currentTrashSettings.value,
+    savedTrashSettings.value,
+    currentPreviewSettings.value,
+    savedPreviewSettings.value,
+  ),
+)
+
+watch(
+  () => auth.user,
+  (user) => {
+    if (!user) return
+    if (!trashDirty.value) {
+      trashAutoDeleteEnabled.value = user.trashAutoDeleteEnabled
+      trashRetentionDays.value = user.trashRetentionDays
+      savedTrashSettings.value = trashSettingsFromUser(user)
+    }
+    if (!previewDirty.value) {
+      imageThumbnailsEnabled.value = user.imageThumbnailsEnabled
+      videoThumbnailsEnabled.value = user.videoThumbnailsEnabled
+      savedPreviewSettings.value = previewSettingsFromUser(user)
+    }
+  },
+)
+
 // Persisted in localStorage under filvault.locale
 function chooseLocale(next: Locale) {
   setLocale(next)
 }
 
-async function saveSettings() {
-  error.value = ''
-  savingSettings.value = true
+async function saveTrashSettings() {
+  if (!trashDirty.value || savingTrashSettings.value) return
+  trashError.value = ''
+  trashSavedFeedback.value = false
+  savingTrashSettings.value = true
   try {
-    await api<User>('/users/me', {
+    const updated = await api<User>('/users/me', {
       method: 'PATCH',
-      body: JSON.stringify({
-        imageThumbnailsEnabled: imageThumbnailsEnabled.value,
-        videoThumbnailsEnabled: videoThumbnailsEnabled.value,
-        trashAutoDeleteEnabled: trashAutoDeleteEnabled.value,
-        trashRetentionDays: Number(trashRetentionDays.value),
-      }),
+      body: JSON.stringify(buildTrashPatchBody(currentTrashSettings.value)),
     })
-    await auth.loadMe()
-    ui.showToast('Settings saved')
+    savedTrashSettings.value = trashSettingsFromUser(updated)
+    trashAutoDeleteEnabled.value = updated.trashAutoDeleteEnabled
+    trashRetentionDays.value = updated.trashRetentionDays
+    if (auth.user) {
+      auth.user = updated
+    }
+    trashSavedFeedback.value = true
+    ui.showToast(t.value.trashSettingsSaved, 'success')
   } catch (e) {
-    error.value = formatApiError(e, 'Save failed')
+    trashError.value = formatApiError(e, t.value.trashSaveFailed)
   } finally {
-    savingSettings.value = false
+    savingTrashSettings.value = false
   }
 }
 
+async function savePreviewSettings() {
+  if (!previewDirty.value || savingPreviewSettings.value) return
+  previewError.value = ''
+  previewSavedFeedback.value = false
+  savingPreviewSettings.value = true
+  try {
+    const updated = await api<User>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(buildPreviewPatchBody(currentPreviewSettings.value)),
+    })
+    savedPreviewSettings.value = previewSettingsFromUser(updated)
+    imageThumbnailsEnabled.value = updated.imageThumbnailsEnabled
+    videoThumbnailsEnabled.value = updated.videoThumbnailsEnabled
+    if (auth.user) {
+      auth.user = updated
+    }
+    previewSavedFeedback.value = true
+    ui.showToast(t.value.previewSettingsSaved, 'success')
+  } catch (e) {
+    previewError.value = formatApiError(e, t.value.previewSaveFailed)
+  } finally {
+    savingPreviewSettings.value = false
+  }
+}
+
+async function confirmDiscardUnsavedSettings(): Promise<boolean> {
+  if (!hasUnsavedSettings.value) return true
+  return ui.confirm({
+    title: t.value.unsavedSettingsTitle,
+    message: t.value.unsavedSettingsMessage,
+    confirmLabel: t.value.leaveWithoutSaving,
+    cancelLabel: t.value.stayOnPage,
+    danger: true,
+  })
+}
+
+onBeforeRouteLeave(async () => confirmDiscardUnsavedSettings())
+
 async function logout() {
+  if (!(await confirmDiscardUnsavedSettings())) return
   const ok = await ui.confirm({
     title: 'Log out?',
     message: 'You will need to sign in again to access your files.',
@@ -306,8 +425,12 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="card section">
-      <h2 class="section-title">{{ t.appearance }}</h2>
+    <section class="card section appearance-section">
+      <div class="section-title-row">
+        <h2 class="section-title">{{ t.appearance }}</h2>
+        <span class="immediate-badge">{{ t.appliesImmediately }}</span>
+      </div>
+      <p class="field-hint appearance-immediate-hint">{{ t.appearanceImmediateHint }}</p>
       <p class="field-hint appearance-mode-label">{{ t.appearanceModeLabel }}</p>
       <div class="appearance-mode-row" role="radiogroup" :aria-label="t.appearanceModeLabel">
         <button
@@ -404,8 +527,18 @@ onMounted(() => {
         <span>{{ t.retentionDays }}</span>
         <input v-model.number="trashRetentionDays" type="number" min="1" inputmode="numeric" />
       </label>
-      <button class="btn save-btn" type="button" :disabled="savingSettings" @click="saveSettings">
-        {{ savingSettings ? t.saving : t.saveTrashSettings }}
+      <p v-if="trashError" class="section-feedback error" role="alert">{{ trashError }}</p>
+      <p v-else-if="trashSavedFeedback && !trashDirty" class="section-feedback success" role="status">
+        {{ t.trashSettingsSaved }}
+      </p>
+      <button
+        class="btn save-btn"
+        type="button"
+        :disabled="!trashDirty || savingTrashSettings"
+        :aria-busy="savingTrashSettings"
+        @click="saveTrashSettings"
+      >
+        {{ savingTrashSettings ? t.saving : trashSavedFeedback && !trashDirty ? t.saved : t.saveTrashSettings }}
       </button>
     </section>
 
@@ -424,8 +557,24 @@ onMounted(() => {
         <span class="switch-track" aria-hidden="true"></span>
         <span class="toggle-label">{{ t.showVideoPreviews }}</span>
       </label>
-      <button class="btn" type="button" :disabled="savingSettings" @click="saveSettings">
-        {{ savingSettings ? t.saving : t.savePreviewSettings }}
+      <p v-if="previewError" class="section-feedback error" role="alert">{{ previewError }}</p>
+      <p v-else-if="previewSavedFeedback && !previewDirty" class="section-feedback success" role="status">
+        {{ t.previewSettingsSaved }}
+      </p>
+      <button
+        class="btn"
+        type="button"
+        :disabled="!previewDirty || savingPreviewSettings"
+        :aria-busy="savingPreviewSettings"
+        @click="savePreviewSettings"
+      >
+        {{
+          savingPreviewSettings
+            ? t.saving
+            : previewSavedFeedback && !previewDirty
+              ? t.saved
+              : t.savePreviewSettings
+        }}
       </button>
     </section>
 
@@ -596,6 +745,45 @@ onMounted(() => {
 
 .section-hint {
   margin: calc(var(--space-xs) * -1) 0 var(--space-sm);
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.appearance-immediate-hint {
+  margin-top: 0;
+  margin-bottom: var(--space-sm);
+}
+
+.immediate-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.section-feedback {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.8125rem;
+}
+
+.section-feedback.error {
+  color: var(--danger);
+}
+
+.section-feedback.success {
+  color: var(--success);
 }
 
 .toggle-row {
