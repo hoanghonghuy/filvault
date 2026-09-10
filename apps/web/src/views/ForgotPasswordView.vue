@@ -82,6 +82,11 @@ async function resetPassword() {
   }
 }
 
+function enterResetPhase() {
+  error.value = ''
+  phase.value = 'reset'
+}
+
 function startOver() {
   phase.value = 'request'
   requestComplete.value = false
@@ -136,7 +141,7 @@ function startOver() {
           {{ requestLoading ? 'Sending…' : 'Send reset instructions' }}
         </button>
 
-        <button type="button" class="token-ready-btn" @click="phase = 'reset'">
+        <button type="button" class="token-ready-btn" @click="enterResetPhase">
           I already have a reset token
         </button>
       </form>
