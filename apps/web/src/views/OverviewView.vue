@@ -256,7 +256,7 @@ onMounted(load)
             :mime-type="item.mimeType"
             :name="item.name"
             :thumbnail-url="item.thumbnailUrl"
-            @click="router.push('/photos')"
+            @click="router.push(`/photos/preview/${item.id}`)"
           />
         </div>
         <p v-else class="empty-inline">
