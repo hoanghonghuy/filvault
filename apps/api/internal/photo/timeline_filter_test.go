@@ -15,7 +15,7 @@ func TestPhotos_FilteredTimelineReturnsOnlyRequestedMediaTypeAndFavoriteState(t 
 	imageID := uploadReady(t, engine, objs, token, "photo.jpg")
 	videoID := uploadReadyVideo(t, engine, objs, token, "clip.mp4")
 
-	code, body := putAuth(t, engine, "/api/v1/files/"+videoID+"/favorite", token)
+	code, body := doJSON(t, engine, http.MethodPut, "/api/v1/files/"+videoID+"/favorite", token, nil)
 	if code != http.StatusNoContent {
 		t.Fatalf("favorite video status=%d body=%s", code, body)
 	}
