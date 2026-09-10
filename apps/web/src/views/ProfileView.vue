@@ -89,6 +89,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
     try {
       objectUrl = URL.createObjectURL(sourceBlob)
     } catch {
+      // Fallback to FileReader if createObjectURL fails
       const reader = new FileReader()
       reader.onerror = () => reject(new Error('Không thể đọc file ảnh từ thiết bị'))
       reader.onload = () => {
@@ -123,9 +124,11 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
             height = Math.round((height * maxSize) / width)
             width = maxSize
           }
-        } else if (height > maxSize) {
-          width = Math.round((width * maxSize) / height)
-          height = maxSize
+        } else {
+          if (height > maxSize) {
+            width = Math.round((width * maxSize) / height)
+            height = maxSize
+          }
         }
 
         const canvas = document.createElement('canvas')
