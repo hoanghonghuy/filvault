@@ -8,15 +8,15 @@ import SharedWithMeView from './SharedWithMeView.vue'
 import { api } from '@/api/client'
 
 vi.mock('@/api/client', () => ({
-  api: vi.fn(),
+  api: vi.fn<(...args: unknown[]) => unknown>(),
   formatBytes: (bytes: number) => `${bytes} B`,
 }))
 
 vi.mock('@/stores/ui', () => ({
   useUiStore: () => ({
-    showToast: vi.fn(),
-    confirm: vi.fn(),
-    openActionSheet: vi.fn(),
+    showToast: vi.fn<() => void>(),
+    confirm: vi.fn<() => void>(),
+    openActionSheet: vi.fn<() => void>(),
   }),
 }))
 
