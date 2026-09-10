@@ -12,12 +12,12 @@ describe('video-focused Photos route contract', () => {
     expect(routeSource).toContain('<PhotosView v-else />')
   })
 
-  it('filters across source pages instead of only the first mixed timeline page', () => {
-    expect(videoSource).toContain('while (matches.length <= PAGE_SIZE)')
-    expect(videoSource).toContain("item.mimeType.startsWith('video/')")
-    expect(videoSource).toContain('if (matches.length > PAGE_SIZE || !data.nextBefore) break')
-    expect(videoSource).toContain('scanBefore = data.nextBefore')
-    expect(videoSource).toContain("matches.length > PAGE_SIZE ? pageItems.at(-1)?.createdAt : undefined")
+  it('uses the server-filtered timeline so filtering happens before pagination', () => {
+    expect(videoSource).toContain("new URLSearchParams({ type: 'video' })")
+    expect(videoSource).toContain("api<Timeline>(`/photos/timeline/filter?${params}`)")
+    expect(videoSource).toContain('loadVideoTimeline(nextBefore.value)')
+    expect(videoSource).not.toContain('while (matches.length <= PAGE_SIZE)')
+    expect(videoSource).not.toContain("item.mimeType.startsWith('video/')")
   })
 
   it('keeps preview, secondary actions, load-more and responsive density', () => {
