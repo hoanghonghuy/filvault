@@ -209,7 +209,7 @@ onMounted(load)
             v-for="file in recentFiles"
             :key="file.id"
             class="row tappable"
-            to="/files"
+            :to="{ path: '/files', query: { q: file.name } }"
           >
             <span class="name">
               <Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />
@@ -231,7 +231,7 @@ onMounted(load)
             v-for="file in favorites"
             :key="file.id"
             class="row tappable"
-            to="/files"
+            :to="{ path: '/files', query: { view: 'favorites', q: file.name } }"
           >
             <span class="name">
               <Icon name="star-filled" :size="18" class="row-icon star-icon" />
