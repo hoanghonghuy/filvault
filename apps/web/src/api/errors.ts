@@ -45,9 +45,20 @@ const shareUserFriendly: Record<string, string> = {
   VALIDATION_ERROR: 'Enter a valid email address.',
 }
 
-export function formatShareUserError(e: unknown, fallback: string): string {
+export interface ShareUserErrorCopy {
+  conflict?: string
+  notFound?: string
+  validation?: string
+  network?: string
+}
+
+export function formatShareUserError(
+  e: unknown,
+  fallback: string,
+  copy: ShareUserErrorCopy = {},
+): string {
   if (isNetworkError(e)) {
-    return NETWORK_UNAVAILABLE
+    return copy.network ?? NETWORK_UNAVAILABLE
   }
   if (!(e instanceof ApiError)) {
     return fallback
@@ -56,9 +67,15 @@ export function formatShareUserError(e: unknown, fallback: string): string {
     if (e.message && e.message.toLowerCase() !== 'conflict') {
       return e.message
     }
-    return shareUserFriendly.CONFLICT ?? 'This item is already shared with that user.'
+    return copy.conflict ?? shareUserFriendly.CONFLICT ?? 'This item is already shared with that user.'
   }
-  return shareUserFriendly[e.code] ?? friendly[e.code] ?? e.message ?? fallback
+  if (e.code === 'NOT_FOUND') {
+    return copy.notFound ?? shareUserFriendly.NOT_FOUND ?? fallback
+  }
+  if (e.code === 'VALIDATION_ERROR') {
+    return copy.validation ?? shareUserFriendly.VALIDATION_ERROR ?? fallback
+  }
+  return friendly[e.code] ?? e.message ?? fallback
 }
 
 export function formatAuthError(e: unknown, fallback: string): string {
