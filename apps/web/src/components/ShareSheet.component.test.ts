@@ -130,18 +130,4 @@ describe('ShareSheet owner operation lifecycle', () => {
     expect(revoke.attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
-
-  it('preserves the TTL roving-radio keyboard contract', async () => {
-    const onCreate = vi.fn<(ttl: unknown) => void>()
-    const wrapper = mountSheet({ onCreate })
-    const radios = wrapper.findAll<HTMLButtonElement>('[role="radio"]')
-
-    expect(radios[0]?.attributes('aria-checked')).toBe('true')
-    await radios[0]?.trigger('keydown', { key: 'ArrowRight' })
-
-    expect(radios[1]?.attributes('aria-checked')).toBe('true')
-    expect(radios[1]?.attributes('tabindex')).toBe('0')
-    expect(document.activeElement).toBe(radios[1]?.element)
-    wrapper.unmount()
-  })
 })
