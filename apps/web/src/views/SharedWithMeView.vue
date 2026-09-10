@@ -105,7 +105,7 @@ async function downloadFile(fileId: string, name: string) {
   try {
     const out = await api<DownloadURL>(`/shared/files/${fileId}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
-    ui.showToast(`Downloading \"${name}\"`, 'success')
+    ui.showToast(`Downloading "${name}"`, 'success')
   } catch (e) {
     error.value = formatApiError(e, 'Could not download file')
   }
@@ -130,7 +130,7 @@ async function copyLink(link: ShareLinkInfo) {
 async function revokeLink(link: ShareLinkInfo) {
   const ok = await ui.confirm({
     title: 'Revoke link?',
-    message: `\"${link.fileName}\" will no longer be shared publicly.`,
+    message: `"${link.fileName}" will no longer be shared publicly.`,
     confirmLabel: 'Revoke link',
     danger: true,
   })
