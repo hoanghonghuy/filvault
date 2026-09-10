@@ -21,6 +21,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   close: []
+  shared: [payload: { invited: boolean; email: string }]
 }>()
 
 type Phase = 'form' | 'submitting' | 'success'
