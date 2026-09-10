@@ -25,13 +25,13 @@ const trashBatchCopy = computed(() =>
     ? {
         deleting: (completed: number, total: number) => `Đang xóa ${completed}/${total}…`,
         partial: (deleted: number, failed: number) =>
-          `Đã xóa vĩnh viễn ${deleted} mục; ${failed} mục không thể xóa. Danh sách đã được làm mới.`,
+          `Đã xóa vĩnh viễn ${deleted} mục; ${failed} mục không thể xóa.`,
         failed: 'Không thể dọn sạch thùng rác',
       }
     : {
         deleting: (completed: number, total: number) => `Deleting ${completed}/${total}…`,
         partial: (deleted: number, failed: number) =>
-          `Permanently deleted ${deleted} items; ${failed} could not be deleted. The list was refreshed.`,
+          `Permanently deleted ${deleted} items; ${failed} could not be deleted.`,
         failed: 'Could not empty trash',
       },
 )
