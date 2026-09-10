@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-type timelineTypeRepository interface {
-	ListTimelineFilesByType(ctx context.Context, ownerID string, before *time.Time, limit int, mediaType string) ([]TimelineItem, error)
-}
-
 // TimelineByType filters before applying the cursor/limit so pagination remains
 // truthful even when matching media is sparse among other timeline items.
 func (s *Service) TimelineByType(ctx context.Context, ownerID string, before *time.Time, limit int, mediaType string) (Timeline, error) {
@@ -28,11 +24,7 @@ func (s *Service) TimelineByType(ctx context.Context, ownerID string, before *ti
 		limit = 100
 	}
 
-	repo, ok := s.repo.(timelineTypeRepository)
-	if !ok {
-		return Timeline{}, errors.New("timeline repository does not support media type filtering")
-	}
-	items, err := repo.ListTimelineFilesByType(ctx, ownerID, before, limit+1, mediaType)
+	items, err := s.repo.ListTimelineFilesByType(ctx, ownerID, before, limit+1, mediaType)
 	if err != nil {
 		return Timeline{}, err
 	}
