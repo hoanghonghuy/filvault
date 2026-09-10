@@ -101,6 +101,8 @@ const dictionaries = {
     changePassword: 'Đổi mật khẩu',
     changing: 'Đang đổi…',
     logOut: 'Đăng xuất',
+    logoutConfirmTitle: 'Đăng xuất?',
+    logoutConfirmMessage: 'Bạn sẽ cần đăng nhập lại để truy cập các tệp của mình.',
     photosTitle: 'Ảnh',
     timeline: 'Dòng thời gian',
     albums: 'Album',
@@ -540,6 +542,8 @@ const dictionaries = {
     changePassword: 'Change password',
     changing: 'Changing…',
     logOut: 'Log out',
+    logoutConfirmTitle: 'Log out?',
+    logoutConfirmMessage: 'You will need to sign in again to access your files.',
     photosTitle: 'Photos',
     timeline: 'Timeline',
     albums: 'Albums',
@@ -885,12 +889,12 @@ const dictionaries = {
   },
 } as const
 
-const saved = localStorage.getItem(STORAGE_KEY)
+const saved = typeof localStorage === 'undefined' ? null : localStorage.getItem(STORAGE_KEY)
 const locale = ref<Locale>(saved === 'en' ? 'en' : 'vi')
 
 export function setLocale(next: Locale) {
   locale.value = next
-  localStorage.setItem(STORAGE_KEY, next)
+  if (typeof localStorage !== 'undefined') localStorage.setItem(STORAGE_KEY, next)
 }
 
 export function useI18n() {
