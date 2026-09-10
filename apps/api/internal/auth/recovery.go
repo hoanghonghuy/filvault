@@ -15,6 +15,7 @@ import (
 )
 
 const passwordResetTTL = 30 * time.Minute
+const passwordResetTokenBytes = 32
 
 func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	email = normalizeEmail(email)
@@ -53,7 +54,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 
 func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) error {
 	token = strings.TrimSpace(token)
-	if token == "" || len(newPassword) < config.MinPasswordLength {
+	if !validPasswordResetToken(token) || len(newPassword) < config.MinPasswordLength {
 		return apperr.Validation
 	}
 
@@ -66,11 +67,16 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 }
 
 func newPasswordResetToken() (string, error) {
-	buf := make([]byte, 32)
+	buf := make([]byte, passwordResetTokenBytes)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func validPasswordResetToken(token string) bool {
+	decoded, err := base64.RawURLEncoding.DecodeString(token)
+	return err == nil && len(decoded) == passwordResetTokenBytes
 }
 
 func hashPasswordResetToken(token string) string {
