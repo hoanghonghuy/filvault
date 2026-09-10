@@ -75,6 +75,38 @@ describe('installRouteFocus', () => {
     cleanup()
   })
 
+  it('ignores hidden aria-modal elements when deciding whether to focus the page title', async () => {
+    const modal = document.createElement('div')
+    modal.setAttribute('aria-modal', 'true')
+    modal.hidden = true
+    document.body.append(modal)
+
+    const { router, navigate } = makeRouter()
+    const cleanup = installRouteFocus(router)
+    navigate()
+    navigate()
+    await flushFrame()
+
+    expect(document.activeElement).toBe(document.querySelector('.header-title'))
+    cleanup()
+  })
+
+  it('does not focus a hidden page title', async () => {
+    const nav = document.querySelector<HTMLButtonElement>('#nav')!
+    const title = document.querySelector<HTMLElement>('.header-title')!
+    title.style.display = 'none'
+    nav.focus()
+
+    const { router, navigate } = makeRouter()
+    const cleanup = installRouteFocus(router)
+    navigate()
+    navigate()
+    await flushFrame()
+
+    expect(document.activeElement).toBe(nav)
+    cleanup()
+  })
+
   it('uses tabindex -1 only for programmatic focus and removes it after blur', async () => {
     const title = document.querySelector<HTMLElement>('.header-title')!
     const { router, navigate } = makeRouter()
