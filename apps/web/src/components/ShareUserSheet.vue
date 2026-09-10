@@ -5,6 +5,7 @@ import { formatShareUserError } from '@/api/errors'
 import type { CreateUserShareResponse, ShareResourceType } from '@/api/types'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/lib/i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -20,12 +21,12 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   close: []
-  shared: [payload: { invited: boolean; email: string }]
 }>()
 
 type Phase = 'form' | 'submitting' | 'success'
 
 const auth = useAuthStore()
+const { locale } = useI18n()
 const email = ref('')
 const phase = ref<Phase>('form')
 const error = ref('')
@@ -35,13 +36,51 @@ const successRecipientLabel = ref('')
 const emailInputRef = ref<HTMLInputElement | null>(null)
 const errorRef = ref<HTMLElement | null>(null)
 const successRef = ref<HTMLElement | null>(null)
-const doneButtonRef = ref<HTMLButtonElement | null>(null)
+
+const copy = computed(() =>
+  locale.value === 'vi'
+    ? {
+        permission: 'Người nhận sẽ có quyền đọc mục này. Email chưa đăng ký sẽ nhận lời mời tạo tài khoản.',
+        email: 'Email',
+        invalidEmail: 'Nhập địa chỉ email hợp lệ.',
+        selfShare: 'Bạn không thể chia sẻ cho chính mình.',
+        conflict: 'Mục này đã được chia sẻ cho người dùng đó.',
+        notFound: 'Không tìm thấy mục để chia sẻ.',
+        network: 'Không thể kết nối máy chủ. Hãy thử lại sau ít phút.',
+        fallback: 'Không thể chia sẻ mục này.',
+        sharing: 'Đang chia sẻ…',
+        share: 'Chia sẻ',
+        close: 'Đóng',
+        done: 'Xong',
+        shareAnother: 'Chia sẻ cho người khác',
+        invitedPrefix: 'Đã gửi lời mời tới',
+        invitedSuffix: 'Họ sẽ có quyền đọc sau khi đăng ký bằng email này.',
+        sharedPrefix: 'Đã chia sẻ với',
+        sharedSuffix: 'Họ có thể xem và tải mục này với quyền đọc.',
+      }
+    : {
+        permission: "They'll get read access to this item. Unknown emails receive an invite to sign up.",
+        email: 'Email',
+        invalidEmail: 'Enter a valid email address.',
+        selfShare: "You can't share with yourself.",
+        conflict: 'This item is already shared with that user.',
+        notFound: 'Item not found.',
+        network: "Can't reach the server. Try again in a moment.",
+        fallback: 'Could not share this item.',
+        sharing: 'Sharing…',
+        share: 'Share',
+        close: 'Close',
+        done: 'Done',
+        shareAnother: 'Share with another',
+        invitedPrefix: 'Invitation sent to',
+        invitedSuffix: "They'll get read access once they sign up with that email.",
+        sharedPrefix: 'Shared with',
+        sharedSuffix: 'They can view and download this item with read access.',
+      },
+)
 
 const trimmedEmail = computed(() => email.value.trim())
 const canSubmit = computed(() => phase.value === 'form' && trimmedEmail.value.length > 0)
-
-const permissionHint =
-  "They'll get read access to this item. Unknown emails receive an invite to sign up."
 
 function resetState() {
   email.value = ''
@@ -72,13 +111,13 @@ async function onSubmit() {
   error.value = ''
 
   if (!isValidEmail(value)) {
-    error.value = 'Enter a valid email address.'
+    error.value = copy.value.invalidEmail
     await focusRef(errorRef)
     return
   }
 
   if (isSelfShare(value)) {
-    error.value = "You can't share with yourself."
+    error.value = copy.value.selfShare
     await focusRef(errorRef)
     return
   }
@@ -103,11 +142,15 @@ async function onSubmit() {
     }
 
     phase.value = 'success'
-    emit('shared', { invited: successInvited.value, email: value })
     await focusRef(successRef)
   } catch (e) {
     phase.value = 'form'
-    error.value = formatShareUserError(e, 'Could not share')
+    error.value = formatShareUserError(e, copy.value.fallback, {
+      conflict: copy.value.conflict,
+      notFound: copy.value.notFound,
+      validation: copy.value.invalidEmail,
+      network: copy.value.network,
+    })
     await focusRef(errorRef)
   }
 }
@@ -131,9 +174,7 @@ watch(
     if (open) {
       resetState()
       void nextTick(() => {
-        if (phase.value === 'form') {
-          emailInputRef.value?.focus()
-        }
+        if (phase.value === 'form') emailInputRef.value?.focus()
       })
     }
   },
@@ -145,25 +186,23 @@ watch(
     <div v-if="phase === 'success'" class="success-state">
       <p ref="successRef" class="success-message" tabindex="-1" role="status" aria-live="polite">
         <template v-if="successInvited">
-          Invitation sent to <strong>{{ successRecipientLabel }}</strong>. They'll get read access once
-          they sign up with that email.
+          {{ copy.invitedPrefix }} <strong>{{ successRecipientLabel }}</strong>. {{ copy.invitedSuffix }}
         </template>
         <template v-else>
-          Shared with <strong>{{ successRecipientLabel }}</strong>. They can view and download this
-          item with read access.
+          {{ copy.sharedPrefix }} <strong>{{ successRecipientLabel }}</strong>. {{ copy.sharedSuffix }}
         </template>
       </p>
       <div class="actions">
-        <button ref="doneButtonRef" type="button" class="btn block ink" @click="onClose">Done</button>
-        <button type="button" class="btn block ghost" @click="onShareAnother">Share with another</button>
+        <button type="button" class="btn block ink" @click="onClose">{{ copy.done }}</button>
+        <button type="button" class="btn block ghost" @click="onShareAnother">{{ copy.shareAnother }}</button>
       </div>
     </div>
 
     <form v-else class="share-form" novalidate @submit.prevent="onSubmit">
-      <p class="hint">{{ permissionHint }}</p>
+      <p class="hint">{{ copy.permission }}</p>
 
       <label class="field">
-        <span class="field-label">Email</span>
+        <span class="field-label">{{ copy.email }}</span>
         <input
           ref="emailInputRef"
           v-model="email"
@@ -179,14 +218,7 @@ watch(
         />
       </label>
 
-      <p
-        v-if="error"
-        id="share-user-error"
-        ref="errorRef"
-        class="error"
-        role="alert"
-        tabindex="-1"
-      >
+      <p v-if="error" id="share-user-error" ref="errorRef" class="error" role="alert" tabindex="-1">
         {{ error }}
       </p>
 
@@ -197,10 +229,10 @@ watch(
           :disabled="phase === 'submitting' || !trimmedEmail"
           :aria-busy="phase === 'submitting' ? 'true' : undefined"
         >
-          {{ phase === 'submitting' ? 'Sharing…' : 'Share' }}
+          {{ phase === 'submitting' ? copy.sharing : copy.share }}
         </button>
         <button type="button" class="btn block ghost" :disabled="phase === 'submitting'" @click="onClose">
-          Close
+          {{ copy.close }}
         </button>
       </div>
     </form>
@@ -228,11 +260,7 @@ watch(
   color: var(--muted);
 }
 
-.actions {
-  display: flex;
-  flex-direction: column;
-}
-
+.actions,
 .success-state {
   display: flex;
   flex-direction: column;
