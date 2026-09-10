@@ -64,10 +64,7 @@ export function formatShareUserError(
     return fallback
   }
   if (e.code === 'CONFLICT') {
-    if (e.message && e.message.toLowerCase() !== 'conflict') {
-      return e.message
-    }
-    return copy.conflict ?? shareUserFriendly.CONFLICT ?? 'This item is already shared with that user.'
+    return copy.conflict ?? shareUserFriendly.CONFLICT ?? fallback
   }
   if (e.code === 'NOT_FOUND') {
     return copy.notFound ?? shareUserFriendly.NOT_FOUND ?? fallback
@@ -75,7 +72,7 @@ export function formatShareUserError(
   if (e.code === 'VALIDATION_ERROR') {
     return copy.validation ?? shareUserFriendly.VALIDATION_ERROR ?? fallback
   }
-  return friendly[e.code] ?? e.message ?? fallback
+  return fallback
 }
 
 export function formatAuthError(e: unknown, fallback: string): string {
