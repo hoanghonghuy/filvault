@@ -4,25 +4,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { ApiError } from '@/api/client'
 import ForgotPasswordView from './ForgotPasswordView.vue'
 
-class MockApiError extends Error {
-  code: string
-  status: number
+const apiMock = vi.hoisted(() => vi.fn<(path: string, init?: RequestInit, options?: { auth?: boolean }) => Promise<void>>())
 
-  constructor(code: string, message: string, status: number) {
-    super(message)
-    this.code = code
-    this.status = status
-  }
-}
-
-const apiMock = vi.hoisted(() => vi.fn<(path: string, init?: RequestInit) => Promise<void>>())
-
-vi.mock('@/api/client', () => ({
-  api: apiMock,
-  ApiError: MockApiError,
-}))
+vi.mock('@/api/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return { ...actual, api: apiMock }
+})
 
 function makeRouter() {
   return createRouter({
@@ -84,7 +74,13 @@ describe('ForgotPasswordView', () => {
     wrapper.unmount()
   })
 
-  it('submits one reset request and returns to Login with success feedback state', async () => {
+  it('submits one reset request while pending and returns to Login with success feedback state', async () => {
+    let resolveReset!: () => void
+    const pending = new Promise<void>((resolve) => {
+      resolveReset = resolve
+    })
+    apiMock.mockReturnValueOnce(pending)
+
     const { wrapper, router } = await mountRecovery()
     await wrapper.get('button.token-ready-btn').trigger('click')
 
@@ -93,7 +89,6 @@ describe('ForgotPasswordView', () => {
     await wrapper.get<HTMLInputElement>('#recovery-confirm-password').setValue('password-123')
     await wrapper.get('form').trigger('submit')
     await wrapper.get('form').trigger('submit')
-    await flushPromises()
 
     expect(apiMock).toHaveBeenCalledTimes(1)
     expect(apiMock).toHaveBeenCalledWith(
@@ -104,12 +99,15 @@ describe('ForgotPasswordView', () => {
       }),
       { auth: false },
     )
+
+    resolveReset()
+    await flushPromises()
     expect(router.currentRoute.value.fullPath).toBe('/login?reset=success')
     wrapper.unmount()
   })
 
   it('offers a request-again path after an invalid or expired token', async () => {
-    apiMock.mockRejectedValueOnce(new MockApiError('VALIDATION_ERROR', 'invalid', 400))
+    apiMock.mockRejectedValueOnce(new ApiError('VALIDATION_ERROR', 'invalid', 400))
     const { wrapper } = await mountRecovery()
     await wrapper.get('button.token-ready-btn').trigger('click')
 
