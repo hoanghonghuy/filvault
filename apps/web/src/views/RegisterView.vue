@@ -16,6 +16,7 @@ onMounted(() => {
 
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
 const displayName = ref('')
 const inviteCode = ref('')
 const error = ref('')
@@ -23,6 +24,12 @@ const loading = ref(false)
 
 async function submit() {
   error.value = ''
+
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Passwords do not match. Re-enter the confirmation and try again.'
+    return
+  }
+
   loading.value = true
   try {
     await auth.register({
@@ -86,8 +93,24 @@ async function submit() {
             autocomplete="new-password"
             :disabled="loading"
             :aria-invalid="error ? true : undefined"
+            :aria-describedby="error ? 'auth-error' : 'register-password-hint'"
           />
-          <span class="field-hint">At least 8 characters.</span>
+          <span id="register-password-hint" class="field-hint">At least 8 characters.</span>
+        </label>
+        <label class="field">
+          <span class="field-label">Confirm password</span>
+          <input
+            id="register-confirm-password"
+            v-model="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+            :disabled="loading"
+            :aria-invalid="error ? true : undefined"
+            :aria-describedby="error ? 'auth-error' : undefined"
+          />
         </label>
         <label class="field">
           <span class="field-label">Invite code</span>
