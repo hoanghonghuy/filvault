@@ -404,7 +404,7 @@ Không multi-layer card stack hàng loạt.
 | **Settings** | `/settings` | Full | Cards, appearance radiogroup, activity, share links | `setAppearanceMode` → `useTheme()` |
 | **Theme** | `/settings/theme` | Full | Theme grid, follow-system | Preview = product mock (xem follow-up) |
 | **Profile** | `/profile` | Full | Form, avatar upload | Avatar in nav footer |
-| **Chat** | `/chat`, `/chat/:id` | **Bare** (`meta.bare`) | Bubbles, composer, call modal | Breakpoint riêng §9.1 |
+| **Chat** | `/chat`, `/chat/:id` | **Bare** (`meta.bare`) | Bubbles, composer, attachment queue, shared-media tabs, call modal | Breakpoint + interaction/a11y §9.1 |
 | **Public share** | `/s/:token` | Bare (guest) | Centered card, ink download | Lỗi generic |
 
 ### 9.1 Chat — intentional exception
@@ -416,6 +416,38 @@ Không multi-layer card stack hàng loạt.
   - Tablet `768–1199`: 2 cột.
   - Desktop `≥1200`: 3 cột (media panel).
 - `--chat-accent` / bubble outgoing: brand Messenger blue — **scoped Chat only**, không lan sang shell.
+- Appearance quick toggle: `useTheme().toggleResolvedAppearance()` — không mutate DOM/storage rời (§2).
+
+#### Composer vs attachment upload (#33 / #60)
+
+Source: `ChatView.vue` — `sendingText` chỉ gate **gửi text** (textarea, Send, Like); **không** gate attach hay sticker.
+
+| Control | Disabled khi `sendingText`? | Disabled khi upload đang chạy? |
+|---------|----------------------------|--------------------------------|
+| Attach (`triggerAttachment`) | **Không** | **Không** |
+| Sticker picker | **Không** | **Không** |
+| Textarea / Send / Like | **Có** | **Không** |
+
+- User có thể **soạn tin và đính kèm file** trong lúc attachment upload đang chạy nền.
+- Attachment queue **single-flight**: `processNextInAttachmentQueue()` chỉ cho **một** upload `uploading` tại một thời điểm; các file còn lại `queued`; khi hoàn tất / hủy / lỗi → dequeue tiếp theo. Không duplicate concurrent upload cho cùng queue.
+- Upload gắn `conversationId` gốc — đổi thread không mất/cancel queue sai conversation.
+
+#### Screen-reader upload progress
+
+- **Một** live region cho upload: `UploadProgress` (`class="sr-only"`, `role="progressbar"`, `aria-live="polite"`) với `attachmentUploadProgressItems` + `attachmentAggregateProgress`.
+- **Không** thêm `aria-live` cạnh tranh trên pending bubble hay hidden attachment-queue list (`attachment-queue sr-only` đã bỏ).
+
+#### Shared-media tabs (a11y)
+
+- Tab pattern WAI-ARIA: `role="tab"` + `aria-selected` + `aria-controls` → `role="tabpanel"` có `aria-labelledby`.
+- Keyboard (`onMediaTabKeydown`): `ArrowLeft` / `ArrowRight` cycle tabs; `Home` → tab đầu; `End` → tab cuối (media panel desktop + shared-media trong info sidebar).
+- Áp dụng cho media / file / link tabs trong media panel và chat-info shared media.
+
+#### Desktop pane resizers (a11y)
+
+- Rail và info sidebar: `role="separator"`, `tabindex="0"`, `aria-orientation="vertical"`, `aria-valuenow` / `aria-valuemin` / `aria-valuemax`.
+- Pointer drag + double-click reset (`resetRailWidth` / `resetInfoWidth`).
+- Keyboard (`onRailResizerKeydown` / `onInfoResizerKeydown`): arrow keys resize theo bước; `Home` reset default; `End` → max width.
 
 ### 9.2 Vault
 
@@ -485,6 +517,8 @@ avatar → Profile, chat → bare /chat, FAB upload on Files (mobile ≤767 only
 bottom sheets not prompt/confirm, component states per §4,
 danger/success/warning never replaced by accent, touch ≥44px.
 Chat may use --chat-accent; shell must use var(--accent).
+Chat §9.1: composer stays usable during attachment upload; single-flight queue;
+one UploadProgress SR region; shared-media tabs + desktop resizers keyboard-accessible.
 No PRO badges, crowns, or premium placeholders until real entitlements exist (§11).
 ```
 
@@ -498,7 +532,7 @@ Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8
 2. Theme logic: `src/lib/theme.ts` (`AppearanceMode`, `useTheme`, `hydrateAppearance`, `THEMES`); bootstrap inline trong `index.html`.
 3. Shell: `AppShell.vue` + `lib/shellNav.ts` (`SHELL_BREAKPOINTS`, `SHELL_NAV_WIDTH`, `isShellNavActive`).
 4. Shared: `BottomSheet`, `ActionSheet`, `ConfirmSheet`, `UploadFab`, `EmptyState`, `ToastHost`, `MediaLightbox`.
-5. Tests contract: `AppShell.test.ts`, `shellNav.test.ts`, `theme.test.ts`, `dark-mode.test.ts`, `vault-view.test.ts`, `chat.test.ts`.
+5. Tests contract: `AppShell.test.ts`, `shellNav.test.ts`, `theme.test.ts`, `dark-mode.test.ts`, `vault-view.test.ts`, `chat.test.ts`, `ChatView.component.test.ts` (composer/upload/a11y §9.1).
 6. Không thêm UI library nặng trừ khi duyệt — CSS + Vue SFC.
 
 ### Follow-up debt (GitHub issues riêng — không giấu trong prose)
@@ -510,4 +544,4 @@ Quick tokens: `--accent`, `--ink`, `--canvas`, `--danger`, `--success`, radius 8
 
 ---
 
-*Chốt hướng visual: **A — Cal.com-like** (2026-08-17). Cập nhật contract sản phẩm hiện tại: 2026-09-09 (#8). Shell 3 form-factor: 2026-09-09 (#48 / #54). AppearanceMode unified: 2026-09-09 (#59).*
+*Chốt hướng visual: **A — Cal.com-like** (2026-08-17). Cập nhật contract sản phẩm hiện tại: 2026-09-09 (#8). Shell 3 form-factor: 2026-09-09 (#48 / #54). AppearanceMode unified: 2026-09-09 (#59). Chat composer/upload a11y: 2026-09-10 (#60 / #33).*
