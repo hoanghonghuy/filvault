@@ -107,6 +107,25 @@ describe('installRouteFocus', () => {
     cleanup()
   })
 
+  it('does not focus a page title inside a hidden ancestor', async () => {
+    const nav = document.querySelector<HTMLButtonElement>('#nav')!
+    const title = document.querySelector<HTMLElement>('.header-title')!
+    const wrapper = document.createElement('div')
+    title.before(wrapper)
+    wrapper.append(title)
+    wrapper.style.display = 'none'
+    nav.focus()
+
+    const { router, navigate } = makeRouter()
+    const cleanup = installRouteFocus(router)
+    navigate()
+    navigate()
+    await flushFrame()
+
+    expect(document.activeElement).toBe(nav)
+    cleanup()
+  })
+
   it('uses tabindex -1 only for programmatic focus and removes it after blur', async () => {
     const title = document.querySelector<HTMLElement>('.header-title')!
     const { router, navigate } = makeRouter()
