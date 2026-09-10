@@ -25,14 +25,10 @@ func RegisterFilteredTimelineRoute(g *gin.RouterGroup, svc *Service, middleware 
 			httpx.Validation(c)
 			return
 		}
-		var before *time.Time
-		if raw := c.Query("before"); raw != "" {
-			parsed, err := time.Parse(time.RFC3339Nano, raw)
-			if err != nil {
-				httpx.Validation(c)
-				return
-			}
-			before = &parsed
+		before, err := ParseTimelineCursor(c.Query("before"))
+		if err != nil {
+			httpx.Validation(c)
+			return
 		}
 		limit := DefaultTimelineLimit
 		if raw := c.Query("limit"); raw != "" {
@@ -48,10 +44,33 @@ func RegisterFilteredTimelineRoute(g *gin.RouterGroup, svc *Service, middleware 
 			httpx.Error(c, err)
 			return
 		}
-		resp := gin.H{"groups": publicGroups(out.Groups)}
+		resp := gin.H{"groups": publicFilteredGroups(out.Groups)}
 		if out.NextBefore != "" {
 			resp["nextBefore"] = out.NextBefore
 		}
 		c.JSON(http.StatusOK, resp)
 	})...)
+}
+
+func publicFilteredGroups(groups []TimelineGroup) []gin.H {
+	out := make([]gin.H, 0, len(groups))
+	for _, group := range groups {
+		items := make([]gin.H, 0, len(group.Items))
+		for _, item := range group.Items {
+			public := gin.H{
+				"id":         item.ID,
+				"name":       item.Name,
+				"mimeType":   item.MimeType,
+				"sizeBytes":  item.SizeBytes,
+				"createdAt":  item.CreatedAt.UTC().Format(time.RFC3339Nano),
+				"isFavorite": item.IsFavorite,
+			}
+			if item.ThumbnailURL != "" {
+				public["thumbnailUrl"] = item.ThumbnailURL
+			}
+			items = append(items, public)
+		}
+		out = append(out, gin.H{"date": group.Date, "items": items})
+	}
+	return out
 }
