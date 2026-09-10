@@ -271,6 +271,16 @@ export interface IncomingShare {
   createdAt: string
 }
 
+/** POST /shares — existing user gets a share row; unknown email returns invited=true only. */
+export interface CreateUserShareResponse {
+  id?: string
+  resourceType?: ShareResourceType
+  resourceId?: string
+  recipient?: ShareUserRef
+  createdAt?: string
+  invited?: boolean
+}
+
 export interface SharedFolderInfo {
   id: string
   name: string

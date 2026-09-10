@@ -39,6 +39,42 @@ export function formatApiError(e: unknown, fallback: string): string {
   return friendly[e.code] ?? e.message ?? fallback
 }
 
+const shareUserFriendly: Record<string, string> = {
+  CONFLICT: 'This item is already shared with that user.',
+  NOT_FOUND: 'Item not found.',
+  VALIDATION_ERROR: 'Enter a valid email address.',
+}
+
+export interface ShareUserErrorCopy {
+  conflict?: string
+  notFound?: string
+  validation?: string
+  network?: string
+}
+
+export function formatShareUserError(
+  e: unknown,
+  fallback: string,
+  copy: ShareUserErrorCopy = {},
+): string {
+  if (isNetworkError(e)) {
+    return copy.network ?? NETWORK_UNAVAILABLE
+  }
+  if (!(e instanceof ApiError)) {
+    return fallback
+  }
+  if (e.code === 'CONFLICT') {
+    return copy.conflict ?? shareUserFriendly.CONFLICT ?? fallback
+  }
+  if (e.code === 'NOT_FOUND') {
+    return copy.notFound ?? shareUserFriendly.NOT_FOUND ?? fallback
+  }
+  if (e.code === 'VALIDATION_ERROR') {
+    return copy.validation ?? shareUserFriendly.VALIDATION_ERROR ?? fallback
+  }
+  return fallback
+}
+
 export function formatAuthError(e: unknown, fallback: string): string {
   if (!(e instanceof ApiError)) {
     return fallback

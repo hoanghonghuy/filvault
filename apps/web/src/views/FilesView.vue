@@ -1046,24 +1046,12 @@ const shareUserOpen = ref(false)
 const shareUserFileName = ref('')
 const shareUserTargetId = ref<string | null>(null)
 
-async function shareWithUser(email: string) {
-  const fileId = shareUserTargetId.value
-  if (!fileId) return
+function onUserShared(result: { invited: boolean; email: string }) {
   const name = shareUserFileName.value
-  error.value = ''
-  try {
-    const res = await api<{ invited?: boolean }>(`/shares`, {
-      method: 'POST',
-      body: JSON.stringify({ resourceType: 'file', resourceId: fileId, email }),
-    })
-    shareUserOpen.value = false
-    if (res.invited) {
-      ui.showToast(`Invitation sent to ${email}`)
-    } else {
-      ui.showToast(`Shared "${name}" with ${email}`, 'success')
-    }
-  } catch (e) {
-    error.value = formatApiError(e, 'Could not share')
+  if (result.invited) {
+    ui.showToast(`Invitation sent to ${result.email}`)
+  } else {
+    ui.showToast(`Shared "${name}" with ${result.email}`, 'success')
   }
 }
 
@@ -1545,7 +1533,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <ShareUserSheet
       :open="shareUserOpen"
       :name="shareUserFileName"
-      @share="shareWithUser"
+      :resource-id="shareUserTargetId"
+      @shared="onUserShared"
       @close="shareUserOpen = false"
     />
 
