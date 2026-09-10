@@ -74,6 +74,33 @@ describe('ShareSheet owner operation lifecycle', () => {
     wrapper.unmount()
   })
 
+  it('keeps create locked across close and reopen until the real request settles', async () => {
+    const pending = deferred()
+    const onCreate = vi.fn<(ttl: unknown) => Promise<void>>(() => pending.promise)
+    const wrapper = mountSheet({ onCreate })
+
+    void wrapper.get('.btn.ink').trigger('click')
+    await flushPromises()
+    expect(onCreate).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+
+    const create = wrapper.get('.btn.ink')
+    expect(create.text()).toBe('Creating…')
+    expect(create.attributes('disabled')).toBeDefined()
+    void create.trigger('click')
+    await flushPromises()
+    expect(onCreate).toHaveBeenCalledTimes(1)
+
+    pending.resolve()
+    await flushPromises()
+    expect(create.text()).toBe('Create link')
+    expect(create.attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('always releases create busy state when a listener rejects', async () => {
     const onCreate = vi.fn<(ttl: unknown) => Promise<void>>(() =>
       Promise.reject(new Error('handled by parent')),
