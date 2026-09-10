@@ -113,7 +113,6 @@ async function addItem(fileId: string) {
 async function openItemActions(item: TimelineItem) {
   const isCover = album.value?.coverFileId === item.id
   const action = await ui.openActionSheet(item.name, [
-    { id: 'view', label: 'View', icon: 'eye' },
     { id: 'download', label: 'Download', icon: 'download' },
     isCover
       ? { id: 'unset-cover', label: 'Remove cover', icon: 'restore' }
@@ -121,9 +120,6 @@ async function openItemActions(item: TimelineItem) {
     { id: 'remove', label: 'Remove from this album', icon: 'trash', danger: true },
   ])
   if (!action) return
-  if (action === 'view') {
-    await openLightbox(item)
-  }
   if (action === 'download') {
     mediaItem.value = item
     await downloadMedia()
@@ -230,11 +226,12 @@ onBeforeUnmount(() => {
 <template>
   <div>
     <div class="album-header">
-      <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">
-        ← {{ t.photosTitle }}
-      </button>
+      <RouterLink to="/photos" class="btn ghost album-back" :aria-label="`${t.back}: ${t.photosTitle}`">
+        <span aria-hidden="true">←</span>
+        <span>{{ t.photosTitle }}</span>
+      </RouterLink>
       <h1 class="album-title">{{ album?.name ?? t.album }}</h1>
-      <button type="button" class="btn icon-only" :aria-label="t.albumMenu" @click="openAlbumMenu">
+      <button type="button" class="btn icon-only album-menu-btn" :aria-label="t.albumMenu" @click="openAlbumMenu">
         <Icon name="more" :size="18" />
       </button>
     </div>
@@ -243,18 +240,28 @@ onBeforeUnmount(() => {
     <LoadingSkeletonAlbum v-if="loading" />
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
-        <PhotoThumb
+        <div
           v-for="(item, index) in album.items"
           :key="item.id"
-          :mime-type="item.mimeType"
-          :name="item.name"
-          :thumbnail-url="item.thumbnailUrl"
-          class="appear"
+          class="album-media-cell appear"
           :style="{ animationDelay: cellDelay(index) }"
-          :aria-label="`Actions for ${item.name}`"
-          @click="openItemActions(item)"
-          @contextmenu.prevent="openItemActions(item)"
-        />
+        >
+          <PhotoThumb
+            :mime-type="item.mimeType"
+            :name="item.name"
+            :thumbnail-url="item.thumbnailUrl"
+            @click="openLightbox(item)"
+            @contextmenu.prevent="openItemActions(item)"
+          />
+          <button
+            type="button"
+            class="album-media-more"
+            :aria-label="`${t.moreActions}: ${item.name}`"
+            @click="openItemActions(item)"
+          >
+            <Icon name="more" :size="18" />
+          </button>
+        </div>
       </div>
 
       <EmptyState
@@ -295,6 +302,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
+  min-width: 0;
 }
 
 .album-title {
@@ -310,19 +318,49 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.mobile-back {
+.album-back {
   min-height: var(--touch-min);
+  min-width: var(--touch-min);
   padding: 0 var(--space-sm);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.album-menu-btn { min-width: var(--touch-min); min-height: var(--touch-min); flex-shrink: 0; }
+.album-media-cell { position: relative; min-width: 0; }
+.album-media-more {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-short) var(--ease-standard);
+}
+.album-media-cell:hover .album-media-more,
+.album-media-more:focus-visible { opacity: 1; }
+.album-media-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (hover: none), (pointer: coarse) {
+  .album-media-more { opacity: 1; }
 }
 
 @media (min-width: 768px) {
-  .mobile-back {
-    display: none;
-  }
-
   .album-title {
     font-size: 1.5rem;
     letter-spacing: -0.02em;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-media-more { transition: none; }
 }
 </style>

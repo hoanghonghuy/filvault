@@ -30,20 +30,19 @@ describe('media lightbox contract', () => {
     expect(vault).toMatch(/api<\{ downloadUrl: string \}>\(`\/files\/\$\{file\.id\}\/download`\)/)
   })
 
-  it('uses direct preview for Photos while Album thumbnails retain their contextual flow', () => {
+  it('uses direct preview for Photos and Album thumbnails with explicit secondary actions', () => {
     expect(photos).toMatch(/@click="openLightbox\(item\)"/)
     expect(photos).toMatch(/@click="openMediaActions\(item\)"/)
+    expect(album).toMatch(/@click="openLightbox\(item\)"/)
     expect(album).toMatch(/@click="openItemActions\(item\)"/)
-    expect(album).not.toMatch(/@click="openLightbox\(item\)"/)
   })
 
-  it('keeps action-sheet View wired to the lightbox', () => {
+  it('keeps Photos action-sheet View wired to the lightbox', () => {
     expect(photos).toMatch(/async function handleSheetAfterLeave\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
-    expect(album).toMatch(/if \(action === 'view'\) \{[\s\S]*?openLightbox\(item\)/)
   })
 
-  it('keeps album actions contextual and removes from album last', () => {
-    expect(album).toMatch(/label: 'View'/)
+  it('keeps album secondary actions contextual and destructive removal last', () => {
+    expect(album).not.toMatch(/label: 'View'/)
     expect(album).toMatch(/label: 'Download'/)
     expect(album).toMatch(/label: 'Remove from this album'/)
     expect(album).toMatch(/action === 'set-cover'/)
