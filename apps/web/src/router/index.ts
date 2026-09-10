@@ -44,7 +44,11 @@ const router = createRouter({
       name: 'public-share',
       component: () => import('@/views/PublicShareView.vue'),
     },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+    },
   ],
 })
 
