@@ -2,6 +2,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useCallStore } from '@/stores/call'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/lib/i18n'
 import Icon from '@/components/AppIcon.vue'
 import {
   Track,
@@ -14,6 +15,63 @@ import {
 
 const callStore = useCallStore()
 const auth = useAuthStore()
+const { locale } = useI18n()
+
+const copy = computed(() => locale.value === 'en' ? {
+  incomingVideo: 'Incoming video call',
+  incomingAudio: 'Incoming voice call',
+  outgoingVideo: 'Calling video…',
+  outgoingAudio: 'Calling…',
+  videoCall: 'Video call',
+  audioCall: 'Voice call',
+  member: 'Member',
+  conversation: 'Conversation',
+  declineCall: 'Decline call',
+  decline: 'Decline',
+  answerCall: 'Answer call',
+  answer: 'Answer',
+  ringing: 'Ringing…',
+  cancelCall: 'Cancel call',
+  cancel: 'Cancel',
+  minimize: 'Exit full screen',
+  fullscreen: 'Full screen',
+  remoteCameraOff: 'Their camera is off',
+  inCall: 'In call',
+  cameraOff: 'Camera off',
+  muteMic: 'Mute microphone',
+  unmuteMic: 'Unmute microphone',
+  turnCameraOff: 'Turn camera off',
+  turnCameraOn: 'Turn camera on',
+  endCall: 'End call',
+  callEnded: 'Call ended',
+} : {
+  incomingVideo: 'Cuộc gọi video đến',
+  incomingAudio: 'Cuộc gọi thoại đến',
+  outgoingVideo: 'Đang gọi video…',
+  outgoingAudio: 'Đang gọi thoại…',
+  videoCall: 'Cuộc gọi video',
+  audioCall: 'Cuộc gọi thoại',
+  member: 'Thành viên',
+  conversation: 'Cuộc trò chuyện',
+  declineCall: 'Từ chối cuộc gọi',
+  decline: 'Từ chối',
+  answerCall: 'Trả lời cuộc gọi',
+  answer: 'Trả lời',
+  ringing: 'Đang đổ chuông…',
+  cancelCall: 'Hủy cuộc gọi',
+  cancel: 'Hủy',
+  minimize: 'Thu nhỏ',
+  fullscreen: 'Toàn màn hình',
+  remoteCameraOff: 'Camera đối phương đang tắt',
+  inCall: 'Đang trong cuộc gọi',
+  cameraOff: 'Camera tắt',
+  muteMic: 'Tắt mic',
+  unmuteMic: 'Bật mic',
+  turnCameraOff: 'Tắt camera',
+  turnCameraOn: 'Bật camera',
+  endCall: 'Kết thúc cuộc gọi',
+  callEnded: 'Cuộc gọi đã kết thúc',
+})
 
 const localVideoRef = ref<HTMLVideoElement | null>(null)
 const remoteVideoRef = ref<HTMLVideoElement | null>(null)
@@ -26,21 +84,21 @@ const isOpen = computed(() => callStore.state !== 'idle')
 
 const callTitle = computed(() => {
   if (callStore.state === 'incoming') {
-    return callStore.isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến'
+    return callStore.isVideo ? copy.value.incomingVideo : copy.value.incomingAudio
   }
   if (callStore.state === 'outgoing') {
-    return callStore.isVideo ? 'Đang gọi video...' : 'Đang gọi thoại...'
+    return callStore.isVideo ? copy.value.outgoingVideo : copy.value.outgoingAudio
   }
-  return callStore.isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại'
+  return callStore.isVideo ? copy.value.videoCall : copy.value.audioCall
 })
 
 const peerName = computed(() => {
   if (callStore.callerName) return callStore.callerName
   if (callStore.participants.size > 0) {
     const first = callStore.participants.values().next().value
-    return first?.name || 'Thành viên'
+    return first?.name || copy.value.member
   }
-  return 'Cuộc trò chuyện'
+  return copy.value.conversation
 })
 
 const peerAvatar = computed(() => callStore.callerAvatar || null)
@@ -199,8 +257,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="call-btn btn-decline"
-            aria-label="Từ chối cuộc gọi"
-            title="Từ chối"
+            :aria-label="copy.declineCall"
+            :title="copy.decline"
             @click="() => callStore.declineCall()"
           >
             <Icon name="phone-off" :size="26" />
@@ -208,8 +266,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="call-btn btn-accept"
-            aria-label="Trả lời cuộc gọi"
-            title="Trả lời"
+            :aria-label="copy.answerCall"
+            :title="copy.answer"
             @click="() => callStore.acceptCall()"
           >
             <Icon name="phone" :size="26" />
@@ -225,14 +283,14 @@ onUnmounted(() => {
           </div>
         </div>
         <h2 class="caller-name">{{ peerName }}</h2>
-        <p class="call-subtitle">Đang đổ chuông...</p>
+        <p class="call-subtitle">{{ copy.ringing }}</p>
 
         <div class="call-actions">
           <button
             type="button"
             class="call-btn btn-decline"
-            aria-label="Hủy cuộc gọi"
-            title="Hủy"
+            :aria-label="copy.cancelCall"
+            :title="copy.cancel"
             @click="() => callStore.endCall()"
           >
             <Icon name="phone-off" :size="26" />
@@ -252,8 +310,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="header-action-btn"
-            :aria-label="isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'"
-            :title="isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'"
+            :aria-label="isFullscreen ? copy.minimize : copy.fullscreen"
+            :title="isFullscreen ? copy.minimize : copy.fullscreen"
             @click="toggleFullscreen"
           >
             <Icon :name="isFullscreen ? 'minimize' : 'maximize'" :size="20" />
@@ -276,7 +334,7 @@ onUnmounted(() => {
             </div>
             <h2 class="active-peer-name">{{ peerName }}</h2>
             <p class="call-timer-label">
-              {{ callStore.isVideo && !hasRemoteVideo ? 'Camera đối phương đang tắt' : 'Đang trong cuộc gọi' }}
+              {{ callStore.isVideo && !hasRemoteVideo ? copy.remoteCameraOff : copy.inCall }}
             </p>
           </div>
 
@@ -291,7 +349,7 @@ onUnmounted(() => {
             ></video>
             <div v-if="!callStore.isCamEnabled" class="cam-off-overlay">
               <Icon name="camera-off" :size="20" />
-              <span class="cam-off-badge">Camera tắt</span>
+              <span class="cam-off-badge">{{ copy.cameraOff }}</span>
             </div>
           </div>
         </div>
@@ -302,8 +360,8 @@ onUnmounted(() => {
             class="control-btn"
             :class="{ muted: !callStore.isMicEnabled }"
             :aria-pressed="callStore.isMicEnabled"
-            :aria-label="callStore.isMicEnabled ? 'Tắt mic' : 'Bật mic'"
-            :title="callStore.isMicEnabled ? 'Tắt mic' : 'Bật mic'"
+            :aria-label="callStore.isMicEnabled ? copy.muteMic : copy.unmuteMic"
+            :title="callStore.isMicEnabled ? copy.muteMic : copy.unmuteMic"
             @click="callStore.toggleMicrophone"
           >
             <Icon :name="callStore.isMicEnabled ? 'mic' : 'mic-off'" :size="22" />
@@ -315,8 +373,8 @@ onUnmounted(() => {
             class="control-btn"
             :class="{ muted: !callStore.isCamEnabled }"
             :aria-pressed="callStore.isCamEnabled"
-            :aria-label="callStore.isCamEnabled ? 'Tắt camera' : 'Bật camera'"
-            :title="callStore.isCamEnabled ? 'Tắt camera' : 'Bật camera'"
+            :aria-label="callStore.isCamEnabled ? copy.turnCameraOff : copy.turnCameraOn"
+            :title="callStore.isCamEnabled ? copy.turnCameraOff : copy.turnCameraOn"
             @click="callStore.toggleCamera"
           >
             <Icon :name="callStore.isCamEnabled ? 'camera' : 'camera-off'" :size="22" />
@@ -325,8 +383,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="control-btn btn-hangup"
-            aria-label="Kết thúc cuộc gọi"
-            title="Kết thúc cuộc gọi"
+            :aria-label="copy.endCall"
+            :title="copy.endCall"
             @click="() => callStore.endCall()"
           >
             <Icon name="phone-off" :size="24" />
@@ -340,7 +398,7 @@ onUnmounted(() => {
           <span v-else>{{ peerName.charAt(0).toUpperCase() }}</span>
         </div>
         <h2 class="caller-name">{{ peerName }}</h2>
-        <p class="call-subtitle">Cuộc gọi đã kết thúc</p>
+        <p class="call-subtitle">{{ copy.callEnded }}</p>
         <p class="call-duration-summary">{{ callStore.formattedDuration }}</p>
       </div>
     </div>
