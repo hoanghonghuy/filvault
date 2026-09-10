@@ -19,6 +19,7 @@ interface ShareLinkInfo {
 }
 
 type BrowseMode = 'root' | 'child'
+type ShareTab = 'my-shares' | 'with-me'
 
 interface RetryFolderTarget {
   id: string
@@ -28,7 +29,7 @@ interface RetryFolderTarget {
 const ui = useUiStore()
 const { t } = useI18n()
 
-const shareTab = ref<'my-shares' | 'with-me'>('my-shares')
+const shareTab = ref<ShareTab>('my-shares')
 const loading = ref(false)
 const error = ref('')
 const shares = ref<IncomingShare[]>([])
@@ -42,6 +43,16 @@ const viewMode = ref<'list' | 'grid'>('list')
 
 function toggleViewMode() {
   viewMode.value = viewMode.value === 'list' ? 'grid' : 'list'
+}
+
+function selectShareTab(next: ShareTab) {
+  shareTab.value = next
+  if (next === 'my-shares' && browsing.value) {
+    browseStack.value = []
+    browsing.value = null
+    folderError.value = ''
+    retryFolderTarget.value = null
+  }
 }
 
 async function loadIncomingShares() {
@@ -232,23 +243,27 @@ onMounted(load)
     <div class="tabs-header">
       <div class="tabs-pill-list" role="tablist" aria-label="Shares views">
         <button
+          id="shared-tab-my-shares"
           type="button"
           role="tab"
           class="tab-pill"
           :class="{ active: shareTab === 'my-shares' }"
           :aria-selected="shareTab === 'my-shares'"
-          @click="shareTab = 'my-shares'"
+          aria-controls="shared-panel-my-shares"
+          @click="selectShareTab('my-shares')"
         >
           {{ t.myShares || 'Chia sẻ của tôi' }}
           <span v-if="shareLinks.length" class="tab-count-badge">{{ shareLinks.length }}</span>
         </button>
         <button
+          id="shared-tab-with-me"
           type="button"
           role="tab"
           class="tab-pill"
           :class="{ active: shareTab === 'with-me' }"
           :aria-selected="shareTab === 'with-me'"
-          @click="shareTab = 'with-me'"
+          aria-controls="shared-panel-with-me"
+          @click="selectShareTab('with-me')"
         >
           {{ t.sharedWithMeTab || 'Được chia sẻ' }}
           <span v-if="shares.length" class="tab-count-badge">{{ shares.length }}</span>
@@ -285,191 +300,216 @@ onMounted(load)
       </button>
     </div>
 
-    <Transition name="page">
-      <section v-if="browsing" class="browse" aria-label="Shared folder contents">
-        <button type="button" class="back-btn" :disabled="folderLoading" @click="goBackFromFolder">
-          <Icon name="arrow-left" :size="18" />
-          {{ browseStack.length > 1 ? t.back : t.allSharedItems || 'Tất cả mục chia sẻ' }}
-        </button>
-
-        <nav v-if="browseStack.length" class="browse-path" aria-label="Shared folder path">
-          <template v-for="(entry, index) in browseStack" :key="entry.folder?.id ?? index">
-            <button
-              v-if="index < browseStack.length - 1"
-              type="button"
-              class="browse-path-link"
-              :disabled="folderLoading"
-              @click="goToBrowseIndex(index)"
+    <section
+      id="shared-panel-my-shares"
+      v-show="shareTab === 'my-shares'"
+      role="tabpanel"
+      aria-labelledby="shared-tab-my-shares"
+      :hidden="shareTab !== 'my-shares'"
+      tabindex="0"
+    >
+      <template v-if="!browsing">
+        <p v-if="error" class="error" role="alert">
+          {{ error }}
+          <button type="button" class="retry-btn" @click="load()">{{ t.retry }}</button>
+        </p>
+        <div v-if="loading" class="shares-container">
+          <div v-for="i in 4" :key="i" class="skeleton sk-row" />
+        </div>
+        <template v-else>
+          <EmptyState
+            v-if="!shareLinks.length"
+            icon="share"
+            title="Chưa có liên kết chia sẻ nào"
+            description="Khi bạn tạo liên kết công khai cho tệp, chúng sẽ xuất hiện tại đây."
+          />
+          <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
+            <div
+              v-for="link in shareLinks"
+              :key="link.token"
+              class="share-item-card tappable"
+              @click="openMyShareActions(link)"
             >
-              {{ entry.folder?.name }}
+              <div
+                class="share-icon-badge"
+                :style="{
+                  background: `color-mix(in srgb, ${getFileTypeColor(link.fileName)} 14%, transparent)`,
+                  color: getFileTypeColor(link.fileName),
+                }"
+              >
+                <Icon name="file" :size="20" />
+              </div>
+              <div class="share-item-info">
+                <span class="share-item-title">{{ link.fileName }}</span>
+                <span class="share-item-sub">{{ formatDate(link.createdAt) }} · {{ formatExpiry(link.expiresAt) }}</span>
+              </div>
+              <button
+                class="share-action-btn"
+                type="button"
+                aria-label="Share actions"
+                @click.stop="openMyShareActions(link)"
+              >
+                <Icon name="more" :size="18" />
+              </button>
+            </div>
+          </div>
+        </template>
+      </template>
+    </section>
+
+    <section
+      id="shared-panel-with-me"
+      v-show="shareTab === 'with-me'"
+      role="tabpanel"
+      aria-labelledby="shared-tab-with-me"
+      :hidden="shareTab !== 'with-me'"
+      tabindex="0"
+    >
+      <Transition name="page">
+        <div v-if="browsing" class="browse" aria-label="Shared folder contents">
+          <button type="button" class="back-btn" :disabled="folderLoading" @click="goBackFromFolder">
+            <Icon name="arrow-left" :size="18" />
+            {{ browseStack.length > 1 ? t.back : t.allSharedItems || 'Tất cả mục chia sẻ' }}
+          </button>
+
+          <nav v-if="browseStack.length" class="browse-path" aria-label="Shared folder path">
+            <template v-for="(entry, index) in browseStack" :key="entry.folder?.id ?? index">
+              <button
+                v-if="index < browseStack.length - 1"
+                type="button"
+                class="browse-path-link"
+                :disabled="folderLoading"
+                @click="goToBrowseIndex(index)"
+              >
+                {{ entry.folder?.name }}
+              </button>
+              <span v-else class="browse-path-current" aria-current="page">{{ entry.folder?.name }}</span>
+              <span v-if="index < browseStack.length - 1" class="browse-path-separator" aria-hidden="true">/</span>
+            </template>
+          </nav>
+
+          <h2 class="folder-name">{{ browsing.folder?.name }}</h2>
+
+          <p v-if="folderError" class="browse-error" role="alert">
+            {{ folderError }}
+            <button type="button" class="retry-btn" :disabled="folderLoading" @click="retryFolderNavigation">
+              {{ t.retry }}
             </button>
-            <span v-else class="browse-path-current" aria-current="page">{{ entry.folder?.name }}</span>
-            <span v-if="index < browseStack.length - 1" class="browse-path-separator" aria-hidden="true">/</span>
-          </template>
-        </nav>
+          </p>
+          <p v-if="folderLoading" class="browse-status" role="status" aria-live="polite">
+            {{ t.loading }}
+          </p>
 
-        <h2 class="folder-name">{{ browsing.folder?.name }}</h2>
+          <div class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
+            <button
+              v-for="f in browsing.folders"
+              :key="'d-' + f.id"
+              type="button"
+              class="share-item-card tappable folder-card"
+              :disabled="folderLoading"
+              @click="openChildFolder(f.id)"
+            >
+              <div class="share-icon-badge folder-badge">
+                <Icon name="folder" :size="22" />
+              </div>
+              <div class="share-item-info">
+                <span class="share-item-title">{{ f.name }}</span>
+                <span class="share-item-sub">{{ t.folder }}</span>
+              </div>
+              <Icon name="chevron-right" :size="18" class="folder-chevron" />
+            </button>
+            <div
+              v-for="f in browsing.files"
+              :key="'f-' + f.id"
+              class="share-item-card tappable"
+              @click="downloadFile(f.id, f.name)"
+            >
+              <div
+                class="share-icon-badge"
+                :style="{
+                  background: `color-mix(in srgb, ${getFileTypeColor(f.name)} 14%, transparent)`,
+                  color: getFileTypeColor(f.name),
+                }"
+              >
+                <Icon :name="mimeIcon(f.mimeType)" :size="20" />
+              </div>
+              <div class="share-item-info">
+                <span class="share-item-title">{{ f.name }}</span>
+                <span class="share-item-sub">{{ formatBytes(f.sizeBytes) }}</span>
+              </div>
+              <button
+                class="share-action-btn"
+                type="button"
+                :aria-label="t.download"
+                @click.stop="downloadFile(f.id, f.name)"
+              >
+                <Icon name="download" :size="18" />
+              </button>
+            </div>
+          </div>
+          <p v-if="!browsing.folders.length && !browsing.files.length" class="empty-inline">
+            {{ t.folderEmpty }}
+          </p>
+        </div>
+      </Transition>
 
-        <p v-if="folderError" class="browse-error" role="alert">
-          {{ folderError }}
-          <button type="button" class="retry-btn" :disabled="folderLoading" @click="retryFolderNavigation">
+      <template v-if="!browsing">
+        <p v-if="error" class="error" role="alert">
+          {{ error }}
+          <button type="button" class="retry-btn" @click="retryFolderTarget ? retryFolderNavigation() : load()">
             {{ t.retry }}
           </button>
         </p>
-        <p v-if="folderLoading" class="browse-status" role="status" aria-live="polite">
-          {{ t.loading }}
-        </p>
-
-        <div class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
-          <button
-            v-for="f in browsing.folders"
-            :key="'d-' + f.id"
-            type="button"
-            class="share-item-card tappable folder-card"
-            :disabled="folderLoading"
-            @click="openChildFolder(f.id)"
-          >
-            <div class="share-icon-badge folder-badge">
-              <Icon name="folder" :size="22" />
-            </div>
-            <div class="share-item-info">
-              <span class="share-item-title">{{ f.name }}</span>
-              <span class="share-item-sub">{{ t.folder }}</span>
-            </div>
-            <Icon name="chevron-right" :size="18" class="folder-chevron" />
-          </button>
-          <div
-            v-for="f in browsing.files"
-            :key="'f-' + f.id"
-            class="share-item-card tappable"
-            @click="downloadFile(f.id, f.name)"
-          >
-            <div
-              class="share-icon-badge"
-              :style="{
-                background: `color-mix(in srgb, ${getFileTypeColor(f.name)} 14%, transparent)`,
-                color: getFileTypeColor(f.name),
-              }"
-            >
-              <Icon :name="mimeIcon(f.mimeType)" :size="20" />
-            </div>
-            <div class="share-item-info">
-              <span class="share-item-title">{{ f.name }}</span>
-              <span class="share-item-sub">{{ formatBytes(f.sizeBytes) }}</span>
-            </div>
-            <button
-              class="share-action-btn"
-              type="button"
-              :aria-label="t.download"
-              @click.stop="downloadFile(f.id, f.name)"
-            >
-              <Icon name="download" :size="18" />
-            </button>
-          </div>
+        <div v-if="loading" class="shares-container">
+          <div v-for="i in 4" :key="i" class="skeleton sk-row" />
         </div>
-        <p v-if="!browsing.folders.length && !browsing.files.length" class="empty-inline">
-          {{ t.folderEmpty }}
-        </p>
-      </section>
-    </Transition>
-
-    <template v-if="!browsing">
-      <p v-if="error" class="error" role="alert">
-        {{ error }}
-        <button type="button" class="retry-btn" @click="retryFolderTarget ? retryFolderNavigation() : load()">
-          {{ t.retry }}
-        </button>
-      </p>
-
-      <div v-if="loading" class="shares-container">
-        <div v-for="i in 4" :key="i" class="skeleton sk-row" />
-      </div>
-
-      <div v-else-if="shareTab === 'my-shares'">
-        <EmptyState
-          v-if="!shareLinks.length"
-          icon="share"
-          title="Chưa có liên kết chia sẻ nào"
-          description="Khi bạn tạo liên kết công khai cho tệp, chúng sẽ xuất hiện tại đây."
-        />
-        <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
-          <div
-            v-for="link in shareLinks"
-            :key="link.token"
-            class="share-item-card tappable"
-            @click="openMyShareActions(link)"
-          >
+        <template v-else>
+          <EmptyState
+            v-if="!shares.length"
+            icon="users"
+            :title="t.nothingShared"
+            :description="t.nothingSharedDesc"
+          />
+          <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
             <div
-              class="share-icon-badge"
-              :style="{
-                background: `color-mix(in srgb, ${getFileTypeColor(link.fileName)} 14%, transparent)`,
-                color: getFileTypeColor(link.fileName),
-              }"
+              v-for="share in shares"
+              :key="share.id"
+              class="share-item-card tappable"
+              @click="onIncomingRowClick(share)"
             >
-              <Icon name="file" :size="20" />
+              <div
+                class="share-icon-badge"
+                :class="{ 'folder-badge': share.resourceType === 'folder' }"
+                :style="
+                  share.resourceType === 'folder'
+                    ? {}
+                    : {
+                        background: `color-mix(in srgb, ${getFileTypeColor(share.resourceName)} 14%, transparent)`,
+                        color: getFileTypeColor(share.resourceName),
+                      }
+                "
+              >
+                <Icon :name="share.resourceType === 'folder' ? 'folder' : 'file'" :size="20" />
+              </div>
+              <div class="share-item-info">
+                <span class="share-item-title">{{ share.resourceName }}</span>
+                <span class="share-item-sub">
+                  {{ share.owner.displayName }} · {{ formatDate(share.createdAt) }}
+                </span>
+              </div>
+              <button
+                class="share-action-btn"
+                type="button"
+                :aria-label="share.resourceType === 'folder' ? t.open : t.download"
+                @click.stop="onIncomingRowClick(share)"
+              >
+                <Icon :name="share.resourceType === 'folder' ? 'chevron-right' : 'download'" :size="18" />
+              </button>
             </div>
-            <div class="share-item-info">
-              <span class="share-item-title">{{ link.fileName }}</span>
-              <span class="share-item-sub">{{ formatDate(link.createdAt) }} · {{ formatExpiry(link.expiresAt) }}</span>
-            </div>
-            <button
-              class="share-action-btn"
-              type="button"
-              aria-label="Share actions"
-              @click.stop="openMyShareActions(link)"
-            >
-              <Icon name="more" :size="18" />
-            </button>
           </div>
-        </div>
-      </div>
-
-      <div v-else-if="shareTab === 'with-me'">
-        <EmptyState
-          v-if="!shares.length"
-          icon="users"
-          :title="t.nothingShared"
-          :description="t.nothingSharedDesc"
-        />
-        <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
-          <div
-            v-for="share in shares"
-            :key="share.id"
-            class="share-item-card tappable"
-            @click="onIncomingRowClick(share)"
-          >
-            <div
-              class="share-icon-badge"
-              :class="{ 'folder-badge': share.resourceType === 'folder' }"
-              :style="
-                share.resourceType === 'folder'
-                  ? {}
-                  : {
-                      background: `color-mix(in srgb, ${getFileTypeColor(share.resourceName)} 14%, transparent)`,
-                      color: getFileTypeColor(share.resourceName),
-                    }
-              "
-            >
-              <Icon :name="share.resourceType === 'folder' ? 'folder' : 'file'" :size="20" />
-            </div>
-            <div class="share-item-info">
-              <span class="share-item-title">{{ share.resourceName }}</span>
-              <span class="share-item-sub">
-                {{ share.owner.displayName }} · {{ formatDate(share.createdAt) }}
-              </span>
-            </div>
-            <button
-              class="share-action-btn"
-              type="button"
-              :aria-label="share.resourceType === 'folder' ? t.open : t.download"
-              @click.stop="onIncomingRowClick(share)"
-            >
-              <Icon :name="share.resourceType === 'folder' ? 'chevron-right' : 'download'" :size="18" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </template>
+        </template>
+      </template>
+    </section>
   </div>
 </template>
 
