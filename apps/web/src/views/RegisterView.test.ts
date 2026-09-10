@@ -46,7 +46,7 @@ describe('RegisterView password confirmation', () => {
     authMock.register.mockResolvedValue(undefined)
   })
 
-  it('blocks registration locally when passwords do not match and preserves input', async () => {
+  it('blocks registration locally when passwords do not match and preserves recoverable input', async () => {
     const router = makeRouter()
     await router.push('/register')
     await router.isReady()
@@ -57,9 +57,11 @@ describe('RegisterView password confirmation', () => {
 
     expect(authMock.register).not.toHaveBeenCalled()
     expect(wrapper.get('[role="alert"]').text()).toContain('Passwords do not match')
-    expect(wrapper.get<HTMLInputElement>('#register-email').element.value).toBe('  user@example.com  ')
+    expect(wrapper.get<HTMLInputElement>('#register-email').element.value).toBe('user@example.com')
+    expect(wrapper.get<HTMLInputElement>('#register-display-name').element.value).toBe('  User Name  ')
     expect(wrapper.get<HTMLInputElement>('#register-password').element.value).toBe('password-123')
     expect(wrapper.get<HTMLInputElement>('#register-confirm-password').element.value).toBe('different-password')
+    expect(wrapper.get<HTMLInputElement>('#register-invite').element.value).toBe('  invite-code  ')
 
     wrapper.unmount()
   })
