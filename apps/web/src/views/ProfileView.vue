@@ -340,8 +340,8 @@ async function logout() {
 
     <section class="card section" aria-labelledby="profile-password-heading">
       <h2 id="profile-password-heading" class="section-title">{{ t.password }}</h2>
-      <label class="field" for="profile-current-password">
-        <span>{{ t.currentPassword }}</span>
+      <div class="field">
+        <label class="field-label" for="profile-current-password">{{ t.currentPassword }}</label>
         <PasswordInput
           id="profile-current-password"
           v-model="currentPassword"
@@ -350,9 +350,9 @@ async function logout() {
           :disabled="changingPassword"
           required
         />
-      </label>
-      <label class="field" for="profile-new-password">
-        <span>{{ t.newPassword }}</span>
+      </div>
+      <div class="field">
+        <label class="field-label" for="profile-new-password">{{ t.newPassword }}</label>
         <PasswordInput
           id="profile-new-password"
           v-model="newPassword"
@@ -360,14 +360,14 @@ async function logout() {
           autocomplete="new-password"
           :disabled="changingPassword"
           :aria-invalid="Boolean(passwordError)"
-          aria-describedby="profile-password-requirement profile-password-error"
+          :aria-describedby="passwordError ? 'profile-password-requirement profile-password-error' : 'profile-password-requirement'"
           :minlength="8"
           required
         />
-      </label>
+      </div>
       <p id="profile-password-requirement" class="field-hint">{{ passwordCopy.requirement }}</p>
-      <label class="field" for="profile-confirm-password">
-        <span>{{ passwordCopy.confirm }}</span>
+      <div class="field">
+        <label class="field-label" for="profile-confirm-password">{{ passwordCopy.confirm }}</label>
         <PasswordInput
           id="profile-confirm-password"
           v-model="confirmPassword"
@@ -375,11 +375,11 @@ async function logout() {
           autocomplete="new-password"
           :disabled="changingPassword"
           :aria-invalid="Boolean(passwordError)"
-          aria-describedby="profile-password-error"
+          :aria-describedby="passwordError ? 'profile-password-error' : undefined"
           :minlength="8"
           required
         />
-      </label>
+      </div>
       <p
         v-if="passwordError"
         id="profile-password-error"
