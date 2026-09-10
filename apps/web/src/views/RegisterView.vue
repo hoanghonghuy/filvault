@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
+import PasswordInput from '@/components/PasswordInput.vue'
 import { formatAuthError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 
@@ -81,37 +82,35 @@ async function submit() {
             :aria-invalid="error ? true : undefined"
           />
         </label>
-        <label class="field">
-          <span class="field-label">Password</span>
-          <input
+        <div class="field">
+          <label class="field-label" for="register-password">Password</label>
+          <PasswordInput
             id="register-password"
             v-model="password"
             name="password"
-            type="password"
-            required
-            minlength="8"
             autocomplete="new-password"
+            required
+            :minlength="8"
             :disabled="loading"
-            :aria-invalid="error ? true : undefined"
+            :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'auth-error' : 'register-password-hint'"
           />
           <span id="register-password-hint" class="field-hint">At least 8 characters.</span>
-        </label>
-        <label class="field">
-          <span class="field-label">Confirm password</span>
-          <input
+        </div>
+        <div class="field">
+          <label class="field-label" for="register-confirm-password">Confirm password</label>
+          <PasswordInput
             id="register-confirm-password"
             v-model="confirmPassword"
             name="confirmPassword"
-            type="password"
-            required
-            minlength="8"
             autocomplete="new-password"
+            required
+            :minlength="8"
             :disabled="loading"
-            :aria-invalid="error ? true : undefined"
+            :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'auth-error' : undefined"
           />
-        </label>
+        </div>
         <label class="field">
           <span class="field-label">Invite code</span>
           <input
