@@ -32,4 +32,9 @@ describe('trashRetentionNotice', () => {
     expect(vietnamese).toContain('đang tắt')
     expect(vietnamese).not.toContain('30 ngày')
   })
+
+  it('uses a neutral unavailable state instead of inventing policy before account hydration', () => {
+    expect(trashRetentionNotice(null, 'en')).toContain('unavailable')
+    expect(trashRetentionNotice(undefined, 'vi')).toContain('Chưa thể xác định')
+  })
 })
