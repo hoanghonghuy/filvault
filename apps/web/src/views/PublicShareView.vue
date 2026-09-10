@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { ApiError, api, formatBytes } from '@/api/client'
 import type { PublicShareMeta } from '@/api/types'
 import Icon from '@/components/AppIcon.vue'
+import MediaLightbox from '@/components/MediaLightbox.vue'
 import { useI18n } from '@/lib/i18n'
 
 const route = useRoute()
@@ -14,7 +15,13 @@ type MetaState = 'loading' | 'ready' | 'retryable-error' | 'unavailable'
 const metaState = ref<MetaState>('loading')
 const meta = ref<PublicShareMeta | null>(null)
 const downloading = ref(false)
+const previewing = ref(false)
 const downloadError = ref(false)
+const previewError = ref(false)
+const previewUrl = ref('')
+const lightboxOpen = ref(false)
+
+let objectUrlRequest: Promise<string> | null = null
 
 const copy = computed(() =>
   locale.value === 'vi'
@@ -24,6 +31,9 @@ const copy = computed(() =>
         temporary: 'Tạm thời không thể tải liên kết này.',
         retry: 'Thử lại',
         expires: 'Hết hạn',
+        preview: 'Xem trước',
+        previewing: 'Đang chuẩn bị xem trước…',
+        previewFailed: 'Không thể chuẩn bị bản xem trước. Liên kết vẫn còn hiệu lực; hãy thử lại.',
         download: 'Tải xuống',
         downloading: 'Đang chuẩn bị tải xuống…',
         downloadFailed: 'Không thể chuẩn bị tệp tải xuống. Liên kết vẫn còn hiệu lực; hãy thử lại.',
@@ -35,6 +45,9 @@ const copy = computed(() =>
         temporary: 'This link could not be loaded right now.',
         retry: 'Retry',
         expires: 'Expires',
+        preview: 'Preview',
+        previewing: 'Preparing preview…',
+        previewFailed: 'Could not prepare the preview. The link is still available; try again.',
         download: 'Download',
         downloading: 'Preparing download…',
         downloadFailed: 'Could not prepare the download. The link is still available; try again.',
@@ -52,6 +65,18 @@ const expiresLabel = computed(() => {
   }).format(date)
 })
 
+const canPreview = computed(() => {
+  const mimeType = meta.value?.mimeType ?? ''
+  return (
+    mimeType.startsWith('image/') ||
+    mimeType.startsWith('video/') ||
+    mimeType.startsWith('audio/') ||
+    mimeType === 'application/pdf'
+  )
+})
+
+const preparingObject = computed(() => downloading.value || previewing.value)
+
 function isTerminalMetadataError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 404 || error.code === 'NOT_FOUND')
 }
@@ -59,6 +84,9 @@ function isTerminalMetadataError(error: unknown): boolean {
 async function loadMeta() {
   metaState.value = 'loading'
   downloadError.value = false
+  previewError.value = false
+  previewUrl.value = ''
+  lightboxOpen.value = false
   try {
     meta.value = await api<PublicShareMeta>(`/public/shares/${route.params.token}`)
     metaState.value = 'ready'
@@ -68,13 +96,45 @@ async function loadMeta() {
   }
 }
 
+async function requestObjectUrl(): Promise<string> {
+  if (!objectUrlRequest) {
+    objectUrlRequest = api<{ downloadUrl: string }>(`/public/shares/${route.params.token}/download`).then(
+      (out) => out.downloadUrl,
+    )
+  }
+
+  try {
+    return await objectUrlRequest
+  } finally {
+    objectUrlRequest = null
+  }
+}
+
+async function preview() {
+  if (!meta.value || !canPreview.value || preparingObject.value) return
+  previewing.value = true
+  previewError.value = false
+  try {
+    previewUrl.value = await requestObjectUrl()
+    lightboxOpen.value = true
+  } catch {
+    previewError.value = true
+  } finally {
+    previewing.value = false
+  }
+}
+
+function closePreview() {
+  lightboxOpen.value = false
+}
+
 async function download() {
-  if (!meta.value || downloading.value) return
+  if (!meta.value || preparingObject.value) return
   downloading.value = true
   downloadError.value = false
   try {
-    const out = await api<{ downloadUrl: string }>(`/public/shares/${route.params.token}/download`)
-    window.location.href = out.downloadUrl
+    const downloadUrl = await requestObjectUrl()
+    window.location.href = downloadUrl
   } catch {
     downloadError.value = true
   } finally {
@@ -112,20 +172,45 @@ onMounted(loadMeta)
           <template v-if="expiresLabel"> · {{ copy.expires }} {{ expiresLabel }} </template>
         </p>
 
-        <p v-if="downloadError" class="download-error" role="alert">{{ copy.downloadFailed }}</p>
-        <button
-          type="button"
-          class="btn ink block download-btn"
-          :disabled="downloading"
-          :aria-busy="downloading ? 'true' : undefined"
-          @click="download"
-        >
-          {{ downloading ? copy.downloading : copy.download }}
-        </button>
+        <p v-if="previewError" class="operation-error" role="alert">{{ copy.previewFailed }}</p>
+        <p v-if="downloadError" class="operation-error" role="alert">{{ copy.downloadFailed }}</p>
+
+        <div class="share-actions">
+          <button
+            v-if="canPreview"
+            type="button"
+            class="btn ghost block preview-btn"
+            :disabled="preparingObject"
+            :aria-busy="previewing ? 'true' : undefined"
+            @click="preview"
+          >
+            <Icon name="eye" :size="18" aria-hidden="true" />
+            {{ previewing ? copy.previewing : copy.preview }}
+          </button>
+          <button
+            type="button"
+            class="btn ink block download-btn"
+            :disabled="preparingObject"
+            :aria-busy="downloading ? 'true' : undefined"
+            @click="download"
+          >
+            {{ downloading ? copy.downloading : copy.download }}
+          </button>
+        </div>
       </template>
 
       <p class="caption muted">{{ copy.sharedVia }}</p>
     </div>
+
+    <MediaLightbox
+      v-if="meta && canPreview && previewUrl"
+      :open="lightboxOpen"
+      :name="meta.name"
+      :mime-type="meta.mimeType"
+      :url="previewUrl"
+      @close="closePreview"
+      @download="download"
+    />
   </div>
 </template>
 
@@ -190,9 +275,24 @@ onMounted(loadMeta)
   overflow-wrap: anywhere;
 }
 
+.share-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.preview-btn,
 .download-btn,
 .retry-btn {
-  min-height: 44px;
+  min-height: var(--touch-min, 44px);
+}
+
+.preview-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
 }
 
 .download-btn {
@@ -209,16 +309,16 @@ onMounted(loadMeta)
 }
 
 .state p,
-.download-error {
+.operation-error {
   margin: 0;
 }
 
 .error-icon,
-.download-error {
+.operation-error {
   color: var(--danger);
 }
 
-.download-error {
+.operation-error {
   width: 100%;
   font-size: 0.875rem;
   line-height: 1.45;
@@ -236,6 +336,10 @@ onMounted(loadMeta)
 @media (max-width: 479px) {
   .share-card {
     padding: var(--space-lg);
+  }
+
+  .share-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>
