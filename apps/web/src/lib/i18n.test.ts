@@ -18,6 +18,14 @@ describe('i18n contract', () => {
     expect(i18n).toMatch(/localStorage\.getItem/)
   })
 
+  it('keeps logout confirmation copy in both locale dictionaries', () => {
+    expect(i18n.match(/logoutConfirmTitle:/g)).toHaveLength(2)
+    expect(i18n.match(/logoutConfirmMessage:/g)).toHaveLength(2)
+    expect(i18n).toContain("logoutConfirmTitle: 'Đăng xuất?'")
+    expect(i18n).toContain("logoutConfirmTitle: 'Log out?'")
+    expect(i18n).toMatch(/typeof localStorage === 'undefined'/)
+  })
+
   it('uses translated navigation labels in the app shell', () => {
     expect(shell).toMatch(/useI18n/)
     for (const label of ['Overview', 'Files', 'Photos', 'Trash', 'Settings']) {
