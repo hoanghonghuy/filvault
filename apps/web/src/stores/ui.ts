@@ -1,5 +1,10 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { useI18n } from '@/lib/i18n'
+import {
+  isLegacyLogoutConfirmation,
+  logoutConfirmationOptions,
+} from '@/lib/logoutConfirmation'
 
 export type ConfirmOptions = {
   title: string
@@ -33,6 +38,7 @@ type ActionSheetState = {
 }
 
 export const useUiStore = defineStore('ui', () => {
+  const { locale } = useI18n()
   const toastMessage = ref<string | null>(null)
   const toastType = ref<'success' | 'error' | 'info'>('info')
   let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -78,13 +84,20 @@ export const useUiStore = defineStore('ui', () => {
   function confirm(options: ConfirmOptions): Promise<boolean> {
     return new Promise((resolve) => {
       confirmResolve = resolve
+      const normalizedOptions = isLegacyLogoutConfirmation(options)
+        ? logoutConfirmationOptions(locale.value)
+        : options
       confirmState.value = {
         open: true,
         confirmLabel: 'Confirm',
         cancelLabel: 'Cancel',
-        ...options,
+        ...normalizedOptions,
       }
     })
+  }
+
+  function confirmLogout(): Promise<boolean> {
+    return confirm(logoutConfirmationOptions(locale.value))
   }
 
   function resolveConfirm(value: boolean) {
@@ -158,6 +171,7 @@ export const useUiStore = defineStore('ui', () => {
     actionSheetState,
     showToast,
     confirm,
+    confirmLogout,
     resolveConfirm,
     prompt,
     resolvePrompt,
