@@ -144,7 +144,7 @@ async function onRevoke() {
       >
         {{ revoking ? 'Revoking…' : 'Revoke link' }}
       </button>
-      <button type="button" class="btn block ghost" :disabled="busy" @click="emit('close')">Close</button>
+      <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
     </div>
 
     <div v-else class="create">
@@ -175,7 +175,7 @@ async function onRevoke() {
       >
         {{ creating ? 'Creating…' : 'Create link' }}
       </button>
-      <button type="button" class="btn block ghost" :disabled="creating" @click="emit('close')">Close</button>
+      <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
     </div>
   </BottomSheet>
 </template>
