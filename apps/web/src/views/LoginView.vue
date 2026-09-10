@@ -61,8 +61,8 @@ async function submit() {
             :aria-invalid="error ? true : undefined"
           />
         </label>
-        <label class="field">
-          <span class="field-label">Password</span>
+        <div class="field">
+          <label class="field-label" for="login-password">Password</label>
           <PasswordInput
             id="login-password"
             v-model="password"
@@ -74,7 +74,7 @@ async function submit() {
             :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'auth-error' : undefined"
           />
-        </label>
+        </div>
 
         <div v-if="error" id="auth-error" class="auth-alert" role="alert">{{ error }}</div>
 
