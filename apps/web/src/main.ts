@@ -6,10 +6,12 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { installCallModalFocusGuard } from '@/lib/callModalFocusGuard'
+import { installRouteFocus } from '@/lib/routeFocus'
 import { hydrateAppearance } from '@/lib/theme'
 
 hydrateAppearance()
 installCallModalFocusGuard()
+installRouteFocus(router)
 
 const app = createApp(App)
 
