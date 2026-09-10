@@ -10,71 +10,34 @@ const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { guest: true } },
     { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guest: true } },
-    {
-      path: '/forgot-password',
-      name: 'forgot-password',
-      component: () => import('@/views/ForgotPasswordView.vue'),
-      meta: { guest: true },
-    },
-    {
-      path: '/verify-email',
-      name: 'verify-email',
-      component: () => import('@/views/VerifyEmailView.vue'),
-      meta: { auth: true, unverifiedOnly: true },
-    },
+    { path: '/forgot-password', name: 'forgot-password', component: () => import('@/views/ForgotPasswordView.vue'), meta: { guest: true } },
+    { path: '/verify-email', name: 'verify-email', component: () => import('@/views/VerifyEmailView.vue'), meta: { auth: true, unverifiedOnly: true } },
     { path: '/', name: 'home', component: () => import('@/views/OverviewView.vue'), meta: { auth: true, verified: true } },
     { path: '/overview', name: 'overview', redirect: '/' },
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/vault', name: 'vault', component: () => import('@/views/VaultView.vue'), meta: { auth: true, verified: true } },
     { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
+    { path: '/photos/preview/:id', name: 'photo-preview', component: () => import('@/views/PhotoPreviewView.vue'), meta: { auth: true, verified: true } },
     { path: '/chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
     { path: '/chat/:id', name: 'chat-thread', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
-    {
-      path: '/photos/albums/:id',
-      name: 'album',
-      component: () => import('@/views/AlbumView.vue'),
-      meta: { auth: true, verified: true },
-    },
+    { path: '/photos/albums/:id', name: 'album', component: () => import('@/views/AlbumView.vue'), meta: { auth: true, verified: true } },
     { path: '/trash', name: 'trash', component: () => import('@/views/TrashView.vue'), meta: { auth: true, verified: true } },
-    {
-      path: '/shared',
-      name: 'shared',
-      component: () => import('@/views/SharedWithMeView.vue'),
-      meta: { auth: true, verified: true },
-    },
+    { path: '/shared', name: 'shared', component: () => import('@/views/SharedWithMeView.vue'), meta: { auth: true, verified: true } },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true, verified: true } },
     { path: '/settings/theme', name: 'theme', component: () => import('@/views/ThemeView.vue'), meta: { auth: true, verified: true } },
     { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { auth: true, verified: true } },
-    {
-      path: '/s/:token',
-      name: 'public-share',
-      component: () => import('@/views/PublicShareView.vue'),
-    },
-    {
-      path: '/:pathMatch(.*)*',
-      name: 'not-found',
-      component: () => import('@/views/NotFoundView.vue'),
-    },
+    { path: '/s/:token', name: 'public-share', component: () => import('@/views/PublicShareView.vue') },
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue') },
   ],
 })
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!auth.user && localStorage.getItem('filvault.accessToken')) {
-    await auth.bootstrap()
-  }
-  if (to.meta.guest && auth.isAuthenticated) {
-    return auth.isVerified ? '/' : '/verify-email'
-  }
-  if (to.meta.auth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
-  if ((to.name === 'verify-email' || to.meta.unverifiedOnly) && auth.isAuthenticated && auth.isVerified) {
-    return '/'
-  }
-  if (to.meta.verified && auth.isAuthenticated && !auth.isVerified) {
-    return '/verify-email'
-  }
+  if (!auth.user && localStorage.getItem('filvault.accessToken')) await auth.bootstrap()
+  if (to.meta.guest && auth.isAuthenticated) return auth.isVerified ? '/' : '/verify-email'
+  if (to.meta.auth && !auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
+  if ((to.name === 'verify-email' || to.meta.unverifiedOnly) && auth.isAuthenticated && auth.isVerified) return '/'
+  if (to.meta.verified && auth.isAuthenticated && !auth.isVerified) return '/verify-email'
   return true
 })
 
