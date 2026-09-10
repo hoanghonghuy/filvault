@@ -20,6 +20,12 @@ describe('video-focused Photos route contract', () => {
     expect(videoSource).not.toContain("item.mimeType.startsWith('video/')")
   })
 
+  it('uses authoritative per-item favorite state without a capped favorites preload', () => {
+    expect(videoSource).not.toContain('/files/favorites?limit=100')
+    expect(videoSource).toContain('Boolean(item.isFavorite)')
+    expect(videoSource).toContain('item.isFavorite = !wasFavorited')
+  })
+
   it('keeps preview, secondary actions, load-more and responsive density', () => {
     expect(videoSource).toContain('@click="openLightbox(item)"')
     expect(videoSource).toContain('@click="openActions(item)"')
