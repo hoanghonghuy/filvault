@@ -74,7 +74,7 @@ describe('ShareSheet owner operation lifecycle', () => {
     wrapper.unmount()
   })
 
-  it('keeps create locked across close and reopen until the real request settles', async () => {
+  it('stays dismissible while pending and keeps create locked across reopen', async () => {
     const pending = deferred()
     const onCreate = vi.fn<(ttl: unknown) => Promise<void>>(() => pending.promise)
     const wrapper = mountSheet({ onCreate })
@@ -82,6 +82,11 @@ describe('ShareSheet owner operation lifecycle', () => {
     void wrapper.get('.btn.ink').trigger('click')
     await flushPromises()
     expect(onCreate).toHaveBeenCalledTimes(1)
+
+    const close = wrapper.get('.btn.ghost')
+    expect(close.attributes('disabled')).toBeUndefined()
+    await close.trigger('click')
+    expect(wrapper.emitted('close')).toEqual([[]])
 
     await wrapper.setProps({ open: false })
     await wrapper.setProps({ open: true })
@@ -132,6 +137,7 @@ describe('ShareSheet owner operation lifecycle', () => {
     expect(onCopy).toHaveBeenCalledWith(existingLink.url)
     expect(copy.attributes('aria-label')).toBe('Copying link…')
     expect(copy.attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('.btn.ghost').attributes('disabled')).toBeUndefined()
 
     void copy.trigger('click')
     await flushPromises()
@@ -146,6 +152,7 @@ describe('ShareSheet owner operation lifecycle', () => {
     expect(onRevoke).toHaveBeenCalledTimes(1)
     expect(revoke.text()).toBe('Revoking…')
     expect(revoke.attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('.btn.ghost').attributes('disabled')).toBeUndefined()
 
     void revoke.trigger('click')
     await flushPromises()
