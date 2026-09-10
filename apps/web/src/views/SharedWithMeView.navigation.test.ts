@@ -91,7 +91,6 @@ async function mountWithMe() {
       stubs: {
         Icon: { template: '<span aria-hidden="true" />' },
         EmptyState: { template: '<div class="empty-stub" />' },
-        Transition: false,
       },
     },
   })
