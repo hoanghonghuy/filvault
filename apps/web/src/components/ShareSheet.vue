@@ -43,6 +43,28 @@ watch(
   },
 )
 
+function selectTtlByKeyboard(event: KeyboardEvent, index: number) {
+  let nextIndex: number | null = null
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    nextIndex = (index + 1) % TTL_OPTIONS.length
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    nextIndex = (index - 1 + TTL_OPTIONS.length) % TTL_OPTIONS.length
+  } else if (event.key === 'Home') {
+    nextIndex = 0
+  } else if (event.key === 'End') {
+    nextIndex = TTL_OPTIONS.length - 1
+  }
+
+  if (nextIndex === null) return
+
+  event.preventDefault()
+  selectedTTL.value = TTL_OPTIONS[nextIndex]?.value ?? null
+
+  const group = (event.currentTarget as HTMLElement | null)?.closest('.ttl-options')
+  group?.querySelectorAll<HTMLButtonElement>('[role="radio"]').item(nextIndex).focus()
+}
+
 async function onCreate() {
   creating.value = true
   emit('create', selectedTTL.value)
@@ -56,7 +78,7 @@ async function onCreate() {
       <div class="link-box">
         <span class="link-url">{{ fullUrl }}</span>
         <button type="button" class="btn icon-only" aria-label="Copy link" @click="emit('copy', existing.url)">
-          <Icon name="file" :size="18" />
+          <Icon name="copy" :size="18" />
         </button>
       </div>
       <p class="expiry muted">
@@ -70,14 +92,16 @@ async function onCreate() {
       <p class="field-label">Link expires after</p>
       <div class="ttl-options" role="radiogroup" aria-label="Link expiry">
         <button
-          v-for="option in TTL_OPTIONS"
+          v-for="(option, index) in TTL_OPTIONS"
           :key="option.label"
           type="button"
           role="radio"
           class="ttl-option"
           :class="{ active: selectedTTL === option.value }"
           :aria-checked="selectedTTL === option.value"
+          :tabindex="selectedTTL === option.value ? 0 : -1"
           @click="selectedTTL = option.value"
+          @keydown="selectTtlByKeyboard($event, index)"
         >
           {{ option.label }}
         </button>
