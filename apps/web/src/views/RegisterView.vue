@@ -82,8 +82,8 @@ async function submit() {
             :aria-invalid="error ? true : undefined"
           />
         </label>
-        <label class="field">
-          <span class="field-label">Password</span>
+        <div class="field">
+          <label class="field-label" for="register-password">Password</label>
           <PasswordInput
             id="register-password"
             v-model="password"
@@ -96,9 +96,9 @@ async function submit() {
             :aria-describedby="error ? 'auth-error' : 'register-password-hint'"
           />
           <span id="register-password-hint" class="field-hint">At least 8 characters.</span>
-        </label>
-        <label class="field">
-          <span class="field-label">Confirm password</span>
+        </div>
+        <div class="field">
+          <label class="field-label" for="register-confirm-password">Confirm password</label>
           <PasswordInput
             id="register-confirm-password"
             v-model="confirmPassword"
@@ -110,7 +110,7 @@ async function submit() {
             :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'auth-error' : undefined"
           />
-        </label>
+        </div>
         <label class="field">
           <span class="field-label">Invite code</span>
           <input
