@@ -12,9 +12,6 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 
-const PAGE_SIZE = 50
-const SOURCE_PAGE_SIZE = 100
-
 const ui = useUiStore()
 const { t } = useI18n()
 const groups = ref<Timeline['groups']>([])
@@ -27,39 +24,10 @@ const lightboxUrl = ref('')
 const mediaItem = ref<TimelineItem | null>(null)
 const favoriteIds = ref<Set<string>>(new Set())
 
-function groupItems(items: TimelineItem[]): Timeline['groups'] {
-  const grouped = new Map<string, TimelineItem[]>()
-  for (const item of items) {
-    const date = item.createdAt.slice(0, 10)
-    const current = grouped.get(date) ?? []
-    current.push(item)
-    grouped.set(date, current)
-  }
-  return Array.from(grouped, ([date, dateItems]) => ({ date, items: dateItems }))
-}
-
-async function collectVideoPage(before?: string) {
-  const matches: TimelineItem[] = []
-  let scanBefore = before
-
-  while (matches.length <= PAGE_SIZE) {
-    const params = new URLSearchParams({ limit: String(SOURCE_PAGE_SIZE) })
-    if (scanBefore) params.set('before', scanBefore)
-    const data = await api<Timeline>(`/photos/timeline?${params}`)
-    for (const group of data.groups) {
-      for (const item of group.items) {
-        if (item.mimeType.startsWith('video/')) matches.push(item)
-      }
-    }
-    if (matches.length > PAGE_SIZE || !data.nextBefore) break
-    scanBefore = data.nextBefore
-  }
-
-  const pageItems = matches.slice(0, PAGE_SIZE)
-  return {
-    groups: groupItems(pageItems),
-    nextBefore: matches.length > PAGE_SIZE ? pageItems.at(-1)?.createdAt : undefined,
-  }
+async function loadVideoTimeline(before?: string) {
+  const params = new URLSearchParams({ type: 'video' })
+  if (before) params.set('before', before)
+  return api<Timeline>(`/photos/timeline/filter?${params}`)
 }
 
 async function loadFavorites() {
@@ -71,7 +39,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [data] = await Promise.all([collectVideoPage(), loadFavorites()])
+    const [data] = await Promise.all([loadVideoTimeline(), loadFavorites()])
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
@@ -86,7 +54,7 @@ async function loadMore() {
   loadingMore.value = true
   error.value = ''
   try {
-    const data = await collectVideoPage(nextBefore.value)
+    const data = await loadVideoTimeline(nextBefore.value)
     const merged = [...groups.value]
     for (const group of data.groups) {
       const existing = merged.find((item) => item.date === group.date)
@@ -138,9 +106,9 @@ async function toggleFavorite(item: TimelineItem) {
 async function openActions(item: TimelineItem) {
   const favorited = favoriteIds.value.has(item.id)
   const action = await ui.openActionSheet(item.name, [
-    { id: 'view', label: 'View', icon: 'eye' },
+    { id: 'view', label: t.value.preview, icon: 'eye' },
     { id: 'download', label: t.value.download, icon: 'download' },
-    { id: 'favorite', label: favorited ? 'Remove from favorites' : t.value.addToFavorites, icon: favorited ? 'star-filled' : 'star' },
+    { id: 'favorite', label: favorited ? t.value.favorites : t.value.addToFavorites, icon: favorited ? 'star-filled' : 'star' },
   ])
   if (action === 'view') await openLightbox(item)
   if (action === 'download') await download(item)
@@ -202,7 +170,7 @@ onMounted(() => void load())
         </div>
       </section>
 
-      <EmptyState v-if="groups.length === 0" :title="t.noPhotos" :description="t.noPhotosDesc" icon="video" />
+      <EmptyState v-if="groups.length === 0" :title="t.filterTypeVideo" :description="t.noPhotosDesc" icon="video" />
 
       <div v-if="nextBefore" class="load-more">
         <LoadingSkeletonPhotos v-if="loadingMore" variant="more" />
