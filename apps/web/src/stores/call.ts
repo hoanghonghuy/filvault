@@ -53,12 +53,14 @@ export const useCallStore = defineStore('call', () => {
   )
   const room = shallowRef<Room | null>(null)
   const error = ref<string | null>(null)
-  const deviceError = ref<string | null>(null)
+  const microphoneError = ref<string | null>(null)
+  const cameraError = ref<string | null>(null)
+  const deviceError = computed(() => microphoneError.value ?? cameraError.value)
   const callDuration = ref(0)
   let callDurationTimer: number | null = null
   let incomingRingTimer: number | null = null
   let outgoingRingTimer: number | null = null
-  let intentionalRoomDisconnect = false
+  const intentionalDisconnectRooms = new WeakSet<Room>()
 
   const formattedDuration = computed(() => {
     const mins = Math.floor(callDuration.value / 60)
@@ -81,11 +83,15 @@ export const useCallStore = defineStore('call', () => {
     }
   }
 
+  function disconnectRoom(activeRoom: Room) {
+    intentionalDisconnectRooms.add(activeRoom)
+    void activeRoom.disconnect()
+  }
+
   function resetState() {
     stopTimer()
     if (room.value) {
-      intentionalRoomDisconnect = true
-      void room.value.disconnect()
+      disconnectRoom(room.value)
       room.value = null
     }
     callDuration.value = 0
@@ -110,7 +116,8 @@ export const useCallStore = defineStore('call', () => {
     activeSpeaker.value = null
     participants.value.clear()
     error.value = null
-    deviceError.value = null
+    microphoneError.value = null
+    cameraError.value = null
     callAudio.stop()
   }
 
@@ -150,7 +157,8 @@ export const useCallStore = defineStore('call', () => {
   async function connectToRoom(convId: string) {
     connectionStatus.value = 'connecting'
     error.value = null
-    deviceError.value = null
+    microphoneError.value = null
+    cameraError.value = null
     try {
       const { token, url } = await fetchToken(convId)
       if (state.value === 'idle' || state.value === 'ended' || conversationId.value !== convId) {
@@ -169,7 +177,6 @@ export const useCallStore = defineStore('call', () => {
         adaptiveStream: true,
         dynacast: true,
       })
-      intentionalRoomDisconnect = false
       room.value = r
 
       r.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
@@ -214,13 +221,14 @@ export const useCallStore = defineStore('call', () => {
 
       r.on(RoomEvent.Disconnected, () => {
         connectionStatus.value = 'idle'
-        if (intentionalRoomDisconnect) {
-          intentionalRoomDisconnect = false
+        if (intentionalDisconnectRooms.has(r)) {
+          intentionalDisconnectRooms.delete(r)
           return
         }
         if (state.value === 'connected') {
-          error.value = 'Mất kết nối cuộc gọi. Hãy kiểm tra mạng và gọi lại.'
-          ui.showToast(error.value, 'error')
+          const message = 'Mất kết nối cuộc gọi. Hãy kiểm tra mạng và gọi lại.'
+          error.value = message
+          ui.showToast(message, 'error')
         }
         void endCall(false)
       })
@@ -230,8 +238,7 @@ export const useCallStore = defineStore('call', () => {
       // Bail out if call was cancelled during connection
       const currentCallState = state.value as CallState
       if (currentCallState === 'idle' || currentCallState === 'ended' || conversationId.value !== convId) {
-        intentionalRoomDisconnect = true
-        void r.disconnect()
+        disconnectRoom(r)
         room.value = null
         connectionStatus.value = 'idle'
         return
@@ -249,22 +256,22 @@ export const useCallStore = defineStore('call', () => {
 
       try {
         await r.localParticipant.setMicrophoneEnabled(isMicEnabled.value)
-        deviceError.value = null
+        microphoneError.value = null
       } catch {
         isMicEnabled.value = false
-        deviceError.value = 'Không thể bật micro. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
-        ui.showToast(deviceError.value, 'error')
+        microphoneError.value = 'Không thể bật micro. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
+        ui.showToast(microphoneError.value, 'error')
       }
 
       // Camera: graceful degradation (Bug L5)
       if (isVideo.value) {
         try {
           await r.localParticipant.setCameraEnabled(isCamEnabled.value)
-          deviceError.value = null
+          cameraError.value = null
         } catch {
           isCamEnabled.value = false
-          deviceError.value = 'Không thể bật camera. Hãy kiểm tra quyền truy cập; cuộc gọi vẫn tiếp tục bằng thoại.'
-          ui.showToast(deviceError.value, 'info')
+          cameraError.value = 'Không thể bật camera. Hãy kiểm tra quyền truy cập; cuộc gọi vẫn tiếp tục bằng thoại.'
+          ui.showToast(cameraError.value, 'info')
         }
       }
 
@@ -412,8 +419,7 @@ export const useCallStore = defineStore('call', () => {
     const convId = conversationId.value
     connectionStatus.value = 'idle'
     if (room.value) {
-      intentionalRoomDisconnect = true
-      void room.value.disconnect()
+      disconnectRoom(room.value)
       room.value = null
     }
     if (notifyRemote && convId) {
@@ -429,10 +435,10 @@ export const useCallStore = defineStore('call', () => {
       try {
         await room.value.localParticipant.setMicrophoneEnabled(next)
         isMicEnabled.value = next
-        deviceError.value = null
+        microphoneError.value = null
       } catch {
-        deviceError.value = 'Không thể thay đổi micro. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
-        ui.showToast(deviceError.value, 'error')
+        microphoneError.value = 'Không thể thay đổi micro. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
+        ui.showToast(microphoneError.value, 'error')
       }
     } else {
       isMicEnabled.value = next
@@ -445,10 +451,10 @@ export const useCallStore = defineStore('call', () => {
       try {
         await room.value.localParticipant.setCameraEnabled(next)
         isCamEnabled.value = next
-        deviceError.value = null
+        cameraError.value = null
       } catch {
-        deviceError.value = 'Không thể thay đổi camera. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
-        ui.showToast(deviceError.value, 'error')
+        cameraError.value = 'Không thể thay đổi camera. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
+        ui.showToast(cameraError.value, 'error')
       }
     } else {
       isCamEnabled.value = next
