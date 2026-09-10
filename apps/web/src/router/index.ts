@@ -11,6 +11,12 @@ const router = createRouter({
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { guest: true } },
     { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guest: true } },
     {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/ForgotPasswordView.vue'),
+      meta: { guest: true },
+    },
+    {
       path: '/verify-email',
       name: 'verify-email',
       component: () => import('@/views/VerifyEmailView.vue'),
