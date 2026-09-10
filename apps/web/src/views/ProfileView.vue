@@ -275,6 +275,7 @@ async function changePassword() {
 }
 
 async function logout() {
+  if (!(await ui.confirmLogout())) return
   await auth.logout()
   window.location.href = '/login'
 }
