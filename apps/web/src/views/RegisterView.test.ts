@@ -9,7 +9,9 @@ import RegisterView from './RegisterView.vue'
 const authMock = vi.hoisted(() => ({
   isAuthenticated: false,
   isVerified: false,
-  register: vi.fn(),
+  register: vi.fn<
+    (payload: { email: string; password: string; displayName: string; inviteCode: string }) => Promise<void>
+  >(),
 }))
 
 vi.mock('@/stores/auth', () => ({
