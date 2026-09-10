@@ -108,7 +108,7 @@ async function openActions(item: TimelineItem) {
   const action = await ui.openActionSheet(item.name, [
     { id: 'view', label: t.value.preview, icon: 'eye' },
     { id: 'download', label: t.value.download, icon: 'download' },
-    { id: 'favorite', label: favorited ? t.value.favorites : t.value.addToFavorites, icon: favorited ? 'star-filled' : 'star' },
+    { id: 'favorite', label: favorited ? t.value.removeFromFavorites : t.value.addToFavorites, icon: favorited ? 'star-filled' : 'star' },
   ])
   if (action === 'view') await openLightbox(item)
   if (action === 'download') await download(item)
