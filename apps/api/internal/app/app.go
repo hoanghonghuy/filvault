@@ -123,6 +123,7 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	engine.GET("/metrics", metrics.Handler)
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
+	authHandlers.RegisterRecoveryRoutes(v1)
 
 	storage := []gin.HandlerFunc{
 		authHandlers.AuthRequired(),
