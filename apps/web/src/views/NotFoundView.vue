@@ -17,6 +17,7 @@ const copy = computed(() => {
       body: 'Liên kết có thể đã cũ hoặc địa chỉ đã được nhập sai. Bạn có thể quay lại nơi an toàn mà không mất thông tin tài khoản.',
       home: 'Về trang chủ',
       files: 'Mở Tệp của tôi',
+      signIn: 'Đăng nhập',
       back: 'Quay lại',
     }
   }
@@ -26,6 +27,7 @@ const copy = computed(() => {
     body: 'The link may be stale or the address may have been mistyped. You can recover safely without exposing account details.',
     home: 'Go home',
     files: 'Open My Files',
+    signIn: 'Sign in',
     back: 'Go back',
   }
 })
@@ -49,7 +51,7 @@ function goBack() {
       <div class="actions">
         <RouterLink v-if="auth.isAuthenticated" to="/" class="btn ink">{{ copy.home }}</RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/files" class="btn ghost">{{ copy.files }}</RouterLink>
-        <RouterLink v-else to="/login" class="btn ink">{{ copy.home }}</RouterLink>
+        <RouterLink v-else to="/login" class="btn ink">{{ copy.signIn }}</RouterLink>
         <button type="button" class="btn ghost" @click="goBack">{{ copy.back }}</button>
       </div>
     </div>
