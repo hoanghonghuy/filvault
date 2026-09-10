@@ -1,6 +1,8 @@
 import type { Locale } from '@/lib/i18n'
 import type { ConfirmOptions } from '@/stores/ui'
 
+const STORAGE_KEY = 'filvault.locale'
+
 const logoutCopy = {
   vi: {
     title: 'Đăng xuất?',
@@ -16,9 +18,22 @@ const logoutCopy = {
   },
 } as const
 
+export function currentLogoutLocale(): Locale {
+  if (typeof localStorage === 'undefined') return 'vi'
+  return localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'vi'
+}
+
 export function logoutConfirmationOptions(locale: Locale): ConfirmOptions {
   return {
     ...logoutCopy[locale],
     danger: true,
   }
+}
+
+export function isLegacyLogoutConfirmation(options: ConfirmOptions): boolean {
+  return (
+    options.title === logoutCopy.en.title &&
+    options.message === logoutCopy.en.message &&
+    options.confirmLabel === logoutCopy.en.confirmLabel
+  )
 }
