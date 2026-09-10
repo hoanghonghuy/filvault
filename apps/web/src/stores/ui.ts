@@ -1,10 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import {
-  currentLogoutLocale,
-  isLegacyLogoutConfirmation,
-  logoutConfirmationOptions,
-} from '@/lib/logoutConfirmation'
+import { useI18n } from '@/lib/i18n'
 
 export type ConfirmOptions = {
   title: string
@@ -37,7 +33,22 @@ type ActionSheetState = {
   items: ActionSheetItem[]
 }
 
+const LEGACY_LOGOUT_CONFIRMATION = {
+  title: 'Log out?',
+  message: 'You will need to sign in again to access your files.',
+  confirmLabel: 'Log out',
+} as const
+
+function isLegacyLogoutConfirmation(options: ConfirmOptions): boolean {
+  return (
+    options.title === LEGACY_LOGOUT_CONFIRMATION.title &&
+    options.message === LEGACY_LOGOUT_CONFIRMATION.message &&
+    options.confirmLabel === LEGACY_LOGOUT_CONFIRMATION.confirmLabel
+  )
+}
+
 export const useUiStore = defineStore('ui', () => {
+  const { t } = useI18n()
   const toastMessage = ref<string | null>(null)
   const toastType = ref<'success' | 'error' | 'info'>('info')
   let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -80,12 +91,20 @@ export const useUiStore = defineStore('ui', () => {
     }, durationMs)
   }
 
+  function logoutConfirmation(): ConfirmOptions {
+    return {
+      title: t.value.logoutConfirmTitle,
+      message: t.value.logoutConfirmMessage,
+      confirmLabel: t.value.logOut,
+      cancelLabel: t.value.cancel,
+      danger: true,
+    }
+  }
+
   function confirm(options: ConfirmOptions): Promise<boolean> {
     return new Promise((resolve) => {
       confirmResolve = resolve
-      const normalizedOptions = isLegacyLogoutConfirmation(options)
-        ? logoutConfirmationOptions(currentLogoutLocale())
-        : options
+      const normalizedOptions = isLegacyLogoutConfirmation(options) ? logoutConfirmation() : options
       confirmState.value = {
         open: true,
         confirmLabel: 'Confirm',
@@ -96,7 +115,7 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function confirmLogout(): Promise<boolean> {
-    return confirm(logoutConfirmationOptions(currentLogoutLocale()))
+    return confirm(logoutConfirmation())
   }
 
   function resolveConfirm(value: boolean) {
