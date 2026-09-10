@@ -50,7 +50,7 @@ afterEach(() => {
 describe('ShareSheet owner operation lifecycle', () => {
   it('tracks the real create promise and suppresses duplicate creates', async () => {
     const pending = deferred()
-    const onCreate = vi.fn(() => pending.promise)
+    const onCreate = vi.fn<(ttl: unknown) => Promise<void>>(() => pending.promise)
     const wrapper = mountSheet({ onCreate })
     const create = wrapper.get('.btn.ink')
 
@@ -75,7 +75,9 @@ describe('ShareSheet owner operation lifecycle', () => {
   })
 
   it('always releases create busy state when a listener rejects', async () => {
-    const onCreate = vi.fn(() => Promise.reject(new Error('handled by parent')))
+    const onCreate = vi.fn<(ttl: unknown) => Promise<void>>(() =>
+      Promise.reject(new Error('handled by parent')),
+    )
     const wrapper = mountSheet({ onCreate })
     const create = wrapper.get('.btn.ink')
 
@@ -92,8 +94,8 @@ describe('ShareSheet owner operation lifecycle', () => {
   it('serializes copy and revoke actions against their real handlers', async () => {
     const copyPending = deferred()
     const revokePending = deferred()
-    const onCopy = vi.fn(() => copyPending.promise)
-    const onRevoke = vi.fn(() => revokePending.promise)
+    const onCopy = vi.fn<(url: unknown) => Promise<void>>(() => copyPending.promise)
+    const onRevoke = vi.fn<() => Promise<void>>(() => revokePending.promise)
     const wrapper = mountSheet({ existing: existingLink, onCopy, onRevoke })
 
     const copy = wrapper.get('button[aria-label="Copy link"]')
@@ -130,7 +132,8 @@ describe('ShareSheet owner operation lifecycle', () => {
   })
 
   it('preserves the TTL roving-radio keyboard contract', async () => {
-    const wrapper = mountSheet({ onCreate: vi.fn() })
+    const onCreate = vi.fn<(ttl: unknown) => void>()
+    const wrapper = mountSheet({ onCreate })
     const radios = wrapper.findAll<HTMLButtonElement>('[role="radio"]')
 
     expect(radios[0]?.attributes('aria-checked')).toBe('true')
