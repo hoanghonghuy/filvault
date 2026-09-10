@@ -196,7 +196,7 @@ onMounted(load)
         type="button"
         class="sub-icon-btn"
         :title="viewMode === 'list' ? t.viewGrid : t.viewList"
-        :aria-label="viewMode === 'list' ? t.viewGrid : t.viewList"
+        :aria-label="t.viewGrid"
         :aria-pressed="viewMode === 'grid'"
         @click="toggleViewMode"
       >
