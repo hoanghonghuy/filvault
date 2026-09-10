@@ -27,6 +27,12 @@ const router = createRouter({
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/vault', name: 'vault', component: () => import('@/views/VaultView.vue'), meta: { auth: true, verified: true } },
     { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
+    {
+      path: '/photos/preview/:id',
+      name: 'photo-preview',
+      component: () => import('@/views/PhotoPreviewView.vue'),
+      meta: { auth: true, verified: true },
+    },
     { path: '/chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
     { path: '/chat/:id', name: 'chat-thread', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
     {
