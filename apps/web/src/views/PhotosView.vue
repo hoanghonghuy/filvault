@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="photo-more-btn"
-              :aria-label="`${t.albumMenu}: ${item.name}`"
+              :aria-label="`${t.moreActions}: ${item.name}`"
               @click="openMediaActions(item)"
             >
               <Icon name="more" :size="18" />
