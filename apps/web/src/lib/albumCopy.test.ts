@@ -13,7 +13,7 @@ describe('albumRuntimeCopy', () => {
     expect(copy.downloadFailed).toBe('Không thể tải xuống')
   })
 
-  it('preserves existing English action semantics', () => {
+  it('preserves English action semantics and clarifies the original file is retained', () => {
     const copy = albumRuntimeCopy('en')
 
     expect(copy.addPhotos).toBe('Add photos')
@@ -22,6 +22,6 @@ describe('albumRuntimeCopy', () => {
     expect(copy.setCover).toBe('Set cover')
     expect(copy.removeCover).toBe('Remove cover')
     expect(copy.removeFromAlbum).toBe('Remove from this album')
-    expect(copy.removeConfirmation('photo.jpg')).toBe('"photo.jpg" will be removed from this album only.')
+    expect(copy.removeConfirmation('photo.jpg')).toBe('"photo.jpg" will be removed from this album only. The original file will remain in your library.')
   })
 })
