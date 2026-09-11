@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '@/lib/i18n'
 import ShareSheet from './ShareSheet.vue'
 
 const BottomSheetStub = {
@@ -33,6 +34,10 @@ function mountSheet(existing: { url: string; expiresAt: string | null; createdAt
 }
 
 describe('ShareSheet', () => {
+  beforeEach(() => {
+    setLocale('en')
+  })
+
   it('uses a truthful copy icon for the copy-link action', () => {
     const wrapper = mountSheet({ url: '/s/token', expiresAt: null, createdAt: new Date().toISOString() })
 
@@ -41,6 +46,25 @@ describe('ShareSheet', () => {
     expect(copy.find('[data-icon="file"]').exists()).toBe(false)
 
     wrapper.unmount()
+  })
+
+  it('reacts to Vietnamese locale in create and existing-link states', async () => {
+    const createWrapper = mountSheet()
+    expect(createWrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Link expiry')
+    expect(createWrapper.text()).toContain('Forever')
+
+    setLocale('vi')
+    await createWrapper.vm.$nextTick()
+    expect(createWrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Thời hạn liên kết')
+    expect(createWrapper.text()).toContain('Vĩnh viễn')
+    expect(createWrapper.text()).toContain('Tạo liên kết')
+    createWrapper.unmount()
+
+    const existingWrapper = mountSheet({ url: '/s/token', expiresAt: null, createdAt: new Date().toISOString() })
+    expect(existingWrapper.text()).toContain('Bất kỳ ai có liên kết này đều có thể xem và tải xuống')
+    expect(existingWrapper.text()).toContain('Không hết hạn')
+    expect(existingWrapper.get('button[aria-label="Sao chép liên kết"]').exists()).toBe(true)
+    existingWrapper.unmount()
   })
 
   it('moves selection with arrows, wraps, and keeps roving tabindex in sync', async () => {

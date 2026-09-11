@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  */
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setLocale } from '@/lib/i18n'
 import ShareSheet from './ShareSheet.vue'
 
 const existingLink = {
@@ -42,6 +43,10 @@ function deferred() {
   })
   return { promise, resolve }
 }
+
+beforeEach(() => {
+  setLocale('en')
+})
 
 afterEach(() => {
   document.body.innerHTML = ''
