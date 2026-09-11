@@ -219,7 +219,15 @@ Conversation personalization is scoped to the conversation. App appearance is gl
 
 Make scope explicit: app appearance mode, app color theme, account/security, and per-feature personalization are different concepts. Global appearance changes go through the canonical theme service.
 
-## 11. PR design/QA gate
+## 11. Entitlements & premium presentation (current policy)
+
+Chưa có mô hình premium / subscription trong product contract hiện tại. UI không được ngụ ý entitlement, tier, quyền lợi trả phí hoặc trạng thái nâng cấp chưa tồn tại.
+
+- **Không** hiển thị badge PRO, crown, premium badge hoặc locked-premium affordance cho tính năng hiện đang khả dụng bình thường.
+- Không tạo fake paywall, fake quota upsell hoặc “coming premium” chỉ để trang trí.
+- Nếu business model premium được phê duyệt sau này, product/spec/security/billing contract phải được taskify và review trước khi thêm presentation vào UI.
+
+## 12. PR design/QA gate
 
 Before merging UI-impacting work, Reviewer + QA + Product Designer should verify the exact current head rather than author summary alone.
 
@@ -237,7 +245,7 @@ Minimum gate:
 
 A new head invalidates prior exact-head gate evidence.
 
-## 12. Known design-system workstreams
+## 13. Known design-system workstreams
 
 This document is the shared contract, not a claim that all implementation is already conformant. Current tracked convergence work includes:
 
