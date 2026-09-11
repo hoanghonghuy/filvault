@@ -13,6 +13,9 @@ export const MIME_CATEGORY_COLORS = {
 
 export type MimeColorCategory = keyof typeof MIME_CATEGORY_COLORS
 
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'avif', 'svg'])
+const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'])
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'])
 const ARCHIVE_EXTENSIONS = new Set(['zip', 'tar', 'gz', 'rar', '7z'])
 const SPREADSHEET_EXTENSIONS = new Set(['xls', 'xlsx', 'csv', 'ods'])
 const DOCUMENT_EXTENSIONS = new Set(['doc', 'docx', 'odt', 'rtf', 'txt', 'md'])
@@ -28,9 +31,9 @@ export function mimeColorCategory(mimeType?: string, name?: string): MimeColorCa
   const mime = mimeType?.toLowerCase() ?? ''
   const ext = extensionFromName(name)
 
-  if (mime.startsWith('image/')) return 'image'
-  if (mime.startsWith('video/')) return 'video'
-  if (mime.startsWith('audio/')) return 'audio'
+  if (mime.startsWith('image/') || IMAGE_EXTENSIONS.has(ext)) return 'image'
+  if (mime.startsWith('video/') || VIDEO_EXTENSIONS.has(ext)) return 'video'
+  if (mime.startsWith('audio/') || AUDIO_EXTENSIONS.has(ext)) return 'audio'
   if (mime.includes('pdf') || ext === 'pdf') return 'pdf'
   if (
     mime.includes('zip') ||
