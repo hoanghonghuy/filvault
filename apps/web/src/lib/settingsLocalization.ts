@@ -13,7 +13,7 @@ export type SettingsLocaleText = {
   linkCopied: string
   copyFailed: string
   revokeConfirmTitle: string
-  revokeConfirmMessage: (fileName: string) => string
+  revokeConfirmMessage: (fileName?: string) => string
   linkRevoked: string
   revokeFailed: string
   expires: (date: string) => string
@@ -37,7 +37,10 @@ const COPY: Record<Locale, SettingsLocaleText> = {
     linkCopied: 'Đã sao chép liên kết',
     copyFailed: 'Không thể sao chép liên kết',
     revokeConfirmTitle: 'Thu hồi liên kết?',
-    revokeConfirmMessage: (fileName) => `“${fileName}” sẽ không còn được chia sẻ công khai.`,
+    revokeConfirmMessage: (fileName) =>
+      fileName
+        ? `“${fileName}” sẽ không còn được chia sẻ công khai.`
+        : 'Mục này sẽ không còn được chia sẻ công khai.',
     linkRevoked: 'Đã thu hồi liên kết',
     revokeFailed: 'Không thể thu hồi liên kết',
     expires: (date) => `Hết hạn ${date}`,
@@ -59,7 +62,10 @@ const COPY: Record<Locale, SettingsLocaleText> = {
     linkCopied: 'Link copied',
     copyFailed: 'Copy failed',
     revokeConfirmTitle: 'Revoke link?',
-    revokeConfirmMessage: (fileName) => `“${fileName}” will no longer be shared publicly.`,
+    revokeConfirmMessage: (fileName) =>
+      fileName
+        ? `“${fileName}” will no longer be shared publicly.`
+        : 'This item will no longer be shared publicly.',
     linkRevoked: 'Link revoked',
     revokeFailed: 'Could not revoke link',
     expires: (date) => `Expires ${date}`,
