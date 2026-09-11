@@ -9,6 +9,7 @@ describe('i18n contract', () => {
   const i18n = readSrc('./i18n.ts')
   const shell = readSrc('../components/AppShell.vue')
   const settings = readSrc('../views/SettingsView.vue')
+  const settingsLocalization = readSrc('./settingsLocalization.ts')
 
   it('provides Vietnamese and English dictionaries', () => {
     expect(i18n).toContain('vi:')
@@ -33,9 +34,11 @@ describe('i18n contract', () => {
     }
   })
 
-  it('exposes a language control in Settings', () => {
-    expect(settings).toContain('Language')
+  it('exposes a localized language control in Settings', () => {
     expect(settings).toMatch(/setLocale\(/)
     expect(settings).toMatch(/filvault.locale/)
+    expect(settings).toContain(':aria-label="settingsText.languageGroup"')
+    expect(settingsLocalization).toContain("languageGroup: 'Ngôn ngữ'")
+    expect(settingsLocalization).toContain("languageGroup: 'Language'")
   })
 })
