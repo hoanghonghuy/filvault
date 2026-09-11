@@ -276,10 +276,10 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .picker-cat-btn.active {
-  background: var(--accent, #0084ff);
-  border-color: var(--accent, #0084ff);
+  background: var(--chat-accent, var(--accent));
+  border-color: var(--chat-accent, var(--accent));
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--chat-accent, var(--accent)) 35%, transparent);
 }
 
 .cat-icon {
@@ -350,7 +350,7 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .picker-item-btn.item-reacted {
-  background: rgba(0, 132, 255, 0.2);
-  box-shadow: inset 0 0 0 1.5px var(--accent, #0084ff);
+  background: color-mix(in srgb, var(--chat-accent, var(--accent)) 20%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--chat-accent, var(--accent));
 }
 </style>
