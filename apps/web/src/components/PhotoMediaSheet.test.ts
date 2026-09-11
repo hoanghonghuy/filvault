@@ -40,7 +40,7 @@ describe('PhotoMediaSheet', () => {
   it('localizes actions and reacts to locale changes without remounting', async () => {
     const wrapper = mountSheet()
 
-    expect(wrapper.text()).toContain('Xem trước')
+    expect(wrapper.text()).toContain('Xem')
     expect(wrapper.text()).toContain('Tải xuống')
     expect(wrapper.text()).toContain('Thêm vào yêu thích')
     expect(wrapper.text()).toContain('Đóng')
@@ -48,7 +48,7 @@ describe('PhotoMediaSheet', () => {
     setLocale('en')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('Preview')
+    expect(wrapper.text()).toContain('View')
     expect(wrapper.text()).toContain('Download')
     expect(wrapper.text()).toContain('Add to favorites')
     expect(wrapper.text()).toContain('Close')
