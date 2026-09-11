@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from '@/lib/i18n'
 
 defineProps<{ mimeType: string; name: string }>()
 
 const emit = defineEmits<{ click: [] }>()
-const { t } = useI18n()
+const { locale } = useI18n()
+const photoLabel = computed(() => (locale.value === 'vi' ? 'Ảnh' : 'Photo'))
 
 const isVideo = (mime: string) => mime.startsWith('video/')
 </script>
@@ -12,7 +14,7 @@ const isVideo = (mime: string) => mime.startsWith('video/')
 <template>
   <button type="button" class="placeholder" :aria-label="name" :title="name" @click="emit('click')">
     <span class="badge" :class="{ video: isVideo(mimeType) }">
-      {{ isVideo(mimeType) ? t.filterTypeVideo : t.navPhotos }}
+      {{ isVideo(mimeType) ? 'Video' : photoLabel }}
     </span>
     <span class="name">{{ name }}</span>
   </button>
