@@ -8,6 +8,7 @@ import Icon from '@/components/AppIcon.vue'
 import OverviewStorageCard from '@/components/OverviewStorageCard.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { overviewCopy } from '@/lib/overviewCopy'
 import {
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
@@ -17,7 +18,8 @@ import type { Browser, BrowserFile, FavoriteFile, Timeline, TimelineGroup } from
 
 const auth = useAuthStore()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const copy = computed(() => overviewCopy(locale.value))
 
 const loading = ref(false)
 const filesError = ref('')
@@ -75,13 +77,13 @@ async function load() {
       files.value = browserResult.value.files
     } else {
       files.value = []
-      filesError.value = formatApiError(browserResult.reason, 'Could not load files')
+      filesError.value = formatApiError(browserResult.reason, copy.value.loadFilesFailed)
     }
     if (timelineResult.status === 'fulfilled') {
       groups.value = timelineResult.value.groups
     } else {
       groups.value = []
-      photosError.value = formatApiError(timelineResult.reason, 'Could not load photos')
+      photosError.value = formatApiError(timelineResult.reason, copy.value.loadPhotosFailed)
     }
     if (favoritesResult.status === 'fulfilled') {
       favorites.value = favoritesResult.value.files
@@ -118,7 +120,7 @@ onMounted(load)
           v-if="searchQuery"
           type="button"
           class="clear-search-btn"
-          aria-label="Xóa tìm kiếm"
+          :aria-label="copy.clearSearchAria"
           @click="searchQuery = ''"
         >
           <Icon name="close" :size="16" />
@@ -129,7 +131,7 @@ onMounted(load)
     <OverviewStorageCard />
 
     <!-- TeraBox-style 8-icon 4-column Category Grid -->
-    <section class="categories-section" aria-label="Danh mục tính năng">
+    <section class="categories-section" :aria-label="copy.featureCategoriesAria">
       <div class="categories-grid">
         <RouterLink
           v-for="item in quickCategories"
@@ -147,7 +149,7 @@ onMounted(load)
 
     <!-- Error recovery if both core sources failed -->
     <div v-if="bothFailed" class="error overview-error" role="alert">
-      <span>Could not load overview. Try again later.</span>
+      <span>{{ copy.loadOverviewFailed }}</span>
       <button
         type="button"
         class="overview-retry"
