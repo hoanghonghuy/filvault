@@ -12,6 +12,8 @@ import {
   type Sticker,
   type StickerCategory,
 } from '@/lib/stickers'
+import { emojiPickerCopy } from '@/lib/emojiPickerCopy'
+import { useI18n } from '@/lib/i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -32,6 +34,8 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const { locale } = useI18n()
+const copy = computed(() => emojiPickerCopy(locale.value))
 const activeType = ref<'emoji' | 'sticker'>('emoji')
 const activeEmojiCategory = ref<EmojiCategory['id']>('popular')
 const activeStickerCategory = ref<StickerCategory['id']>('expressions')
@@ -53,10 +57,10 @@ function handleStickerClick(sticker: Sticker) {
 </script>
 
 <template>
-  <div class="emoji-picker" role="region" aria-label="Bộ chọn biểu tượng cảm xúc và nhãn dán">
+  <div class="emoji-picker" role="region" :aria-label="copy.regionAria">
     <!-- Header with Type Switcher (if stickers enabled) and Close button -->
     <div v-if="showStickers || showClose" class="picker-top-bar">
-      <div v-if="showStickers" class="picker-type-switch" role="tablist" aria-label="Loại biểu tượng">
+      <div v-if="showStickers" class="picker-type-switch" role="tablist" :aria-label="copy.typeAria">
         <button
           type="button"
           class="type-switch-btn"
@@ -65,7 +69,7 @@ function handleStickerClick(sticker: Sticker) {
           :aria-selected="activeType === 'emoji'"
           @click="activeType = 'emoji'"
         >
-          <span>Biểu tượng</span>
+          <span>{{ copy.emojiType }}</span>
         </button>
         <button
           type="button"
@@ -75,7 +79,7 @@ function handleStickerClick(sticker: Sticker) {
           :aria-selected="activeType === 'sticker'"
           @click="activeType = 'sticker'"
         >
-          <span>Nhãn dán</span>
+          <span>{{ copy.stickerType }}</span>
         </button>
       </div>
 
@@ -83,7 +87,7 @@ function handleStickerClick(sticker: Sticker) {
         v-if="showClose"
         type="button"
         class="picker-close-btn"
-        aria-label="Đóng"
+        :aria-label="copy.closeAria"
         @click="emit('close')"
       >
         <AppIcon name="close" :size="16" />
@@ -91,7 +95,7 @@ function handleStickerClick(sticker: Sticker) {
     </div>
 
     <!-- Category Bar for Emojis -->
-    <div v-if="activeType === 'emoji'" class="picker-categories" role="tablist" aria-label="Danh mục biểu tượng">
+    <div v-if="activeType === 'emoji'" class="picker-categories" role="tablist" :aria-label="copy.emojiCategoriesAria">
       <button
         v-for="cat in EMOJI_CATEGORIES"
         :key="cat.id"
@@ -108,7 +112,7 @@ function handleStickerClick(sticker: Sticker) {
     </div>
 
     <!-- Category Bar for Stickers -->
-    <div v-else class="picker-categories" role="tablist" aria-label="Danh mục nhãn dán">
+    <div v-else class="picker-categories" role="tablist" :aria-label="copy.stickerCategoriesAria">
       <button
         v-for="cat in STICKER_CATEGORIES"
         :key="cat.id"
