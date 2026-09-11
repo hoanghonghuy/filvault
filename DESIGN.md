@@ -1,503 +1,250 @@
----
-version: alpha
-name: Filvault-design-system
-description: Light utility UI for personal cloud storage — Cal.com-like white canvas and confident hierarchy, Filvault teal as the single chromatic accent, mobile-first shell with Material 3 navigation and action patterns.
-references:
-  visual: Cal.com DESIGN.md (VoltAgent/awesome-design-md) — canvas, density, radius hierarchy, secondary surfaces
-  interaction: Material Design 3 — bottom navigation, FAB, modal bottom sheets, touch targets
-  product: Google Drive / Photos / Files — file list + photo grid dual surface, simplified top-level tabs
-
-colors:
-  ink: "#111827"
-  body: "#374151"
-  muted: "#6b7280"
-  muted-soft: "#9ca3af"
-  canvas: "#ffffff"
-  surface: "#ffffff"
-  surface-soft: "#f8fafc"
-  surface-card: "#f3f4f6"
-  hairline: "#e5e7eb"
-  hairline-soft: "#f3f4f6"
-  accent: "#0d9488"
-  accent-hover: "#0f766e"
-  accent-soft: "#ccfbf1"
-  danger: "#dc2626"
-  danger-soft: "#fee2e2"
-  warning: "#d97706"
-  success: "#059669"
-  on-accent: "#ffffff"
-  on-ink: "#ffffff"
-  primary-cta: "#111827"
-  primary-cta-hover: "#1f2937"
-  overlay: "rgba(17, 24, 39, 0.45)"
-
-typography:
-  font-display: "Plus Jakarta Sans, system-ui, sans-serif"
-  font-body: "Plus Jakarta Sans, system-ui, sans-serif"
-  font-mono: "ui-monospace, SFMono-Regular, Menlo, monospace"
-  display: 28px / 600 / -0.02em
-  title-lg: 22px / 600 / -0.01em
-  title-md: 18px / 600
-  title-sm: 16px / 600
-  body: 16px / 400 / 1.5
-  body-sm: 14px / 400 / 1.45
-  caption: 12px / 500 / 1.4
-  button: 14px / 600
-
-rounded:
-  sm: 6px
-  md: 8px
-  lg: 12px
-  xl: 16px
-  pill: 9999px
-
-spacing:
-  xxs: 4px
-  xs: 8px
-  sm: 12px
-  md: 16px
-  lg: 24px
-  xl: 32px
-  xxl: 48px
-  shell-pad: 16px
-  content-max: 1100px
-
-touch:
-  min-target: 44px
-  preferred-target: 48px
-  fab-size: 56px
-
-motion:
-  ease-standard: cubic-bezier(0.2, 0, 0, 1)
-  ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1)
-  ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15)
-  duration-short: 100ms
-  duration-medium: 200ms
-  duration-long: 300ms
-
-breakpoints:
-  mobile: 0–767px
-  tablet: 768–1023px
-  desktop: 1024px+
----
-
-# Filvault DESIGN.md
-
-Nguồn sự thật cho **giao diện web Phase 1** (`apps/web`). Agent và người làm UI đọc file này trước khi thêm màn / component.
-
-Tham chiếu visual: [Cal.com DESIGN.md](https://github.com/VoltAgent/awesome-design-md) (canvas trắng, hierarchy rõ, radius có tầng).  
-Tham chiếu interaction: [Material Design 3](https://m3.material.io/) (bottom nav, FAB, bottom sheet).  
-Nghiệp vụ / ràng buộc sản phẩm: [`docs/spec/07-phase-1-business.md`](docs/spec/07-phase-1-business.md).
-
----
-
-## 1. Visual Theme & Atmosphere
-
-Filvault là **personal cloud** (My Files + Photos trên cùng một kho). UI phải đọc như phần mềm tiện ích đáng tin — sáng, gọn, một accent, không marketing hero.
-
-**Tone:** calm utility, confident hierarchy, mobile-first.  
-**Density:** list/file rows hơi dày (Cal.com product fragment feel); Photos grid thoáng hơn.  
-**Motion:** ngắn (100–300ms), chỉ để xác nhận sheet mở/đóng, FAB press, toast, và phản hồi nhấn trên row/ô ảnh — không decorative, không trượt cả trang khi đổi tab.
-
-### Motion tokens (Material 3)
-
-| Token | Value | Dùng cho |
-|-------|-------|----------|
-| `--ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Mọi transition mặc định |
-| `--ease-emphasized-decelerate` | `cubic-bezier(0.05, 0.7, 0.1, 1)` | Sheet/trang đi vào |
-| `--ease-emphasized-accelerate` | `cubic-bezier(0.3, 0, 0.8, 0.15)` | Sheet/trang rời đi |
-| `--duration-short` | `100ms` | Press state, hover màu |
-| `--duration-medium` | `200ms` | Fade, item move, toast ra |
-| `--duration-long` | `300ms` | Sheet slide-up, toast vào |
-
-### Motion tokens Filvault (nhấn/sheet/toast)
-
-| Token | Value | Use |
-|-------|-------|-----|
-| `--motion-press` | 150ms | Nút, FAB, row, ô ảnh |
-| `--motion-enter` | 250ms | Sheet / toast vào màn |
-| `--motion-exit` | 200ms | Sheet / toast ra (nhanh hơn vào) |
-
-Rules:
-- Chỉ animate `transform` + `opacity`; cấm `transition: all`.
-- Vào chậm hơn ra (enter ≥ leave duration) — cảm giác phản hồi nhanh.
-- Press feedback: `.btn` scale 0.97, `.row.tappable` scale 0.98 khi `:active`.
-- Mọi motion phải được vô hiệu hoá bởi global `prefers-reduced-motion` guard trong `main.css`.
-- Route change: `<Transition name="page" mode="out-in">` trong `AppShell` — fade-out 100ms, fade-in + translateY(8px) 200ms.
-- List/grid thay đổi (xóa, move, search): `<TransitionGroup name="row">` — item rời đi scale-fade 100ms, item còn lại trượt vào chỗ (`move`) 200ms.
-- Grid Photos / album list xuất hiện lần đầu: class `.appear` + stagger từ `lib/motion.ts` (`cellDelay`, 30ms/cell, tối đa 240ms).
-- Bottom/side nav: indicator pill trượt bằng `transform: scale` (200ms emphasized-decelerate) — không animate layout.
-- FAB: hover nâng shadow, press scale 0.94 + hạ shadow (100ms).
-- Optimistic UI cho thao tác phá hủy (delete/restore): gỡ row khỏi list **trước** khi gọi API để TransitionGroup chạy move animation; lỗi thì `loadBrowser()`/`load()` rollback kèm error alert. Toast chỉ hiện khi API thành công.
-- Router: luôn có `scrollBehavior` — reset về đầu trang khi điều hướng, khôi phục vị trí khi back/forward (`savedPosition`).
-- Logout và mọi action thoát app phải đi qua confirm sheet.
-- Bottom sheet bắt buộc có focus trap (Tab loop trong panel) + trả focus về trigger khi đóng.
-- Upload: progress bar component (`UploadProgress`, `role="progressbar"` + `aria-live="polite"`), fill animate bằng `transform: scaleX` — không animate `width`. Files hỗ trợ drag & drop với overlay "Drop files to upload".
-- Component dùng `<Transition>`: `BottomSheet`, `ToastHost`.
-
-**Key characteristics**
-- Canvas trắng (`{colors.canvas}`), surface phụ xám rất nhạt (`{colors.surface-soft}` / `{colors.surface-card}`).
-- Một accent chromatic: teal Filvault (`{colors.accent}` — `#0d9488`). Dùng cho FAB, tab active, link hành động, progress storage.
-- Primary destructive / confirm mạnh dùng ink (`{colors.primary-cta}`) hoặc danger — không rainbow.
-- Font: **Plus Jakarta Sans** (display + body). Không Inter / Roboto / Arial / system-only stack.
-- Radius: controls `{rounded.md}` (8px), cards/sheets `{rounded.lg}`–`{rounded.xl}` (12–16px). Không pill CTA hàng loạt.
-- Không dark mode Phase 1. Không purple glow. Không glassmorphism.
-
----
-
-## 2. Color Palette & Roles
-
-| Token | Hex | Role |
-|-------|-----|------|
-| `ink` | `#111827` | Tiêu đề, primary text, CTA đậm (Cal.com-like black button) |
-| `body` | `#374151` | Body copy |
-| `muted` | `#6b7280` | Meta, breadcrumb, placeholder |
-| `canvas` | `#ffffff` | Nền trang / sheet |
-| `surface-soft` | `#f8fafc` | Storage bar, nested bands |
-| `surface-card` | `#f3f4f6` | Empty state bg, inactive chip |
-| `hairline` | `#e5e7eb` | Border 1px |
-| `accent` | `#0d9488` | Brand action: FAB, active nav, focus ring, storage fill |
-| `accent-hover` | `#0f766e` | Hover/press accent |
-| `accent-soft` | `#ccfbf1` | Selected row tint, soft badge |
-| `danger` | `#dc2626` | Delete forever, lỗi |
-| `danger-soft` | `#fee2e2` | Danger button border/bg nhẹ |
-| `overlay` | `rgba(17,24,39,0.45)` | Backdrop bottom sheet / modal |
-
-**Rules**
-- Primary constructive action trên màn Files = **FAB accent** (Upload), không nhân bản nhiều nút primary cùng lúc.
-- Confirm nguy hiểm = danger text + ink secondary “Cancel”.
-- Storage bar fill = accent; ≥90% quota → warning; ≥100% → danger.
-
----
-
-## 3. Typography Rules
-
-Family: **Plus Jakarta Sans** (load via `fonts.google.com` hoặc self-host). Fallback: `system-ui, sans-serif`.
-
-| Role | Size | Weight | Use |
-|------|------|--------|-----|
-| Display / page title | 28px (mobile 24px) | 600 | “My Files”, “Photos” |
-| Title md | 18px | 600 | Section (Albums, date group) |
-| Title sm | 16px | 600 | Sheet title, card title |
-| Body | 16px | 400 | Form, empty copy |
-| Body sm | 14px | 400 | Row meta, helper |
-| Caption | 12px | 500 | Badge, storage numbers |
-| Button | 14px | 600 | Mọi button label |
-
-Letter-spacing display: nhẹ âm (`-0.02em`). Không ALL-CAPS trừ badge kỹ thuật ngắn.
-
----
-
-## 4. Component Stylings
-
-### Auth card (Login / Register / Verify)
-
-Full-screen centered card — **không** bottom nav. Cal.com-like: canvas trắng trên nền `surface-soft`, hierarchy rõ.
-
-**Anatomy**
-```text
-[Brand: mark + “Filvault”]     ← trên card, căn giữa
-┌─────────────────────────┐
-│ Title (h1)              │
-│ Subtitle (muted, 1 câu) │
-│ Form fields (label trên)│
-│ Error alert (nếu có)    │
-│ Primary ink CTA (full)  │
-│ ─────────────────────── │
-│ Footer switch link      │
-└─────────────────────────┘
-```
-
-| Token | Value | Ghi chú |
-|-------|-------|---------|
-| Shell max-width | 420px | §8 responsive |
-| Card padding | 24px (`space-lg`) | |
-| Card radius | 16px (`radius-xl`) | |
-| Field min height | 44px | touch target |
-| CTA | ink `#111827`, full width | §4 Buttons |
-| Error | `danger-soft` bg + border | `role="alert"` |
-| Link switch | accent + underline | hit area ≥44px |
-
-**States:** default, focus (accent ring 2px), disabled/loading (opacity + `aria-busy`), error alert, success notice (verify resend).
-
-**Accessibility:** `aria-labelledby` form ↔ h1; labels luôn visible; autocomplete đúng (`username`, `current-password`, `new-password`, `one-time-code`); không placeholder-only. Màn ngắn: page scroll từ trên, không cắt field đầu.
-
-**Anti-patterns:** không bottom nav; không nhiều CTA primary; không placeholder thay label; không lỗi API raw; không `autocapitalize` invite (mã phân biệt hoa/thường).
-
-Verify: tách state Verifying / Resend — không đổi nhãn cả hai nút cùng lúc.
-
-Component: `AuthCard.vue` + views `LoginView`, `RegisterView`, `VerifyEmailView`.
-
-### Overview (`/`)
-
-Hub sau login. **Không** lặp 4 tab nav (Files/Photos/Trash/Settings đã ở bottom/side). Trash và Settings không phải lối vào chính.
-
-**Anatomy**
-```text
-[Name]                          ← title-lg, ink
-[used of quota]                 ← caption muted (từ users/me)
-┌────────────┐ ┌────────────┐
-│ My Files   │ │ Photos     │   ← 2 destination cards
-│ Browse…    │ │ Timeline…  │
-└────────────┘ └────────────┘
-Recent files              See all
-  rows (hoặc 1 dòng empty + link)
-Recent photos             See all
-  PhotoThumb grid (thumbnailUrl; fallback mime icon — không <img> original)
-```
-
-| Token | Value | Ghi chú |
-|-------|-------|---------|
-| Hero title | 22px mobile / 28px desktop | `displayName` |
-| Cards | 2 cột, radius-lg, border hairline | chỉ Files + Photos |
-| Card min-height | 96px | chạm dễ |
-| Section gap | 32px (`space-xl`) | |
-| Empty | 1 dòng + link accent | không EmptyState lồng card |
-
-**Anti-patterns:** 4 ô trùng bottom nav; card lồng card; empty dashed lớn; FAB trên Overview.
-
-Component: `OverviewView.vue`. Logo F / wordmark → `/`.
-
-### Buttons
-- **Primary ink** (`primary-cta`): dùng cho auth submit, “Save”, confirm không phá hủy. Height ≥44px mobile; radius `{rounded.md}`; text `{on-ink}`.
-- **Primary accent**: hiếm — chỉ khi action mang brand (vd. “Verify”). Prefer FAB cho Upload.
-- **Secondary**: border `{hairline}`, bg canvas, text ink.
-- **Danger**: text/border danger; không fill đỏ đặc trừ “Delete forever” trong sheet.
-- **Ghost / linkish**: text accent hoặc muted; min hit area vẫn 44px.
-
-### Inputs
-- Height ≥44px; padding 12px 14px; border `{hairline}`; focus ring 2px `{accent}` (không outline browser mặc định).
-- Label trên field (`field` stack), không placeholder-only.
-
-### List row (Files / Trash / Search)
-- Full-width tap row: icon/type + name (1 dòng truncate) + meta phụ.
-- Actions **không** xếp 3–4 nút ngang trên mobile → một nút `⋯` mở **Action sheet**.
-- Desktop (≥768): có thể hiện 1–2 action phụ + `⋯`.
-
-### Photo grid
-- `auto-fill`, min cell ~108–120px mobile; gap `{spacing.xs}`–`{spacing.sm}`.
-- Cell = `PhotoThumb`: `thumbnailUrl` khi có (server thumb), không thì icon theo mime — **không** `<img>` original.
-- Tap → sheet: Xem / Tải / Thêm vào album / Xóa (nếu context cho phép).
-
-### Upload progress (Files)
-- Khi đang upload: `LinearProgress` (track hairline 4px, fill accent) + label + % — không chỉ text “Uploading… N%”.
-- `role="progressbar"` + `aria-valuenow` / min / max.
-
-### Bottom sheet / Action sheet
-- Backdrop `{overlay}`; sheet bg canvas; top radius `{rounded.xl}`; drag handle 32×4px muted.
-- Max height ~90vh; safe-area padding đáy.
-- Confirm sheet: title + short body + stacked full-width buttons (primary / cancel / danger).
-
-### FAB
-- Size `{touch.fab-size}` (56px); bg `{accent}`; icon trắng; shadow nhẹ (elevation 1).
-- Chỉ trên **Files** (và có thể Photos nếu upload media — Phase 1: Files là chính).
-- Vị trí: bottom-end, trên bottom nav (~16px + safe-area).
-
-### Toast / snackbar
-- Bottom, trên nav; bg ink; text on-ink; auto-dismiss ~3s; một toast tại một thời điểm.
-
-### Empty state
-- Icon đơn giản + 1 câu + 1 CTA (không illustration phức tạp).
-
-### Storage bar
-- Mobile: track + “used / quota” caption; có thể rút label “Storage”.
-- Reload sau upload / permanent delete.
-
----
-
-## 5. Layout Principles
-
-### Shell
-```text
-Mobile (<768)                         Tablet/Desktop (≥768)
-┌─────────────────────┐               ┌──────┬──────────────────┐
-│ [F] Filvault        │               │ Side │ (no top header)  │
-│     My Files        │               │ nav  │ Storage          │
-│ Storage (compact)   │               │ 4    │ Page title in    │
-│ Main (scroll)       │               │ tabs │ main             │
-│ [FAB]               │               │      │                  │
-│ Bottom nav (4)      │               └──────┴──────────────────┘
-└─────────────────────┘               FAB → toolbar button
-```
-
-Mobile header: mark 32px (ô **F** là nút Home, chạm ≥44px) + tên app caption muted + page title ink + **avatar initials** (phải, chạm ≥44px → `/profile`). Bấm **F** (mobile) hoặc wordmark sidebar (desktop) → `/` Overview. Title Files = “My Files”. Header ẩn ≥768 — title nằm trong view; avatar nằm đáy side nav. Overview **không** thêm tab thứ 5 vào bottom nav.
-
-### Top-level destinations (đúng M3: 3–5, chỉ navigation)
-**Home / Overview** — vào bằng logo (ô F / wordmark), không phải tab.  
-**Profile** — vào bằng avatar (header mobile / side-nav desktop), không phải tab.
-
-Bottom / side nav (4):
-1. **Files** — browser + search + upload  
-2. **Photos** — timeline + albums  
-3. **Trash**  
-4. **Settings** — trash prefs, media preview prefs (không chứa account)
-
-Auth / verify: full-screen card giữa, không bottom nav.
-
-### Spacing
-- Page padding ngang: `{spacing.shell-pad}` (16px) mobile; 24px desktop.
-- Content max-width: `{spacing.content-max}` (1100px) căn giữa.
-- Section gap: `{spacing.lg}`–`{spacing.xl}`.
-- `padding-bottom` main ≥ bottom-nav height + FAB clear + `env(safe-area-inset-bottom)`.
-
-### Breadcrumb (Files)
-- Mobile: `← Parent` hoặc truncate giữa `Root / … / Current`.
-- Desktop: full trail.
-
----
-
-## 6. Depth & Elevation
-
-| Level | Use |
-|-------|-----|
-| 0 | Canvas, list rows flat + hairline |
-| 1 | FAB shadow, sticky header optional |
-| 2 | Bottom sheet / modal |
-| Overlay | Dim behind sheet |
-
-Không multi-layer card stack. Row = border, không drop-shadow hàng loạt.
-
----
-
-## 7. Do's and Don'ts
-
-### Do
-- Mobile-first: thiết kế 375px trước, mở rộng lên.
-- Thay `window.prompt` / `confirm` bằng sheet.
-- Touch target ≥44px (ưu tiên 48px).
-- Photos: `PhotoThumb` + thumbnail URL / mime fallback; xem original qua presign on demand (spec 07).
-- Một việc chính mỗi màn; overflow vào sheet.
-- Báo lỗi API bằng copy ngắn + code ẩn trong detail nếu cần (`QUOTA_EXCEEDED`, `409`).
-
-### Don't
-- Đừng dùng Inter / Roboto / Arial làm font chính.
-- Đừng purple / indigo gradient theme; đừng cream+serif “AI brochure”.
-- Đừng `<img src>` original trong grid Photos.
-- Đừng nhồi >5 item vào bottom nav.
-- Đừng dùng FAB cho navigation.
-- Đừng dark mode Phase 1.
-- Đừng emoji làm icon hệ thống (SVG đơn giản).
-
----
-
-## 8. Responsive Behavior
-
-| Breakpoint | Nav | Upload | Actions |
-|------------|-----|--------|---------|
-| `<768` | Bottom nav | FAB | Action sheet |
-| `768–1023` | Side rail hoặc bottom giữ + wider | Toolbar + optional FAB | Sheet hoặc menu |
-| `≥1024` | Side nav persistent | Toolbar primary | Inline + menu |
-
-- Photo grid: 3 cột hẹp → 4–6 cột rộng.
-- Auth card: max-width 420px, luôn center.
-- Keyboard mở: sheet tránh bị che (visual viewport / padding).
-
----
-
-## 9. Screen map (Phase 1 — đủ API)
-
-| Screen | Must-have UI | API |
-|--------|--------------|-----|
-| Login / Register | Form ink CTA | auth |
-| Verify email | OTP 6 số + resend | verify / resend |
-| Overview (`/`) | Greeting + quota, 2 destination cards (Files/Photos), recent files/photos | me, browser, photos/timeline |
-| Files | Browser, search + filter sheet, create folder, upload (progress bar + drag & drop), rename/move/delete file & folder | browser, folders, files, search |
-| Photos | Timeline (+ load more), albums CRUD, add/remove items, open/download | photos/* |
-| Album detail | Grid + manage | albums/:id, items |
-| Trash | Restore / delete forever (optimistic UI) | trash, restore |
-| Settings | trash prefs, thumbnail prefs | users/me |
-| Profile (`/profile`) | avatar initials, displayName, password, logout | users/me, password |
-
----
-
-## 9a. Surface mới Phase 2 (spec 09)
-
-### FilterSheet (Files search)
-- `BottomSheet` title "Filter"; các nhóm option dạng pill chọn 1: Type (All/Image/Video/Doc/Archive/Folder), Sort (Relevance/Name/Date/Size), Date range (2 input date).
-- Nút "Apply" ink full-width; "Reset" ghost bên trái. State filter sống ở query string (`?q=&type=...`) để share/reload giữ được.
-
-### Album cover
-- Card album: khung ảnh bìa 1:1 radius-lg phía trên tên; trống → icon photos trên `surface-card`.
-- Set/Remove cover nằm trong action sheet item (icon `image` / `restore`), không có nút riêng ngoài grid.
-
-### Share link
-- Action sheet file thêm "Share link" (icon `share`) → `ShareSheet`: chọn hạn (segmented Forever/1h/24h/7d) → tạo → hiển thị URL + nút Copy + "Revoke link" danger.
-- Settings section "Shared links": list tên file + hạn + revoke (confirm trước khi thu hồi).
-
-### Favorites
-- Icon sao: outline khi chưa, fill `warning` (#d97706) khi đã — điểm màu thứ hai duy nhất được phép.
-- Files root: segment "Favorites | All" trên list; Overview ưu tiên section Favorites khi có dữ liệu.
-
-### Public share page
-- Canvas `surface-soft`, card trắng radius-xl max-width 420px giữa màn: brand mark F, tên file (truncate 2 dòng), meta loại · size, nút Download ink full-width, caption "Shared via Filvault".
-- Lỗi (token sai/hết hạn/thu hồi): cùng layout, icon alert, message chung "This link is not available" — không phân biệt nguyên nhân.
-
-### Activity log
-- List trong Settings: icon theo type + targetName (1 dòng truncate) + thời gian tương đối muted; "Load more" pattern như timeline.
-
-### Shared with me (S5)
-- Entry từ Overview: card thứ 3 trong destinations (icon `users`), **không** thêm tab bottom nav.
-- `/shared`: list dòng = icon loại + tên + "by {owner} · {thời gian tương đối}"; file → download qua presign; folder → browse 1 cấp ngay trong trang (nút Back về list). Empty state icon `users` "Nothing shared with you yet".
-- Owner share theo email: action sheet file "Share with user" → sheet input email; email lạ vẫn thành công (toast "Invitation sent").
-
-> **Trạng thái (2026-08-23): toàn bộ surface §9a đã implement** — S1 filter, S2 album cover, S3 favorites, S4 share link + public page, S5 shared-with-me + share user nội bộ, S6 activity log. Chi tiết hợp đồng: spec [09](docs/spec/09-phase-2-features.md), tiến độ [10](docs/spec/10-phase-2-status.md).
-
-### Chat (`/chat` — bare surface, spec 11)
-- **Surface riêng hoàn toàn**: không dùng shell Filvault (không bottom nav/side nav/header/storage bar). Route có `meta: { bare: true }`; `AppShell` bỏ chrome khi route bare. Truy cập trực tiếp bằng URL `/chat`.
-- Layout full-screen kiểu Messenger: rail hội thoại (trái) + thread (giữa) + media panel (phải, ≥1024px).
-- Mobile `<768`: master–detail — hiện rail HOẶC thread, không xếp dọc; nút Back (≥44px) quay lại rail.
-- Rail: header "Chats" + brand mark F (link về `/`) + contact picker tạo direct chat bằng email đã xác minh + list peer (avatar tròn chữ đầu, tên, preview sender, unread badge, ngày muted).
-- Thread: header avatar + peer name + connection state; search pill; incoming bubble bên trái, outgoing bubble bên phải; sender action sheet sửa/gỡ trong 15 phút; hiển thị `Edited`, `Message removed`, pending/failed/retry.
-- Composer: pill "Aa" + attachment queue (preview/remove/cancel/retry) + send ink; gửi text có `clientMessageId` để retry không tạo tin trùng.
-- Media panel/gallery: mọi ảnh/video/file gửi vào direct chat tự động hiện trong shared album của conversation; có entry trên desktop/tablet/mobile, mở từ Chat hoặc Photos theo quyền của hai member.
-- Attachment bị sender Trash/Purge thì hiện unavailable hoặc bị ẩn đồng bộ ở Chat và shared album; không nới quyền download generic của Vault.
-- Realtime: REST write + SSE receive, trạng thái Reconnecting và Latest; hỗ trợ reconnect/backfill, tôn trọng `prefers-reduced-motion`, focus return và live region hẹp.
-- Touch targets ≥44px; focus ring accent 2px; safe-area top/bottom; motion theo token chung.
-
----
-
-## 10. Agent Prompt Guide
-
-Khi generate / sửa UI:
-
-```text
-Follow DESIGN.md (Filvault). Cal.com-like light utility UI, teal accent #0d9488,
-Plus Jakarta Sans, mobile-first bottom nav (Files/Photos/Trash/Settings),
-avatar → Profile (not a 5th tab), FAB upload on Files, bottom sheets instead of prompt/confirm,
-no original <img> in Photos grid, touch targets ≥44px, no purple/dark-mode.
-```
-
-Quick tokens:
-- Accent: `#0d9488`
-- Ink CTA: `#111827`
-- Canvas: `#ffffff`
-- Hairline: `#e5e7eb`
-- Radius control: `8px` · card/sheet: `12–16px`
-- Font: Plus Jakarta Sans
-
----
-
-## 11. Entitlements & premium presentation (current policy)
-
-**Chưa có mô hình premium / subscription.** Cho đến khi có nguồn entitlement thật (API hoặc billing):
-
-- **Không** hiển thị badge PRO, crown, hoặc affordance “khóa” trên profile, theme, hoặc settings.
-- **Không** đánh dấu theme là premium (`isPro`) trong định nghĩa hoặc UI nếu chưa gate hành vi tương ứng.
-- **Không** thêm CTA upgrade, luồng mua giả, hoặc trạng thái “locked” chỉ mang tính trang trí.
-- Tất cả theme trong Theme Center **áp dụng tự do**; Settings và Theme Center phải **nhất quán** (cùng trạng thái free, không PRO).
-
-Khi monetization sẵn sàng: thêm entitlement source, gate theme/affordance theo quyền thật, và cập nhật mục này — không giữ UI premium placeholder.
-
----
-
-## 12. Implementation notes (`apps/web`)
-
-1. Map tokens → CSS variables trong `src/assets/main.css`.
-2. Shell: refactor `AppShell.vue` (bottom nav + desktop side).
-3. Shared: `BottomSheet`, `ActionSheet`, `ConfirmSheet`, `Fab`, `EmptyState`, `Toast`.
-4. Không thêm UI library nặng Phase 1 trừ khi được duyệt — CSS + Vue SFC trước.
-5. Mọi màn mới phải khớp §9 và gap API đã liệt kê trong kế hoạch W1–W6.
-
----
-
-*Chốt hướng visual: **A — Cal.com-like** (2026-08-17).*
+# Filvault Design System
+
+**Status:** current product contract  
+**Applies to:** `apps/web` across mobile, tablet, and desktop  
+**Product/release truth:** [`docs/CURRENT_PRODUCT_STATE.md`](docs/CURRENT_PRODUCT_STATE.md)
+
+This document defines the current UI/UX contract for Filvault. It replaces the former Phase-1-only design snapshot. Historical phase documents remain historical records and must not override this contract or the current product-state handoff.
+
+Filvault is a personal cloud product: files, photos/media, sharing, trash/recovery, personal vault, chat/calls, account/settings, and appearance all belong to one coherent application. External products such as Google Drive, Dropbox, OneDrive, TeraBox, Messenger, and Telegram are pattern references only; do not copy their visual identity.
+
+## 1. Product design principles
+
+1. **Product-first utility.** Core actions must be obvious before decorative polish: browse, upload, organize, preview/download, share, recover, secure, and communicate.
+2. **Mobile-first, not mobile-only.** Mobile optimizes reachability and progressive disclosure; tablet uses available width; desktop adds density, persistent navigation where appropriate, hover/focus affordances, keyboard efficiency, drag/drop, and multi-column layouts when useful.
+3. **Progressive disclosure.** Keep primary surfaces calm. Secondary or destructive actions belong in contextual menus, sheets, drawers, or dialogs rather than competing with the primary task.
+4. **Semantic consistency.** Use shared tokens and shared interaction patterns. Feature-specific brand/color exceptions must be explicit and scoped.
+5. **State completeness.** Every significant surface must account for loading, empty, error, success, disabled, destructive, permission-denied, offline/retry where relevant, progress, duplicate/conflict, overflow, and long content.
+6. **Accessible by default.** Keyboard, focus-visible, touch targets, labels, contrast, reduced motion, and screen-reader states are release criteria, not optional polish.
+7. **Reactive localization.** User-facing copy, errors, dates/times, and ARIA labels follow the active locale. Do not compare behavior against translated display strings; use stable IDs/keys.
+
+## 2. Appearance and themes
+
+Filvault supports three app appearance modes through the canonical `useTheme()` service:
+
+- `system`
+- `light`
+- `dark`
+
+Color theme and appearance mode are independent. Current color themes include default, cyan, teal, sage, sunshine, peach, lavender, pearl, pebble, material, and seasonal spring/summer/autumn/winter variants.
+
+### Rules
+
+- Do not implement a second global dark-mode state inside a feature. All app-level appearance changes go through `useTheme()`.
+- Theme selection may change the accent family, but **must not redefine semantic danger/success/warning meaning**.
+- Dark mode is a first-class supported state. Any statement that Filvault has “no dark mode” is obsolete.
+- Components should consume semantic CSS variables instead of baking a selected theme's hex value into feature CSS.
+- Color alone must not be the only indicator of selected, error, success, destructive, or disabled state.
+
+## 3. Semantic color contract
+
+Prefer semantic variables already exposed by the web app, including the following roles where available:
+
+- `--accent`, `--accent-soft`: app accent and soft selected/hover surfaces.
+- text roles: primary/body/muted equivalents from shared styles.
+- surface roles: page/canvas, card/surface, elevated/soft surface, hairline/border.
+- semantic status roles: danger, warning, success and their soft variants.
+- overlays and focus-visible rings.
+
+### Chat exception
+
+Chat is an intentional scoped brand exception. Use:
+
+- `--chat-accent` for chat-owned accent semantics;
+- `--chat-accent-secondary` / `--chat-surface-tint` where the conversation theme defines them;
+- `var(--accent)` as the app-level fallback when an explicit chat accent is unavailable.
+
+Do not spread raw Messenger blue (`#0084ff`) into shared shell/components. Existing migration work is tracked in #52.
+
+### File/media category colors
+
+MIME/file-category colors are informational category colors, not app accent or semantic status colors. They may remain fixed by category, but duplicated maps should converge on a shared source (#51). Do not route danger/success/warning through MIME colors.
+
+## 4. Typography, spacing, and shape
+
+Use the current shared typography/tokens from app styles. Maintain a clear hierarchy rather than view-local arbitrary sizes.
+
+Recommended hierarchy:
+
+- page/display title: 24–28px, semibold;
+- section title: 18–22px, semibold;
+- component/card title: 16px, semibold;
+- body: 14–16px;
+- metadata/caption: 12–14px.
+
+Spacing follows a small consistent scale based around 4/8/12/16/24/32/48px. Prefer shared spacing variables/classes where present rather than introducing near-duplicate one-off values.
+
+Controls should generally use modest radii; cards/sheets may use larger radii. Pill shapes are appropriate for chips, badges, compact segmented controls, or true pill actions—not as the default shape for every CTA.
+
+## 5. Responsive contract
+
+Use the product's established responsive behavior and keep these intent bands explicit:
+
+### Mobile
+
+- Single primary content column.
+- Reachable primary actions and bottom-sheet/action-sheet disclosure where appropriate.
+- Minimum interactive target: 44px; prefer 48px for primary touch controls.
+- No hover-only information or actions.
+- Long names/content must truncate or wrap intentionally without pushing critical controls off-screen.
+
+### Tablet
+
+- Use horizontal room instead of stretching a phone layout edge-to-edge.
+- Grid/list density may increase.
+- Drawers, split panes, or side-by-side content are allowed when they improve task continuity.
+- Preserve touch usability even when pointer input is present.
+
+### Desktop
+
+- Do not render a scaled-up mobile screen.
+- Use denser lists, persistent navigation/secondary panels where useful, keyboard/focus states, hover affordances, drag-and-drop, context actions, and multi-column layouts where the task benefits.
+- Keep readable content widths for settings/forms rather than stretching text across the viewport.
+
+## 6. Shared component patterns
+
+### Navigation and shell
+
+- Current shell navigation is the product contract; feature pages must not invent competing global navigation.
+- The active destination must be visually and accessibly identifiable.
+- Header actions use semantic accent tokens and must retain focus-visible states.
+
+### Buttons/actions
+
+- One visually dominant constructive action per local decision point whenever possible.
+- Secondary actions use neutral/outlined/ghost treatment.
+- Destructive actions must be explicitly destructive in label, treatment, and confirmation when data loss/revocation is meaningful.
+- Disabled and loading states must prevent duplicate submission/action.
+
+### Forms
+
+- Visible labels; placeholders are not labels.
+- Errors are actionable and localized; do not surface raw API/internal error strings directly.
+- Loading/submitting state exposes disabled/`aria-busy` behavior where appropriate.
+- Preserve autocomplete and password/OTP semantics.
+
+### Modal / dialog / bottom sheet / drawer
+
+- Trap focus when modal.
+- Return focus to the trigger on close where practical.
+- Escape/back behavior must not silently execute destructive work.
+- Mobile may use a sheet where desktop uses a centered dialog or side panel, provided semantics stay equivalent.
+- Destructive confirmation copy states the object/action clearly.
+
+### Lists, grids, and file cards
+
+- List view prioritizes density, metadata, keyboard movement, and bulk selection.
+- Grid view prioritizes recognizability/preview while keeping filename and selection state usable.
+- Selection must not depend on color alone.
+- Context actions must remain discoverable on touch and keyboard, not hover only.
+
+### Upload and progress
+
+- Upload exposes progress and terminal success/failure.
+- Retry/cancel are available when the underlying operation supports them.
+- Desktop drag/drop is additive; file picker remains available.
+- Do not fake completion before durable success is known.
+
+### Empty/loading/error states
+
+- Loading: skeleton/progress when useful; avoid layout jumps.
+- Empty: explain the state and provide the next meaningful action if one exists.
+- Error: explain recovery/retry, not raw implementation details.
+- Partial failure: preserve successfully completed work and identify failed items.
+
+## 7. Core journey review matrix
+
+Any UI-heavy PR should consider the affected portion of this journey:
+
+`onboarding/auth → upload → organize → search → preview/download → share → trash/recovery → settings/account/security`
+
+Also review cross-cutting surfaces when relevant:
+
+- Photos/media preview
+- Personal Vault
+- Chat/calls
+- Theme/appearance
+- Activity/history
+
+For each affected surface, verify:
+
+- mobile / tablet / desktop intent;
+- light / dark appearance;
+- active color themes do not break semantic contrast;
+- loading / empty / error / success / disabled / destructive states;
+- keyboard / focus-visible / touch behavior;
+- localized visible copy and ARIA labels;
+- overflow and long filenames/content.
+
+## 8. Accessibility contract
+
+- Interactive touch targets: minimum 44px unless a platform-native exception is justified.
+- Keyboard users can reach and operate all primary actions.
+- Focus-visible state must remain visible against every supported appearance/theme.
+- Icon-only controls require an accessible name.
+- Form controls require labels and useful error association.
+- Dialog/sheet semantics and focus behavior must be correct.
+- Respect `prefers-reduced-motion`; motion must not be required to understand state.
+- Contrast must be reviewed under light/dark and representative accent themes.
+
+## 9. Motion
+
+Motion confirms state change; it is not decorative spectacle.
+
+- Prefer transform/opacity for short transitions.
+- Avoid `transition: all`.
+- Respect reduced-motion globally.
+- Loading/progress motion must not imply completion prematurely.
+- Optimistic UI must have a deterministic rollback/reconciliation path on failure.
+
+## 10. Feature-specific contracts
+
+### Files / Search
+
+Core actions: upload, create folder, organize, search/filter/sort, preview/download, move/share/trash, bulk selection. Search/filter state should remain understandable when zero results occur because filters—not because the library is empty.
+
+### Sharing
+
+Differentiate “Shared with me” and “My shares” clearly. Public-link copy/revoke/expiry/permission states must be localized, destructive revoke must be explicit, and dates must be locale aware. Current remaining localization work is tracked in #168.
+
+### Personal Vault
+
+Vault actions must communicate the security boundary clearly without implying stronger guarantees than implemented. Move-in/move-out errors must follow active locale; remaining Files→Vault localization is tracked in #160.
+
+### Chat and Calls
+
+Conversation personalization is scoped to the conversation. App appearance is global and uses `useTheme()`. Chat-owned accent styling uses the `--chat-accent` contract. Call controls must retain clear active/muted/disabled/error states and usable touch targets.
+
+### Settings / Theme Center
+
+Make scope explicit: app appearance mode, app color theme, account/security, and per-feature personalization are different concepts. Global appearance changes go through the canonical theme service.
+
+## 11. PR design/QA gate
+
+Before merging UI-impacting work, Reviewer + QA + Product Designer should verify the exact current head rather than author summary alone.
+
+Minimum gate:
+
+- acceptance criteria and product intent met;
+- no material regression in core flow;
+- mobile/tablet/desktop intent reviewed for UI-heavy changes;
+- light/dark/theme contrast considered;
+- loading/empty/error/destructive/permission states considered where relevant;
+- keyboard/focus/touch accessibility considered;
+- localization/date/ARIA impact considered;
+- tests/CI for the scope are green;
+- no unresolved material review finding.
+
+A new head invalidates prior exact-head gate evidence.
+
+## 12. Known design-system workstreams
+
+This document is the shared contract, not a claim that all implementation is already conformant. Current tracked convergence work includes:
+
+- #8 — design-system reconciliation parent;
+- #16 — mixed-language UX across core journeys;
+- #34 — app appearance vs per-chat personalization hierarchy;
+- #51 — centralized MIME/category colors;
+- #52 — semantic Chat accent contract.
+
+When a new inconsistency is feature-specific or too large for the current PR, create/refine a focused issue with testable acceptance criteria instead of hiding it in this document or expanding into a giant PR.
