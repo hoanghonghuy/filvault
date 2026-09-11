@@ -128,7 +128,7 @@ export function formatSettingsRelativeTime(locale: Locale, iso: string, now = Da
   const seconds = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000))
   const formatter = new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: 'auto' })
 
-  if (seconds < 60) return formatter.format(0, 'second')
+  if (seconds < 60) return formatter.format(-seconds, 'second')
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return formatter.format(-minutes, 'minute')
   const hours = Math.round(minutes / 60)
