@@ -8,7 +8,7 @@ export interface VaultMoveCopy {
   confirmSingleMessage: (name: string) => string
   confirmSingleLabel: string
   confirmBatchTitle: (count: number) => string
-  confirmBatchMessage: string
+  confirmBatchMessage: (count: number) => string
   confirmBatchLabel: string
 }
 
@@ -22,7 +22,10 @@ export function vaultMoveCopy(locale: Locale): VaultMoveCopy {
       confirmSingleMessage: (name) => `"${name}" sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.`,
       confirmSingleLabel: 'Chuyển vào kho',
       confirmBatchTitle: (count) => `Chuyển ${count} tệp vào kho cá nhân?`,
-      confirmBatchMessage: 'Các tệp này sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.',
+      confirmBatchMessage: (count) =>
+        count === 1
+          ? 'Tệp này sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.'
+          : 'Các tệp này sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.',
       confirmBatchLabel: 'Chuyển vào kho',
     }
   }
@@ -35,7 +38,10 @@ export function vaultMoveCopy(locale: Locale): VaultMoveCopy {
     confirmSingleMessage: (name) => `"${name}" will be password-protected and hidden from your regular file list.`,
     confirmSingleLabel: 'Move to Vault',
     confirmBatchTitle: (count) => `Move ${count} ${count === 1 ? 'file' : 'files'} to Personal Vault?`,
-    confirmBatchMessage: 'These files will be password-protected and hidden from your regular file list.',
+    confirmBatchMessage: (count) =>
+      count === 1
+        ? 'This file will be password-protected and hidden from your regular file list.'
+        : 'These files will be password-protected and hidden from your regular file list.',
     confirmBatchLabel: 'Move to Vault',
   }
 }
