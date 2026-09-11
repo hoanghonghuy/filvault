@@ -7,7 +7,8 @@ let lockedCount = 0
 </script>
 
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref, useId, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
+import { useI18n } from '@/lib/i18n'
 
 const props = defineProps<{
   open: boolean
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   'after-leave': []
 }>()
 
+const { locale } = useI18n()
+const fallbackDialogLabel = computed(() => (locale.value === 'vi' ? 'Hộp thoại' : 'Dialog'))
 const titleId = useId()
 const panelRef = ref<HTMLElement | null>(null)
 const sheetId = sheetCounter++
@@ -185,7 +188,7 @@ onUnmounted(unlockPage)
           aria-modal="true"
           tabindex="-1"
           :aria-labelledby="title ? titleId : undefined"
-          :aria-label="title ? undefined : 'Dialog'"
+          :aria-label="title ? undefined : fallbackDialogLabel"
           @touchstart="onTouchStart"
           @touchmove="onTouchMove"
           @touchend="onTouchEnd"
