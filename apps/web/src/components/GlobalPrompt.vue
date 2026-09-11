@@ -1,10 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useI18n } from '@/lib/i18n'
+import { sharedDialogCopy } from '@/lib/sharedDialogCopy'
 import { useUiStore } from '@/stores/ui'
 
 const ui = useUiStore()
 const { promptState } = storeToRefs(ui)
+const { locale } = useI18n()
+const copy = computed(() => sharedDialogCopy(locale.value))
+const confirmLabel = computed(() => promptState.value.confirmLabel ?? copy.value.save)
+const cancelLabel = computed(() => promptState.value.cancelLabel ?? copy.value.cancel)
 
 function onSubmit() {
   const value = promptState.value.value.trim()
@@ -28,10 +35,10 @@ function onCancel() {
     </label>
     <div class="actions">
       <button type="button" class="btn block ink" @click="onSubmit">
-        {{ promptState.confirmLabel }}
+        {{ confirmLabel }}
       </button>
       <button type="button" class="btn block ghost" @click="onCancel">
-        {{ promptState.cancelLabel }}
+        {{ cancelLabel }}
       </button>
     </div>
   </BottomSheet>
