@@ -26,6 +26,25 @@ describe('video-focused Photos route contract', () => {
     expect(videoSource).toContain('item.isFavorite = !wasFavorited')
   })
 
+  it('localizes runtime fallback errors for VI and EN without bypassing API error formatting', () => {
+    expect(videoSource).toContain("const { t, locale } = useI18n()")
+    expect(videoSource).toContain("load: 'Không thể tải video'")
+    expect(videoSource).toContain("loadMore: 'Không thể tải thêm video'")
+    expect(videoSource).toContain("view: 'Không thể mở video'")
+    expect(videoSource).toContain("download: 'Không thể tải video xuống'")
+    expect(videoSource).toContain("favorite: 'Không thể cập nhật mục yêu thích'")
+    expect(videoSource).toContain("load: 'Failed to load videos'")
+    expect(videoSource).toContain("loadMore: 'Failed to load more videos'")
+    expect(videoSource).toContain("view: 'View failed'")
+    expect(videoSource).toContain("download: 'Download failed'")
+    expect(videoSource).toContain("favorite: 'Failed to update favorite'")
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.load)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.loadMore)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.view)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.download)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.favorite)')
+  })
+
   it('keeps preview, secondary actions, load-more and responsive density', () => {
     expect(videoSource).toContain('@click="openLightbox(item)"')
     expect(videoSource).toContain('@click="openActions(item)"')
