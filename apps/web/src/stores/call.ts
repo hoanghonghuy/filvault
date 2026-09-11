@@ -11,6 +11,8 @@ import { API_BASE, getAccessToken } from '@/api/client'
 export type CallState = 'idle' | 'incoming' | 'outgoing' | 'connected' | 'ended'
 export type CallConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting'
 
+const MEDIA_REQUIRES_SECURE_CONTEXT = Symbol('media-requires-secure-context')
+
 export interface CallSignalPayload {
   conversationId: string
   senderId: string
@@ -172,7 +174,7 @@ export const useCallStore = defineStore('call', () => {
       const connectUrl = resolveLiveKitUrl(url)
 
       if (typeof navigator !== 'undefined' && !navigator.mediaDevices?.getUserMedia) {
-        throw new Error(runtimeCopy.value.mediaRequiresSecureContext)
+        throw MEDIA_REQUIRES_SECURE_CONTEXT
       }
 
       const r = new Room({
@@ -282,9 +284,8 @@ export const useCallStore = defineStore('call', () => {
       connectionStatus.value = 'connected'
       startTimer()
     } catch (e: unknown) {
-      const err = e as Error
       const msg =
-        err?.message === runtimeCopy.value.mediaRequiresSecureContext
+        e === MEDIA_REQUIRES_SECURE_CONTEXT
           ? runtimeCopy.value.mediaRequiresSecureContext
           : runtimeCopy.value.connectionFailed
       connectionStatus.value = 'idle'
