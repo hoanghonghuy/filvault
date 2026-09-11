@@ -4,6 +4,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { ApiError } from '@/api/client'
+import { setLocale } from '@/lib/i18n'
 import RegisterView from './RegisterView.vue'
 
 const authMock = vi.hoisted(() => ({
@@ -40,6 +42,7 @@ async function fillRegistration(wrapper: ReturnType<typeof mount>, confirmation:
 
 describe('RegisterView password confirmation', () => {
   beforeEach(() => {
+    setLocale('en')
     authMock.isAuthenticated = false
     authMock.isVerified = false
     authMock.register.mockReset()
@@ -95,6 +98,46 @@ describe('RegisterView password confirmation', () => {
 
     expect(wrapper.get('#register-password').attributes('autocomplete')).toBe('new-password')
     expect(wrapper.get('#register-confirm-password').attributes('autocomplete')).toBe('new-password')
+
+    wrapper.unmount()
+  })
+
+  it('reacts to Vietnamese locale and localizes password mismatch feedback', async () => {
+    setLocale('vi')
+    const router = makeRouter()
+    await router.push('/register')
+    await router.isReady()
+    const wrapper = mount(RegisterView, { global: { plugins: [router] } })
+
+    expect(wrapper.get('h1').text()).toBe('Tạo tài khoản')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Tạo tài khoản')
+    expect(wrapper.text()).toContain('Mã mời')
+
+    await fillRegistration(wrapper, 'different-password')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Mật khẩu xác nhận không khớp')
+
+    setLocale('en')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('h1').text()).toBe('Create account')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Create account')
+
+    wrapper.unmount()
+  })
+
+  it('uses localized safe copy for known registration API errors', async () => {
+    setLocale('vi')
+    authMock.register.mockRejectedValueOnce(new ApiError('FORBIDDEN', 'internal invite failure', 403))
+    const router = makeRouter()
+    await router.push('/register')
+    await router.isReady()
+    const wrapper = mount(RegisterView, { global: { plugins: [router] } })
+
+    await fillRegistration(wrapper, 'password-123')
+    await wrapper.get('form').trigger('submit')
+
+    await vi.waitFor(() => expect(wrapper.get('[role="alert"]').text()).toBe('Mã mời không hợp lệ.'))
+    expect(wrapper.text()).not.toContain('internal invite failure')
 
     wrapper.unmount()
   })
