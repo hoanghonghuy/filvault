@@ -12,9 +12,11 @@ describe('settings localization', () => {
     expect(getSettingsText('vi').revokeConfirmTitle).toBe('Thu hồi liên kết?')
     expect(getSettingsText('vi').revokeConfirmMessage('photo.jpg')).toContain('photo.jpg')
     expect(getSettingsText('vi').revokeConfirmMessage('photo.jpg')).toContain('không còn được chia sẻ công khai')
+    expect(getSettingsText('vi').revokeConfirmMessage()).toContain('Mục này')
 
     expect(getSettingsText('en').revokeConfirmTitle).toBe('Revoke link?')
     expect(getSettingsText('en').revokeConfirmMessage('photo.jpg')).toContain('will no longer be shared publicly')
+    expect(getSettingsText('en').revokeConfirmMessage()).toContain('This item')
   })
 
   it('localizes activity labels', () => {
