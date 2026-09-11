@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { mount } from '@vue/test-utils'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { setLocale } from '@/lib/i18n'
