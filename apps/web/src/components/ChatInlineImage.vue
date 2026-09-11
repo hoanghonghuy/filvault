@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { ChatAttachment } from '@/api/types'
 import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 import { normalizePresignedUrl } from '@/api/client'
+import { chatAttachmentCopy } from '@/lib/chatAttachmentCopy'
+import { useI18n } from '@/lib/i18n'
 
 const props = defineProps<{
   attachment: ChatAttachment
@@ -12,6 +14,8 @@ const emit = defineEmits<{
   click: [attachment: ChatAttachment]
 }>()
 
+const { locale } = useI18n()
+const copy = computed(() => chatAttachmentCopy(locale.value))
 const isHeicImage = computed(() => isHeic(props.attachment.name, props.attachment.mimeType))
 const heicUrl = ref<string>('')
 const loading = ref(false)
@@ -48,7 +52,7 @@ onMounted(resolveImage)
     type="button"
     class="inline-image"
     :class="{ 'is-heic': isHeicImage }"
-    :aria-label="`Xem ${attachment.name}`"
+    :aria-label="copy.viewImageAria(attachment.name)"
     @click="emit('click', attachment)"
   >
     <div v-if="loading" class="heic-loading-box" aria-live="polite">
