@@ -24,6 +24,13 @@ describe('call store resilience contract', () => {
     expect(runtimeCopy).toContain("disconnected: 'The call disconnected. Check your network and call again.'")
   })
 
+  it('identifies secure-context failures independently of localized copy', () => {
+    expect(source).toContain("const MEDIA_REQUIRES_SECURE_CONTEXT = Symbol('media-requires-secure-context')")
+    expect(source).toContain('throw MEDIA_REQUIRES_SECURE_CONTEXT')
+    expect(source).toMatch(/e === MEDIA_REQUIRES_SECURE_CONTEXT[\s\S]*?runtimeCopy\.value\.mediaRequiresSecureContext/)
+    expect(source).not.toContain('err?.message === runtimeCopy.value.mediaRequiresSecureContext')
+  })
+
   it('stores mic and camera failures independently and clears each after retry', () => {
     expect(source).toContain('const microphoneError = ref<string | null>(null)')
     expect(source).toContain('const cameraError = ref<string | null>(null)')
