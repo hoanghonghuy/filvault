@@ -13,11 +13,13 @@ import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 import { cellDelay } from '@/lib/motion'
 import { useI18n } from '@/lib/i18n'
+import { photosRuntimeCopy } from '@/lib/photosCopy'
 import type { Album, DownloadURL, Timeline, TimelineItem } from '@/api/types'
 
 const router = useRouter()
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const copy = computed(() => photosRuntimeCopy(locale.value))
 const photosPageRef = ref<HTMLElement | null>(null)
 const timelineTabRef = ref<HTMLButtonElement | null>(null)
 const albumsTabRef = ref<HTMLButtonElement | null>(null)
@@ -70,7 +72,7 @@ async function load() {
     albums.value = list.albums
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load photos')
+    error.value = formatApiError(e, copy.value.loadPhotosFailed)
   } finally {
     loading.value = false
   }
@@ -91,7 +93,7 @@ async function loadMore() {
     groups.value = merged
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load more')
+    error.value = formatApiError(e, copy.value.loadMoreFailed)
   } finally {
     loadingMore.value = false
   }
@@ -106,18 +108,18 @@ async function createAlbum() {
       body: JSON.stringify({ name: newAlbumName.value.trim() }),
     })
     newAlbumName.value = ''
-    ui.showToast('Album created')
+    ui.showToast(copy.value.albumCreated)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to create album')
+    error.value = formatApiError(e, copy.value.createAlbumFailed)
   }
 }
 
 async function openAlbumActions(album: Album) {
   const action = await ui.openActionSheet(album.name, [
-    { id: 'open', label: 'Open', icon: 'arrow-right' },
-    { id: 'rename', label: 'Rename', icon: 'pencil' },
-    { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
+    { id: 'open', label: copy.value.openAlbum, icon: 'arrow-right' },
+    { id: 'rename', label: copy.value.renameAlbum, icon: 'pencil' },
+    { id: 'delete', label: copy.value.deleteAlbum, icon: 'trash', danger: true },
   ])
   if (!action) return
   if (action === 'open') await router.push(`/photos/albums/${album.id}`)
@@ -134,14 +136,14 @@ async function renameAlbum(album: Album) {
     ui.showToast(t.value.renameAlbum)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, 'Rename failed')
+    error.value = formatApiError(e, copy.value.renameFailed)
   }
 }
 
 async function deleteAlbum(id: string, name: string) {
   const ok = await ui.confirm({
     title: `${t.value.deleteAlbum}?`,
-    message: `"${name}" ${t.value.deleteAlbumConfirm}`,
+    message: `\"${name}\" ${t.value.deleteAlbumConfirm}`,
     confirmLabel: t.value.deleteAlbum,
     danger: true,
   })
@@ -149,10 +151,10 @@ async function deleteAlbum(id: string, name: string) {
   error.value = ''
   try {
     await api(`/photos/albums/${id}`, { method: 'DELETE' })
-    ui.showToast('Album deleted')
+    ui.showToast(copy.value.albumDeleted)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, copy.value.deleteFailed)
   }
 }
 
@@ -169,14 +171,14 @@ async function toggleFavorite(item: TimelineItem) {
   try {
     if (wasFavorited) {
       await api(`/files/${item.id}/favorite`, { method: 'DELETE' })
-      ui.showToast(`Removed "${item.name}" from favorites`)
+      ui.showToast(copy.value.removeFavorite(item.name))
     } else {
       await api(`/files/${item.id}/favorite`, { method: 'PUT' })
-      ui.showToast(`Added "${item.name}" to favorites`)
+      ui.showToast(copy.value.addFavorite(item.name))
     }
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to update favorite')
+    error.value = formatApiError(e, copy.value.favoriteFailed)
   }
 }
 
@@ -203,7 +205,7 @@ async function openLightbox(item: TimelineItem) {
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'View failed')
+    error.value = formatApiError(e, copy.value.viewFailed)
   }
 }
 
@@ -248,7 +250,7 @@ async function downloadMedia() {
     const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, 'Download failed')
+    error.value = formatApiError(e, copy.value.downloadFailed)
   }
 }
 
@@ -275,7 +277,7 @@ onBeforeUnmount(() => {
       aria-live="polite"
     >
       <span class="pull-icon" :class="{ spin: isRefreshing }" aria-hidden="true">{{ isRefreshing ? '↻' : '↓' }}</span>
-      <span class="sr-only">{{ isRefreshing ? t.loading : 'Pull to refresh photos' }}</span>
+      <span class="sr-only">{{ isRefreshing ? t.loading : copy.pullToRefreshPhotos }}</span>
     </div>
 
     <h1 class="page-title desktop-only">{{ t.photosTitle }}</h1>
@@ -283,7 +285,7 @@ onBeforeUnmount(() => {
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
 
     <div class="tabs-header">
-      <div class="tabs-pill-list" role="tablist" aria-label="Photos views" @keydown="handleTabKeydown">
+      <div class="tabs-pill-list" role="tablist" :aria-label="copy.photosViewsAria" @keydown="handleTabKeydown">
         <button
           id="photos-tab-timeline"
           ref="timelineTabRef"
