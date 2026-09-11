@@ -122,8 +122,8 @@ onMounted(() => {
   height: 28px;
   flex: 0 0 28px;
   border-radius: 50%;
-  background: var(--accent-soft, rgba(0, 132, 255, 0.12));
-  color: var(--accent, #0084ff);
+  background: var(--accent-soft);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
