@@ -41,12 +41,15 @@ describe('media lightbox contract', () => {
     expect(photos).toMatch(/async function handleSheetAfterLeave\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
   })
 
-  it('keeps album secondary actions contextual and destructive removal last', () => {
-    expect(album).not.toMatch(/label: 'View'/)
-    expect(album).toMatch(/label: 'Download'/)
-    expect(album).toMatch(/label: 'Remove from this album'/)
+  it('keeps album secondary actions contextual, locale-safe and destructive removal last', () => {
+    expect(album).not.toMatch(/id: 'view'/)
+    expect(album).toMatch(/id: 'download', label: copy\.value\.download/)
+    expect(album).toMatch(/id: 'set-cover', label: copy\.value\.setCover/)
+    expect(album).toMatch(/id: 'unset-cover', label: copy\.value\.removeCover/)
+    expect(album).toMatch(/id: 'remove', label: copy\.value\.removeFromAlbum, icon: 'trash', danger: true/)
     expect(album).toMatch(/action === 'set-cover'/)
     expect(album).toMatch(/action === 'unset-cover'/)
     expect(album).toMatch(/action === 'remove'/)
+    expect(album.indexOf("id: 'remove'")).toBeGreaterThan(album.indexOf("id: 'set-cover'"))
   })
 })
