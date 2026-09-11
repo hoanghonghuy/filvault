@@ -13,7 +13,7 @@ import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
 const loading = ref(false)
@@ -22,6 +22,24 @@ const error = ref('')
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
 const mediaItem = ref<TimelineItem | null>(null)
+
+const errorCopy = computed(() =>
+  locale.value === 'vi'
+    ? {
+        load: 'Không thể tải video',
+        loadMore: 'Không thể tải thêm video',
+        view: 'Không thể mở video',
+        download: 'Không thể tải video xuống',
+        favorite: 'Không thể cập nhật mục yêu thích',
+      }
+    : {
+        load: 'Failed to load videos',
+        loadMore: 'Failed to load more videos',
+        view: 'View failed',
+        download: 'Download failed',
+        favorite: 'Failed to update favorite',
+      },
+)
 
 async function loadVideoTimeline(before?: string) {
   const params = new URLSearchParams({ type: 'video' })
@@ -37,7 +55,7 @@ async function load() {
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load videos')
+    error.value = formatApiError(e, errorCopy.value.load)
   } finally {
     loading.value = false
   }
@@ -58,7 +76,7 @@ async function loadMore() {
     groups.value = merged
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load more videos')
+    error.value = formatApiError(e, errorCopy.value.loadMore)
   } finally {
     loadingMore.value = false
   }
@@ -72,7 +90,7 @@ async function openLightbox(item: TimelineItem) {
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'View failed')
+    error.value = formatApiError(e, errorCopy.value.view)
   }
 }
 
@@ -82,7 +100,7 @@ async function download(item: TimelineItem) {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, 'Download failed')
+    error.value = formatApiError(e, errorCopy.value.download)
   }
 }
 
@@ -93,7 +111,7 @@ async function toggleFavorite(item: TimelineItem) {
     await api(`/files/${item.id}/favorite`, { method: wasFavorited ? 'DELETE' : 'PUT' })
     item.isFavorite = !wasFavorited
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to update favorite')
+    error.value = formatApiError(e, errorCopy.value.favorite)
   }
 }
 
