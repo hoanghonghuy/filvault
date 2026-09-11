@@ -13,6 +13,9 @@ describe('mimeColors', () => {
   })
 
   it('falls back to filename extension when MIME data is missing or generic', () => {
+    expect(mimeColorCategory(undefined, 'photo.HEIC')).toBe('image')
+    expect(mimeColorCategory('', 'clip.webm')).toBe('video')
+    expect(mimeColorCategory('application/octet-stream', 'voice.m4a')).toBe('audio')
     expect(mimeColorCategory(undefined, 'report.pdf')).toBe('pdf')
     expect(mimeColorCategory('', 'budget.xlsx')).toBe('spreadsheet')
     expect(mimeColorCategory('application/octet-stream', 'notes.docx')).toBe('document')
