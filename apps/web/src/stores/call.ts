@@ -4,10 +4,14 @@ import { Room, RoomEvent, type RemoteParticipant } from 'livekit-client'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { callAudio } from '@/lib/callAudio'
+import { getCallRuntimeCopy } from '@/lib/callRuntimeCopy'
+import { useI18n } from '@/lib/i18n'
 import { API_BASE, getAccessToken } from '@/api/client'
 
 export type CallState = 'idle' | 'incoming' | 'outgoing' | 'connected' | 'ended'
 export type CallConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting'
+
+const MEDIA_REQUIRES_SECURE_CONTEXT = Symbol('media-requires-secure-context')
 
 export interface CallSignalPayload {
   conversationId: string
@@ -37,6 +41,8 @@ export function resolveLiveKitUrl(rawUrl: string): string {
 export const useCallStore = defineStore('call', () => {
   const auth = useAuthStore()
   const ui = useUiStore()
+  const { locale } = useI18n()
+  const runtimeCopy = computed(() => getCallRuntimeCopy(locale.value))
   const state = ref<CallState>('idle')
   const connectionStatus = ref<CallConnectionStatus>('idle')
   const conversationId = ref<string | null>(null)
@@ -168,9 +174,7 @@ export const useCallStore = defineStore('call', () => {
       const connectUrl = resolveLiveKitUrl(url)
 
       if (typeof navigator !== 'undefined' && !navigator.mediaDevices?.getUserMedia) {
-        throw new Error(
-          'Micro/Camera yêu cầu HTTPS hoặc localhost. Nếu dùng qua IP LAN, hãy bật cờ chrome://flags/#unsafely-treat-insecure-origin-as-secure.',
-        )
+        throw MEDIA_REQUIRES_SECURE_CONTEXT
       }
 
       const r = new Room({
@@ -192,7 +196,7 @@ export const useCallStore = defineStore('call', () => {
         participants.value.delete(p.identity)
         participants.value = new Map(participants.value)
         if (state.value === 'connected' && participants.value.size === 0) {
-          ui.showToast('Đối phương đã rời cuộc gọi', 'info')
+          ui.showToast(runtimeCopy.value.peerLeft, 'info')
           void endCall(false)
         }
       })
@@ -208,15 +212,15 @@ export const useCallStore = defineStore('call', () => {
       r.on(RoomEvent.Reconnecting, () => {
         if (state.value !== 'connected') return
         connectionStatus.value = 'reconnecting'
-        error.value = 'Kết nối cuộc gọi không ổn định. Đang thử kết nối lại.'
-        ui.showToast('Đang kết nối lại cuộc gọi…', 'info')
+        error.value = runtimeCopy.value.reconnecting
+        ui.showToast(runtimeCopy.value.reconnecting, 'info')
       })
 
       r.on(RoomEvent.Reconnected, () => {
         if (state.value !== 'connected') return
         connectionStatus.value = 'connected'
         error.value = null
-        ui.showToast('Đã kết nối lại cuộc gọi', 'success')
+        ui.showToast(runtimeCopy.value.reconnected, 'success')
       })
 
       r.on(RoomEvent.Disconnected, () => {
@@ -226,7 +230,7 @@ export const useCallStore = defineStore('call', () => {
           return
         }
         if (state.value === 'connected') {
-          const message = 'Mất kết nối cuộc gọi. Hãy kiểm tra mạng và gọi lại.'
+          const message = runtimeCopy.value.disconnected
           error.value = message
           ui.showToast(message, 'error')
         }
@@ -259,7 +263,7 @@ export const useCallStore = defineStore('call', () => {
         microphoneError.value = null
       } catch {
         isMicEnabled.value = false
-        microphoneError.value = 'Không thể bật micro. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
+        microphoneError.value = runtimeCopy.value.microphoneFailed
         ui.showToast(microphoneError.value, 'error')
       }
 
@@ -270,7 +274,7 @@ export const useCallStore = defineStore('call', () => {
           cameraError.value = null
         } catch {
           isCamEnabled.value = false
-          cameraError.value = 'Không thể bật camera. Hãy kiểm tra quyền truy cập; cuộc gọi vẫn tiếp tục bằng thoại.'
+          cameraError.value = runtimeCopy.value.cameraFailed
           ui.showToast(cameraError.value, 'info')
         }
       }
@@ -280,8 +284,10 @@ export const useCallStore = defineStore('call', () => {
       connectionStatus.value = 'connected'
       startTimer()
     } catch (e: unknown) {
-      const err = e as Error
-      const msg = err?.message || 'Lỗi kết nối cuộc gọi'
+      const msg =
+        e === MEDIA_REQUIRES_SECURE_CONTEXT
+          ? runtimeCopy.value.mediaRequiresSecureContext
+          : runtimeCopy.value.connectionFailed
       connectionStatus.value = 'idle'
       error.value = msg
       ui.showToast(msg, 'error')
@@ -304,7 +310,7 @@ export const useCallStore = defineStore('call', () => {
 
     outgoingRingTimer = window.setTimeout(() => {
       if (state.value === 'outgoing') {
-        ui.showToast('Người nhận không trả lời', 'info')
+        ui.showToast(runtimeCopy.value.unanswered, 'info')
         void endCall(true)
       }
     }, 45000)
@@ -369,7 +375,7 @@ export const useCallStore = defineStore('call', () => {
       case 'decline':
         if (conversationId.value === payload.conversationId) {
           if (state.value === 'outgoing') {
-            ui.showToast('Người nhận đã từ chối cuộc gọi', 'info')
+            ui.showToast(runtimeCopy.value.declined, 'info')
           }
           void endCall(false)
         }
@@ -378,9 +384,9 @@ export const useCallStore = defineStore('call', () => {
       case 'end':
         if (conversationId.value === payload.conversationId) {
           if (state.value === 'incoming') {
-            ui.showToast('Người gọi đã hủy cuộc gọi', 'info')
+            ui.showToast(runtimeCopy.value.callerCancelled, 'info')
           } else if (state.value === 'connected') {
-            ui.showToast('Cuộc gọi đã kết thúc', 'info')
+            ui.showToast(runtimeCopy.value.ended, 'info')
           }
           void endCall(false)
         }
@@ -437,7 +443,7 @@ export const useCallStore = defineStore('call', () => {
         isMicEnabled.value = next
         microphoneError.value = null
       } catch {
-        microphoneError.value = 'Không thể thay đổi micro. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
+        microphoneError.value = runtimeCopy.value.microphoneToggleFailed
         ui.showToast(microphoneError.value, 'error')
       }
     } else {
@@ -453,7 +459,7 @@ export const useCallStore = defineStore('call', () => {
         isCamEnabled.value = next
         cameraError.value = null
       } catch {
-        cameraError.value = 'Không thể thay đổi camera. Hãy kiểm tra quyền truy cập thiết bị rồi thử lại.'
+        cameraError.value = runtimeCopy.value.cameraToggleFailed
         ui.showToast(cameraError.value, 'error')
       }
     } else {
