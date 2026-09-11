@@ -60,7 +60,7 @@ const copy: Record<Locale, AlbumRuntimeCopy> = {
     setCoverFailed: 'Failed to set cover',
     coverReset: 'Cover reset to automatic',
     removeCoverFailed: 'Failed to remove cover',
-    removeConfirmation: (name) => `"${name}" will be removed from this album only.`,
+    removeConfirmation: (name) => `"${name}" will be removed from this album only. The original file will remain in your library.`,
     removeFailed: 'Remove failed',
     viewFailed: 'View failed',
     downloadFailed: 'Download failed',
