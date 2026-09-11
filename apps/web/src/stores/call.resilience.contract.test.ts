@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(fileURLToPath(new URL('./call.ts', import.meta.url)), 'utf-8')
+const runtimeCopy = readFileSync(fileURLToPath(new URL('../lib/callRuntimeCopy.ts', import.meta.url)), 'utf-8')
 
 describe('call store resilience contract', () => {
   it('tracks LiveKit reconnect transitions without tearing down a transient call', () => {
@@ -18,15 +19,19 @@ describe('call store resilience contract', () => {
     expect(source).toContain('const intentionalDisconnectRooms = new WeakSet<Room>()')
     expect(source).toContain('intentionalDisconnectRooms.add(activeRoom)')
     expect(source).toMatch(/RoomEvent\.Disconnected[\s\S]*?intentionalDisconnectRooms\.has\(r\)/)
-    expect(source).toContain('Mất kết nối cuộc gọi. Hãy kiểm tra mạng và gọi lại.')
+    expect(source).toContain('const message = runtimeCopy.value.disconnected')
+    expect(runtimeCopy).toContain("disconnected: 'Mất kết nối cuộc gọi. Hãy kiểm tra mạng và gọi lại.'")
+    expect(runtimeCopy).toContain("disconnected: 'The call disconnected. Check your network and call again.'")
   })
 
   it('stores mic and camera failures independently and clears each after retry', () => {
     expect(source).toContain('const microphoneError = ref<string | null>(null)')
     expect(source).toContain('const cameraError = ref<string | null>(null)')
     expect(source).toContain('const deviceError = computed(() => microphoneError.value ?? cameraError.value)')
-    expect(source).toMatch(/setMicrophoneEnabled\(next\)[\s\S]*?microphoneError\.value = null[\s\S]*?Không thể thay đổi micro/)
-    expect(source).toMatch(/setCameraEnabled\(next\)[\s\S]*?cameraError\.value = null[\s\S]*?Không thể thay đổi camera/)
+    expect(source).toMatch(/setMicrophoneEnabled\(next\)[\s\S]*?microphoneError\.value = null[\s\S]*?microphoneError\.value = runtimeCopy\.value\.microphoneToggleFailed/)
+    expect(source).toMatch(/setCameraEnabled\(next\)[\s\S]*?cameraError\.value = null[\s\S]*?cameraError\.value = runtimeCopy\.value\.cameraToggleFailed/)
+    expect(runtimeCopy).toContain("microphoneToggleFailed: 'Không thể thay đổi micro")
+    expect(runtimeCopy).toContain("cameraToggleFailed: 'Không thể thay đổi camera")
     expect(source).toMatch(/return \{[\s\S]*?connectionStatus,[\s\S]*?deviceError,/)
   })
 })
