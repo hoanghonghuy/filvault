@@ -4,10 +4,68 @@ import { RouterLink, useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { api, ApiError } from '@/api/client'
+import { useI18n } from '@/lib/i18n'
 
 const router = useRouter()
+const { locale } = useI18n()
 
 type Phase = 'request' | 'reset'
+
+const copy = computed(() =>
+  locale.value === 'en'
+    ? {
+        requestTitle: 'Reset your password',
+        resetTitle: 'Enter your reset token',
+        requestSubtitle: 'Enter your account email to request a password reset.',
+        resetSubtitle: 'Paste the reset token from your email, then choose a new password.',
+        email: 'Email',
+        requestFailed: 'Could not request a password reset. Check your connection and try again.',
+        sending: 'Sending…',
+        send: 'Send reset instructions',
+        haveToken: 'I already have a reset token',
+        sentPrefix: 'If an account exists for',
+        sentSuffix: ', reset instructions were sent.',
+        token: 'Reset token',
+        newPassword: 'New password',
+        passwordHint: 'Use at least 8 characters.',
+        confirmPassword: 'Confirm new password',
+        tooShort: 'Use at least 8 characters for your new password.',
+        mismatch: 'Passwords do not match.',
+        invalidToken: 'This reset token is invalid or expired. Request a new one and try again.',
+        resetFailed: 'Could not reset your password. Check your connection and try again.',
+        resetting: 'Resetting…',
+        reset: 'Reset password',
+        requestNew: 'Request a new reset token',
+        remembered: 'Remembered your password?',
+        back: 'Back to sign in',
+      }
+    : {
+        requestTitle: 'Đặt lại mật khẩu',
+        resetTitle: 'Nhập mã đặt lại mật khẩu',
+        requestSubtitle: 'Nhập email tài khoản để yêu cầu đặt lại mật khẩu.',
+        resetSubtitle: 'Dán mã đặt lại từ email rồi chọn mật khẩu mới.',
+        email: 'Email',
+        requestFailed: 'Không thể gửi yêu cầu đặt lại mật khẩu. Hãy kiểm tra kết nối và thử lại.',
+        sending: 'Đang gửi…',
+        send: 'Gửi hướng dẫn đặt lại',
+        haveToken: 'Tôi đã có mã đặt lại mật khẩu',
+        sentPrefix: 'Nếu tồn tại tài khoản với email',
+        sentSuffix: ', hướng dẫn đặt lại đã được gửi.',
+        token: 'Mã đặt lại',
+        newPassword: 'Mật khẩu mới',
+        passwordHint: 'Sử dụng ít nhất 8 ký tự.',
+        confirmPassword: 'Xác nhận mật khẩu mới',
+        tooShort: 'Hãy sử dụng ít nhất 8 ký tự cho mật khẩu mới.',
+        mismatch: 'Mật khẩu xác nhận không khớp.',
+        invalidToken: 'Mã đặt lại không hợp lệ hoặc đã hết hạn. Hãy yêu cầu mã mới và thử lại.',
+        resetFailed: 'Không thể đặt lại mật khẩu. Hãy kiểm tra kết nối và thử lại.',
+        resetting: 'Đang đặt lại…',
+        reset: 'Đặt lại mật khẩu',
+        requestNew: 'Yêu cầu mã đặt lại mới',
+        remembered: 'Đã nhớ mật khẩu?',
+        back: 'Quay lại đăng nhập',
+      },
+)
 
 const phase = ref<Phase>('request')
 const email = ref('')
@@ -41,7 +99,7 @@ async function requestReset() {
     requestComplete.value = true
     phase.value = 'reset'
   } catch {
-    error.value = 'Could not request a password reset. Check your connection and try again.'
+    error.value = copy.value.requestFailed
   } finally {
     requestLoading.value = false
   }
@@ -52,11 +110,11 @@ async function resetPassword() {
   error.value = ''
 
   if (newPassword.value.length < 8) {
-    error.value = 'Use at least 8 characters for your new password.'
+    error.value = copy.value.tooShort
     return
   }
   if (newPassword.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match.'
+    error.value = copy.value.mismatch
     return
   }
 
@@ -73,9 +131,9 @@ async function resetPassword() {
     await router.replace({ name: 'login', query: { reset: 'success' } })
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 400) {
-      error.value = 'This reset token is invalid or expired. Request a new one and try again.'
+      error.value = copy.value.invalidToken
     } else {
-      error.value = 'Could not reset your password. Check your connection and try again.'
+      error.value = copy.value.resetFailed
     }
   } finally {
     resetLoading.value = false
@@ -99,12 +157,8 @@ function startOver() {
 
 <template>
   <AuthCard
-    :title="phase === 'request' ? 'Reset your password' : 'Enter your reset token'"
-    :subtitle="
-      phase === 'request'
-        ? 'Enter your account email to request a password reset.'
-        : 'Paste the reset token from your email, then choose a new password.'
-    "
+    :title="phase === 'request' ? copy.requestTitle : copy.resetTitle"
+    :subtitle="phase === 'request' ? copy.requestSubtitle : copy.resetSubtitle"
   >
     <template #default="{ titleId }">
       <form
@@ -114,7 +168,7 @@ function startOver() {
         @submit.prevent="requestReset"
       >
         <label class="field">
-          <span class="field-label">Email</span>
+          <span class="field-label">{{ copy.email }}</span>
           <input
             id="recovery-email"
             v-model="email"
@@ -138,11 +192,11 @@ function startOver() {
           :disabled="requestDisabled"
           :aria-busy="requestLoading"
         >
-          {{ requestLoading ? 'Sending…' : 'Send reset instructions' }}
+          {{ requestLoading ? copy.sending : copy.send }}
         </button>
 
         <button type="button" class="token-ready-btn" @click="enterResetPhase">
-          I already have a reset token
+          {{ copy.haveToken }}
         </button>
       </form>
 
@@ -153,11 +207,11 @@ function startOver() {
         @submit.prevent="resetPassword"
       >
         <div v-if="requestComplete" class="privacy-status" role="status">
-          If an account exists for <strong>{{ email.trim() }}</strong>, reset instructions were sent.
+          {{ copy.sentPrefix }} <strong>{{ email.trim() }}</strong>{{ copy.sentSuffix }}
         </div>
 
         <label class="field">
-          <span class="field-label">Reset token</span>
+          <span class="field-label">{{ copy.token }}</span>
           <input
             id="recovery-token"
             v-model="token"
@@ -173,7 +227,7 @@ function startOver() {
         </label>
 
         <div class="field">
-          <label class="field-label" for="recovery-password">New password</label>
+          <label class="field-label" for="recovery-password">{{ copy.newPassword }}</label>
           <PasswordInput
             id="recovery-password"
             v-model="newPassword"
@@ -185,11 +239,11 @@ function startOver() {
             :aria-invalid="Boolean(error)"
             :aria-describedby="error ? 'password-recovery-error' : 'password-recovery-requirement'"
           />
-          <p id="password-recovery-requirement" class="password-requirement">Use at least 8 characters.</p>
+          <p id="password-recovery-requirement" class="password-requirement">{{ copy.passwordHint }}</p>
         </div>
 
         <div class="field">
-          <label class="field-label" for="recovery-confirm-password">Confirm new password</label>
+          <label class="field-label" for="recovery-confirm-password">{{ copy.confirmPassword }}</label>
           <PasswordInput
             id="recovery-confirm-password"
             v-model="confirmPassword"
@@ -211,19 +265,19 @@ function startOver() {
           :disabled="resetDisabled"
           :aria-busy="resetLoading"
         >
-          {{ resetLoading ? 'Resetting…' : 'Reset password' }}
+          {{ resetLoading ? copy.resetting : copy.reset }}
         </button>
 
         <button type="button" class="token-ready-btn" :disabled="resetLoading" @click="startOver">
-          Request a new reset token
+          {{ copy.requestNew }}
         </button>
       </form>
     </template>
 
     <template #footer>
       <p class="auth-switch">
-        Remembered your password?
-        <RouterLink class="link-accent" to="/login">Back to sign in</RouterLink>
+        {{ copy.remembered }}
+        <RouterLink class="link-accent" to="/login">{{ copy.back }}</RouterLink>
       </p>
     </template>
   </AuthCard>
