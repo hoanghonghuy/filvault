@@ -56,8 +56,6 @@ export const useUiStore = defineStore('ui', () => {
   const confirmState = ref<ConfirmState>({
     open: false,
     title: '',
-    confirmLabel: 'Confirm',
-    cancelLabel: 'Cancel',
   })
   let confirmResolve: ((value: boolean) => void) | null = null
 
@@ -66,8 +64,6 @@ export const useUiStore = defineStore('ui', () => {
     title: '',
     label: '',
     value: '',
-    confirmLabel: 'Save',
-    cancelLabel: 'Cancel',
   })
   let promptResolve: ((value: string | null) => void) | null = null
 
@@ -107,8 +103,6 @@ export const useUiStore = defineStore('ui', () => {
       const normalizedOptions = isLegacyLogoutConfirmation(options) ? logoutConfirmation() : options
       confirmState.value = {
         open: true,
-        confirmLabel: 'Confirm',
-        cancelLabel: 'Cancel',
         ...normalizedOptions,
       }
     })
@@ -132,8 +126,8 @@ export const useUiStore = defineStore('ui', () => {
         title: options.title,
         label: options.label ?? '',
         value: options.initialValue ?? '',
-        confirmLabel: options.confirmLabel ?? 'Save',
-        cancelLabel: options.cancelLabel ?? 'Cancel',
+        confirmLabel: options.confirmLabel,
+        cancelLabel: options.cancelLabel,
       }
     })
   }
