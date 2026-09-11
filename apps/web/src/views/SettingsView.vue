@@ -10,6 +10,12 @@ import { userInitials } from '@/lib/userInitials'
 import type { ActivityEvent, ActivityEventType, ShareLinkInfo, User } from '@/api/types'
 import { setLocale, useI18n, type Locale } from '@/lib/i18n'
 import {
+  formatSettingsDate,
+  formatSettingsRelativeTime,
+  getSettingsText,
+  settingsActivityLabel,
+} from '@/lib/settingsLocalization'
+import {
   buildPreviewPatchBody,
   buildTrashPatchBody,
   hasUnsavedExplicitSettings,
@@ -26,6 +32,7 @@ import { useStorageUsage } from '@/lib/useStorageUsage'
 const auth = useAuthStore()
 const ui = useUiStore()
 const { locale, t } = useI18n()
+const settingsText = computed(() => getSettingsText(locale.value))
 const { appearanceMode, currentColorTheme, resolvedIsDark, applyColorTheme, setAppearanceMode } = useTheme()
 const fallbackTheme = THEMES[0] as ThemeDef
 const currentThemeDef = computed<ThemeDef>(
@@ -190,9 +197,9 @@ onBeforeRouteLeave(async () => confirmDiscardUnsavedSettings())
 async function logout() {
   if (!(await confirmDiscardUnsavedSettings())) return
   const ok = await ui.confirm({
-    title: 'Log out?',
-    message: 'You will need to sign in again to access your files.',
-    confirmLabel: 'Log out',
+    title: t.value.logoutConfirmTitle,
+    message: t.value.logoutConfirmMessage,
+    confirmLabel: t.value.logOut,
   })
   if (!ok) return
   await auth.logout()
@@ -217,28 +224,33 @@ async function loadShareLinks() {
 async function copyLink(link: ShareLinkInfo) {
   try {
     await navigator.clipboard.writeText(window.location.origin + (link.url ?? ''))
-    ui.showToast('Link copied')
+    ui.showToast(settingsText.value.linkCopied)
   } catch {
-    ui.showToast('Copy failed', 'info')
+    ui.showToast(settingsText.value.copyFailed, 'info')
   }
 }
 
 async function revokeFromSettings(link: ShareLinkInfo) {
   const ok = await ui.confirm({
-    title: 'Revoke link?',
-    message: `"${link.fileName}" will no longer be shared publicly.`,
-    confirmLabel: 'Revoke link',
+    title: settingsText.value.revokeConfirmTitle,
+    message: settingsText.value.revokeConfirmMessage(link.fileName),
+    confirmLabel: settingsText.value.revokeLink,
     danger: true,
   })
   if (!ok) return
   error.value = ''
   try {
     await api(`/files/${link.fileId}/share`, { method: 'DELETE' })
-    ui.showToast('Link revoked')
+    ui.showToast(settingsText.value.linkRevoked)
     await loadShareLinks()
   } catch (e) {
-    error.value = formatApiError(e, 'Could not revoke link')
+    error.value = formatApiError(e, settingsText.value.revokeFailed)
   }
+}
+
+function shareExpiryLabel(link: ShareLinkInfo): string {
+  if (!link.expiresAt) return settingsText.value.neverExpires
+  return settingsText.value.expires(formatSettingsDate(locale.value, link.expiresAt))
 }
 
 const activityEvents = ref<ActivityEvent[]>([])
@@ -275,7 +287,7 @@ async function loadMoreActivity() {
     activityEvents.value.push(...page.events)
     activityNextBefore.value = page.nextBefore
   } catch {
-    ui.showToast('Could not load more activity', 'info')
+    ui.showToast(settingsText.value.activityLoadMoreFailed, 'info')
   } finally {
     activityLoadingMore.value = false
   }
@@ -301,42 +313,11 @@ function activityIcon(type: ActivityEventType): string {
 }
 
 function activityLabel(type: ActivityEventType): string {
-  switch (type) {
-    case 'file.uploaded':
-      return 'Uploaded'
-    case 'file.trashed':
-      return 'Moved to trash'
-    case 'file.restored':
-      return 'Restored'
-    case 'file.purged':
-      return 'Permanently deleted'
-    case 'folder.trashed':
-      return 'Folder moved to trash'
-    case 'folder.restored':
-      return 'Folder restored'
-    case 'share.created':
-      return 'Share created'
-    case 'share.revoked':
-      return 'Share revoked'
-    case 'password.changed':
-      return 'Password changed'
-    case 'settings.changed':
-      return 'Settings updated'
-    default:
-      return type
-  }
+  return settingsActivityLabel(locale.value, type)
 }
 
 function relativeTime(iso: string): string {
-  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  if (days < 30) return `${days}d ago`
-  return new Date(iso).toLocaleDateString()
+  return formatSettingsRelativeTime(locale.value, iso)
 }
 
 onMounted(() => {
@@ -358,14 +339,14 @@ onMounted(() => {
           <img
             v-if="auth.user?.avatarUrl"
             :src="auth.user.avatarUrl"
-            :alt="auth.user.displayName || 'Avatar'"
+            :alt="auth.user.displayName || settingsText.avatar"
             class="profile-avatar-img"
           />
           <span v-else class="profile-avatar-initials">{{ avatarInitials }}</span>
         </div>
         <div class="profile-meta">
           <div class="profile-name-row">
-            <h2 class="profile-name">{{ auth.user?.displayName || auth.user?.email || 'Người dùng Filvault' }}</h2>
+            <h2 class="profile-name">{{ auth.user?.displayName || auth.user?.email || settingsText.fallbackUser }}</h2>
           </div>
           <p class="profile-email muted">{{ auth.user?.email }}</p>
         </div>
@@ -497,7 +478,7 @@ onMounted(() => {
               : t.appearanceModeLightHint
         }}
       </p>
-      <div class="language-row" aria-label="Language">
+      <div class="language-row" :aria-label="settingsText.languageGroup">
         <button
           type="button"
           class="btn"
@@ -538,7 +519,7 @@ onMounted(() => {
       </RouterLink>
 
       <!-- Quick Swatches Grid (balanced 6 columns, no clipping) -->
-      <div class="quick-swatches-grid" role="radiogroup" aria-label="Quick themes">
+      <div class="quick-swatches-grid" role="radiogroup" :aria-label="settingsText.quickThemesGroup">
         <button
           v-for="th in THEMES.slice(0, 6)"
           :key="th.id"
@@ -621,21 +602,20 @@ onMounted(() => {
     </section>
 
     <section class="card section">
-      <h2 class="section-title">Shared links</h2>
-      <p v-if="linksLoading" class="muted">Loading…</p>
-      <p v-else-if="shareLinks.length === 0" class="muted">No active share links.</p>
+      <h2 class="section-title">{{ settingsText.sharedLinks }}</h2>
+      <p v-if="linksLoading" class="muted">{{ t.loading }}</p>
+      <p v-else-if="shareLinks.length === 0" class="muted">{{ settingsText.noActiveShareLinks }}</p>
       <ul v-else class="link-list">
         <li v-for="link in shareLinks" :key="link.id" class="link-row">
           <Icon name="share" :size="18" class="row-icon" />
           <span class="link-name">{{ link.fileName }}</span>
           <span class="link-meta muted">
-            {{ link.expiresAt ? `Expires ${new Date(link.expiresAt).toLocaleDateString()}` : 'Never expires' }}
-            · {{ formatBytes(link.sizeBytes ?? 0) }}
+            {{ shareExpiryLabel(link) }} · {{ formatBytes(link.sizeBytes ?? 0) }}
           </span>
-          <button type="button" class="btn icon-only" aria-label="Copy link" @click="copyLink(link)">
+          <button type="button" class="btn icon-only" :aria-label="settingsText.copyLink" @click="copyLink(link)">
             <Icon name="file" :size="18" />
           </button>
-          <button type="button" class="btn icon-only danger-text" aria-label="Revoke link" @click="revokeFromSettings(link)">
+          <button type="button" class="btn icon-only danger-text" :aria-label="settingsText.revokeLink" @click="revokeFromSettings(link)">
             <Icon name="trash" :size="18" />
           </button>
         </li>
@@ -643,13 +623,13 @@ onMounted(() => {
     </section>
 
     <section class="card section">
-      <h2 class="section-title">Activity</h2>
-      <p v-if="activityLoading" class="muted">Loading…</p>
+      <h2 class="section-title">{{ settingsText.activity }}</h2>
+      <p v-if="activityLoading" class="muted">{{ t.loading }}</p>
       <p v-else-if="activityError" class="muted">
-        Could not load activity.
-        <button type="button" class="btn retry-btn" @click="loadActivity">Retry</button>
+        {{ settingsText.activityLoadFailed }}
+        <button type="button" class="btn retry-btn" @click="loadActivity">{{ t.retry }}</button>
       </p>
-      <p v-else-if="activityEvents.length === 0" class="muted">No recent activity.</p>
+      <p v-else-if="activityEvents.length === 0" class="muted">{{ settingsText.noRecentActivity }}</p>
       <ul v-else class="activity-list">
         <li v-for="ev in activityEvents" :key="ev.id" class="activity-row">
           <span class="activity-icon" aria-hidden="true">
@@ -669,12 +649,12 @@ onMounted(() => {
         :disabled="activityLoadingMore"
         @click="loadMoreActivity"
       >
-        {{ activityLoadingMore ? 'Loading…' : 'Load more' }}
+        {{ activityLoadingMore ? t.loading : t.loadMore }}
       </button>
     </section>
 
     <section class="card section">
-      <button class="btn danger block" type="button" @click="logout">Log out</button>
+      <button class="btn danger block" type="button" @click="logout">{{ t.logOut }}</button>
     </section>
   </div>
 </template>
