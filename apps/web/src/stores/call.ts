@@ -283,7 +283,10 @@ export const useCallStore = defineStore('call', () => {
       startTimer()
     } catch (e: unknown) {
       const err = e as Error
-      const msg = err?.message || runtimeCopy.value.connectionFailed
+      const msg =
+        err?.message === runtimeCopy.value.mediaRequiresSecureContext
+          ? runtimeCopy.value.mediaRequiresSecureContext
+          : runtimeCopy.value.connectionFailed
       connectionStatus.value = 'idle'
       error.value = msg
       ui.showToast(msg, 'error')
