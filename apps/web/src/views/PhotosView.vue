@@ -143,7 +143,7 @@ async function renameAlbum(album: Album) {
 async function deleteAlbum(id: string, name: string) {
   const ok = await ui.confirm({
     title: `${t.value.deleteAlbum}?`,
-    message: `\"${name}\" ${t.value.deleteAlbumConfirm}`,
+    message: `"${name}" ${t.value.deleteAlbumConfirm}`,
     confirmLabel: t.value.deleteAlbum,
     danger: true,
   })
