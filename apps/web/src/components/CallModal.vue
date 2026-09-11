@@ -481,7 +481,7 @@ onUnmounted(() => {
   position: absolute;
   inset: -14px;
   border-radius: 50%;
-  border: 2px solid #0084ff;
+  border: 2px solid var(--chat-accent, var(--accent));
   opacity: 0.8;
   animation: ripple 1.8s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -492,7 +492,7 @@ onUnmounted(() => {
 
 .caller-avatar-pulse.outgoing::before,
 .caller-avatar-pulse.outgoing::after {
-  border-color: #3b82f6;
+  border-color: var(--chat-accent, var(--accent));
 }
 
 @keyframes ripple {
@@ -510,7 +510,11 @@ onUnmounted(() => {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
+  background: linear-gradient(
+    135deg,
+    var(--chat-accent, var(--accent)) 0%,
+    color-mix(in srgb, var(--chat-accent, var(--accent)) 72%, white) 100%
+  );
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -518,7 +522,7 @@ onUnmounted(() => {
   font-size: 32px;
   font-weight: 700;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 132, 255, 0.3);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--chat-accent, var(--accent)) 30%, transparent);
 }
 
 .avatar-img {
@@ -531,7 +535,7 @@ onUnmounted(() => {
   width: 120px;
   height: 120px;
   font-size: 48px;
-  box-shadow: 0 12px 32px rgba(0, 132, 255, 0.4);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--chat-accent, var(--accent)) 40%, transparent);
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   margin-bottom: 16px;
 }
