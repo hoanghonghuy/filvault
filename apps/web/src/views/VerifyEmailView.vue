@@ -3,11 +3,57 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthCard from '@/components/AuthCard.vue'
 import { formatAuthError } from '@/api/errors'
+import { useI18n } from '@/lib/i18n'
 import { useResendCooldown } from '@/lib/useResendCooldown'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { locale } = useI18n()
+
+const copy = computed(() =>
+  locale.value === 'en'
+    ? {
+        title: 'Verify email',
+        subtitlePrefix: 'Enter the 6-digit code sent to',
+        emailFallback: 'your email',
+        code: 'Verification code',
+        codeHint: 'Code expires in 15 minutes.',
+        verifying: 'Verifying…',
+        verify: 'Verify email',
+        sending: 'Sending…',
+        resend: 'Resend code',
+        resendIn: (seconds: number) => `Resend in ${seconds}s`,
+        cooldown: (seconds: number) =>
+          `You can request another code in ${seconds} seconds. You can still verify the current code now.`,
+        sent: 'A new code was sent. It expires in 15 minutes.',
+        resendFailed: 'Could not resend code. Try again.',
+        invalidCode: 'Invalid or expired code. Try again.',
+        wrongEmail: 'Wrong email? You can sign out of this unverified session and register again.',
+        switching: 'Switching…',
+        differentEmail: 'Use a different email',
+      }
+    : {
+        title: 'Xác minh email',
+        subtitlePrefix: 'Nhập mã 6 chữ số đã được gửi tới',
+        emailFallback: 'email của bạn',
+        code: 'Mã xác minh',
+        codeHint: 'Mã sẽ hết hạn sau 15 phút.',
+        verifying: 'Đang xác minh…',
+        verify: 'Xác minh email',
+        sending: 'Đang gửi…',
+        resend: 'Gửi lại mã',
+        resendIn: (seconds: number) => `Gửi lại sau ${seconds} giây`,
+        cooldown: (seconds: number) =>
+          `Bạn có thể yêu cầu mã khác sau ${seconds} giây. Bạn vẫn có thể xác minh mã hiện tại ngay bây giờ.`,
+        sent: 'Mã mới đã được gửi và sẽ hết hạn sau 15 phút.',
+        resendFailed: 'Không thể gửi lại mã. Hãy thử lại.',
+        invalidCode: 'Mã không hợp lệ hoặc đã hết hạn. Hãy thử lại.',
+        wrongEmail: 'Sai email? Bạn có thể đăng xuất khỏi phiên chưa xác minh này và đăng ký lại.',
+        switching: 'Đang chuyển…',
+        differentEmail: 'Dùng email khác',
+      },
+)
 
 onMounted(() => {
   if (auth.isAuthenticated && auth.isVerified) {
@@ -26,10 +72,13 @@ const { remainingSeconds, active: resendCooldownActive, start: startResendCooldo
 const requestBusy = computed(() => verifying.value || resending.value || switchingEmail.value)
 const resendDisabled = computed(() => requestBusy.value || resendCooldownActive.value)
 const resendLabel = computed(() => {
-  if (resending.value) return 'Sending…'
-  if (resendCooldownActive.value) return `Resend in ${remainingSeconds.value}s`
-  return 'Resend code'
+  if (resending.value) return copy.value.sending
+  if (resendCooldownActive.value) return copy.value.resendIn(remainingSeconds.value)
+  return copy.value.resend
 })
+const subtitle = computed(
+  () => `${copy.value.subtitlePrefix} ${auth.user?.email ?? copy.value.emailFallback}.`,
+)
 
 function onCodeInput(event: Event) {
   const input = event.target as HTMLInputElement
@@ -43,10 +92,10 @@ async function resend() {
   resending.value = true
   try {
     await auth.resendVerification(auth.user.email)
-    message.value = 'A new code was sent. It expires in 15 minutes.'
+    message.value = copy.value.sent
     startResendCooldown()
   } catch (e) {
-    error.value = formatAuthError(e, 'Could not resend code. Try again.')
+    error.value = formatAuthError(e, copy.value.resendFailed)
   } finally {
     resending.value = false
   }
@@ -61,7 +110,7 @@ async function submit() {
     await auth.verifyEmail(auth.user.email, code.value)
     await router.replace('/')
   } catch (e) {
-    error.value = formatAuthError(e, 'Invalid or expired code. Try again.')
+    error.value = formatAuthError(e, copy.value.invalidCode)
   } finally {
     verifying.value = false
   }
@@ -78,11 +127,11 @@ async function useDifferentEmail() {
 </script>
 
 <template>
-  <AuthCard title="Verify email" :subtitle="`Enter the 6-digit code sent to ${auth.user?.email ?? 'your email'}.`">
+  <AuthCard :title="copy.title" :subtitle="subtitle">
     <template #default="{ titleId }">
       <form :aria-labelledby="titleId" :aria-describedby="error ? 'auth-error' : undefined" @submit.prevent="submit">
         <label class="field">
-          <span class="field-label">Verification code</span>
+          <span class="field-label">{{ copy.code }}</span>
           <input
             id="verify-code"
             class="auth-otp"
@@ -99,7 +148,7 @@ async function useDifferentEmail() {
             :aria-invalid="error ? true : undefined"
             @input="onCodeInput"
           />
-          <span class="field-hint">Code expires in 15 minutes.</span>
+          <span class="field-hint">{{ copy.codeHint }}</span>
         </label>
 
         <output v-if="message" class="auth-notice" role="status" aria-live="polite">{{ message }}</output>
@@ -107,7 +156,7 @@ async function useDifferentEmail() {
 
         <div class="auth-actions">
           <button class="btn ink block" type="submit" :disabled="requestBusy" :aria-busy="verifying">
-            {{ verifying ? 'Verifying…' : 'Verify email' }}
+            {{ verifying ? copy.verifying : copy.verify }}
           </button>
           <button
             class="btn block"
@@ -120,12 +169,12 @@ async function useDifferentEmail() {
             {{ resendLabel }}
           </button>
           <span v-if="resendCooldownActive" id="resend-cooldown-status" class="field-hint">
-            You can request another code in {{ remainingSeconds }} seconds. You can still verify the current code now.
+            {{ copy.cooldown(remainingSeconds) }}
           </span>
         </div>
 
         <div class="auth-recovery">
-          <p class="field-hint">Wrong email? You can sign out of this unverified session and register again.</p>
+          <p class="field-hint">{{ copy.wrongEmail }}</p>
           <button
             class="btn block ghost"
             type="button"
@@ -133,7 +182,7 @@ async function useDifferentEmail() {
             :aria-busy="switchingEmail"
             @click="useDifferentEmail"
           >
-            {{ switchingEmail ? 'Switching…' : 'Use a different email' }}
+            {{ switchingEmail ? copy.switching : copy.differentEmail }}
           </button>
         </div>
       </form>
