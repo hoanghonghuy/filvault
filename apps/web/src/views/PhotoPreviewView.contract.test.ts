@@ -12,12 +12,31 @@ describe('photo deep-link contract', () => {
     expect(preview).toContain('api<DownloadURL>(`/files/${encodeURIComponent(id)}/download`)')
   })
 
-  it('allows only ready image or video media and fails without raw API detail', () => {
+  it('allows only ready image or video media and keeps error state locale-reactive', () => {
     expect(preview).toContain("file.status === 'READY'")
     expect(preview).toContain("file.mimeType.startsWith('image/')")
     expect(preview).toContain("file.mimeType.startsWith('video/')")
-    expect(preview).toContain('This photo or video is unavailable.')
+    expect(preview).toContain("error.value = 'unavailable'")
+    expect(preview).toContain("error.value = 'unsupported'")
+    expect(preview).toContain("locale.value === 'vi'")
+    expect(preview).toContain("unavailable: 'Ảnh hoặc video này hiện không khả dụng.'")
+    expect(preview).toContain("unavailable: 'This photo or video is unavailable.'")
+    expect(preview).toContain("unsupported: 'Mục này không thể xem trước trong Ảnh.'")
+    expect(preview).toContain("unsupported: 'This item cannot be previewed in Photos.'")
     expect(preview).not.toContain('formatApiError')
+  })
+
+  it('localizes loading, recovery and navigation copy in VI and EN', () => {
+    expect(preview).toContain("photos: 'Ảnh'")
+    expect(preview).toContain("photos: 'Photos'")
+    expect(preview).toContain("loading: 'Đang tải bản xem trước…'")
+    expect(preview).toContain("loading: 'Loading preview…'")
+    expect(preview).toContain("unavailableTitle: 'Không thể xem trước'")
+    expect(preview).toContain("unavailableTitle: 'Preview unavailable'")
+    expect(preview).toContain("openPhotos: 'Mở Ảnh'")
+    expect(preview).toContain("openPhotos: 'Open Photos'")
+    expect(preview).toContain('{{ copy.loading }}')
+    expect(preview).toContain('{{ errorMessage }}')
   })
 
   it('returns to a usable Photos surface when preview closes', () => {
