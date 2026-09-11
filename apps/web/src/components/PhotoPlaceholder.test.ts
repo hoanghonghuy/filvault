@@ -9,7 +9,7 @@ afterEach(() => {
 })
 
 describe('PhotoPlaceholder', () => {
-  it('reactively localizes image and video badges', async () => {
+  it('reactively localizes the photo badge while preserving concise video wording', async () => {
     setLocale('vi')
     const image = mount(PhotoPlaceholder, { props: { mimeType: 'image/jpeg', name: 'photo.jpg' } })
     const video = mount(PhotoPlaceholder, { props: { mimeType: 'video/mp4', name: 'clip.mp4' } })
@@ -20,8 +20,8 @@ describe('PhotoPlaceholder', () => {
     setLocale('en')
     await nextTick()
 
-    expect(image.find('.badge').text()).toBe('Photos')
-    expect(video.find('.badge').text()).toBe('Videos')
+    expect(image.find('.badge').text()).toBe('Photo')
+    expect(video.find('.badge').text()).toBe('Video')
 
     image.unmount()
     video.unmount()
