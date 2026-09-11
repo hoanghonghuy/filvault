@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
+import { profileAvatarCopy } from '@/lib/profileAvatarCopy'
 import { isHeic, convertHeicBlobToJpeg, checkIsHeicBlob } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
@@ -14,6 +15,7 @@ import type { User } from '@/api/types'
 const auth = useAuthStore()
 const ui = useUiStore()
 const { t, locale } = useI18n()
+const avatarCopy = computed(() => profileAvatarCopy(locale.value))
 
 const displayName = ref(auth.user?.displayName ?? '')
 const currentPassword = ref('')
@@ -66,11 +68,11 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
     /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name) ||
     isHeic(file.name, file.type)
   if (!isImage) {
-    throw new Error('Vui lòng chọn file hình ảnh (JPG, PNG, WebP, HEIC)')
+    throw new Error(avatarCopy.value.invalidType)
   }
 
   if (file.size > 25 * 1024 * 1024) {
-    throw new Error('Kích thước ảnh quá lớn (tối đa 25MB)')
+    throw new Error(avatarCopy.value.tooLarge)
   }
 
   let sourceBlob: Blob = file
@@ -80,7 +82,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
       sourceBlob = await convertHeicBlobToJpeg(file, 0.9)
     } catch (err) {
       console.error('HEIC conversion failed:', err)
-      throw new Error('Không thể giải mã file ảnh HEIC. Vui lòng chọn ảnh JPG, PNG hoặc thử lại.')
+      throw new Error(avatarCopy.value.heicDecodeFailed)
     }
   }
 
@@ -91,11 +93,11 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
     } catch {
       // Fallback to FileReader if createObjectURL fails
       const reader = new FileReader()
-      reader.onerror = () => reject(new Error('Không thể đọc file ảnh từ thiết bị'))
+      reader.onerror = () => reject(new Error(avatarCopy.value.readFailed))
       reader.onload = () => {
         const result = reader.result
         if (typeof result !== 'string' || !result) {
-          reject(new Error('Dữ liệu ảnh không hợp lệ'))
+          reject(new Error(avatarCopy.value.invalidData))
           return
         }
         loadImageAndCompress(result, null)
@@ -115,7 +117,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
         let width = img.naturalWidth || img.width
         let height = img.naturalHeight || img.height
         if (!width || !height) {
-          reject(new Error('Không thể xác định kích thước ảnh'))
+          reject(new Error(avatarCopy.value.dimensionsFailed))
           return
         }
 
@@ -136,7 +138,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
         canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) {
-          reject(new Error('Không thể xử lý đồ họa ảnh'))
+          reject(new Error(avatarCopy.value.graphicsFailed))
           return
         }
 
@@ -169,7 +171,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
         if (urlToRevoke) {
           URL.revokeObjectURL(urlToRevoke)
         }
-        reject(new Error('Không thể giải mã định dạng ảnh này. Vui lòng chọn ảnh JPG, PNG hoặc WebP.'))
+        reject(new Error(avatarCopy.value.decodeFailed))
       }
 
       img.src = src
@@ -186,15 +188,15 @@ async function handleAvatarSelected(e: Event) {
   try {
     const dataUrl = await compressImage(file, 256)
     if (!dataUrl) {
-      throw new Error('Không thể xử lý ảnh')
+      throw new Error(avatarCopy.value.processFailed)
     }
     await auth.updateAvatar(dataUrl)
-    ui.showToast('Đã cập nhật ảnh đại diện', 'success')
+    ui.showToast(avatarCopy.value.uploadSuccess, 'success')
   } catch (err) {
     const message =
       err instanceof ApiError
-        ? formatApiError(err, 'Không thể tải ảnh lên')
-        : (err as Error)?.message || 'Không thể tải ảnh lên'
+        ? formatApiError(err, avatarCopy.value.uploadFailed)
+        : (err as Error)?.message || avatarCopy.value.uploadFailed
     error.value = message
     ui.showToast(message, 'error')
   } finally {
@@ -208,12 +210,12 @@ async function removeAvatar() {
   updatingAvatar.value = true
   try {
     await auth.updateAvatar('')
-    ui.showToast('Đã xóa ảnh đại diện', 'success')
+    ui.showToast(avatarCopy.value.removeSuccess, 'success')
   } catch (err) {
     const message =
       err instanceof ApiError
-        ? formatApiError(err, 'Không thể xóa ảnh')
-        : (err as Error)?.message || 'Không thể xóa ảnh'
+        ? formatApiError(err, avatarCopy.value.removeFailed)
+        : (err as Error)?.message || avatarCopy.value.removeFailed
     error.value = message
     ui.showToast(message, 'error')
   } finally {
@@ -292,15 +294,15 @@ async function logout() {
           <img
             v-if="auth.user?.avatarUrl"
             :src="auth.user.avatarUrl"
-            :alt="auth.user.displayName || 'Avatar'"
+            :alt="auth.user.displayName || avatarCopy.avatarAlt"
             class="avatar-image"
           />
           <span v-else class="avatar" aria-hidden="true">{{ initials }}</span>
           <button
             type="button"
             class="avatar-action-btn"
-            :title="'Đổi ảnh đại diện'"
-            :aria-label="'Đổi ảnh đại diện'"
+            :title="avatarCopy.changeAvatar"
+            :aria-label="avatarCopy.changeAvatar"
             :disabled="updatingAvatar"
             @click="triggerAvatarPick"
           >
@@ -316,7 +318,7 @@ async function logout() {
         </div>
         <div class="identity-copy">
           <h2 id="profile-identity-heading" class="identity-name">
-            {{ auth.user?.displayName || 'Your account' }}
+            {{ auth.user?.displayName || avatarCopy.fallbackAccount }}
           </h2>
           <p class="identity-email">{{ auth.user?.email }}</p>
           <button
@@ -326,7 +328,7 @@ async function logout() {
             :disabled="updatingAvatar"
             @click="removeAvatar"
           >
-            Xóa ảnh đại diện
+            {{ avatarCopy.removeAvatar }}
           </button>
         </div>
       </div>
