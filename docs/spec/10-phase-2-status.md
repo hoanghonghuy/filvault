@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Tài liệu lịch sử — không dùng làm current handoff hoặc backlog.** File này ghi lại trạng thái/next-step của Phase 2 web tại thời điểm 2026-08. Cả 6/6 slice bên dưới đã hoàn tất; hướng triển khai hiện tại, workstream đang active và release blockers được quản lý tại [`../CURRENT_PRODUCT_STATE.md`](../CURRENT_PRODUCT_STATE.md) và các GitHub issue/PR đang mở. Mọi chỉ dẫn “bắt đầu S2/S3/…” ở cuối file chỉ còn giá trị lịch sử.
+
 # Phase 2 — Checklist bàn giao (web features)
 
 Cập nhật: **2026-08-22**.  
