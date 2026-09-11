@@ -8,6 +8,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import LoadingSkeletonTrash from '@/components/LoadingSkeletonTrash.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { mimeCategoryColor } from '@/lib/mimeColors'
 import { runTrashPurge, type TrashPurgeTarget } from '@/lib/trashPurge'
 import { formatTrashItemDate, trashCopy } from '@/lib/trashCopy'
 import { trashRetentionNotice } from '@/lib/trashRetention'
@@ -118,16 +119,6 @@ const totalCount = computed(() => (trash.value?.folders.length ?? 0) + (trash.va
 
 function formatItemDate(iso?: string): string {
   return formatTrashItemDate(iso, locale.value)
-}
-
-function getFileTypeColor(mimeType?: string): string {
-  if (!mimeType) return '#64748b'
-  if (mimeType.startsWith('image/')) return '#8b5cf6'
-  if (mimeType.startsWith('video/')) return '#ec4899'
-  if (mimeType.startsWith('audio/')) return '#06b6d4'
-  if (mimeType.includes('pdf')) return '#ef4444'
-  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('rar') || mimeType.includes('7z')) return '#f97316'
-  return '#0084ff'
 }
 
 async function emptyAllTrash() {
@@ -265,8 +256,8 @@ onMounted(load)
             <div
               class="trash-icon-badge"
               :style="{
-                background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
-                color: getFileTypeColor(file.mimeType),
+                background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
+                color: mimeCategoryColor(file.mimeType, file.name),
               }"
             >
               <Icon :name="mimeIcon(file.mimeType ?? '')" :size="20" />
