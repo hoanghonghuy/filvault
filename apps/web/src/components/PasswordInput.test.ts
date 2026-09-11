@@ -3,9 +3,10 @@
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PasswordInput from './PasswordInput.vue'
+import { setLocale } from '@/lib/i18n'
 
 const readSrc = (relativePath: string) =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8')
@@ -25,6 +26,8 @@ function mountInput(overrides: Record<string, unknown> = {}) {
 }
 
 describe('PasswordInput', () => {
+  beforeEach(() => setLocale('en'))
+
   it('toggles visibility without changing the password value or input semantics', async () => {
     const wrapper = mountInput({ enterkeyhint: 'go' })
     const input = wrapper.get<HTMLInputElement>('input')
@@ -46,6 +49,20 @@ describe('PasswordInput', () => {
     expect(input.element.value).toBe('secret-value')
     expect(toggle.attributes('aria-label')).toBe('Hide password')
     expect(toggle.attributes('aria-pressed')).toBe('true')
+  })
+
+  it('reacts to the active locale for visibility labels', async () => {
+    setLocale('vi')
+    const wrapper = mountInput()
+    const toggle = wrapper.get<HTMLButtonElement>('button')
+
+    expect(toggle.attributes('aria-label')).toBe('Hiện mật khẩu')
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-label')).toBe('Ẩn mật khẩu')
+
+    setLocale('en')
+    await wrapper.vm.$nextTick()
+    expect(toggle.attributes('aria-label')).toBe('Hide password')
   })
 
   it('disables both the field and visibility control while its owner is busy', () => {

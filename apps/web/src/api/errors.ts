@@ -75,9 +75,27 @@ export function formatShareUserError(
   return fallback
 }
 
-export function formatAuthError(e: unknown, fallback: string): string {
+export interface AuthErrorCopy {
+  conflict?: string
+  forbidden?: string
+  registerDisabled?: string
+  unauthorized?: string
+}
+
+export function formatAuthError(
+  e: unknown,
+  fallback: string,
+  copy: AuthErrorCopy = {},
+): string {
   if (!(e instanceof ApiError)) {
     return fallback
   }
-  return authFriendly[e.code] ?? fallback
+
+  const localized: Record<string, string | undefined> = {
+    CONFLICT: copy.conflict,
+    FORBIDDEN: copy.forbidden,
+    REGISTER_DISABLED: copy.registerDisabled,
+    UNAUTHORIZED: copy.unauthorized,
+  }
+  return localized[e.code] ?? authFriendly[e.code] ?? fallback
 }

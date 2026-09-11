@@ -5,11 +5,41 @@ import AuthCard from '@/components/AuthCard.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { formatAuthError } from '@/api/errors'
 import { safeInternalPath } from '@/lib/safeInternalPath'
+import { useI18n } from '@/lib/i18n'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+const { locale } = useI18n()
+
+const copy = computed(() => locale.value === 'en' ? {
+  title: 'Sign in',
+  subtitle: 'Access your files and photos from any device.',
+  resetSuccess: 'Password reset complete. Sign in with your new password.',
+  email: 'Email',
+  password: 'Password',
+  forgotPassword: 'Forgot password?',
+  failed: 'Sign in failed. Try again.',
+  incorrectCredentials: 'Incorrect email or password.',
+  signingIn: 'Signing in…',
+  signIn: 'Sign in',
+  noAccount: 'No account?',
+  createAccount: 'Create account',
+} : {
+  title: 'Đăng nhập',
+  subtitle: 'Truy cập tệp và ảnh của bạn trên mọi thiết bị.',
+  resetSuccess: 'Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.',
+  email: 'Email',
+  password: 'Mật khẩu',
+  forgotPassword: 'Quên mật khẩu?',
+  failed: 'Đăng nhập không thành công. Vui lòng thử lại.',
+  incorrectCredentials: 'Email hoặc mật khẩu không đúng.',
+  signingIn: 'Đang đăng nhập…',
+  signIn: 'Đăng nhập',
+  noAccount: 'Chưa có tài khoản?',
+  createAccount: 'Tạo tài khoản',
+})
 
 onMounted(() => {
   if (auth.isAuthenticated) {
@@ -34,7 +64,9 @@ async function submit() {
     }
     await router.replace(safeInternalPath(route.query.redirect, '/'))
   } catch (e) {
-    error.value = formatAuthError(e, 'Sign in failed. Try again.')
+    error.value = formatAuthError(e, copy.value.failed, {
+      unauthorized: copy.value.incorrectCredentials,
+    })
   } finally {
     loading.value = false
   }
@@ -42,15 +74,15 @@ async function submit() {
 </script>
 
 <template>
-  <AuthCard title="Sign in" subtitle="Access your files and photos from any device.">
+  <AuthCard :title="copy.title" :subtitle="copy.subtitle">
     <template #default="{ titleId }">
       <form :aria-labelledby="titleId" :aria-describedby="error ? 'auth-error' : undefined" @submit.prevent="submit">
         <div v-if="resetSucceeded" class="auth-success" role="status">
-          Password reset complete. Sign in with your new password.
+          {{ copy.resetSuccess }}
         </div>
 
         <label class="field">
-          <span class="field-label">Email</span>
+          <span class="field-label">{{ copy.email }}</span>
           <input
             id="login-email"
             v-model="email"
@@ -68,8 +100,8 @@ async function submit() {
         </label>
         <div class="field">
           <div class="password-label-row">
-            <label class="field-label" for="login-password">Password</label>
-            <RouterLink class="forgot-link" to="/forgot-password">Forgot password?</RouterLink>
+            <label class="field-label" for="login-password">{{ copy.password }}</label>
+            <RouterLink class="forgot-link" to="/forgot-password">{{ copy.forgotPassword }}</RouterLink>
           </div>
           <PasswordInput
             id="login-password"
@@ -87,15 +119,15 @@ async function submit() {
         <div v-if="error" id="auth-error" class="auth-alert" role="alert">{{ error }}</div>
 
         <button class="btn ink block auth-submit" type="submit" :disabled="loading" :aria-busy="loading">
-          {{ loading ? 'Signing in…' : 'Sign in' }}
+          {{ loading ? copy.signingIn : copy.signIn }}
         </button>
       </form>
     </template>
 
     <template #footer>
       <p class="auth-switch">
-        No account?
-        <RouterLink class="link-accent" to="/register">Create account</RouterLink>
+        {{ copy.noAccount }}
+        <RouterLink class="link-accent" to="/register">{{ copy.createAccount }}</RouterLink>
       </p>
     </template>
   </AuthCard>

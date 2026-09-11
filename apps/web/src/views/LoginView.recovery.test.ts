@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import LoginView from './LoginView.vue'
+import { setLocale } from '@/lib/i18n'
 
 const authMock = vi.hoisted(() => ({
   isAuthenticated: false,
@@ -31,6 +32,7 @@ function makeRouter() {
 
 describe('LoginView password recovery', () => {
   beforeEach(() => {
+    setLocale('en')
     authMock.isAuthenticated = false
     authMock.isVerified = false
     authMock.login.mockReset()
@@ -58,6 +60,26 @@ describe('LoginView password recovery', () => {
 
     expect(wrapper.get('[role="status"]').text()).toContain('Password reset complete')
     expect(wrapper.get('button[type="submit"]').text()).toBe('Sign in')
+
+    wrapper.unmount()
+  })
+
+  it('reacts to Vietnamese locale across recovery and primary actions', async () => {
+    setLocale('vi')
+    const router = makeRouter()
+    await router.push('/login?reset=success')
+    await router.isReady()
+    const wrapper = mount(LoginView, { global: { plugins: [router] } })
+
+    expect(wrapper.get('h1').text()).toBe('Đăng nhập')
+    expect(wrapper.get('a.forgot-link').text()).toBe('Quên mật khẩu?')
+    expect(wrapper.get('[role="status"]').text()).toContain('Đặt lại mật khẩu thành công')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Đăng nhập')
+
+    setLocale('en')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('h1').text()).toBe('Sign in')
+    expect(wrapper.get('a.forgot-link').text()).toBe('Forgot password?')
 
     wrapper.unmount()
   })
