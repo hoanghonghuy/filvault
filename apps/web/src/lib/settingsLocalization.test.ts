@@ -24,6 +24,16 @@ describe('settings localization', () => {
     expect(settingsActivityLabel('en', 'file.uploaded')).toBe('Uploaded')
   })
 
+  it('preserves second-level precision in relative time', () => {
+    const now = Date.parse('2026-09-11T03:00:00.000Z')
+    const thirtySecondsAgo = '2026-09-11T02:59:30.000Z'
+
+    expect(formatSettingsRelativeTime('en', thirtySecondsAgo, now)).toContain('30')
+    expect(formatSettingsRelativeTime('en', thirtySecondsAgo, now).toLowerCase()).toContain('ago')
+    expect(formatSettingsRelativeTime('vi', thirtySecondsAgo, now)).toContain('30')
+    expect(formatSettingsRelativeTime('vi', thirtySecondsAgo, now).toLowerCase()).toContain('trước')
+  })
+
   it('formats relative time with the active locale', () => {
     const now = Date.parse('2026-09-11T03:00:00.000Z')
     const fiveMinutesAgo = '2026-09-11T02:55:00.000Z'
