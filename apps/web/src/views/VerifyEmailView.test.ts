@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { setLocale } from '@/lib/i18n'
 import VerifyEmailView from './VerifyEmailView.vue'
 
 const authMock = vi.hoisted(() => ({
@@ -30,8 +31,16 @@ function makeRouter() {
   })
 }
 
+async function mountVerifyEmail() {
+  const router = makeRouter()
+  await router.push('/verify-email')
+  await router.isReady()
+  return { router, wrapper: mount(VerifyEmailView, { global: { plugins: [router] } }) }
+}
+
 describe('VerifyEmailView wrong-email recovery', () => {
   beforeEach(() => {
+    setLocale('en')
     authMock.isAuthenticated = true
     authMock.isVerified = false
     authMock.user = { email: 'wrong@example.com' }
@@ -40,11 +49,26 @@ describe('VerifyEmailView wrong-email recovery', () => {
     authMock.verifyEmail.mockReset().mockResolvedValue(undefined)
   })
 
+  it('reacts to Vietnamese locale without remounting', async () => {
+    const { wrapper } = await mountVerifyEmail()
+
+    expect(wrapper.get('h1').text()).toBe('Verify email')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Verify email')
+    expect(wrapper.text()).toContain('Wrong email?')
+
+    setLocale('vi')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('h1').text()).toBe('Xác minh email')
+    expect(wrapper.text()).toContain('Nhập mã 6 chữ số đã được gửi tới wrong@example.com.')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Xác minh email')
+    expect(wrapper.text()).toContain('Sai email?')
+    expect(wrapper.get('button.btn.ghost').text()).toBe('Dùng email khác')
+    wrapper.unmount()
+  })
+
   it('signs out the unverified session and replaces to registration', async () => {
-    const router = makeRouter()
-    await router.push('/verify-email')
-    await router.isReady()
-    const wrapper = mount(VerifyEmailView, { global: { plugins: [router] } })
+    const { router, wrapper } = await mountVerifyEmail()
 
     const button = wrapper.get('button.btn.ghost')
     expect(button.text()).toBe('Use a different email')
@@ -67,10 +91,7 @@ describe('VerifyEmailView wrong-email recovery', () => {
       }),
     )
 
-    const router = makeRouter()
-    await router.push('/verify-email')
-    await router.isReady()
-    const wrapper = mount(VerifyEmailView, { global: { plugins: [router] } })
+    const { router, wrapper } = await mountVerifyEmail()
 
     const button = wrapper.get('button.btn.ghost')
     await button.trigger('click')
