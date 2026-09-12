@@ -31,6 +31,40 @@ describe('UploadProgress', () => {
     expect(wrapper.get('[aria-label="Files uploading"]')).toBeTruthy()
   })
 
+  it('preserves explicit labels, including an intentionally empty label', async () => {
+    const wrapper = mount(UploadProgress, {
+      props: {
+        progress: 0.5,
+        label: 'Custom upload label',
+      },
+    })
+
+    expect(wrapper.get('.upload-progress-title span').text()).toBe('Custom upload label')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Custom upload label')
+
+    await wrapper.setProps({ label: '' })
+
+    expect(wrapper.get('.upload-progress-title span').text()).toBe('')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('')
+  })
+
+  it('keeps omitted labels locale-reactive', async () => {
+    const wrapper = mount(UploadProgress, {
+      props: {
+        progress: 0.5,
+      },
+    })
+
+    expect(wrapper.get('.upload-progress-title span').text()).toBe('Uploading…')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Overall upload progress')
+
+    setLocale('vi')
+    await flushPromises()
+
+    expect(wrapper.get('.upload-progress-title span').text()).toBe('Đang tải lên…')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Tiến trình tải lên tổng thể')
+  })
+
   it('exposes dismiss-failed and clear-settled actions', async () => {
     const wrapper = mount(UploadProgress, {
       props: {
