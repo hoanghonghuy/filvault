@@ -123,9 +123,5 @@ const photoCount = computed(() => (props.variant === 'initial' ? 8 : 6))
     animation: none;
     background: var(--hairline);
   }
-
-  .placeholder:active {
-    transform: none;
-  }
 }
 </style>
