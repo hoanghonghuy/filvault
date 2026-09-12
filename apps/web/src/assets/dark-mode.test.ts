@@ -56,7 +56,20 @@ describe('dark mode contract', () => {
   })
 
   it('uses subtle, pale sidebar backgrounds for light themes so colors are not overly saturated', () => {
-    expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--sidebar-bg:\s*#fff0f4;/)
-    expect(css).toMatch(/\[data-color-theme='spring'\][\s\S]*?--sidebar-bg:\s*#fdf0f6;/)
+    expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--sidebar-bg:\s*#fbe6ee;/)
+    expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--surface-soft:\s*#fdf7f9;/)
+    expect(css).toMatch(/\[data-color-theme='spring'\][\s\S]*?--sidebar-bg:\s*#fce7f1;/)
+    expect(css).toMatch(/\[data-color-theme='spring'\][\s\S]*?--surface-soft:\s*#fdf8fb;/)
+  })
+
+  it('ensures light theme sidebar-bg is visually distinct from content surface-soft', () => {
+    const peachMatch = css.match(/\[data-color-theme='peach'\]\{([^}]+)\}/s) || css.match(/\[data-color-theme='peach'\]\s*\{([\s\S]*?)\n\}/)
+    expect(peachMatch).not.toBeNull()
+    const block = peachMatch ? peachMatch[1] : ''
+    const sidebar = block.match(/--sidebar-bg:\s*([^;]+);/)?.[1]?.trim()
+    const surface = block.match(/--surface-soft:\s*([^;]+);/)?.[1]?.trim()
+    expect(sidebar).toBeDefined()
+    expect(surface).toBeDefined()
+    expect(sidebar).not.toBe(surface)
   })
 })
