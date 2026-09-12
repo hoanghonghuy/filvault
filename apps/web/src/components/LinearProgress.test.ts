@@ -41,6 +41,13 @@ describe('LinearProgress', () => {
     expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Uploading…')
   })
 
+  it('keeps an explicitly empty label instead of replacing it with the localized default', () => {
+    const wrapper = mount(LinearProgress, { props: { value: 0.1, label: '' } })
+
+    expect(wrapper.get('.linear-progress__label').text()).toBe('')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('')
+  })
+
   it('clamps out-of-range values to 0–100', () => {
     const over = mount(LinearProgress, { props: { value: 1.5 } })
     expect(over.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')
