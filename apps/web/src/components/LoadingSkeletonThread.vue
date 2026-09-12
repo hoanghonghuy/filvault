@@ -129,4 +129,12 @@
   );
   background-size: 200% 100%;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-chat-shimmer,
+  [data-theme='dark'] .sk-chat-shimmer {
+    animation: none;
+    background: var(--hairline);
+  }
+}
 </style>

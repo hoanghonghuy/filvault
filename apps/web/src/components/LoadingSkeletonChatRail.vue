@@ -104,4 +104,12 @@
   );
   background-size: 200% 100%;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  [data-theme='dark'] .skeleton {
+    animation: none;
+    background: var(--hairline);
+  }
+}
 </style>
