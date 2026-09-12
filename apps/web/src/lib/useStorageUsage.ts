@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { api } from '@/api/client'
 import type { StorageUsage } from '@/api/types'
+import { useI18n } from '@/lib/i18n'
 import {
   storageFillRatio,
   storageProgressAria,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/storageUsage'
 
 export function useStorageUsage(formatBytes: (bytes: number) => string) {
+  const { locale } = useI18n()
   const usage = ref<StorageUsage | null>(null)
   const loading = ref(true)
   const unavailable = ref(false)
@@ -29,7 +31,7 @@ export function useStorageUsage(formatBytes: (bytes: number) => string) {
   const fillRatio = computed(() => storageFillRatio(usedBytes.value, quotaBytes.value))
   const toneClass = computed(() => storageToneClass(state.value))
   const progressAria = computed(() =>
-    storageProgressAria(usedBytes.value, quotaBytes.value, formatBytes),
+    storageProgressAria(usedBytes.value, quotaBytes.value, formatBytes, locale.value),
   )
 
   async function reload() {

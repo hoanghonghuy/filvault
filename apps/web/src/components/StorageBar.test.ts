@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { computed } from 'vue'
+import { nextTick } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setLocale } from '@/lib/i18n'
 import StorageBar from './StorageBar.vue'
 
 const { apiMock } = vi.hoisted(() => ({
@@ -15,29 +16,10 @@ vi.mock('@/api/client', () => ({
   formatBytes: (n: number) => `${n} B`,
 }))
 
-const messages = {
-  storageLabel: 'Storage',
-  storageLoading: 'Loading storage…',
-  storageUnavailable: 'Storage usage unavailable',
-  storageUnavailableHint: 'Usage may be outdated until it loads again.',
-  storageNearQuota: 'Almost full',
-  storageNearQuotaHint: 'Free up space in Trash or delete files.',
-  storageFullQuota: 'Storage full',
-  storageFullQuotaHint: 'Uploads may fail until you free space.',
-  storageFreeUp: 'Free up space',
-  retry: 'Retry',
-  navTrash: 'Trash',
-}
-
-vi.mock('@/lib/i18n', () => ({
-  useI18n: () => ({
-    t: computed(() => messages),
-  }),
-}))
-
 describe('StorageBar', () => {
   beforeEach(() => {
     apiMock.mockReset()
+    setLocale('en')
   })
 
   it('shows a compact unavailable state with retry when /storage fails', async () => {
@@ -109,5 +91,21 @@ describe('StorageBar', () => {
     expect(bar.attributes('aria-valuemin')).toBe('0')
     expect(bar.attributes('aria-valuemax')).toBe('100')
     expect(Number.isFinite(Number(bar.attributes('aria-valuenow')))).toBe(true)
+  })
+
+  it('reactively localizes the storage progress accessibility label', async () => {
+    apiMock.mockResolvedValueOnce({ usedBytes: 250, quotaBytes: 1000 })
+    const wrapper = mount(StorageBar, {
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    const bar = wrapper.get('[role="progressbar"]')
+    expect(bar.attributes('aria-label')).toBe('250 B of 1000 B used')
+
+    setLocale('vi')
+    await nextTick()
+
+    expect(bar.attributes('aria-label')).toBe('Đã dùng 250 B trên 1000 B')
   })
 })

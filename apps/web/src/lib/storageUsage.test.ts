@@ -47,18 +47,28 @@ describe('storageUsage', () => {
     expect(storageFillRatio(100, 0)).toBe(0)
     expect(storageFillRatio(100, Number.POSITIVE_INFINITY)).toBe(0)
 
-    const aria = storageProgressAria(100, 0, (n) => `${n} B`)
+    const aria = storageProgressAria(100, 0, (n) => `${n} B`, 'en')
     expect(aria.valuenow).toBe(0)
     expect(Number.isFinite(aria.valuenow)).toBe(true)
-    expect(aria.label).toContain('100 B')
+    expect(aria.label).toBe('100 B used')
     expect(aria.label).not.toMatch(/NaN|Infinity/)
+  })
+
+  it('localizes progress labels for valid and unavailable quota values', () => {
+    expect(storageProgressAria(250, quota, (n) => `${n} B`, 'en').label).toBe(
+      '250 B of 1000 B used',
+    )
+    expect(storageProgressAria(250, quota, (n) => `${n} B`, 'vi').label).toBe(
+      'Đã dùng 250 B trên 1000 B',
+    )
+    expect(storageProgressAria(250, 0, (n) => `${n} B`, 'vi').label).toBe('Đã dùng 250 B')
   })
 
   it('clamps fill ratio and aria values to safe ranges', () => {
     expect(storageFillRatio(1500, quota)).toBe(1)
     expect(storageUsagePercent(1500, quota)).toBe(100)
 
-    const aria = storageProgressAria(1500, quota, (n) => `${n}`)
+    const aria = storageProgressAria(1500, quota, (n) => `${n}`, 'en')
     expect(aria.valuenow).toBe(100)
     expect(aria.valuemin).toBe(0)
     expect(aria.valuemax).toBe(100)
