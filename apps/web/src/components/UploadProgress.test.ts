@@ -62,7 +62,7 @@ describe('UploadProgress', () => {
     await flushPromises()
 
     expect(wrapper.get('.upload-progress-title span').text()).toBe('Đang tải lên…')
-    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Tiến trình tải lên tổng thể')
+    expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Tiến trình tải lên tổng')
   })
 
   it('exposes dismiss-failed and clear-settled actions', async () => {
