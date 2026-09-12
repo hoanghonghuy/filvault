@@ -19,6 +19,7 @@ import MediaLightbox from '@/components/MediaLightbox.vue'
 import { usePullToRefresh } from '@/lib/usePullToRefresh'
 import { useLongPress } from '@/lib/useLongPress'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { mimeCategoryColor } from '@/lib/mimeColors'
 import type {
   Browser,
   DownloadURL,
@@ -247,17 +248,6 @@ function formatItemDate(iso?: string): string {
   })
 }
 
-function getFileTypeColor(mimeType?: string): string {
-  if (!mimeType) return '#64748b'
-  if (mimeType.startsWith('image/')) return '#8b5cf6'
-  if (mimeType.startsWith('video/')) return '#ec4899'
-  if (mimeType.startsWith('audio/')) return '#06b6d4'
-  if (mimeType.includes('pdf')) return '#ef4444'
-  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('rar') || mimeType.includes('7z') || mimeType.includes('compressed')) return '#f97316'
-  if (mimeType.includes('sheet') || mimeType.includes('excel') || mimeType.includes('csv')) return '#10b981'
-  if (mimeType.includes('word') || mimeType.includes('document')) return '#0084ff'
-  return '#3b82f6'
-}
 
 const currentSortLabel = computed(() => {
   if (sortBy.value === 'name') return t.value.sortByName
@@ -1369,8 +1359,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <div
           class="file-icon-badge"
           :style="{
-            background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
-            color: getFileTypeColor(file.mimeType)
+            background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
+            color: mimeCategoryColor(file.mimeType, file.name)
           }"
         >
           <Icon
@@ -1421,8 +1411,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <div
             class="file-icon-badge"
             :style="{
-              background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
-              color: getFileTypeColor(file.mimeType)
+              background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
+              color: mimeCategoryColor(file.mimeType, file.name)
             }"
           >
             <Icon name="star-filled" :size="20" style="color: #f59e0b;" />
