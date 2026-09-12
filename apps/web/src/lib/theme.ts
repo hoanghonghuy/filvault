@@ -44,7 +44,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
     accentColor: '#2563eb',
-    previewBg: '#f0f7ff',
+    previewBg: '#f3f7fd',
     todayAccent: '#2563eb',
   },
   {
@@ -54,7 +54,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 100%)',
     accentColor: '#0284c7',
-    previewBg: '#f0f9ff',
+    previewBg: '#f0f8fd',
     todayAccent: '#0284c7',
   },
   {
@@ -64,7 +64,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #5eead4 0%, #0d9488 100%)',
     accentColor: '#0d9488',
-    previewBg: '#f0fdfa',
+    previewBg: '#f0faf7',
     todayAccent: '#0d9488',
   },
   {
@@ -74,7 +74,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #bef264 0%, #84cc16 100%)',
     accentColor: '#65a30d',
-    previewBg: '#f7fee7',
+    previewBg: '#f4fbe8',
     todayAccent: '#65a30d',
   },
   {
@@ -84,7 +84,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)',
     accentColor: '#d97706',
-    previewBg: '#fffbeb',
+    previewBg: '#fef9ea',
     todayAccent: '#d97706',
   },
   {
@@ -94,7 +94,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%)',
     accentColor: '#f472b6',
-    previewBg: '#fff0f3',
+    previewBg: '#fff0f4',
     todayAccent: '#f472b6',
   },
   {
@@ -104,7 +104,7 @@ export const THEMES: ThemeDef[] = [
     category: 'colors',
     swatchGradient: 'linear-gradient(135deg, #ddd6fe 0%, #8b5cf6 100%)',
     accentColor: '#7c3aed',
-    previewBg: '#fbf8ff',
+    previewBg: '#f6f0fe',
     todayAccent: '#8b5cf6',
   },
   {
@@ -144,7 +144,7 @@ export const THEMES: ThemeDef[] = [
     category: 'seasonal',
     swatchGradient: 'linear-gradient(135deg, #f472b6 0%, #34d399 100%)',
     accentColor: '#db2777',
-    previewBg: '#fdf2f8',
+    previewBg: '#fdf0f6',
     todayAccent: '#db2777',
   },
   {
@@ -154,7 +154,7 @@ export const THEMES: ThemeDef[] = [
     category: 'seasonal',
     swatchGradient: 'linear-gradient(135deg, #0ea5e9 0%, #eab308 100%)',
     accentColor: '#0284c7',
-    previewBg: '#f0f9ff',
+    previewBg: '#f0f8fd',
     todayAccent: '#0284c7',
   },
   {
@@ -164,7 +164,7 @@ export const THEMES: ThemeDef[] = [
     category: 'seasonal',
     swatchGradient: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
     accentColor: '#ea580c',
-    previewBg: '#fff7ed',
+    previewBg: '#fef3e7',
     todayAccent: '#ea580c',
   },
   {
@@ -174,7 +174,7 @@ export const THEMES: ThemeDef[] = [
     category: 'seasonal',
     swatchGradient: 'linear-gradient(135deg, #38bdf8 0%, #a5b4fc 100%)',
     accentColor: '#0284c7',
-    previewBg: '#f0f9ff',
+    previewBg: '#f0f8fd',
     todayAccent: '#0284c7',
   },
 ]

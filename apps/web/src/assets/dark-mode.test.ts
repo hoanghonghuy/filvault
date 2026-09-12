@@ -54,4 +54,9 @@ describe('dark mode contract', () => {
     expect(chatView).not.toMatch(/localStorage\.removeItem\('filvault\.theme'/)
     expect(chatView).not.toMatch(/document\.documentElement\.dataset\.theme/)
   })
+
+  it('uses subtle, pale sidebar backgrounds for light themes so colors are not overly saturated', () => {
+    expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--sidebar-bg:\s*#fff0f4;/)
+    expect(css).toMatch(/\[data-color-theme='spring'\][\s\S]*?--sidebar-bg:\s*#fdf0f6;/)
+  })
 })
