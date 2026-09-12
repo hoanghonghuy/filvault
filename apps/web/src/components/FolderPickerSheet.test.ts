@@ -34,7 +34,7 @@ describe('FolderPickerSheet', () => {
     expect(wrapper.find('.picker-breadcrumb').attributes('aria-label')).toBe('Duyệt thư mục')
     expect(wrapper.find('.crumb').text()).toBe('Gốc')
     expect(wrapper.find('.picker-empty').text()).toBe('Không có thư mục con.')
-    expect(wrapper.find('.picker-confirm').text()).toBe('Di chuyển vào đây')
+    expect(wrapper.find('.picker-confirm').text()).toBe('Di chuyển tới đây')
 
     setLocale('en')
     await nextTick()
