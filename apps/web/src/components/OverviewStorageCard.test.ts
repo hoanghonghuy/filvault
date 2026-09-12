@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { computed } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setLocale } from '@/lib/i18n'
 import OverviewStorageCard from './OverviewStorageCard.vue'
 
 const { apiMock } = vi.hoisted(() => ({
@@ -13,22 +13,6 @@ const { apiMock } = vi.hoisted(() => ({
 vi.mock('@/api/client', () => ({
   api: apiMock,
   formatBytes: (n: number) => `${n} B`,
-}))
-
-const messages = {
-  storageLabel: 'Storage',
-  storageLoading: 'Loading storage…',
-  storageUnavailable: 'Storage usage unavailable',
-  storageNearQuota: 'Almost full',
-  storageFullQuota: 'Storage full',
-  storageFreeUp: 'Free up space',
-  retry: 'Retry',
-  myCloud: 'My cloud',
-  manageStorage: 'Manage storage',
-}
-
-vi.mock('@/lib/i18n', () => ({
-  useI18n: () => ({ t: computed(() => messages) }),
 }))
 
 const mountCard = () =>
@@ -44,7 +28,10 @@ const mountCard = () =>
   })
 
 describe('OverviewStorageCard', () => {
-  beforeEach(() => apiMock.mockReset())
+  beforeEach(() => {
+    apiMock.mockReset()
+    setLocale('en')
+  })
 
   it('shows live normal usage from /storage rather than an auth snapshot', async () => {
     apiMock.mockResolvedValueOnce({ usedBytes: 250, quotaBytes: 1000 })
