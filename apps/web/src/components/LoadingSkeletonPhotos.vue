@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '@/lib/i18n'
 
 type Variant = 'initial' | 'more'
 
@@ -10,6 +11,7 @@ const props = withDefaults(
   { variant: 'initial' },
 )
 
+const { t } = useI18n()
 const groupCount = computed(() => (props.variant === 'initial' ? 2 : 1))
 const photoCount = computed(() => (props.variant === 'initial' ? 8 : 6))
 </script>
@@ -17,13 +19,13 @@ const photoCount = computed(() => (props.variant === 'initial' ? 8 : 6))
 <template>
   <div aria-busy="true" aria-live="polite">
     <h1 v-if="variant === 'initial'" class="page-title desktop-only sk-title">
-      Photos
+      {{ t.photosTitle }}
     </h1>
 
-    <p v-if="variant === 'initial'" class="muted sk-line sk-subtitle desktop-only">Loading…</p>
+    <p v-if="variant === 'initial'" class="muted sk-line sk-subtitle desktop-only">{{ t.loading }}</p>
 
     <section v-if="variant === 'initial'" class="card section">
-      <h2 class="section-title sk-line">Albums</h2>
+      <h2 class="section-title sk-line">{{ t.albums }}</h2>
       <div class="toolbar">
         <div class="skeleton sk-input" />
         <div class="skeleton sk-btn ink" />
@@ -121,6 +123,9 @@ const photoCount = computed(() => (props.variant === 'initial' ? 8 : 6))
     animation: none;
     background: var(--hairline);
   }
+
+  .placeholder:active {
+    transform: none;
+  }
 }
 </style>
-
