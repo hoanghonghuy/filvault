@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-const resolvedLabel = computed(() => props.label || t.value.uploadProgressLabel)
+const resolvedLabel = computed(() => props.label ?? t.value.uploadProgressLabel)
 
 const percent = computed(() => {
   const raw = Number.isFinite(props.value) ? props.value : 0
