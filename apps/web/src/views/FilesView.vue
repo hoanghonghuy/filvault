@@ -1097,7 +1097,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <!-- TeraBox Segmented Tabs -->
     <div class="tabs-header">
-      <div class="tabs-pill-list" role="tablist" aria-label="File views">
+      <div class="tabs-pill-list" role="tablist" :aria-label="t.fileViewsAria">
         <button
           type="button"
           role="tab"
@@ -1134,7 +1134,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <button
         type="button"
         class="folder-hierarchy-btn mobile-only"
-        aria-label="View hierarchy"
+        :aria-label="t.fileHierarchyAria"
         @click="breadcrumbSheetOpen = true"
       >
         <Icon name="more" :size="18" />
@@ -1233,7 +1233,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         @click="openFolder(folder.id)"
       >
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
-        <button class="btn icon-only" type="button" aria-label="Open folder" @click.stop="openFolder(folder.id)">
+        <button class="btn icon-only" type="button" :aria-label="`${t.openFolderAria}: ${folder.name}`" @click.stop="openFolder(folder.id)">
           <Icon name="arrow-right" :size="18" />
         </button>
       </div>
@@ -1245,7 +1245,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       >
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+        <button class="btn icon-only" type="button" :aria-label="`${t.fileActionsAria}: ${file.name}`" @click.stop="openFileActions(file)">
           <Icon name="more" :size="18" />
         </button>
       </div>
@@ -1332,7 +1332,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           v-if="!isSelecting"
           class="file-item-more-btn"
           type="button"
-          aria-label="Folder actions"
+          :aria-label="`${t.folderActionsAria}: ${folder.name}`"
           @click.stop="openFolderActions(folder)"
         >
           <Icon name="more" :size="18" />
@@ -1379,7 +1379,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           v-if="!isSelecting"
           class="file-item-more-btn"
           type="button"
-          aria-label="File actions"
+          :aria-label="`${t.fileActionsAria}: ${file.name}`"
           @click.stop="openFileActions(file)"
         >
           <Icon name="more" :size="18" />
@@ -1424,7 +1424,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
             <span class="file-item-title">{{ file.name }}</span>
             <span class="file-item-sub">{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span>
           </div>
-          <button class="file-item-more-btn" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+          <button class="file-item-more-btn" type="button" :aria-label="`${t.fileActionsAria}: ${file.name}`" @click.stop="openFileActions(file)">
             <Icon name="more" :size="18" />
           </button>
         </div>
