@@ -1,8 +1,12 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { useI18n } from '@/lib/i18n'
+
+const { t } = useI18n()
+</script>
 
 <template>
   <div class="sk-page" aria-busy="true" aria-live="polite">
-    <h1 class="page-title desktop-only">Trash</h1>
+    <h1 class="page-title desktop-only">{{ t.trashTitle }}</h1>
 
     <section class="list-section">
       <div class="section-title sk-line"> </div>
@@ -125,4 +129,3 @@
   }
 }
 </style>
-
