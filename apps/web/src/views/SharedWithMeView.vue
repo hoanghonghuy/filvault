@@ -409,8 +409,8 @@ onMounted(load)
               <div
                 class="share-icon-badge"
                 :style="{
-                  background: `color-mix(in srgb, ${mimeCategoryColor(undefined, f.name)} 14%, transparent)`,
-                  color: mimeCategoryColor(undefined, f.name),
+                  background: `color-mix(in srgb, ${mimeCategoryColor(f.mimeType, f.name)} 14%, transparent)`,
+                  color: mimeCategoryColor(f.mimeType, f.name),
                 }"
               >
                 <Icon :name="mimeIcon(f.mimeType)" :size="20" />

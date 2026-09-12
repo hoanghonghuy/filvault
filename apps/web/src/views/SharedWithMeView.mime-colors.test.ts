@@ -9,7 +9,8 @@ describe('SharedWithMeView MIME color contract', () => {
   it('uses the shared MIME/category color helper instead of a duplicate local map', () => {
     expect(source).toContain("import { mimeCategoryColor } from '@/lib/mimeColors'")
     expect(source).not.toContain('function getFileTypeColor(')
-    expect(source.match(/mimeCategoryColor\(undefined, /g)).toHaveLength(6)
+    expect(source.match(/mimeCategoryColor\(undefined, /g)).toHaveLength(4)
+    expect(source.match(/mimeCategoryColor\(f\.mimeType, f\.name\)/g)).toHaveLength(2)
   })
 
   it('keeps representative filename categories aligned with the shared palette', () => {
