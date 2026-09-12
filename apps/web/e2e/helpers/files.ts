@@ -104,7 +104,7 @@ export async function uploadFile(page: Page, kind: 'text' | 'image', targetName:
 export async function openFileActions(page: Page, fileName: string): Promise<void> {
   const fileCard = page.getByRole('button', { name: fileName, exact: true })
   await expect(fileCard).toBeVisible()
-  await fileCard.getByRole('button', { name: /^File actions$/ }).click()
+  await fileCard.getByRole('button', { name: /^File actions:/ }).click()
   await expect(topDialog(page)).toBeVisible()
 }
 
@@ -135,7 +135,7 @@ export async function moveFileToTrash(page: Page, fileName: string): Promise<voi
 
 export async function moveFolderToTrash(page: Page, folderName: string): Promise<void> {
   const folderCard = page.getByRole('button', { name: folderName, exact: true })
-  await folderCard.getByRole('button', { name: /^Folder actions$/ }).click()
+  await folderCard.getByRole('button', { name: /^Folder actions:/ }).click()
   await clickActionSheetItem(page, /^Move to trash$/)
 
   await confirmTrashMutation(page, 'folders')
