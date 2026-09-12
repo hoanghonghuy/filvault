@@ -26,6 +26,7 @@ vi.mock('@/stores/ui', () => ({
 
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({
+    locale: ref<'vi' | 'en'>('en'),
     t: ref({
       navShared: 'Shared',
       myShares: 'My shares',

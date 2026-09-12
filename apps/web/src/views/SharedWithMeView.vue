@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
@@ -7,6 +7,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
 import { useI18n } from '@/lib/i18n'
+import { formatShareExpiry, formatSharedDate, sharedCopy } from '@/lib/sharedCopy'
 import type { DownloadURL, IncomingShare, SharedBrowser } from '@/api/types'
 
 interface ShareLinkInfo {
@@ -27,7 +28,8 @@ interface RetryFolderTarget {
 }
 
 const ui = useUiStore()
-const { t } = useI18n()
+const { locale, t } = useI18n()
+const copy = computed(() => sharedCopy(locale.value))
 
 const shareTab = ref<ShareTab>('my-shares')
 const loading = ref(false)
@@ -60,7 +62,7 @@ async function loadIncomingShares() {
     const out = await api<{ shares: IncomingShare[] }>('/shares/with-me')
     shares.value = out.shares
   } catch (e) {
-    error.value = formatApiError(e, 'Could not load shared items')
+    error.value = formatApiError(e, copy.value.loadIncomingFailed)
   }
 }
 
@@ -69,7 +71,7 @@ async function loadMyShareLinks() {
     const out = await api<{ links: ShareLinkInfo[] }>('/share-links')
     shareLinks.value = out.links
   } catch (e) {
-    error.value = formatApiError(e, 'Could not load your share links')
+    error.value = formatApiError(e, copy.value.loadLinksFailed)
   }
 }
 
@@ -84,21 +86,11 @@ async function load() {
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatSharedDate(iso, locale.value)
 }
 
 function formatExpiry(expiresAt: string | null): string {
-  if (!expiresAt) return t.value.activeForever || 'Có hiệu lực vĩnh viễn'
-  const exp = new Date(expiresAt)
-  if (exp.getTime() < Date.now()) return 'Đã hết hạn'
-  return `Hết hạn ${formatDate(expiresAt)}`
+  return formatShareExpiry(expiresAt, locale.value)
 }
 
 function getFileTypeColor(name?: string): string {
@@ -130,7 +122,7 @@ async function openSharedFolder(folderId: string, mode: BrowseMode) {
     browsing.value = next
     retryFolderTarget.value = null
   } catch (e) {
-    const message = formatApiError(e, 'Could not open folder')
+    const message = formatApiError(e, copy.value.openFolderFailed)
     retryFolderTarget.value = { id: folderId, mode }
     if (mode === 'root') error.value = message
     else folderError.value = message
@@ -181,9 +173,9 @@ async function downloadFile(fileId: string, name: string) {
   try {
     const out = await api<DownloadURL>(`/shared/files/${fileId}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
-    ui.showToast(`Downloading "${name}"`, 'success')
+    ui.showToast(copy.value.downloading(name), 'success')
   } catch (e) {
-    error.value = formatApiError(e, 'Could not download file')
+    error.value = formatApiError(e, copy.value.downloadFailed)
   }
 }
 
@@ -197,36 +189,36 @@ async function copyLink(link: ShareLinkInfo) {
   try {
     const fullUrl = window.location.origin + (link.url ?? `/s/${link.token}`)
     await navigator.clipboard.writeText(fullUrl)
-    ui.showToast('Link copied')
+    ui.showToast(copy.value.linkCopied)
   } catch {
-    ui.showToast('Copy failed', 'info')
+    ui.showToast(copy.value.copyFailed, 'info')
   }
 }
 
 async function revokeLink(link: ShareLinkInfo) {
   const ok = await ui.confirm({
-    title: 'Revoke link?',
-    message: `"${link.fileName}" will no longer be shared publicly.`,
-    confirmLabel: 'Revoke link',
+    title: copy.value.revokeTitle,
+    message: copy.value.revokeMessage(link.fileName),
+    confirmLabel: copy.value.revokeConfirm,
     danger: true,
   })
   if (!ok) return
   error.value = ''
   try {
     await api(`/files/${link.fileId}/share`, { method: 'DELETE' })
-    ui.showToast('Link revoked')
+    ui.showToast(copy.value.revokeSuccess)
     await loadMyShareLinks()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to revoke link')
+    error.value = formatApiError(e, copy.value.revokeFailed)
   }
 }
 
 async function openMyShareActions(link: ShareLinkInfo) {
   const fullUrl = window.location.origin + (link.url ?? `/s/${link.token}`)
   const action = await ui.openActionSheet(link.fileName, [
-    { id: 'copy', label: 'Copy link', icon: 'copy' },
-    { id: 'open', label: 'Open link', icon: 'external-link' },
-    { id: 'revoke', label: 'Revoke link', icon: 'trash', danger: true },
+    { id: 'copy', label: copy.value.copyLink, icon: 'copy' },
+    { id: 'open', label: copy.value.openLink, icon: 'external-link' },
+    { id: 'revoke', label: copy.value.revokeLink, icon: 'trash', danger: true },
   ])
   if (action === 'copy') await copyLink(link)
   if (action === 'open') window.open(fullUrl, '_blank', 'noopener')
@@ -238,10 +230,10 @@ onMounted(load)
 
 <template>
   <div class="shared-page">
-    <h1 class="page-title desktop-only">{{ t.navShared || 'Chia sẻ' }}</h1>
+    <h1 class="page-title desktop-only">{{ t.navShared }}</h1>
 
     <div class="tabs-header">
-      <div class="tabs-pill-list" role="tablist" aria-label="Shares views">
+      <div class="tabs-pill-list" role="tablist" :aria-label="copy.sharesViewsAria">
         <button
           id="shared-tab-my-shares"
           type="button"
@@ -252,7 +244,7 @@ onMounted(load)
           aria-controls="shared-panel-my-shares"
           @click="selectShareTab('my-shares')"
         >
-          {{ t.myShares || 'Chia sẻ của tôi' }}
+          {{ t.myShares }}
           <span v-if="shareLinks.length" class="tab-count-badge">{{ shareLinks.length }}</span>
         </button>
         <button
@@ -265,7 +257,7 @@ onMounted(load)
           aria-controls="shared-panel-with-me"
           @click="selectShareTab('with-me')"
         >
-          {{ t.sharedWithMeTab || 'Được chia sẻ' }}
+          {{ t.sharedWithMeTab }}
           <span v-if="shares.length" class="tab-count-badge">{{ shares.length }}</span>
         </button>
       </div>
@@ -276,7 +268,7 @@ onMounted(load)
         type="button"
         class="sub-icon-btn"
         :title="viewMode === 'list' ? t.viewGrid : t.viewList"
-        :aria-label="t.viewGrid"
+        :aria-label="viewMode === 'list' ? t.viewGrid : t.viewList"
         :aria-pressed="viewMode === 'grid'"
         @click="toggleViewMode"
       >
@@ -320,8 +312,8 @@ onMounted(load)
           <EmptyState
             v-if="!shareLinks.length"
             icon="share"
-            title="Chưa có liên kết chia sẻ nào"
-            description="Khi bạn tạo liên kết công khai cho tệp, chúng sẽ xuất hiện tại đây."
+            :title="copy.mySharesEmptyTitle"
+            :description="copy.mySharesEmptyDescription"
           />
           <div v-else class="shares-container" :class="{ 'grid-mode': viewMode === 'grid' }">
             <div
@@ -346,7 +338,7 @@ onMounted(load)
               <button
                 class="share-action-btn"
                 type="button"
-                aria-label="Share actions"
+                :aria-label="copy.shareActionsAria"
                 @click.stop="openMyShareActions(link)"
               >
                 <Icon name="more" :size="18" />
@@ -366,13 +358,13 @@ onMounted(load)
       tabindex="0"
     >
       <Transition name="page">
-        <div v-if="browsing" class="browse" aria-label="Shared folder contents">
+        <div v-if="browsing" class="browse" :aria-label="copy.sharedFolderContentsAria">
           <button type="button" class="back-btn" :disabled="folderLoading" @click="goBackFromFolder">
             <Icon name="arrow-left" :size="18" />
-            {{ browseStack.length > 1 ? t.back : t.allSharedItems || 'Tất cả mục chia sẻ' }}
+            {{ browseStack.length > 1 ? t.back : t.allSharedItems }}
           </button>
 
-          <nav v-if="browseStack.length" class="browse-path" aria-label="Shared folder path">
+          <nav v-if="browseStack.length" class="browse-path" :aria-label="copy.sharedFolderPathAria">
             <template v-for="(entry, index) in browseStack" :key="entry.folder?.id ?? index">
               <button
                 v-if="index < browseStack.length - 1"

@@ -13,7 +13,7 @@ describe('SharedWithMeView toolbar contract', () => {
 
   it('uses explicit list/grid glyphs and accessible toggle state', () => {
     expect(source).toContain('class="view-mode-glyph"')
-    expect(source).toContain(':aria-label="t.viewGrid"')
+    expect(source).toContain(':aria-label="viewMode === \'list\' ? t.viewGrid : t.viewList"')
     expect(source).toContain(':aria-pressed="viewMode === \'grid\'"')
     expect(source).toContain(':title="viewMode === \'list\' ? t.viewGrid : t.viewList"')
     expect(source).not.toContain("viewMode === 'list' ? 'palette' : 'file'")
