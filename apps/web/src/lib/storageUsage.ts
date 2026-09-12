@@ -1,3 +1,5 @@
+import type { Locale } from '@/lib/i18n'
+
 export const STORAGE_NEAR_QUOTA_PERCENT = 90
 export const STORAGE_FULL_QUOTA_PERCENT = 100
 
@@ -52,11 +54,17 @@ export function storageProgressAria(
   usedBytes: number,
   quotaBytes: number,
   formatBytes: (bytes: number) => string,
+  locale: Locale = 'en',
 ): { valuemin: number; valuemax: number; valuenow: number; label: string } {
   const valuenow = storageUsagePercent(usedBytes, quotaBytes)
+  const used = formatBytes(usedBytes)
   const label = isValidQuotaBytes(quotaBytes)
-    ? `${formatBytes(usedBytes)} of ${formatBytes(quotaBytes)} used`
-    : `${formatBytes(usedBytes)} used`
+    ? locale === 'vi'
+      ? `Đã dùng ${used} trên ${formatBytes(quotaBytes)}`
+      : `${used} of ${formatBytes(quotaBytes)} used`
+    : locale === 'vi'
+      ? `Đã dùng ${used}`
+      : `${used} used`
 
   return {
     valuemin: 0,
