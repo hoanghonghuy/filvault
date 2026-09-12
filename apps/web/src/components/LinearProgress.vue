@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '@/lib/i18n'
 
-const props = withDefaults(
-  defineProps<{
-    /** Progress from 0 to 1. */
-    value: number
-    label?: string
-  }>(),
-  { label: 'Uploading…' },
-)
+const props = defineProps<{
+  /** Progress from 0 to 1. */
+  value: number
+  label?: string
+}>()
+
+const { t } = useI18n()
+
+const resolvedLabel = computed(() => props.label ?? t.value.uploadProgressLabel)
 
 const percent = computed(() => {
   const raw = Number.isFinite(props.value) ? props.value : 0
@@ -19,13 +21,13 @@ const percent = computed(() => {
 <template>
   <div class="linear-progress" role="status" aria-live="polite">
     <div class="linear-progress__meta">
-      <span class="linear-progress__label">{{ label }}</span>
+      <span class="linear-progress__label">{{ resolvedLabel }}</span>
       <span class="linear-progress__percent">{{ percent }}%</span>
     </div>
     <div
       class="linear-progress__track"
       role="progressbar"
-      :aria-label="label"
+      :aria-label="resolvedLabel"
       aria-valuemin="0"
       aria-valuemax="100"
       :aria-valuenow="percent"
