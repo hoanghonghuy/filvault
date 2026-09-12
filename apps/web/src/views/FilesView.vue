@@ -30,6 +30,7 @@ import type {
 } from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
+import { vaultMoveCopy } from '@/lib/vaultMoveCopy'
 import {
   buildFilesRouteQuery,
   buildSearchApiQueryString,
@@ -47,7 +48,8 @@ import {
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
-const { t } = useI18n()
+const { locale, t } = useI18n()
+const vaultCopy = computed(() => vaultMoveCopy(locale.value))
 const reloadStorage = inject<() => Promise<void>>('reloadStorage')
 
 const browser = ref<Browser | null>(null)
@@ -912,9 +914,9 @@ async function openFileActions(file: { id: string; name: string; mimeType?: stri
 
 async function moveFileToVault(id: string, name: string) {
   const ok = await ui.confirm({
-    title: 'Chuyển vào kho cá nhân?',
-    message: `"${name}" sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.`,
-    confirmLabel: 'Chuyển vào kho',
+    title: vaultCopy.value.confirmSingleTitle,
+    message: vaultCopy.value.confirmSingleMessage(name),
+    confirmLabel: vaultCopy.value.confirmSingleLabel,
   })
   if (!ok) return
   error.value = ''
@@ -924,10 +926,10 @@ async function moveFileToVault(id: string, name: string) {
       method: 'POST',
       body: JSON.stringify({ fileIds: [id] }),
     })
-    ui.showToast(t.value.vaultMoveInSuccess, 'success')
+    ui.showToast(vaultCopy.value.moveInSuccess, 'success')
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Không thể chuyển vào kho cá nhân')
+    error.value = formatApiError(e, vaultCopy.value.moveInFailed)
     await loadBrowser()
   }
 }
@@ -936,9 +938,9 @@ async function batchMoveToVault() {
   const fileIds = Array.from(selectedFileIds.value)
   if (fileIds.length === 0) return
   const ok = await ui.confirm({
-    title: `Chuyển ${fileIds.length} tệp vào kho cá nhân?`,
-    message: 'Các tệp này sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.',
-    confirmLabel: 'Chuyển vào kho',
+    title: vaultCopy.value.confirmBatchTitle(fileIds.length),
+    message: vaultCopy.value.confirmBatchMessage(fileIds.length),
+    confirmLabel: vaultCopy.value.confirmBatchLabel,
   })
   if (!ok) return
   error.value = ''
@@ -950,11 +952,11 @@ async function batchMoveToVault() {
       method: 'POST',
       body: JSON.stringify({ fileIds }),
     })
-    ui.showToast(`Đã chuyển ${fileIds.length} tệp vào kho cá nhân`, 'success')
+    ui.showToast(vaultCopy.value.moveInBatchSuccess(fileIds.length), 'success')
     clearSelection()
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Không thể chuyển vào kho cá nhân')
+    error.value = formatApiError(e, vaultCopy.value.moveInFailed)
     await loadBrowser()
   }
 }
