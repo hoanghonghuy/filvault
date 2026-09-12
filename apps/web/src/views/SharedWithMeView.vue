@@ -6,6 +6,7 @@ import { useUiStore } from '@/stores/ui'
 import EmptyState from '@/components/EmptyState.vue'
 import Icon from '@/components/AppIcon.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { mimeCategoryColor } from '@/lib/mimeColors'
 import { useI18n } from '@/lib/i18n'
 import { formatShareExpiry, formatSharedDate, sharedCopy } from '@/lib/sharedCopy'
 import type { DownloadURL, IncomingShare, SharedBrowser } from '@/api/types'
@@ -93,17 +94,6 @@ function formatExpiry(expiresAt: string | null): string {
   return formatShareExpiry(expiresAt, locale.value)
 }
 
-function getFileTypeColor(name?: string): string {
-  if (!name) return '#0084ff'
-  const ext = name.split('.').pop()?.toLowerCase() ?? ''
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '#8b5cf6'
-  if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) return '#ec4899'
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '#f97316'
-  if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) return '#06b6d4'
-  if (['pdf'].includes(ext)) return '#ef4444'
-  if (['xls', 'xlsx', 'csv'].includes(ext)) return '#10b981'
-  return '#0084ff'
-}
 
 async function openSharedFolder(folderId: string, mode: BrowseMode) {
   if (folderLoading.value) return
@@ -325,8 +315,8 @@ onMounted(load)
               <div
                 class="share-icon-badge"
                 :style="{
-                  background: `color-mix(in srgb, ${getFileTypeColor(link.fileName)} 14%, transparent)`,
-                  color: getFileTypeColor(link.fileName),
+                  background: `color-mix(in srgb, ${mimeCategoryColor(undefined, link.fileName)} 14%, transparent)`,
+                  color: mimeCategoryColor(undefined, link.fileName),
                 }"
               >
                 <Icon name="file" :size="20" />
@@ -419,8 +409,8 @@ onMounted(load)
               <div
                 class="share-icon-badge"
                 :style="{
-                  background: `color-mix(in srgb, ${getFileTypeColor(f.name)} 14%, transparent)`,
-                  color: getFileTypeColor(f.name),
+                  background: `color-mix(in srgb, ${mimeCategoryColor(f.mimeType, f.name)} 14%, transparent)`,
+                  color: mimeCategoryColor(f.mimeType, f.name),
                 }"
               >
                 <Icon :name="mimeIcon(f.mimeType)" :size="20" />
@@ -476,8 +466,8 @@ onMounted(load)
                   share.resourceType === 'folder'
                     ? {}
                     : {
-                        background: `color-mix(in srgb, ${getFileTypeColor(share.resourceName)} 14%, transparent)`,
-                        color: getFileTypeColor(share.resourceName),
+                        background: `color-mix(in srgb, ${mimeCategoryColor(undefined, share.resourceName)} 14%, transparent)`,
+                        color: mimeCategoryColor(undefined, share.resourceName),
                       }
                 "
               >
