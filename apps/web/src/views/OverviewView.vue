@@ -8,6 +8,7 @@ import Icon from '@/components/AppIcon.vue'
 import OverviewStorageCard from '@/components/OverviewStorageCard.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { MIME_CATEGORY_COLORS } from '@/lib/mimeColors'
 import { overviewCopy } from '@/lib/overviewCopy'
 import {
   recentFilesFromBrowser,
@@ -35,9 +36,9 @@ const recentFiles = computed(() => recentFilesFromBrowser(files.value))
 const recentPhotos = computed(() => recentPhotosFromTimeline(groups.value))
 
 const quickCategories = computed(() => [
-  { to: '/files', label: t.value.myFiles, icon: 'folder', color: '#f59e0b' },
-  { to: '/photos', label: t.value.navPhotos, icon: 'photos', color: '#10b981' },
-  { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos || 'Video', icon: 'video', color: '#8b5cf6' },
+  { to: '/files', label: t.value.myFiles, icon: 'folder', color: MIME_CATEGORY_COLORS.folder },
+  { to: '/photos', label: t.value.navPhotos, icon: 'photos', color: MIME_CATEGORY_COLORS.image },
+  { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos || 'Video', icon: 'video', color: MIME_CATEGORY_COLORS.video },
   { to: { path: '/files', query: { view: 'favorites' } }, label: t.value.tabFavorites, icon: 'star', color: '#eab308' },
   { to: '/shared', label: t.value.sharedWithMe, icon: 'users', color: '#06b6d4' },
   { to: '/vault', label: t.value.personalVault, icon: 'lock', color: '#6366f1' },
