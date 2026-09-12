@@ -8,7 +8,7 @@ import { setLocale } from '@/lib/i18n'
 import FolderPickerSheet from './FolderPickerSheet.vue'
 
 vi.mock('@/api/client', () => ({
-  api: vi.fn(async () => ({ folder: null, breadcrumb: [], folders: [] })),
+  api: async () => ({ folder: null, breadcrumb: [], folders: [] }),
 }))
 
 afterEach(() => {
