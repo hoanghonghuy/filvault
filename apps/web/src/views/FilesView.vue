@@ -32,6 +32,7 @@ import type {
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
 import { vaultMoveCopy } from '@/lib/vaultMoveCopy'
+import { filesOperationsCopy } from '@/lib/filesOperationsCopy'
 import {
   buildFilesRouteQuery,
   buildSearchApiQueryString,
@@ -51,6 +52,7 @@ const router = useRouter()
 const ui = useUiStore()
 const { locale, t } = useI18n()
 const vaultCopy = computed(() => vaultMoveCopy(locale.value))
+const operationsCopy = computed(() => filesOperationsCopy(locale.value))
 const reloadStorage = inject<() => Promise<void>>('reloadStorage')
 
 const browser = ref<Browser | null>(null)
@@ -100,7 +102,9 @@ const selectedFolderIds = ref<Set<string>>(new Set())
 const totalSelectedCount = computed(() => selectedFileIds.value.size + selectedFolderIds.value.size)
 const selectedFileCount = computed(() => selectedFileIds.value.size)
 const selectedFolderCount = computed(() => selectedFolderIds.value.size)
-const totalItemsCount = computed(() => (browser.value?.folders.length ?? 0) + (browser.value?.files.length ?? 0))
+const totalItemsCount = computed(
+  () => (browser.value?.folders.length ?? 0) + (browser.value?.files.length ?? 0),
+)
 
 function startSelection(type: 'file' | 'folder', id: string) {
   isSelecting.value = true
@@ -216,7 +220,13 @@ function onFileItemKeydown(
 }
 
 // Long-press detection
-const { start: startLongPress, move: moveLongPress, end: endLongPress, cancel: cancelLongPress, shouldIgnoreClick } = useLongPress({
+const {
+  start: startLongPress,
+  move: moveLongPress,
+  end: endLongPress,
+  cancel: cancelLongPress,
+  shouldIgnoreClick,
+} = useLongPress({
   onLongPress: (payload) => {
     if (payload && typeof payload === 'object' && 'type' in payload && 'id' in payload) {
       const p = payload as { type: 'file' | 'folder'; id: string }
@@ -230,7 +240,9 @@ const breadcrumbSheetOpen = ref(false)
 
 const sortBy = ref<'updatedAt' | 'name' | 'size'>('updatedAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
-const viewMode = ref<'list' | 'grid'>((localStorage.getItem('filvault.filesViewMode') as 'list' | 'grid') || 'list')
+const viewMode = ref<'list' | 'grid'>(
+  (localStorage.getItem('filvault.filesViewMode') as 'list' | 'grid') || 'list',
+)
 
 function toggleViewMode() {
   viewMode.value = viewMode.value === 'list' ? 'grid' : 'list'
@@ -247,7 +259,6 @@ function formatItemDate(iso?: string): string {
     year: 'numeric',
   })
 }
-
 
 const currentSortLabel = computed(() => {
   if (sortBy.value === 'name') return t.value.sortByName
@@ -321,7 +332,12 @@ const previewFile = ref<{ id: string; name: string; mimeType: string; url: strin
 async function previewMediaFile(file: { id: string; name: string; mimeType: string }) {
   try {
     const out = await api<DownloadURL>(`/files/${file.id}/download`)
-    previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
+    previewFile.value = {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      url: out.downloadUrl,
+    }
     previewOpen.value = true
   } catch (e) {
     error.value = formatApiError(e, 'Could not preview file')
@@ -359,14 +375,21 @@ function onDrop(event: DragEvent) {
 const pickerOpen = ref(false)
 const pickerMode = ref<'file' | 'folder' | null>(null)
 const pickerTargetId = ref<string | null>(null)
-const pickerTitle = ref('Move to')
+const pickerTitle = computed(() => {
+  if (pickerTargetId.value === 'batch')
+    return operationsCopy.value.moveBatchTitle(totalSelectedCount.value)
+  if (pickerMode.value === 'folder') return operationsCopy.value.moveFolderTitle
+  return operationsCopy.value.moveFileTitle
+})
 
 const folderId = computed(() => {
   const raw = route.query.folderId
   return typeof raw === 'string' && raw ? raw : null
 })
 
-const pickerExcludeFolderId = computed(() => (pickerMode.value === 'folder' ? pickerTargetId.value : null))
+const pickerExcludeFolderId = computed(() =>
+  pickerMode.value === 'folder' ? pickerTargetId.value : null,
+)
 
 const isEmpty = computed(() => {
   if (searchResults.value) return false
@@ -469,7 +492,9 @@ async function runSearch() {
   error.value = ''
   searchLoading.value = true
   try {
-    searchResults.value = await api<SearchResult>(`/search?${buildSearchApiQueryString(searchQuery.value, filters.value)}`)
+    searchResults.value = await api<SearchResult>(
+      `/search?${buildSearchApiQueryString(searchQuery.value, filters.value)}`,
+    )
   } catch (e) {
     error.value = formatApiError(e, 'Search failed')
   } finally {
@@ -597,42 +622,48 @@ async function downloadFile(id: string) {
 }
 
 async function renameFile(id: string, current: string) {
-  const name = await ui.prompt({ title: 'Rename file', label: 'Name', initialValue: current })
+  const name = await ui.prompt({
+    title: operationsCopy.value.renameFileTitle,
+    label: operationsCopy.value.nameLabel,
+    initialValue: current,
+  })
   if (!name || name === current) return
   error.value = ''
   try {
     await api(`/files/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-    ui.showToast('File renamed')
+    ui.showToast(operationsCopy.value.fileRenamed)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Rename failed')
+    error.value = formatApiError(e, operationsCopy.value.renameFailed)
   }
 }
 
 async function renameFolder(id: string, current: string) {
-  const name = await ui.prompt({ title: 'Rename folder', label: 'Name', initialValue: current })
+  const name = await ui.prompt({
+    title: operationsCopy.value.renameFolderTitle,
+    label: operationsCopy.value.nameLabel,
+    initialValue: current,
+  })
   if (!name || name === current) return
   error.value = ''
   try {
     await api(`/folders/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-    ui.showToast('Folder renamed')
+    ui.showToast(operationsCopy.value.folderRenamed)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Rename failed')
+    error.value = formatApiError(e, operationsCopy.value.renameFailed)
   }
 }
 
 function openMoveFile(id: string) {
   pickerTargetId.value = id
   pickerMode.value = 'file'
-  pickerTitle.value = 'Move file'
   pickerOpen.value = true
 }
 
 function openMoveFolder(id: string) {
   pickerTargetId.value = id
   pickerMode.value = 'folder'
-  pickerTitle.value = 'Move folder'
   pickerOpen.value = true
 }
 
@@ -659,7 +690,7 @@ async function onPickerSelect(targetFolderId: string | null) {
           body: JSON.stringify({ parentId: targetFolderId }),
         })
       }
-      ui.showToast(`Moved ${totalSelectedCount.value} items`)
+      ui.showToast(operationsCopy.value.movedBatch(totalSelectedCount.value))
       clearSelection()
       await loadBrowser()
       return
@@ -670,17 +701,17 @@ async function onPickerSelect(targetFolderId: string | null) {
         method: 'PATCH',
         body: JSON.stringify({ folderId: targetFolderId }),
       })
-      ui.showToast('File moved')
+      ui.showToast(operationsCopy.value.fileMoved)
     } else {
       await api(`/folders/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ parentId: targetFolderId }),
       })
-      ui.showToast('Folder moved')
+      ui.showToast(operationsCopy.value.folderMoved)
     }
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Move failed')
+    error.value = formatApiError(e, operationsCopy.value.moveFailed)
   }
 }
 
@@ -688,9 +719,9 @@ async function batchDelete() {
   const count = totalSelectedCount.value
   if (count === 0) return
   const ok = await ui.confirm({
-    title: `Move ${count} items to trash?`,
-    message: 'You can restore them from Trash later.',
-    confirmLabel: 'Move to trash',
+    title: operationsCopy.value.trashBatchTitle(count),
+    message: operationsCopy.value.trashBatchMessage,
+    confirmLabel: t.value.moveToTrash,
     danger: true,
   })
   if (!ok) return
@@ -704,12 +735,12 @@ async function batchDelete() {
       removeOptimistic(id)
       await api(`/folders/${id}`, { method: 'DELETE' })
     }
-    ui.showToast(`Moved ${count} items to trash`)
+    ui.showToast(operationsCopy.value.movedBatchToTrash(count))
     clearSelection()
     await loadBrowser()
     await reloadStorage?.()
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, operationsCopy.value.trashFailed)
     await loadBrowser()
   }
 }
@@ -737,7 +768,6 @@ function batchMove() {
   if (totalSelectedCount.value === 0) return
   pickerTargetId.value = 'batch'
   pickerMode.value = 'file'
-  pickerTitle.value = `Move ${totalSelectedCount.value} items`
   pickerOpen.value = true
 }
 
@@ -766,9 +796,9 @@ function removeOptimistic(id: string) {
 
 async function deleteFile(id: string) {
   const ok = await ui.confirm({
-    title: 'Move to trash?',
-    message: 'You can restore this file from Trash later.',
-    confirmLabel: 'Move to trash',
+    title: operationsCopy.value.trashFileTitle,
+    message: operationsCopy.value.trashFileMessage,
+    confirmLabel: t.value.moveToTrash,
     danger: true,
   })
   if (!ok) return
@@ -776,19 +806,19 @@ async function deleteFile(id: string) {
   removeOptimistic(id)
   try {
     await api(`/files/${id}`, { method: 'DELETE' })
-    ui.showToast('Moved to trash')
+    ui.showToast(operationsCopy.value.movedToTrash)
     await reloadStorage?.()
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, operationsCopy.value.trashFailed)
     await loadBrowser()
   }
 }
 
 async function deleteFolder(id: string) {
   const ok = await ui.confirm({
-    title: 'Move folder to trash?',
-    message: 'The folder must be empty. You can restore it from Trash later.',
-    confirmLabel: 'Move to trash',
+    title: operationsCopy.value.trashFolderTitle,
+    message: operationsCopy.value.trashFolderMessage,
+    confirmLabel: t.value.moveToTrash,
     danger: true,
   })
   if (!ok) return
@@ -796,19 +826,19 @@ async function deleteFolder(id: string) {
   removeOptimistic(id)
   try {
     await api(`/folders/${id}`, { method: 'DELETE' })
-    ui.showToast('Moved to trash')
+    ui.showToast(operationsCopy.value.movedToTrash)
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, operationsCopy.value.trashFailed)
     await loadBrowser()
   }
 }
 
 async function openFolderActions(folder: { id: string; name: string }) {
   const action = await ui.openActionSheet(folder.name, [
-    { id: 'open', label: 'Open', icon: 'arrow-right' },
-    { id: 'rename', label: 'Rename', icon: 'pencil' },
-    { id: 'move', label: 'Move', icon: 'move' },
-    { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
+    { id: 'open', label: t.value.open, icon: 'arrow-right' },
+    { id: 'rename', label: t.value.rename, icon: 'pencil' },
+    { id: 'move', label: t.value.move, icon: 'move' },
+    { id: 'delete', label: t.value.moveToTrash, icon: 'trash', danger: true },
   ])
   if (action === 'open') await openFolder(folder.id)
   if (action === 'rename') await renameFolder(folder.id, folder.name)
@@ -864,27 +894,28 @@ async function openFileActions(file: { id: string; name: string; mimeType?: stri
   const favorited = isFavorited(file.id)
   const canPreview = Boolean(
     file.mimeType &&
-      (file.mimeType.startsWith('image/') ||
-        file.mimeType.startsWith('video/') ||
-        file.mimeType === 'application/pdf' ||
-        file.mimeType.startsWith('audio/')),
+    (file.mimeType.startsWith('image/') ||
+      file.mimeType.startsWith('video/') ||
+      file.mimeType === 'application/pdf' ||
+      file.mimeType.startsWith('audio/')),
   )
   const action = await ui.openActionSheet(file.name, [
-    ...(canPreview ? [{ id: 'preview', label: 'Preview', icon: 'eye' }] : []),
-    { id: 'download', label: 'Download', icon: 'download' },
+    ...(canPreview ? [{ id: 'preview', label: t.value.preview, icon: 'eye' }] : []),
+    { id: 'download', label: t.value.download, icon: 'download' },
     {
       id: 'favorite',
-      label: favorited ? 'Remove from favorites' : 'Add to favorites',
+      label: favorited ? t.value.removeFromFavorites : t.value.addToFavorites,
       icon: favorited ? 'star-filled' : 'star',
     },
-    { id: 'share', label: 'Share link', icon: 'share' },
-    { id: 'share-user', label: 'Share with user', icon: 'users' },
-    { id: 'rename', label: 'Rename', icon: 'pencil' },
-    { id: 'move', label: 'Move', icon: 'move' },
-    { id: 'vault', label: 'Move to vault', icon: 'lock' },
-    { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
+    { id: 'share', label: t.value.shareLink, icon: 'share' },
+    { id: 'share-user', label: t.value.shareWithUser, icon: 'users' },
+    { id: 'rename', label: t.value.rename, icon: 'pencil' },
+    { id: 'move', label: t.value.move, icon: 'move' },
+    { id: 'vault', label: t.value.vaultMoveToVault, icon: 'lock' },
+    { id: 'delete', label: t.value.moveToTrash, icon: 'trash', danger: true },
   ])
-  if (action === 'preview') await previewMediaFile({ id: file.id, name: file.name, mimeType: file.mimeType ?? '' })
+  if (action === 'preview')
+    await previewMediaFile({ id: file.id, name: file.name, mimeType: file.mimeType ?? '' })
   if (action === 'download') await downloadFile(file.id)
   if (action === 'favorite') await toggleFavorite(file.id, file.name)
   if (action === 'share') {
@@ -995,7 +1026,11 @@ async function createShareLink(ttl: ShareLinkTTL | null) {
       method: 'POST',
       body: JSON.stringify({ expiresIn: ttl }),
     })
-    const entry = { url: created.url ?? '', expiresAt: created.expiresAt, createdAt: created.createdAt }
+    const entry = {
+      url: created.url ?? '',
+      expiresAt: created.expiresAt,
+      createdAt: created.createdAt,
+    }
     sessionLinks.set(fileId, entry)
     existingLink.value = entry
     ui.showToast('Share link created')
@@ -1059,7 +1094,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <div v-if="pullDistance > 0 || isRefreshing" class="pull-refresh-bar" :style="{ height: `${pullDistance}px` }">
+    <div
+      v-if="pullDistance > 0 || isRefreshing"
+      class="pull-refresh-bar"
+      :style="{ height: `${pullDistance}px` }"
+    >
       <span class="pull-icon" :class="{ spin: isRefreshing }">{{ isRefreshing ? '↻' : '↓' }}</span>
     </div>
     <Transition name="page">
@@ -1190,9 +1229,15 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         >
           <Icon :name="viewMode === 'list' ? 'palette' : 'file'" :size="18" />
         </button>
-        <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">{{ t.newFolder }}</button>
-        <button class="btn accent desktop-only" type="button" @click="triggerUpload">{{ t.upload }}</button>
-        <button class="btn desktop-only" type="button" @click="triggerFolderUpload">{{ t.uploadFolder }}</button>
+        <button class="btn desktop-only" type="button" @click="folderSheetOpen = true">
+          {{ t.newFolder }}
+        </button>
+        <button class="btn accent desktop-only" type="button" @click="triggerUpload">
+          {{ t.upload }}
+        </button>
+        <button class="btn desktop-only" type="button" @click="triggerFolderUpload">
+          {{ t.uploadFolder }}
+        </button>
       </div>
     </div>
 
@@ -1209,7 +1254,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <LoadingSkeletonFiles v-if="segment === 'all' && loading && !searchResults" mode="browse" />
     <LoadingSkeletonFiles v-else-if="searchLoading" mode="search" />
 
-    <TransitionGroup v-if="segment === 'all' && !loading && searchResults" name="row" tag="section" class="list">
+    <TransitionGroup
+      v-if="segment === 'all' && !loading && searchResults"
+      name="row"
+      tag="section"
+      class="list"
+    >
       <h2 key="search-title" class="section-title">
         {{ searchResults.folders.length + searchResults.files.length }} {{ t.results }}
         <template v-if="hasActiveFilters"> · {{ t.filtered }}<!-- · filtered --></template>
@@ -1217,7 +1267,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <div v-if="hasActiveFilters" key="filter-chips" class="filter-chips">
         <span v-for="chip in activeFilterChips" :key="chip.key" class="filter-chip">
           {{ chip.label }}
-          <button type="button" class="chip-remove" :aria-label="t.removeFilterAria" @click="removeFilter(chip.key)">
+          <button
+            type="button"
+            class="chip-remove"
+            :aria-label="t.removeFilterAria"
+            @click="removeFilter(chip.key)"
+          >
             ×
           </button>
         </span>
@@ -1229,8 +1284,15 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         class="row tappable"
         @click="openFolder(folder.id)"
       >
-        <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
-        <button class="btn icon-only" type="button" aria-label="Open folder" @click.stop="openFolder(folder.id)">
+        <span class="name"
+          ><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span
+        >
+        <button
+          class="btn icon-only"
+          type="button"
+          aria-label="Open folder"
+          @click.stop="openFolder(folder.id)"
+        >
           <Icon name="arrow-right" :size="18" />
         </button>
       </div>
@@ -1240,9 +1302,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         class="row tappable"
         @click="openFileActions(file)"
       >
-        <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
+        <span class="name"
+          ><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span
+        >
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+        <button
+          class="btn icon-only"
+          type="button"
+          aria-label="File actions"
+          @click.stop="openFileActions(file)"
+        >
           <Icon name="more" :size="18" />
         </button>
       </div>
@@ -1315,7 +1384,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         @click="onItemClick($event, 'folder', folder.id)"
         @keydown="onItemKeydown($event, 'folder', folder.id)"
       >
-        <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFolderIds.has(folder.id) }">
+        <span
+          v-if="isSelecting"
+          class="checkbox-indicator"
+          :class="{ checked: selectedFolderIds.has(folder.id) }"
+        >
           <Icon v-if="selectedFolderIds.has(folder.id)" name="check" :size="14" />
         </span>
         <div class="file-icon-badge folder-badge">
@@ -1353,24 +1426,27 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         @click="onFileItemClick($event, file)"
         @keydown="onFileItemKeydown($event, file)"
       >
-        <span v-if="isSelecting" class="checkbox-indicator" :class="{ checked: selectedFileIds.has(file.id) }">
+        <span
+          v-if="isSelecting"
+          class="checkbox-indicator"
+          :class="{ checked: selectedFileIds.has(file.id) }"
+        >
           <Icon v-if="selectedFileIds.has(file.id)" name="check" :size="14" />
         </span>
         <div
           class="file-icon-badge"
           :style="{
             background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
-            color: mimeCategoryColor(file.mimeType, file.name)
+            color: mimeCategoryColor(file.mimeType, file.name),
           }"
         >
-          <Icon
-            :name="isFavorited(file.id) ? 'star-filled' : mimeIcon(file.mimeType)"
-            :size="20"
-          />
+          <Icon :name="isFavorited(file.id) ? 'star-filled' : mimeIcon(file.mimeType)" :size="20" />
         </div>
         <div class="file-item-info">
           <span class="file-item-title">{{ file.name }}</span>
-          <span class="file-item-sub">{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span>
+          <span class="file-item-sub"
+            >{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span
+          >
         </div>
         <button
           v-if="!isSelecting"
@@ -1412,16 +1488,23 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
             class="file-icon-badge"
             :style="{
               background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
-              color: mimeCategoryColor(file.mimeType, file.name)
+              color: mimeCategoryColor(file.mimeType, file.name),
             }"
           >
-            <Icon name="star-filled" :size="20" style="color: #f59e0b;" />
+            <Icon name="star-filled" :size="20" style="color: #f59e0b" />
           </div>
           <div class="file-item-info">
             <span class="file-item-title">{{ file.name }}</span>
-            <span class="file-item-sub">{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span>
+            <span class="file-item-sub"
+              >{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span
+            >
           </div>
-          <button class="file-item-more-btn" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+          <button
+            class="file-item-more-btn"
+            type="button"
+            aria-label="File actions"
+            @click.stop="openFileActions(file)"
+          >
             <Icon name="more" :size="18" />
           </button>
         </div>
@@ -1436,13 +1519,15 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     </TransitionGroup>
 
     <input ref="fileInputRef" type="file" class="sr-only" multiple @change="onUploadChange" />
-    <input ref="folderInputRef" type="file" class="sr-only" webkitdirectory @change="onFolderUploadChange" />
-
-    <UploadFab
-      v-if="segment === 'all' && !isSelecting"
-      :label="t.uploadFile"
-      @click="onFabClick"
+    <input
+      ref="folderInputRef"
+      type="file"
+      class="sr-only"
+      webkitdirectory
+      @change="onFolderUploadChange"
     />
+
+    <UploadFab v-if="segment === 'all' && !isSelecting" :label="t.uploadFile" @click="onFabClick" />
 
     <BatchActionBar
       v-if="isSelecting"
@@ -1465,10 +1550,16 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <span>{{ t.folderName }}</span>
         <input v-model="newFolderName" type="text" @keyup.enter="createFolder" />
       </label>
-      <button type="button" class="btn block ink" @click="createFolder">{{ t.createFolder }}</button>
+      <button type="button" class="btn block ink" @click="createFolder">
+        {{ t.createFolder }}
+      </button>
     </BottomSheet>
 
-    <BottomSheet :open="breadcrumbSheetOpen" :title="t.location" @close="breadcrumbSheetOpen = false">
+    <BottomSheet
+      :open="breadcrumbSheetOpen"
+      :title="t.location"
+      @close="breadcrumbSheetOpen = false"
+    >
       <div class="breadcrumb-sheet-list">
         <button
           type="button"
@@ -1491,7 +1582,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         </button>
         <div v-if="browser?.folder" class="breadcrumb-sheet-item current">
           <Icon name="folder" :size="20" />
-          <span><strong>{{ browser.folder.name }}</strong> ({{ t.current }})</span>
+          <span
+            ><strong>{{ browser.folder.name }}</strong> ({{ t.current }})</span
+          >
         </div>
       </div>
     </BottomSheet>
@@ -1611,7 +1704,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   color: var(--muted);
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--duration-short) var(--ease-standard), color var(--duration-short) var(--ease-standard);
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    color var(--duration-short) var(--ease-standard);
 }
 
 .segment-tab.active {
@@ -1785,8 +1880,12 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .row.selected {
@@ -1805,7 +1904,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: var(--surface);
   flex-shrink: 0;
   color: #fff;
-  transition: background var(--duration-short) var(--ease-standard), border-color var(--duration-short) var(--ease-standard);
+  transition:
+    background var(--duration-short) var(--ease-standard),
+    border-color var(--duration-short) var(--ease-standard);
 }
 
 .checkbox-indicator.checked {
@@ -1872,7 +1973,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   border-radius: 9999px;
   padding: 8px 16px;
   margin-bottom: var(--space-md);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .files-search-wrap:focus-within {
@@ -2058,7 +2161,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   cursor: pointer;
   text-decoration: none;
   color: inherit;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .vault-entry-card:focus-visible {
@@ -2139,7 +2244,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   border-radius: var(--radius-md, 12px);
   background: var(--canvas);
   border: 1px solid transparent;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
   user-select: none;
 }
 
