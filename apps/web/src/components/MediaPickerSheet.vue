@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import type { Timeline, TimelineItem } from '@/api/types'
+import { useI18n } from '@/lib/i18n'
+import { mediaPickerCopy } from '@/lib/mediaPickerCopy'
 
 const props = defineProps<{
   open: boolean
@@ -17,6 +19,8 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { t, locale } = useI18n()
+const copy = computed(() => mediaPickerCopy(locale.value))
 const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
 const loading = ref(false)
@@ -52,7 +56,7 @@ async function loadInitial() {
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load photos')
+    error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
     loading.value = false
   }
@@ -67,7 +71,7 @@ async function loadMore() {
     groups.value = [...groups.value, ...data.groups]
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load more')
+    error.value = formatApiError(e, copy.value.loadMoreFailed)
   } finally {
     loadingMore.value = false
   }
@@ -88,10 +92,10 @@ watch(
 </script>
 
 <template>
-  <BottomSheet :open="open" title="Add to album" @close="emit('close')">
-    <p class="muted hint">Tap a photo or video to add it.</p>
+  <BottomSheet :open="open" :title="copy.title" @close="emit('close')">
+    <p class="muted hint">{{ copy.hint }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+    <p v-if="loading" class="muted">{{ t.loading }}</p>
 
     <div v-else class="grid photos picker-grid">
       <PhotoThumb
@@ -106,8 +110,8 @@ watch(
 
     <EmptyState
       v-if="!loading && flattenItems().length === 0"
-      title="No media available"
-      description="Upload photos or videos in My Files first."
+      :title="copy.emptyTitle"
+      :description="copy.emptyDescription"
     />
 
     <button
@@ -117,7 +121,7 @@ watch(
       :disabled="loadingMore"
       @click="loadMore"
     >
-      {{ loadingMore ? 'Loading…' : 'Load more' }}
+      {{ loadingMore ? t.loading : t.loadMore }}
     </button>
   </BottomSheet>
 </template>
