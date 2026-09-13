@@ -721,7 +721,7 @@ async function batchDelete() {
 async function batchFavorite() {
   const fileIds = Array.from(selectedFileIds.value)
   if (fileIds.length === 0) {
-    ui.showToast('No files selected to favorite', 'info')
+    ui.showToast(t.value.favoriteNoneSelected, 'info')
     return
   }
   error.value = ''
@@ -729,11 +729,11 @@ async function batchFavorite() {
     for (const id of fileIds) {
       await api(`/files/${id}/favorite`, { method: 'PUT' })
     }
-    ui.showToast(`Added ${fileIds.length} files to favorites`)
+    ui.showToast(t.value.favoriteBatchAdded.replace('{n}', String(fileIds.length)))
     clearSelection()
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to favorite items')
+    error.value = formatApiError(e, t.value.favoriteBatchFailed)
   }
 }
 
@@ -826,7 +826,7 @@ async function loadFavorites() {
     const out = await api<{ files: FavoriteFile[] }>('/files/favorites')
     favorites.value = out.files
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load favorites')
+    error.value = formatApiError(e, t.value.favoritesLoadFailed)
   } finally {
     favoritesLoading.value = false
   }
@@ -852,14 +852,14 @@ async function toggleFavorite(fileId: string, name: string) {
   try {
     if (wasFavorited) {
       await api(`/files/${fileId}/favorite`, { method: 'DELETE' })
-      ui.showToast(`Removed "${name}" from favorites`)
+      ui.showToast(t.value.favoriteRemoved.replace('{name}', () => name))
     } else {
       await api(`/files/${fileId}/favorite`, { method: 'PUT' })
-      ui.showToast(`Added "${name}" to favorites`)
+      ui.showToast(t.value.favoriteAdded.replace('{name}', () => name))
     }
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to update favorite')
+    error.value = formatApiError(e, t.value.favoriteUpdateFailed)
   }
 }
 
