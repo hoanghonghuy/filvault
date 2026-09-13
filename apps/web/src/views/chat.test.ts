@@ -68,7 +68,17 @@ describe('chat surface contract', () => {
 
   it('localizes Chat details and reaction controls', () => {
     const i18n = readSrc('../lib/i18n.ts')
-    for (const key of ['resizeChatDetailsAria', 'resizeChatDetailsTitle', 'messageLabel', 'addReaction', 'chooseReaction']) {
+    for (const key of [
+      'resizeChatDetailsAria',
+      'resizeChatDetailsTitle',
+      'privacyAndSupport',
+      'pressEnterToSearch',
+      'searchingMessages',
+      'peekUnreadBadge',
+      'messageLabel',
+      'addReaction',
+      'chooseReaction',
+    ]) {
       expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
     }
     expect(chat).toMatch(/:aria-label="t\.resizeChatDetailsAria"/)
@@ -76,9 +86,23 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/\{\{ t\.messageLabel \}\}/)
     expect(chat).toMatch(/:aria-label="t\.addReaction"/)
     expect(chat).toMatch(/:title="t\.chooseReaction"/)
+    expect(chat.match(/\{\{ t\.callVoice \}\}/g)).toHaveLength(2)
+    expect(chat.match(/\{\{ t\.callVideo \}\}/g)).toHaveLength(2)
+    expect(chat.match(/\{\{ t\.privacyAndSupport \}\}/g)).toHaveLength(2)
+    expect(chat.match(/\{\{ t\.pressEnterToSearch \}\}/g)).toHaveLength(2)
+    expect(chat.match(/\{\{ t\.searchingMessages \}\}/g)).toHaveLength(2)
+    expect(chat.match(/\{\{ t\.noMessagesFound \}\}/g)).toHaveLength(2)
+    expect(chat).toMatch(/\{\{ t\.peekUnreadBadge \}\}/)
+    expect(chat).toMatch(/return t\.value\.search/)
+    expect(chat).toMatch(/return t\.value\.sharedMedia/)
     expect(chat).not.toMatch(/aria-label="Resize chat details panel"/)
     expect(chat).not.toMatch(/aria-label="Thêm biểu tượng khác"/)
     expect(chat).not.toMatch(/title="Chọn biểu tượng cảm xúc"/)
+    expect(chat).not.toMatch(/>\s*Gọi (thoại|video)\s*</)
+    expect(chat).not.toMatch(/Quyền riêng tư và hỗ trợ/)
+    expect(chat).not.toMatch(/Nhấn "Enter" để tìm kiếm/)
+    expect(chat).not.toMatch(/Đang tìm kiếm/)
+    expect(chat).not.toMatch(/Chế độ xem trước • Chưa dính đã xem/)
   })
 
   it('supports search, media panel and attachment uploads', () => {
