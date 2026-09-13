@@ -175,6 +175,7 @@ smoke_log "download verified (sha256 match)"
 
 smoke_step "restart"
 restart_app_services
+wait_origin "post-restart edge"
 
 smoke_step "persist"
 smoke_login

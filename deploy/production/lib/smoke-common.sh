@@ -137,6 +137,20 @@ wait_readyz() {
   smoke_fail "$label: API /readyz did not return ready within 120s"
 }
 
+wait_origin() {
+  local label="${1:-origin}"
+  local i code
+  for i in $(seq 1 30); do
+    code="$(http_code "$ORIGIN/")"
+    if [[ "$code" == "200" ]]; then
+      smoke_log "$label: edge reachable (${i} attempts)"
+      return 0
+    fi
+    sleep 1
+  done
+  smoke_fail "$label: edge did not return HTTP 200 within 30s"
+}
+
 mailpit_verification_code() {
   local email="$1"
   local i msg_id body digits
