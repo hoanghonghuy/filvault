@@ -139,8 +139,10 @@ assert_http "$API_LAST_CODE" "201" "upload session"
 FILE_ID="$(jq -r '.fileId' <<<"$API_LAST_BODY")"
 UPLOAD_URL="$(jq -r '.uploadUrl' <<<"$API_LAST_BODY")"
 
+upload_host="${UPLOAD_URL#*://}"
+upload_host="${upload_host%%/*}"
 put_code="$(curl -sk -o /dev/null -w '%{http_code}' -X PUT "$UPLOAD_URL" \
-  -H 'Content-Type: text/plain' --data-binary @"$FIXTURE")"
+  -H 'Content-Type: text/plain' -H "X-Presigned-Host: $upload_host" --data-binary @"$FIXTURE")"
 if [[ "$put_code" != "200" ]]; then
   smoke_fail "S3 PUT failed HTTP $put_code (presigned upload)"
 fi
