@@ -25,8 +25,10 @@ describe('VaultView UX contract', () => {
     expect(vault).toMatch(/t\.value\.vaultLockedToast/)
     expect(vault).toMatch(/t\.vaultPinPlaceholder/)
     expect(vault).toMatch(/t\.vaultGoToMyFiles/)
+    expect(vault).toMatch(/t\.value\.vaultDownloadFailed/)
     expect(vault).not.toContain("'Kho cá nhân đã tự động khóa'")
     expect(vault).not.toContain("'Đi tới Tệp của tôi'")
+    expect(vault).not.toContain("formatApiError(e, 'Download failed')")
   })
 
   it('shows distinct credential visibility icons and accessible labels', () => {
