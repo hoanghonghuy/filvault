@@ -625,6 +625,8 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/selectPhotoFromPersonalStorage/)
     expect(chat).toMatch(/wallpaper-custom-section/)
     expect(chat).toMatch(/delete-custom-wp-btn/)
+    expect(chat.match(/@keydown\.enter\.self="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g)).toHaveLength(2)
+    expect(chat.match(/@keydown\.space\.self\.prevent="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g)).toHaveLength(2)
   })
 })
 
