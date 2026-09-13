@@ -1001,18 +1001,18 @@ async function createShareLink(ttl: ShareLinkTTL | null) {
     const entry = { url: created.url ?? '', expiresAt: created.expiresAt, createdAt: created.createdAt }
     sessionLinks.set(fileId, entry)
     existingLink.value = entry
-    ui.showToast('Share link created')
+    ui.showToast(t.value.shareLinkCreated)
   } catch (e) {
-    error.value = formatApiError(e, 'Could not create link')
+    error.value = formatApiError(e, t.value.shareLinkCreateFailed)
   }
 }
 
 async function copyShareLink(url: string) {
   try {
     await navigator.clipboard.writeText(window.location.origin + url)
-    ui.showToast('Link copied')
+    ui.showToast(t.value.shareLinkCopied)
   } catch {
-    ui.showToast('Copy failed', 'info')
+    ui.showToast(t.value.shareLinkCopyFailed, 'info')
   }
 }
 
@@ -1020,9 +1020,9 @@ async function revokeShareLink() {
   const fileId = shareTargetId.value
   if (!fileId) return
   const ok = await ui.confirm({
-    title: 'Revoke link?',
-    message: 'Anyone who has this link will lose access immediately.',
-    confirmLabel: 'Revoke link',
+    title: t.value.shareLinkRevokeTitle,
+    message: t.value.shareLinkRevokeMessage,
+    confirmLabel: t.value.shareLinkRevokeConfirm,
     danger: true,
   })
   if (!ok) return
@@ -1031,9 +1031,9 @@ async function revokeShareLink() {
     await api(`/files/${fileId}/share`, { method: 'DELETE' })
     sessionLinks.delete(fileId)
     existingLink.value = null
-    ui.showToast('Link revoked')
+    ui.showToast(t.value.shareLinkRevoked)
   } catch (e) {
-    error.value = formatApiError(e, 'Could not revoke link')
+    error.value = formatApiError(e, t.value.shareLinkRevokeFailed)
   }
 }
 
@@ -1044,9 +1044,14 @@ const shareUserTargetId = ref<string | null>(null)
 function onUserShared(result: { invited: boolean; email: string }) {
   const name = shareUserFileName.value
   if (result.invited) {
-    ui.showToast(`Invitation sent to ${result.email}`)
+    ui.showToast(t.value.shareInvitationSent.replace('{email}', () => result.email))
   } else {
-    ui.showToast(`Shared "${name}" with ${result.email}`, 'success')
+    ui.showToast(
+      t.value.shareUserSuccess
+        .replace('{name}', () => name)
+        .replace('{email}', () => result.email),
+      'success',
+    )
   }
 }
 
