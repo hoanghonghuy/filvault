@@ -66,6 +66,11 @@ describe('VaultView UX contract', () => {
     expect(vault).toContain('@click.stop="openFileMenu(file)"')
     expect(vault).toMatch(/\.vault-file-row:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)[\s\S]*?outline-offset:\s*2px/)
   })
+  it('gives each vault file action control a filename-specific accessible name', () => {
+    expect(vault).toContain(':aria-label="`${t.vaultFileActions}: ${file.name}`"')
+    expect(vault).not.toContain(':aria-label="t.vaultFileActions"')
+  })
+
   it('keeps localized file dates reactive and hides their separator when no date can be rendered', () => {
     expect(vault).toContain("const { t, locale } = useI18n()")
     expect(vault).toContain('v-if="formatVaultDate(file.createdAt, locale)"')
