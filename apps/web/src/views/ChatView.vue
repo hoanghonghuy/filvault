@@ -404,7 +404,7 @@ async function selectPhotoFromChatMedia(photo: ChatAttachment) {
   const customItem: ChatCustomWallpaper = {
     id: generateUUID(),
     url: photoUrl,
-    name: photo.name || photo.originalName || 'Ảnh đoạn chat',
+    name: photo.name || photo.originalName || t.value.chatMediaFallbackName,
     source: 'chat_media',
     sourceId: photo.id,
     createdAt: new Date().toISOString(),
@@ -432,7 +432,7 @@ async function selectPhotoFromPersonalStorage(item: TimelineItem) {
   const customItem: ChatCustomWallpaper = {
     id: generateUUID(),
     url: photoUrl,
-    name: item.name || 'Ảnh kho cá nhân',
+    name: item.name || t.value.personalPhotoFallbackName,
     source: 'storage',
     sourceId: item.id,
     createdAt: new Date().toISOString(),
@@ -586,7 +586,7 @@ async function handleWallpaperUpload(event: Event) {
     const customItem: ChatCustomWallpaper = {
       id: generateUUID(),
       url: dataUrl,
-      name: file.name || 'Ảnh tải lên',
+      name: file.name || t.value.uploadedImageFallbackName,
       source: 'uploaded',
       createdAt: new Date().toISOString(),
     }
@@ -659,6 +659,10 @@ const infoSearching = ref(false)
 const infoSearchDone = ref(false)
 const infoSearchInputRef = ref<HTMLInputElement | null>(null)
 
+function formatInfoSearchResults(count: number): string {
+  return t.value.searchResultsCount.replace('{count}', String(count))
+}
+
 interface SharedLinkItem {
   url: string
   domain: string
@@ -687,11 +691,11 @@ const sharedFiles = computed(() =>
 const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`]+)/gi
 
 function messageSenderName(msg: ChatMessage): string {
-  if (msg.senderId === auth.user?.id) return 'Bạn'
+  if (msg.senderId === auth.user?.id) return t.value.chatSenderYou
   const c = conversations.value.find((item) => item.id === msg.conversationId)
   if (c?.peer?.name) return c.peer.name
   if (c?.peer?.email) return c.peer.email
-  return 'Người gửi'
+  return t.value.chatSenderFallback
 }
 
 const sharedLinks = computed<SharedLinkItem[]>(() => {
@@ -1302,7 +1306,7 @@ function triggerReplyMessage() {
   const msg = activeMessage.value
   messageMenuOpen.value = false
   if (!msg) return
-  const preview = msg.body ? (msg.body.length > 50 ? msg.body.slice(0, 50) + '…' : msg.body) : 'Tệp đính kèm'
+  const preview = msg.body ? (msg.body.length > 50 ? msg.body.slice(0, 50) + '…' : msg.body) : t.value.chatReplyAttachmentFallback
   draft.value = `> ${preview}\n`
   focusComposer(true)
 }
@@ -2804,7 +2808,7 @@ watch(
                       v-if="item.previewUrl"
                       :src="item.previewUrl"
                       class="pending-image-thumb"
-                      alt="Đang gửi ảnh..."
+                      :alt="t.sendingImageAlt"
                     />
                     <div v-else class="pending-image-placeholder">
                       <div class="pending-skeleton-pulse" />
@@ -3388,7 +3392,7 @@ watch(
               v-if="infoSearchDone && infoSearchResults.length"
               class="info-search-results-tag"
             >
-              {{ infoSearchResults.length }} kết quả
+              {{ formatInfoSearchResults(infoSearchResults.length) }}
             </span>
             <button
               v-if="infoSearchQuery"
@@ -4332,7 +4336,7 @@ watch(
               v-if="infoSearchDone && infoSearchResults.length"
               class="info-search-results-tag"
             >
-              {{ infoSearchResults.length }} kết quả
+              {{ formatInfoSearchResults(infoSearchResults.length) }}
             </span>
             <button
               v-if="infoSearchQuery"
