@@ -1183,7 +1183,7 @@ function conversationTitle(conversation: ChatConversation | null): string {
   if (!conversation) return ''
   const nick = nicknames.value[conversation.id]
   if (nick) return nick
-  return conversation.peer?.name || conversation.peer?.email || conversation.title || 'Untitled chat'
+  return conversation.peer?.name || conversation.peer?.email || conversation.title || t.value.untitledChat
 }
 
 function avatarClass(title: string): string {
@@ -1807,9 +1807,9 @@ function formatDayLabel(iso: string): string {
   const today = new Date()
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
-  if (date.toDateString() === today.toDateString()) return 'Today'
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  if (date.toDateString() === today.toDateString()) return t.value.today
+  if (date.toDateString() === yesterday.toDateString()) return t.value.yesterday
+  return date.toLocaleDateString(locale.value === 'vi' ? 'vi-VN' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatTime(iso: string): string {
@@ -1966,8 +1966,8 @@ async function removeMessage(message: ChatMessage) {
 }
 
 function attachmentLabel(attachment: ChatAttachment): string {
-  if (attachment.availability === 'trashed') return 'File moved to Trash'
-  if (attachment.availability === 'purged') return 'File permanently deleted'
+  if (attachment.availability === 'trashed') return t.value.fileMovedToTrash
+  if (attachment.availability === 'purged') return t.value.filePermanentlyDeleted
   return ''
 }
 

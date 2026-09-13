@@ -529,6 +529,23 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/shared-file-item/)
   })
 
+  it('keeps Chat date separators and fallback metadata locale-aware', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    expect(i18n).toContain("today: 'Hôm nay'")
+    expect(i18n).toContain("today: 'Today'")
+    expect(i18n).toContain("untitledChat: 'Cuộc trò chuyện chưa đặt tên'")
+    expect(i18n).toContain("fileMovedToTrash: 'Tệp đã được chuyển vào Thùng rác'")
+    expect(i18n).toContain("filePermanentlyDeleted: 'Tệp đã bị xóa vĩnh viễn'")
+    expect(chat).toMatch(/return t\.value\.today/)
+    expect(chat).toMatch(/return t\.value\.yesterday/)
+    expect(chat).toMatch(/locale\.value === 'vi' \? 'vi-VN' : 'en-US'/)
+    expect(chat).toMatch(/t\.value\.untitledChat/)
+    expect(chat).toMatch(/t\.value\.fileMovedToTrash/)
+    expect(chat).toMatch(/t\.value\.filePermanentlyDeleted/)
+    expect(chat).not.toContain("return 'Today'")
+    expect(chat).not.toContain("return 'Yesterday'")
+  })
+
   it('supports custom wallpaper collection, safe unlinking, and storage picker modal', () => {
     expect(chat).toMatch(/chatCustomWallpapers/)
     expect(chat).toMatch(/currentConversationCustomWallpapers/)
