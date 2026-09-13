@@ -340,9 +340,9 @@ onMounted(load)
   justify-content: center;
   min-height: var(--touch-min);
   gap: 6px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
   border-radius: var(--radius-pill, 9999px);
   padding: 6px 14px;
   font-size: 13px;
@@ -358,7 +358,7 @@ onMounted(load)
 }
 
 .empty-trash-btn:active:not(:disabled) {
-  background: rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
 }
 
 .trash-list {
@@ -398,8 +398,8 @@ onMounted(load)
 }
 
 .folder-badge {
-  background: rgba(245, 158, 11, 0.14);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
 }
 
 .trash-item-info {
@@ -454,11 +454,11 @@ onMounted(load)
 }
 
 .trash-action-btn.danger {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .trash-action-btn.danger:active:not(:disabled) {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--danger-soft);
 }
 
 .files-section {
