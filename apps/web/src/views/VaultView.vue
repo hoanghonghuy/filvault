@@ -215,6 +215,13 @@ async function previewMediaFile(file: VaultFile) {
   }
 }
 
+function onVaultFileKeydown(event: KeyboardEvent, file: VaultFile) {
+  if (event.target !== event.currentTarget) return
+  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
+  event.preventDefault()
+  void previewMediaFile(file)
+}
+
 async function removeSelectedFileFromVault() {
   if (!selectedFile.value) return
   const f = selectedFile.value
@@ -424,7 +431,11 @@ function formatDate(iso: string): string {
           v-for="file in vault.files"
           :key="file.id"
           class="vault-file-row tappable"
+          role="button"
+          tabindex="0"
+          :aria-label="file.name"
           @click="previewMediaFile(file)"
+          @keydown="onVaultFileKeydown($event, file)"
         >
           <div class="file-icon-box" :class="mimeIcon(file.mimeType)">
             <Icon :name="mimeIcon(file.mimeType)" :size="24" />
@@ -922,6 +933,11 @@ function formatDate(iso: string): string {
 .vault-file-row:hover {
   background: var(--surface-soft);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.vault-file-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .file-icon-box {
