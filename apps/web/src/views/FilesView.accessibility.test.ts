@@ -19,4 +19,11 @@ describe('FilesView accessibility contract', () => {
     expect(toolbarRule).toContain('width: var(--touch-min);')
     expect(toolbarRule).toContain('height: var(--touch-min);')
   })
+  it('keeps search-clear control touch-accessible', () => {
+    const clearRule = source.match(/\.files-search-clear\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+
+    expect(clearRule).toContain('width: var(--touch-min);')
+    expect(clearRule).toContain('height: var(--touch-min);')
+  })
+
 })
