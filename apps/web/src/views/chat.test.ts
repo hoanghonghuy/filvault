@@ -66,6 +66,21 @@ describe('chat surface contract', () => {
     expect(chat).not.toMatch(/>\s*Cancel upload\s*</)
   })
 
+  it('localizes Chat details and reaction controls', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    for (const key of ['resizeChatDetailsAria', 'resizeChatDetailsTitle', 'messageLabel', 'addReaction', 'chooseReaction']) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+    expect(chat).toMatch(/:aria-label="t\.resizeChatDetailsAria"/)
+    expect(chat).toMatch(/:title="t\.resizeChatDetailsTitle"/)
+    expect(chat).toMatch(/\{\{ t\.messageLabel \}\}/)
+    expect(chat).toMatch(/:aria-label="t\.addReaction"/)
+    expect(chat).toMatch(/:title="t\.chooseReaction"/)
+    expect(chat).not.toMatch(/aria-label="Resize chat details panel"/)
+    expect(chat).not.toMatch(/aria-label="Thêm biểu tượng khác"/)
+    expect(chat).not.toMatch(/title="Chọn biểu tượng cảm xúc"/)
+  })
+
   it('supports search, media panel and attachment uploads', () => {
     expect(chat).toMatch(/\/chat\/conversations/)
     expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/messages\/search/)
