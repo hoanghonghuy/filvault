@@ -2083,8 +2083,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: var(--accent-soft);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
