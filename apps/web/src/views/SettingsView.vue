@@ -448,7 +448,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="card section appearance-section">
+    <section id="appearance" class="card section appearance-section">
       <div class="section-title-row">
         <h2 class="section-title">{{ t.appearance }}</h2>
         <span class="immediate-badge">{{ t.appliesImmediately }}</span>

@@ -47,9 +47,11 @@ describe('dark mode contract', () => {
     expect(themeView).not.toMatch(/document\.documentElement\.dataset\.theme/)
   })
 
-  it('routes Chat quick toggle through the canonical appearance API', () => {
+  it('keeps Chat appearance read-only and routes global changes to canonical Settings', () => {
     expect(chatView).toMatch(/useTheme\(\)/)
-    expect(chatView).toMatch(/toggleResolvedAppearance/)
+    expect(chatView).toMatch(/resolvedIsDark/)
+    expect(chatView).toMatch(/navigateTo\('\/settings#appearance'\)/)
+    expect(chatView).not.toMatch(/toggleResolvedAppearance/)
     expect(chatView).not.toMatch(/localStorage\.setItem\('filvault\.theme'/)
     expect(chatView).not.toMatch(/localStorage\.removeItem\('filvault\.theme'/)
     expect(chatView).not.toMatch(/document\.documentElement\.dataset\.theme/)
