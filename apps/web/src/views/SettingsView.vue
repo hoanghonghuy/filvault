@@ -921,13 +921,13 @@ onMounted(() => {
   width: 52px;
   height: 52px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .profile-avatar-img {
@@ -939,7 +939,7 @@ onMounted(() => {
 .profile-avatar-initials {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--on-accent);
   letter-spacing: 0.5px;
 }
 
