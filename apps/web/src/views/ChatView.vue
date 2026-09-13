@@ -793,10 +793,10 @@ function formatSearchSnippet(body: string, query: string): string {
 }
 
 const chatInfoTitle = computed(() => {
-  if (chatInfoCurrentView.value === 'search') return 'Tìm kiếm'
-  if (chatInfoCurrentView.value === 'media') return 'File phương tiện và file'
-  if (chatInfoCurrentView.value === 'wallpaper') return t.value.chatWallpaper || 'Hình nền đoạn chat'
-  return t.value.chatInfo || 'Thông tin đoạn chat'
+  if (chatInfoCurrentView.value === 'search') return t.value.search
+  if (chatInfoCurrentView.value === 'media') return t.value.sharedMedia
+  if (chatInfoCurrentView.value === 'wallpaper') return t.value.chatWallpaper
+  return t.value.chatInfo
 })
 
 function openInfoSearchView() {
@@ -3217,7 +3217,7 @@ watch(
                 @click="initiateCall(false)"
               >
                 <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-                <span>Gọi thoại</span>
+                <span>{{ t.callVoice }}</span>
               </button>
               <button
                 type="button"
@@ -3225,7 +3225,7 @@ watch(
                 @click="initiateCall(true)"
               >
                 <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-                <span>Gọi video</span>
+                <span>{{ t.callVideo }}</span>
               </button>
             </template>
             <button
@@ -3344,7 +3344,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('privacy')"
             >
-              <span class="menu-section-label">Quyền riêng tư và hỗ trợ</span>
+              <span class="menu-section-label">{{ t.privacyAndSupport }}</span>
               <Icon
                 :name="infoSectionsOpen.privacy ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3395,13 +3395,13 @@ watch(
           </div>
 
           <div v-if="infoSearching" class="subpage-status">
-            Đang tìm kiếm...
+            {{ t.searchingMessages }}
           </div>
           <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
-            <p class="search-enter-hint">Nhấn "Enter" để tìm kiếm.</p>
+            <p class="search-enter-hint">{{ t.pressEnterToSearch }}</p>
           </div>
           <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
-            <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
+            <p>{{ t.noMessagesFound }}</p>
           </div>
           <div v-else-if="infoSearchResults.length" class="subpage-results-container">
             <div class="info-search-list">
@@ -4075,7 +4075,7 @@ watch(
           </span>
           <div class="peek-meta">
             <h4>{{ conversationTitle(peekConv) }}</h4>
-            <span class="peek-badge">Chế độ xem trước • Chưa dính đã xem</span>
+            <span class="peek-badge">{{ t.peekUnreadBadge }}</span>
           </div>
         </div>
 
@@ -4161,7 +4161,7 @@ watch(
                 @click="initiateCall(false); threadInfoOpen = false"
               >
                 <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-                <span>Gọi thoại</span>
+                <span>{{ t.callVoice }}</span>
               </button>
               <button
                 type="button"
@@ -4169,7 +4169,7 @@ watch(
                 @click="initiateCall(true); threadInfoOpen = false"
               >
                 <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-                <span>Gọi video</span>
+                <span>{{ t.callVideo }}</span>
               </button>
             </template>
             <button
@@ -4288,7 +4288,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('privacy')"
             >
-              <span class="menu-section-label">Quyền riêng tư và hỗ trợ</span>
+              <span class="menu-section-label">{{ t.privacyAndSupport }}</span>
               <Icon
                 :name="infoSectionsOpen.privacy ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -4339,13 +4339,13 @@ watch(
           </div>
 
           <div v-if="infoSearching" class="subpage-status">
-            Đang tìm kiếm...
+            {{ t.searchingMessages }}
           </div>
           <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
-            <p class="search-enter-hint">Nhấn "Enter" để tìm kiếm.</p>
+            <p class="search-enter-hint">{{ t.pressEnterToSearch }}</p>
           </div>
           <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
-            <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
+            <p>{{ t.noMessagesFound }}</p>
           </div>
           <div v-else-if="infoSearchResults.length" class="subpage-results-container">
             <div class="info-search-list">
