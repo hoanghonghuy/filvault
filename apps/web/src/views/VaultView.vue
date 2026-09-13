@@ -201,7 +201,7 @@ async function downloadFile(id: string) {
     const out = await api<{ downloadUrl: string }>(`/files/${id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Download failed'), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultDownloadFailed), 'error')
   }
 }
 
