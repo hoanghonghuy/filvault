@@ -163,6 +163,22 @@ describe('chat surface contract', () => {
     }
   })
 
+  it('localizes built-in Chat theme and wallpaper preset names reactively', () => {
+    expect(chat).toMatch(/const localizedChatThemes = computed\(\(\) => chatThemes\.map/)
+    expect(chat).toMatch(/name: theme\.names\[locale\.value\]/)
+    expect(chat.match(/v-for="th in localizedChatThemes"/g)).toHaveLength(2)
+    expect(chat).toMatch(/names: \{ vi: 'Hoàng hôn Tím', en: 'Purple Sunset' \}/)
+    expect(chat).toMatch(/names: \{ vi: 'Hoa anh đào', en: 'Cherry Blossom' \}/)
+    expect(chat).toMatch(/names: \{ vi: 'Rừng nhiệt đới', en: 'Rainforest' \}/)
+    expect(chat).toMatch(/preset\.names\[locale\.value\]/)
+    expect(chat).toMatch(/name: preset\.names\[locale\.value\]/)
+    expect(chat).toMatch(/locale\.value === 'vi' \? 'Mặc định' : 'Default'/)
+    expect(chat).toMatch(/locale\.value === 'vi' \? 'Ảnh tùy chỉnh' : 'Custom image'/)
+
+    expect(chat).not.toMatch(/v-for="th in chatThemes"/)
+    expect(chat).not.toMatch(/if \(preset\) return preset\.name\b/)
+  })
+
   it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
     const i18n = readSrc('../lib/i18n.ts')
 
