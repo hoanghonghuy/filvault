@@ -1953,7 +1953,9 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  padding: 2px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
