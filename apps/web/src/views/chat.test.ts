@@ -98,6 +98,44 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/item\.error \|\| t\.uploadImageFailed/)
   })
 
+  it('localizes Chat message, attachment, and media feedback', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    for (const key of [
+      'chatMediaLoadFailed',
+      'chatMessageEditFailed',
+      'chatMessageRemoveFailed',
+      'chatMessageSendFailed',
+      'chatAttachmentSent',
+      'chatAttachmentSendFailed',
+      'chatDownloadFailed',
+      'chatViewFailed',
+    ]) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMediaLoadFailed\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageEditFailed\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageRemoveFailed\)/)
+    expect(chat.match(/formatApiError\(e, t\.value\.chatMessageSendFailed\)/g)).toHaveLength(2)
+    expect(chat).toMatch(/ui\.showToast\(t\.value\.chatAttachmentSent\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatAttachmentSendFailed\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatDownloadFailed\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatViewFailed\)/)
+
+    for (const stale of [
+      'Failed to load media',
+      'Failed to edit message',
+      'Failed to remove message',
+      'Failed to send message',
+      'Attachment sent',
+      'Failed to send attachment',
+      'Download failed',
+      'View failed',
+    ]) {
+      expect(chat).not.toContain(`'${stale}'`)
+    }
+  })
+
   it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
     const i18n = readSrc('../lib/i18n.ts')
 
