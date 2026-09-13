@@ -217,6 +217,16 @@ function onFileItemKeydown(
   }
 }
 
+function onFavoriteFileKeydown(
+  event: KeyboardEvent,
+  file: { id: string; name: string; mimeType?: string },
+) {
+  if (event.target !== event.currentTarget) return
+  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
+  event.preventDefault()
+  void openFileActions(file)
+}
+
 // Long-press detection
 const { start: startLongPress, move: moveLongPress, end: endLongPress, cancel: cancelLongPress, shouldIgnoreClick } = useLongPress({
   onLongPress: (payload) => {
@@ -1414,7 +1424,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           v-for="file in favorites ?? []"
           :key="file.id"
           class="file-item-card tappable"
+          role="button"
+          tabindex="0"
+          :aria-label="file.name"
           @click="openFileActions(file)"
+          @keydown="onFavoriteFileKeydown($event, file)"
         >
           <div
             class="file-icon-badge"
