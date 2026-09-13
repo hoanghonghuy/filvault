@@ -227,6 +227,25 @@ function onFavoriteFileKeydown(
   void openFileActions(file)
 }
 
+function isPrimaryKeyboardActivation(event: KeyboardEvent) {
+  return event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar'
+}
+
+function onSearchFolderKeydown(event: KeyboardEvent, folderId: string) {
+  if (event.target !== event.currentTarget || !isPrimaryKeyboardActivation(event)) return
+  event.preventDefault()
+  void openFolder(folderId)
+}
+
+function onSearchFileKeydown(
+  event: KeyboardEvent,
+  file: { id: string; name: string; mimeType?: string },
+) {
+  if (event.target !== event.currentTarget || !isPrimaryKeyboardActivation(event)) return
+  event.preventDefault()
+  void openFileActions(file)
+}
+
 // Long-press detection
 const { start: startLongPress, move: moveLongPress, end: endLongPress, cancel: cancelLongPress, shouldIgnoreClick } = useLongPress({
   onLongPress: (payload) => {
@@ -1245,7 +1264,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-for="folder in searchResults.folders"
         :key="folder.id"
         class="row tappable"
+        role="button"
+        tabindex="0"
+        :aria-label="folder.name"
         @click="openFolder(folder.id)"
+        @keydown="onSearchFolderKeydown($event, folder.id)"
       >
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
         <button class="btn icon-only" type="button" :aria-label="`${t.openFolderAria}: ${folder.name}`" @click.stop="openFolder(folder.id)">
@@ -1256,7 +1279,11 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-for="file in searchResults.files"
         :key="file.id"
         class="row tappable"
+        role="button"
+        tabindex="0"
+        :aria-label="file.name"
         @click="openFileActions(file)"
+        @keydown="onSearchFileKeydown($event, file)"
       >
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
