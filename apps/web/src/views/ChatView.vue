@@ -1200,7 +1200,7 @@ function formatRelativeDay(iso: string): string {
   yesterday.setDate(today.getDate() - 1)
   if (date.toDateString() === today.toDateString()) return formatTime(iso)
   if (date.toDateString() === yesterday.toDateString()) return t.value.yesterday
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })
+  return date.toLocaleDateString(locale.value === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'numeric' })
 }
 const inThread = computed({
   get: () => Boolean(selectedId.value),
@@ -1813,7 +1813,7 @@ function formatDayLabel(iso: string): string {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString(locale.value === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 function conversationPreview(conv: ChatConversation): string {
@@ -3068,7 +3068,7 @@ watch(
             />
             <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="18" />
             <span class="media-name">{{ item.name }}</span>
-            <small>{{ new Date(item.createdAt).toLocaleDateString() }}</small>
+            <small>{{ new Date(item.createdAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') }}</small>
           </button>
         </div>
         <p v-else class="muted-hint">{{ t.noSharedMedia }}</p>
@@ -3094,7 +3094,7 @@ watch(
             <span class="file-row-icon"><Icon name="file" :size="18" /></span>
             <span class="file-row-info">
               <span class="file-row-name" :title="item.name">{{ item.name }}</span>
-              <span class="file-row-meta">{{ formatBytes(item.sizeBytes) }} · {{ new Date(item.createdAt).toLocaleDateString() }}</span>
+              <span class="file-row-meta">{{ formatBytes(item.sizeBytes) }} · {{ new Date(item.createdAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') }}</span>
             </span>
             <Icon name="download" :size="16" class="file-row-dl" />
           </button>
