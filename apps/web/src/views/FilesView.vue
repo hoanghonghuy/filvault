@@ -389,7 +389,7 @@ async function loadBrowser() {
     const q = folderId.value ? `?folderId=${folderId.value}` : ''
     browser.value = await api<Browser>(`/browser${q}`)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load files')
+    error.value = formatApiError(e, t.value.filesLoadFailed)
   } finally {
     loading.value = false
   }
@@ -556,10 +556,10 @@ async function createFolder() {
     })
     newFolderName.value = ''
     folderSheetOpen.value = false
-    ui.showToast('Folder created')
+    ui.showToast(t.value.folderCreated)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to create folder')
+    error.value = formatApiError(e, t.value.folderCreateFailed)
   }
 }
 
@@ -598,7 +598,7 @@ async function downloadFile(id: string) {
     const out = await api<DownloadURL>(`/files/${id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, 'Download failed')
+    error.value = formatApiError(e, t.value.fileDownloadFailed)
   }
 }
 
