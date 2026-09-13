@@ -2347,7 +2347,7 @@ watch(
 
 <template>
   <div class="chat-app" :class="{ 'in-thread': inThread, 'resizing-col': isResizingRail || isResizingInfo }" :style="{ '--rail-w': `${railWidth}px`, '--info-w': `${infoWidth}px` }">
-    <aside class="chat-rail" aria-label="Conversations">
+    <aside class="chat-rail" :aria-label="t.chats">
       <!-- Left resizer splitter (Desktop only) -->
       <div
         v-if="isDesktop"
@@ -2359,8 +2359,8 @@ watch(
         :aria-valuenow="railWidth"
         :aria-valuemin="MIN_RAIL_WIDTH"
         :aria-valuemax="MAX_RAIL_WIDTH"
-        aria-label="Resize conversation list"
-        title="Kéo để chỉnh độ rộng danh sách chat (Nhấp đúp để đặt lại)"
+        :aria-label="t.resizeConversationListAria"
+        :title="t.resizeConversationListTitle"
         @pointerdown.stop.prevent="startRailResize"
         @dblclick="resetRailWidth"
         @keydown="onRailResizerKeydown"
@@ -2378,7 +2378,7 @@ watch(
           <span class="chat-mark" aria-hidden="true">F</span>
         </button>
         <h1>{{ t.chats }}</h1>
-        <button type="button" class="icon-btn" aria-label="Back to Filvault" @click="backToVault">
+        <button type="button" class="icon-btn" :aria-label="t.backToFilvault" @click="backToVault">
           <Icon name="folder" :size="20" />
         </button>
         <button type="button" class="compose-btn" :aria-label="t.newChat" @click="promptNewConversation">
@@ -2499,8 +2499,8 @@ watch(
               <button
                 class="icon-btn"
                 type="button"
-                aria-label="Gọi thoại"
-                title="Gọi thoại"
+                :aria-label="t.callVoice"
+                :title="t.callVoice"
                 @click="initiateCall(false)"
               >
                 <Icon name="phone" :size="18" />
@@ -2508,8 +2508,8 @@ watch(
               <button
                 class="icon-btn"
                 type="button"
-                aria-label="Gọi video"
-                title="Gọi video"
+                :aria-label="t.callVideo"
+                :title="t.callVideo"
                 @click="initiateCall(true)"
               >
                 <Icon name="camera" :size="18" />
@@ -2831,7 +2831,7 @@ watch(
                             {{ t.retry || 'Thử lại' }}
                           </button>
                           <button type="button" class="bubble-action-btn cancel" @click="cancelUpload(item.id)">
-                            Cancel upload
+                            {{ t.cancelUpload }}
                           </button>
                         </div>
                       </div>
@@ -2842,8 +2842,8 @@ watch(
                       v-if="item.status === 'uploading' || item.status === 'queued'"
                       type="button"
                       class="pending-bubble-cancel"
-                      title="Cancel upload"
-                      aria-label="Cancel upload"
+                      :title="t.cancelUpload"
+                      :aria-label="t.cancelUpload"
                       @click="cancelUpload(item.id)"
                     >
                       <Icon name="x" :size="13" />
@@ -2861,7 +2861,7 @@ watch(
                     </div>
                     <div v-if="item.status === 'uploading' || item.status === 'queued'" class="pending-file-actions">
                       <span class="pending-file-pct">{{ Math.round((item.progress || 0) * 100) }}%</span>
-                      <button type="button" class="pending-file-cancel-btn" title="Cancel upload" @click="cancelUpload(item.id)">
+                      <button type="button" class="pending-file-cancel-btn" :title="t.cancelUpload" :aria-label="t.cancelUpload" @click="cancelUpload(item.id)">
                         <Icon name="x" :size="14" />
                       </button>
                     </div>
@@ -2870,7 +2870,7 @@ watch(
                         {{ t.retry || 'Thử lại' }}
                       </button>
                       <button type="button" class="message-action" @click="cancelUpload(item.id)">
-                        Cancel upload
+                        {{ t.cancelUpload }}
                       </button>
                     </div>
                   </div>
@@ -2924,7 +2924,7 @@ watch(
           />
         </div>
         <form class="chat-composer" @submit.prevent="sendText">
-          <button type="button" class="icon-btn attach-btn" aria-label="Attach file" @click="triggerAttachment">
+          <button type="button" class="icon-btn attach-btn" :aria-label="t.attachFile" @click="triggerAttachment">
             <Icon name="plus" :size="18" />
           </button>
           <button
@@ -2963,14 +2963,14 @@ watch(
             v-show="Boolean(draft.trim())"
             class="send-btn"
             type="submit"
-            aria-label="Send"
+            :aria-label="t.send"
             :class="{ active: Boolean(draft.trim()) }"
             :disabled="!draft.trim() || sendingText"
             @click.prevent="sendText"
           >
             <Icon name="send" :size="18" />
           </button>
-          <label class="sr-only" for="chat-attachment">Attachment</label>
+          <label class="sr-only" for="chat-attachment">{{ t.attachment }}</label>
           <input id="chat-attachment" ref="fileInputRef" type="file" class="sr-only" @change="onAttachmentChange" />
         </form>
       </template>
@@ -2992,7 +2992,7 @@ watch(
       </template>
     </section>
 
-    <aside class="media-panel" aria-label="Shared media">
+    <aside class="media-panel" :aria-label="t.sharedMedia">
       <div class="media-panel-header">
         <h2>{{ t.sharedMedia }}</h2>
       </div>
@@ -3141,7 +3141,7 @@ watch(
     <aside
       v-if="selectedConversation && isDesktop && desktopInfoOpen"
       class="chat-info-sidebar"
-      aria-label="Chat details"
+      :aria-label="t.chatInfo"
     >
       <!-- Right resizer splitter (Desktop only) -->
       <div
@@ -3387,7 +3387,7 @@ watch(
               v-if="infoSearchQuery"
               type="button"
               class="info-search-clear"
-              aria-label="Clear search"
+              :aria-label="t.clearSearch"
               @click="clearInfoSearch"
             >
               <Icon name="close" :size="14" />
@@ -4331,7 +4331,7 @@ watch(
               v-if="infoSearchQuery"
               type="button"
               class="info-search-clear"
-              aria-label="Clear search"
+              :aria-label="t.clearSearch"
               @click="clearInfoSearch"
             >
               <Icon name="close" :size="14" />

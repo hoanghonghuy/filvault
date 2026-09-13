@@ -33,6 +33,39 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/function backToRail/)
   })
 
+  it('localizes core Chat chrome and attachment controls', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+
+    for (const key of [
+      'resizeConversationListAria',
+      'resizeConversationListTitle',
+      'backToFilvault',
+      'callVoice',
+      'callVideo',
+      'cancelUpload',
+      'attachFile',
+    ]) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+
+    expect(chat).toMatch(/:aria-label="t\.chats"/)
+    expect(chat).toMatch(/:aria-label="t\.backToFilvault"/)
+    expect(chat).toMatch(/:aria-label="t\.callVoice"/)
+    expect(chat).toMatch(/:aria-label="t\.callVideo"/)
+    expect(chat).toMatch(/\{\{ t\.cancelUpload \}\}/)
+    expect(chat).toMatch(/:aria-label="t\.attachFile"/)
+    expect(chat).toMatch(/:aria-label="t\.send"/)
+    expect(chat).toMatch(/:aria-label="t\.sharedMedia"/)
+    expect(chat).toMatch(/:aria-label="t\.chatInfo"/)
+    expect(chat).toMatch(/:aria-label="t\.clearSearch"/)
+
+    expect(chat).not.toMatch(/aria-label="Conversations"/)
+    expect(chat).not.toMatch(/aria-label="Back to Filvault"/)
+    expect(chat).not.toMatch(/aria-label="Gọi (thoại|video)"/)
+    expect(chat).not.toMatch(/aria-label="(Attach file|Send|Shared media|Chat details|Clear search)"/)
+    expect(chat).not.toMatch(/>\s*Cancel upload\s*</)
+  })
+
   it('supports search, media panel and attachment uploads', () => {
     expect(chat).toMatch(/\/chat\/conversations/)
     expect(chat).toMatch(/\/chat\/conversations\/\$\{[^}]+\}\/messages\/search/)
