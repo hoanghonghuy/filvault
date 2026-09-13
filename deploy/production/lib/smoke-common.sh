@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SMOKE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SMOKE_ROOT="$(cd "$SMOKE_SCRIPT_DIR/../.." && pwd)"
+SMOKE_ROOT="$(cd "$SMOKE_SCRIPT_DIR/../../.." && pwd)"
 
 COMPOSE="${COMPOSE:-docker compose -f docker-compose.prod.yml --env-file deploy/production/.env}"
 MAILPIT_API="${MAILPIT_API:-http://127.0.0.1:8025/api/v1}"
