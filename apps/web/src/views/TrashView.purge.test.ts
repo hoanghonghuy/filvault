@@ -75,6 +75,7 @@ describe('TrashView Empty Trash', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.confirm.mockResolvedValue(true)
+    mocks.openActionSheet.mockResolvedValue(null)
   })
 
   it('disables the purge action and prevents a duplicate batch while deletion is pending', async () => {
@@ -127,4 +128,46 @@ describe('TrashView Empty Trash', () => {
     expect(trashLoads).toBe(2)
     expect(mocks.showToast).toHaveBeenCalledWith('Delete forever')
   })
+
+  it('makes folder and file rows keyboard-operable without hijacking nested controls', async () => {
+    mocks.api.mockImplementation((path) => {
+      if (path === '/trash') {
+        return Promise.resolve({
+          folders: [{ id: 'folder-1', name: 'Archive', deletedAt: '2026-09-10T00:00:00Z' }],
+          files: [{ id: 'file-1', name: 'notes.txt', mimeType: 'text/plain', sizeBytes: 12, deletedAt: '2026-09-10T00:00:00Z' }],
+        })
+      }
+      return Promise.resolve({})
+    })
+
+    const wrapper = mount(TrashView, {
+      global: {
+        stubs: {
+          Icon: { template: '<span />' },
+          EmptyState: { template: '<div />' },
+          LoadingSkeletonTrash: { template: '<div />' },
+          TransitionGroup: { template: '<div><slot /></div>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    const rows = wrapper.findAll('.trash-item-card')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.attributes()).toMatchObject({ role: 'button', tabindex: '0', 'aria-label': 'Archive' })
+    expect(rows[1]?.attributes()).toMatchObject({ role: 'button', tabindex: '0', 'aria-label': 'notes.txt' })
+
+    await rows[0]?.trigger('keydown', { key: 'Enter' })
+    await rows[1]?.trigger('keydown', { key: ' ' })
+    await flushPromises()
+
+    expect(mocks.openActionSheet).toHaveBeenNthCalledWith(1, 'Archive', expect.any(Array))
+    expect(mocks.openActionSheet).toHaveBeenNthCalledWith(2, 'notes.txt', expect.any(Array))
+
+    const nestedRestore = rows[0]?.find('.trash-action-btn')
+    await nestedRestore?.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(mocks.openActionSheet).toHaveBeenCalledTimes(2)
+  })
+
 })
