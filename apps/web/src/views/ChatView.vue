@@ -2937,7 +2937,7 @@ watch(
           >
             <Icon name="sticker" :size="20" />
           </button>
-          <label class="sr-only" for="chat-message">Message</label>
+          <label class="sr-only" for="chat-message">{{ t.messageLabel }}</label>
           <textarea
             id="chat-message"
             ref="composerRef"
@@ -3153,8 +3153,8 @@ watch(
         :aria-valuenow="infoWidth"
         :aria-valuemin="MIN_INFO_WIDTH"
         :aria-valuemax="MAX_INFO_WIDTH"
-        aria-label="Resize chat details panel"
-        title="Kéo để chỉnh độ rộng thông tin đoạn chat (Nhấp đúp để đặt lại)"
+        :aria-label="t.resizeChatDetailsAria"
+        :title="t.resizeChatDetailsTitle"
         @pointerdown.stop.prevent="startInfoResize"
         @dblclick="resetInfoWidth"
         @keydown="onInfoResizerKeydown"
@@ -3946,8 +3946,8 @@ watch(
             <button
               type="button"
               class="rx-btn rx-plus-btn"
-              title="Thêm biểu tượng khác"
-              aria-label="Thêm biểu tượng khác"
+              :title="t.addReaction"
+              :aria-label="t.addReaction"
               @click="openReactionPicker"
             >
               <Icon name="plus" :size="18" />
@@ -4027,7 +4027,7 @@ watch(
     </Teleport>
 
     <!-- Custom Emoji Reaction Picker BottomSheet -->
-    <BottomSheet :open="reactionPickerOpen" title="Chọn biểu tượng cảm xúc" @close="reactionPickerOpen = false">
+    <BottomSheet :open="reactionPickerOpen" :title="t.chooseReaction" @close="reactionPickerOpen = false">
       <EmojiPicker
         :active-reactions="targetMessageReactionList"
         @select-emoji="handlePickReactionEmoji"
