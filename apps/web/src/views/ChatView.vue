@@ -337,7 +337,7 @@ function removeCustomWallpaperItem(conversationId: string, wallpaperId: string) 
   if (threadWallpaper.value === target.url) {
     setConversationWallpaper(conversationId, '')
   }
-  ui.showToast(t.value.wallpaperRemoved || 'Đã gỡ hình nền khỏi đoạn chat')
+  ui.showToast(t.value.wallpaperRemoved)
 }
 
 // Storage & Media Picker for Chat Wallpaper
@@ -408,7 +408,7 @@ async function selectPhotoFromChatMedia(photo: ChatAttachment) {
   }
   addCustomWallpaperToConversation(convId, customItem)
   setConversationWallpaper(convId, photoUrl)
-  ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+  ui.showToast(t.value.wallpaperUpdated)
 }
 
 async function selectPhotoFromPersonalStorage(item: TimelineItem) {
@@ -436,7 +436,7 @@ async function selectPhotoFromPersonalStorage(item: TimelineItem) {
   }
   addCustomWallpaperToConversation(convId, customItem)
   setConversationWallpaper(convId, photoUrl)
-  ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+  ui.showToast(t.value.wallpaperUpdated)
 }
 
 const threadWallpaper = computed(() => {
@@ -497,13 +497,13 @@ async function setConversationWallpaper(conversationId: string, wallpaperVal: st
 function selectWallpaperPreset(presetId: string) {
   if (!selectedConversation.value) return
   setConversationWallpaper(selectedConversation.value.id, presetId === 'none' ? '' : presetId)
-  ui.showToast(presetId === 'none' ? (t.value.wallpaperRemoved || 'Đã đặt lại hình nền') : (t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat'))
+  ui.showToast(presetId === 'none' ? t.value.wallpaperRemoved : t.value.wallpaperUpdated)
 }
 
 function removeConversationWallpaper() {
   if (!selectedConversation.value) return
   setConversationWallpaper(selectedConversation.value.id, '')
-  ui.showToast(t.value.wallpaperRemoved || 'Đã xóa hình nền đoạn chat')
+  ui.showToast(t.value.wallpaperRemoved)
 }
 
 const wallpaperCategoryFilter = ref<'all' | 'light' | 'dark'>('all')
@@ -585,7 +585,7 @@ async function handleWallpaperUpload(event: Event) {
     }
     addCustomWallpaperToConversation(convId, customItem)
     setConversationWallpaper(convId, dataUrl)
-    ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+    ui.showToast(t.value.wallpaperUpdated)
 
     // Asynchronously backup original image to user's Filvault personal storage
     void (async () => {
@@ -2546,7 +2546,7 @@ watch(
             v-if="chatStore.connectionState !== 'connected'"
             class="connection-status"
             role="status"
-            :title="t.retry || 'Thử lại'"
+            :title="t.retry"
             @click="chatStore.connectEvents()"
           >
             {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
@@ -2568,7 +2568,7 @@ watch(
           @scroll.passive="onThreadScroll"
         >
           <LoadingSkeletonThread v-if="loadingThread" />
-          <p v-else-if="loadingOlder" class="loading-older">{{ t.loadingOlder || 'Đang tải tin nhắn cũ hơn…' }}</p>
+          <p v-else-if="loadingOlder" class="loading-older">{{ t.loadingOlder }}</p>
           <div v-else-if="visibleMessages.length" class="message-list">
             <TransitionGroup name="msg">
               <template v-for="(message, index) in visibleMessages" :key="message.id">
@@ -2828,7 +2828,7 @@ watch(
                         <span class="failed-msg">{{ item.error || 'Lỗi tải ảnh' }}</span>
                         <div class="failed-actions">
                           <button type="button" class="bubble-action-btn retry" @click="retryUpload(item.id)">
-                            {{ t.retry || 'Thử lại' }}
+                            {{ t.retry }}
                           </button>
                           <button type="button" class="bubble-action-btn cancel" @click="cancelUpload(item.id)">
                             {{ t.cancelUpload }}
@@ -2867,7 +2867,7 @@ watch(
                     </div>
                     <div v-else-if="item.status === 'failed'" class="pending-file-actions">
                       <button type="button" class="message-action" @click="retryUpload(item.id)">
-                        {{ t.retry || 'Thử lại' }}
+                        {{ t.retry }}
                       </button>
                       <button type="button" class="message-action" @click="cancelUpload(item.id)">
                         {{ t.cancelUpload }}
@@ -2898,7 +2898,7 @@ watch(
           <Transition name="msg">
             <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest({ smooth: true })">
               <Icon name="download" :size="16" />
-              <span>{{ t.latest || 'Mới nhất' }}</span>
+              <span>{{ t.latest }}</span>
             </button>
           </Transition>
         </div>
@@ -2979,14 +2979,14 @@ watch(
           v-if="chatStore.connectionState !== 'connected'"
           class="connection-status"
           role="status"
-          :title="t.retry || 'Thử lại'"
+          :title="t.retry"
           @click="chatStore.connectEvents()"
         >
           {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
         </p>
         <EmptyState
-          :title="t.selectChat || 'Chọn một đoạn chat'"
-          :description="t.selectChatDesc || 'Chọn một cuộc trò chuyện từ danh sách hoặc bắt đầu cuộc trò chuyện mới.'"
+          :title="t.selectChat"
+          :description="t.selectChatDesc"
           icon="chat"
         />
       </template>
@@ -3275,14 +3275,14 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openWallpaperSubPage">
                 <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
+                <span class="menu-item-text">{{ t.chatWallpaper }}</span>
                 <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
               <button type="button" class="menu-row-item" @click="bubblePickerOpen = true">
                 <span class="menu-item-icon badge-theme"><Icon name="chat" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatBubbleStyle || 'Kiểu bong bóng' }}</span>
+                <span class="menu-item-text">{{ t.chatBubbleStyle }}</span>
                 <span class="menu-badge">{{ currentBubbleStyle.name }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -3295,7 +3295,7 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openInfoSearchView">
                 <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
-                <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
+                <span class="menu-item-text">{{ t.searchInChat }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
             </div>
@@ -3308,7 +3308,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('media')"
             >
-              <span class="menu-section-label">{{ t.sharedMedia || 'File phương tiện và file' }}</span>
+              <span class="menu-section-label">{{ t.sharedMedia }}</span>
               <Icon
                 :name="infoSectionsOpen.media ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3318,19 +3318,19 @@ watch(
             <div v-show="infoSectionsOpen.media" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
                 <span class="menu-item-icon badge-theme"><Icon name="photos" :size="18" /></span>
-                <span class="menu-item-text">{{ t.photosAndVideos || 'File phương tiện' }}</span>
+                <span class="menu-item-text">{{ t.photosAndVideos }}</span>
                 <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
                 <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
-                <span class="menu-item-text">{{ t.files || 'File' }}</span>
+                <span class="menu-item-text">{{ t.files }}</span>
                 <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
                 <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
-                <span class="menu-item-text">{{ t.links || 'Liên kết' }}</span>
+                <span class="menu-item-text">{{ t.links }}</span>
                 <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -3354,7 +3354,7 @@ watch(
             <div v-show="infoSectionsOpen.privacy" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
-                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : (t.muteChat || 'Tắt thông báo') }}</span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
               </button>
               <button type="button" class="menu-row-item danger-item" @click="deleteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
@@ -3373,7 +3373,7 @@ watch(
               v-model="infoSearchQuery"
               type="search"
               class="info-search-input"
-              :placeholder="t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện...'"
+              :placeholder="t.searchInChat"
               @input="onInfoSearchInput"
               @keydown.enter.prevent="performInfoSearch"
             />
@@ -3585,13 +3585,13 @@ watch(
             <div class="wallpaper-preview-bubbles">
               <div class="preview-bubble incoming">
                 <span>{{ conversationTitle(selectedConversation) }}</span>
-                <p>Giao diện chat trông thế nào? ✨</p>
+                <p>{{ t.wallpaperPreviewIncoming }}</p>
               </div>
               <div
                 class="preview-bubble outgoing"
                 :style="{ background: activeWallpaperTheme ? activeWallpaperTheme.gradient : currentTheme.gradient }"
               >
-                <p>Rất đẹp và dễ nhìn! 👍</p>
+                <p>{{ t.wallpaperPreviewOutgoing }}</p>
               </div>
             </div>
           </div>
@@ -3600,11 +3600,11 @@ watch(
           <div class="wallpaper-actions-row">
             <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
               <Icon name="upload" :size="16" />
-              <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+              <span>{{ t.uploadCustomWallpaper }}</span>
             </button>
             <button type="button" class="wallpaper-action-btn storage" @click="openMediaStoragePicker">
               <Icon name="folder" :size="16" />
-              <span>{{ t.chooseFromStorage || 'Chọn từ kho lưu trữ' }}</span>
+              <span>{{ t.chooseFromStorage }}</span>
             </button>
             <button
               v-if="threadWallpaper"
@@ -3613,7 +3613,7 @@ watch(
               @click="removeConversationWallpaper"
             >
               <Icon name="trash" :size="16" />
-              <span>{{ t.resetWallpaper || 'Đặt lại mặc định' }}</span>
+              <span>{{ t.resetWallpaper }}</span>
             </button>
           </div>
           <input
@@ -3627,7 +3627,7 @@ watch(
           <!-- Custom Wallpapers of this Conversation -->
           <div v-if="currentConversationCustomWallpapers.length" class="wallpaper-presets-section wallpaper-custom-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.customWallpapers || 'Hình nền tùy chỉnh' }}</span>
+              <span class="wallpaper-section-title">{{ t.customWallpapers }}</span>
               <span class="custom-wallpaper-count">({{ currentConversationCustomWallpapers.length }})</span>
             </div>
             <div class="wallpaper-presets-grid">
@@ -3649,8 +3649,8 @@ watch(
                   <button
                     type="button"
                     class="delete-custom-wp-btn"
-                    :title="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
-                    :aria-label="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    :title="t.removeWallpaperFromChat"
+                    :aria-label="t.removeWallpaperFromChat"
                     @click.stop="removeCustomWallpaperItem(selectedConversation.id, wp.id)"
                   >
                     <Icon name="trash" :size="12" />
@@ -3664,7 +3664,7 @@ watch(
           <!-- Presets Grid -->
           <div class="wallpaper-presets-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.chooseWallpaper || 'Hình nền có sẵn' }}</span>
+              <span class="wallpaper-section-title">{{ t.chooseWallpaper }}</span>
             </div>
 
             <!-- Mode Filter Tabs -->
@@ -3675,7 +3675,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'all' }"
                 @click="wallpaperCategoryFilter = 'all'"
               >
-                {{ t.allWallpapers || 'Tất cả' }}
+                {{ t.allWallpapers }}
               </button>
               <button
                 type="button"
@@ -3683,7 +3683,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'light' }"
                 @click="wallpaperCategoryFilter = 'light'"
               >
-                {{ t.lightModeWallpapers || 'Chế độ Sáng ☀️' }}
+                {{ t.lightModeWallpapers }}
               </button>
               <button
                 type="button"
@@ -3691,7 +3691,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'dark' }"
                 @click="wallpaperCategoryFilter = 'dark'"
               >
-                {{ t.darkModeWallpapers || 'Chế độ Tối 🌙' }}
+                {{ t.darkModeWallpapers }}
               </button>
             </div>
 
@@ -3729,7 +3729,7 @@ watch(
     <!-- Media & Personal Storage Picker BottomSheet for Wallpaper -->
     <BottomSheet
       :open="storagePickerOpen"
-      :title="t.pickWallpaperFromStorage || 'Chọn ảnh làm hình nền'"
+      :title="t.pickWallpaperFromStorage"
       @close="storagePickerOpen = false"
     >
       <div class="storage-picker-content">
@@ -3743,7 +3743,7 @@ watch(
             @click="switchStoragePickerTab('chat')"
           >
             <Icon name="chat" :size="15" />
-            <span>{{ t.fromThisChat || 'Trong đoạn chat' }} ({{ sharedPhotos.length }})</span>
+            <span>{{ t.fromThisChat }} ({{ sharedPhotos.length }})</span>
           </button>
           <button
             type="button"
@@ -3754,7 +3754,7 @@ watch(
             @click="switchStoragePickerTab('personal')"
           >
             <Icon name="folder" :size="15" />
-            <span>{{ t.fromPersonalStorage || 'Kho ảnh cá nhân' }}</span>
+            <span>{{ t.fromPersonalStorage }}</span>
           </button>
         </div>
 
@@ -3783,7 +3783,7 @@ watch(
           </div>
           <div v-else class="storage-picker-empty">
             <Icon name="image" :size="36" />
-            <p>{{ t.noChatPhotos || 'Chưa có ảnh nào trong đoạn chat' }}</p>
+            <p>{{ t.noChatPhotos }}</p>
           </div>
         </div>
 
@@ -3791,7 +3791,7 @@ watch(
         <div v-else-if="storagePickerTab === 'personal'" class="storage-picker-body">
           <div v-if="loadingPersonalPhotos" class="storage-picker-loading">
             <span class="spinner" />
-            <p>{{ t.loadingPhotos || 'Đang tải ảnh...' }}</p>
+            <p>{{ t.loadingPhotos }}</p>
           </div>
           <p v-else-if="personalPhotosError" class="alert">{{ personalPhotosError }}</p>
           <div v-else-if="personalPhotos.length" class="storage-picker-grid">
@@ -3817,7 +3817,7 @@ watch(
           </div>
           <div v-else class="storage-picker-empty">
             <Icon name="folder" :size="36" />
-            <p>{{ t.noPersonalPhotos || 'Chưa có ảnh nào trong kho cá nhân' }}</p>
+            <p>{{ t.noPersonalPhotos }}</p>
           </div>
         </div>
       </div>
@@ -3986,13 +3986,13 @@ watch(
             <div class="action-icon-circle">
               <Icon name="reply" :size="20" />
             </div>
-            <span>{{ t.reply || 'Trả lời' }}</span>
+            <span>{{ t.reply }}</span>
           </button>
           <button type="button" class="bottom-action-btn" @click="copyMessageText">
             <div class="action-icon-circle">
               <Icon name="copy" :size="20" />
             </div>
-            <span>{{ t.copyMessage || 'Sao chép' }}</span>
+            <span>{{ t.copyMessage }}</span>
           </button>
           <button
             v-if="canMutateMessage(activeMessage)"
@@ -4003,7 +4003,7 @@ watch(
             <div class="action-icon-circle">
               <Icon name="pencil" :size="20" />
             </div>
-            <span>{{ t.edit || 'Sửa' }}</span>
+            <span>{{ t.edit }}</span>
           </button>
           <button
             v-if="canMutateMessage(activeMessage)"
@@ -4014,13 +4014,13 @@ watch(
             <div class="action-icon-circle danger-circle">
               <Icon name="trash" :size="20" />
             </div>
-            <span>{{ t.remove || 'Xóa' }}</span>
+            <span>{{ t.remove }}</span>
           </button>
           <button type="button" class="bottom-action-btn" @click="messageMenuOpen = false">
             <div class="action-icon-circle">
               <Icon name="close" :size="20" />
             </div>
-            <span>{{ t.close || 'Đóng' }}</span>
+            <span>{{ t.close }}</span>
           </button>
         </div>
       </div>
@@ -4080,7 +4080,7 @@ watch(
         </div>
 
         <div v-if="peekLoading" class="peek-loading">
-          <p>Đang tải tin nhắn…</p>
+          <p>{{ t.peekLoading }}</p>
         </div>
         <div v-else-if="!peekMessages.length" class="peek-empty">
           <p>{{ t.noMessagesYet }}</p>
@@ -4219,14 +4219,14 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openWallpaperSubPage">
                 <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
+                <span class="menu-item-text">{{ t.chatWallpaper }}</span>
                 <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
               <button type="button" class="menu-row-item" @click="bubblePickerOpen = true">
                 <span class="menu-item-icon badge-theme"><Icon name="chat" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatBubbleStyle || 'Kiểu bong bóng' }}</span>
+                <span class="menu-item-text">{{ t.chatBubbleStyle }}</span>
                 <span class="menu-badge">{{ currentBubbleStyle.name }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -4239,7 +4239,7 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openInfoSearchView">
                 <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
-                <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
+                <span class="menu-item-text">{{ t.searchInChat }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
             </div>
@@ -4252,7 +4252,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('media')"
             >
-              <span class="menu-section-label">{{ t.sharedMedia || 'File phương tiện và file' }}</span>
+              <span class="menu-section-label">{{ t.sharedMedia }}</span>
               <Icon
                 :name="infoSectionsOpen.media ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -4262,19 +4262,19 @@ watch(
             <div v-show="infoSectionsOpen.media" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
                 <span class="menu-item-icon badge-theme"><Icon name="photos" :size="18" /></span>
-                <span class="menu-item-text">{{ t.photosAndVideos || 'File phương tiện' }}</span>
+                <span class="menu-item-text">{{ t.photosAndVideos }}</span>
                 <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
                 <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
-                <span class="menu-item-text">{{ t.files || 'File' }}</span>
+                <span class="menu-item-text">{{ t.files }}</span>
                 <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
                 <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
-                <span class="menu-item-text">{{ t.links || 'Liên kết' }}</span>
+                <span class="menu-item-text">{{ t.links }}</span>
                 <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -4298,7 +4298,7 @@ watch(
             <div v-show="infoSectionsOpen.privacy" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
-                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : (t.muteChat || 'Tắt thông báo') }}</span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
               </button>
               <button type="button" class="menu-row-item danger-item" @click="deleteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
@@ -4317,7 +4317,7 @@ watch(
               v-model="infoSearchQuery"
               type="search"
               class="info-search-input"
-              :placeholder="t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện...'"
+              :placeholder="t.searchInChat"
               @input="onInfoSearchInput"
               @keydown.enter.prevent="performInfoSearch"
             />
@@ -4529,13 +4529,13 @@ watch(
             <div class="wallpaper-preview-bubbles">
               <div class="preview-bubble incoming">
                 <span>{{ conversationTitle(selectedConversation) }}</span>
-                <p>Giao diện chat trông thế nào? ✨</p>
+                <p>{{ t.wallpaperPreviewIncoming }}</p>
               </div>
               <div
                 class="preview-bubble outgoing"
                 :style="{ background: activeWallpaperTheme ? activeWallpaperTheme.gradient : currentTheme.gradient }"
               >
-                <p>Rất đẹp và dễ nhìn! 👍</p>
+                <p>{{ t.wallpaperPreviewOutgoing }}</p>
               </div>
             </div>
           </div>
@@ -4544,11 +4544,11 @@ watch(
           <div class="wallpaper-actions-row">
             <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
               <Icon name="upload" :size="16" />
-              <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+              <span>{{ t.uploadCustomWallpaper }}</span>
             </button>
             <button type="button" class="wallpaper-action-btn storage" @click="openMediaStoragePicker">
               <Icon name="folder" :size="16" />
-              <span>{{ t.chooseFromStorage || 'Chọn từ kho lưu trữ' }}</span>
+              <span>{{ t.chooseFromStorage }}</span>
             </button>
             <button
               v-if="threadWallpaper"
@@ -4557,7 +4557,7 @@ watch(
               @click="removeConversationWallpaper"
             >
               <Icon name="trash" :size="16" />
-              <span>{{ t.resetWallpaper || 'Đặt lại mặc định' }}</span>
+              <span>{{ t.resetWallpaper }}</span>
             </button>
           </div>
           <input
@@ -4571,7 +4571,7 @@ watch(
           <!-- Custom Wallpapers of this Conversation -->
           <div v-if="currentConversationCustomWallpapers.length" class="wallpaper-presets-section wallpaper-custom-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.customWallpapers || 'Hình nền tùy chỉnh' }}</span>
+              <span class="wallpaper-section-title">{{ t.customWallpapers }}</span>
               <span class="custom-wallpaper-count">({{ currentConversationCustomWallpapers.length }})</span>
             </div>
             <div class="wallpaper-presets-grid">
@@ -4593,8 +4593,8 @@ watch(
                   <button
                     type="button"
                     class="delete-custom-wp-btn"
-                    :title="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
-                    :aria-label="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    :title="t.removeWallpaperFromChat"
+                    :aria-label="t.removeWallpaperFromChat"
                     @click.stop="removeCustomWallpaperItem(selectedConversation.id, wp.id)"
                   >
                     <Icon name="trash" :size="12" />
@@ -4608,7 +4608,7 @@ watch(
           <!-- Presets Grid -->
           <div class="wallpaper-presets-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.chooseWallpaper || 'Hình nền có sẵn' }}</span>
+              <span class="wallpaper-section-title">{{ t.chooseWallpaper }}</span>
             </div>
 
             <!-- Mode Filter Tabs -->
@@ -4619,7 +4619,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'all' }"
                 @click="wallpaperCategoryFilter = 'all'"
               >
-                {{ t.allWallpapers || 'Tất cả' }}
+                {{ t.allWallpapers }}
               </button>
               <button
                 type="button"
@@ -4627,7 +4627,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'light' }"
                 @click="wallpaperCategoryFilter = 'light'"
               >
-                {{ t.lightModeWallpapers || 'Chế độ Sáng ☀️' }}
+                {{ t.lightModeWallpapers }}
               </button>
               <button
                 type="button"
@@ -4635,7 +4635,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'dark' }"
                 @click="wallpaperCategoryFilter = 'dark'"
               >
-                {{ t.darkModeWallpapers || 'Chế độ Tối 🌙' }}
+                {{ t.darkModeWallpapers }}
               </button>
             </div>
 

@@ -66,6 +66,19 @@ describe('chat surface contract', () => {
     expect(chat).not.toMatch(/>\s*Cancel upload\s*</)
   })
 
+  it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+
+    for (const key of ['wallpaperPreviewIncoming', 'wallpaperPreviewOutgoing', 'peekLoading']) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+
+    expect(chat.match(/\{\{ t\.wallpaperPreviewIncoming \}\}/g)).toHaveLength(2)
+    expect(chat.match(/\{\{ t\.wallpaperPreviewOutgoing \}\}/g)).toHaveLength(2)
+    expect(chat).toMatch(/<p>\{\{ t\.peekLoading \}\}<\/p>/)
+    expect(chat).not.toMatch(/t(?:\.value)?\.[A-Za-z0-9_]+\s*\|\|\s*['"][^'"]*[À-ỹ]/u)
+  })
+
   it('localizes Chat details and reaction controls', () => {
     const i18n = readSrc('../lib/i18n.ts')
     for (const key of [
