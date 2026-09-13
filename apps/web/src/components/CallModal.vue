@@ -590,8 +590,8 @@ onUnmounted(() => {
 }
 
 .btn-decline {
-  background: #ef4444;
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
+  background: var(--danger);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--danger) 45%, transparent);
 }
 
 .call-active-room {
@@ -811,14 +811,14 @@ onUnmounted(() => {
 }
 
 .control-btn.muted {
-  background: #ef4444;
+  background: var(--danger);
   color: #ffffff;
 }
 
 .control-btn.btn-hangup {
-  background: #ef4444;
+  background: var(--danger);
   color: #ffffff;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--danger) 50%, transparent);
 }
 
 @media (max-width: 767px) {
