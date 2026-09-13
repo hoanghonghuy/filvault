@@ -33,6 +33,17 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/function backToRail/)
   })
 
+  it('keeps the thread-info trigger keyboard-complete and action-named', () => {
+    const trigger = chat.match(/<div\s+class="thread-peer-info clickable"[\s\S]*?>/)?.[0] ?? ''
+
+    expect(trigger).toContain('role="button"')
+    expect(trigger).toContain('tabindex="0"')
+    expect(trigger).toContain(':aria-label="t.chatInfo"')
+    expect(trigger).toContain('@click="openChatInfo"')
+    expect(trigger).toContain('@keydown.enter="openChatInfo"')
+    expect(trigger).toContain('@keydown.space.prevent="openChatInfo"')
+  })
+
   it('localizes core Chat chrome and attachment controls', () => {
     const i18n = readSrc('../lib/i18n.ts')
 

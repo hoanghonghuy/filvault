@@ -2478,9 +2478,11 @@ watch(
             class="thread-peer-info clickable"
             role="button"
             tabindex="0"
+            :aria-label="t.chatInfo"
             :title="t.chatInfo"
             @click="openChatInfo"
             @keydown.enter="openChatInfo"
+            @keydown.space.prevent="openChatInfo"
           >
             <img
               v-if="selectedConversation?.peer?.avatarUrl"
