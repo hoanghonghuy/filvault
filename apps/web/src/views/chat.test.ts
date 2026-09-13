@@ -439,6 +439,14 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/img\.avatar-img/)
   })
 
+  it('keeps sticker conversation previews locale-aware', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    expect(i18n).toContain("sticker: 'Nhãn dán'")
+    expect(i18n).toContain("sticker: 'Sticker'")
+    expect(chat).toContain('t.value.sticker')
+    expect(chat).not.toContain("'[Sticker]'")
+  })
+
   it('provides a full-featured sticker pack with picker drawer and bubble rendering', () => {
     const stickersModule = readSrc('../lib/stickers.ts')
     expect(stickersModule).toMatch(/STICKERS/)
