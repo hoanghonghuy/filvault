@@ -66,6 +66,38 @@ describe('chat surface contract', () => {
     expect(chat).not.toMatch(/>\s*Cancel upload\s*</)
   })
 
+  it('localizes Chat runtime feedback, destructive, nickname, presence, and call copy', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    for (const key of [
+      'personalPhotosLoadError',
+      'wallpaperImageUrlError',
+      'wallpaperInvalidImage',
+      'wallpaperProcessError',
+      'reactionFailed',
+      'copyFailed',
+      'deleteChatMessage',
+      'deleteChatSuccess',
+      'newNicknameLabel',
+      'nicknameSave',
+      'nicknameUpdated',
+      'peekLoadError',
+      'activeStatusEnabled',
+      'activeStatusDisabled',
+      'activeStatusUpdateError',
+      'callAlreadyActive',
+      'uploadImageFailed',
+    ]) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+
+    expect(chat).toMatch(/message: t\.value\.deleteChatMessage/)
+    expect(chat).toMatch(/label: t\.value\.newNicknameLabel/)
+    expect(chat).toMatch(/confirmLabel: t\.value\.nicknameSave/)
+    expect(chat).toMatch(/formatApiError\(err, t\.value\.reactionFailed\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.activeStatusUpdateError\)/)
+    expect(chat).toMatch(/item\.error \|\| t\.uploadImageFailed/)
+  })
+
   it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
     const i18n = readSrc('../lib/i18n.ts')
 

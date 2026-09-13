@@ -361,7 +361,7 @@ async function loadPersonalPhotos() {
     personalPhotos.value = allItems
     personalPhotosLoaded.value = true
   } catch (e) {
-    personalPhotosError.value = formatApiError(e, 'Không thể tải ảnh từ kho lưu trữ cá nhân')
+    personalPhotosError.value = formatApiError(e, t.value.personalPhotosLoadError)
   } finally {
     loadingPersonalPhotos.value = false
   }
@@ -395,7 +395,7 @@ async function selectPhotoFromChatMedia(photo: ChatAttachment) {
     }
   }
   if (!photoUrl) {
-    ui.showToast('Không thể lấy đường dẫn ảnh')
+    ui.showToast(t.value.wallpaperImageUrlError)
     return
   }
   const customItem: ChatCustomWallpaper = {
@@ -423,7 +423,7 @@ async function selectPhotoFromPersonalStorage(item: TimelineItem) {
     // fallback
   }
   if (!photoUrl) {
-    ui.showToast('Không thể lấy đường dẫn ảnh')
+    ui.showToast(t.value.wallpaperImageUrlError)
     return
   }
   const customItem: ChatCustomWallpaper = {
@@ -569,7 +569,7 @@ async function handleWallpaperUpload(event: Event) {
   if (!file || !selectedConversation.value) return
 
   if (!file.type.startsWith('image/')) {
-    ui.showToast('Vui lòng chọn tệp hình ảnh')
+    ui.showToast(t.value.wallpaperInvalidImage)
     return
   }
 
@@ -607,7 +607,7 @@ async function handleWallpaperUpload(event: Event) {
       }
     })()
   } catch {
-    ui.showToast('Không thể xử lý hình ảnh')
+    ui.showToast(t.value.wallpaperProcessError)
   } finally {
     target.value = ''
   }
@@ -1262,7 +1262,7 @@ async function selectReaction(emoji: string, targetMessage?: ChatMessage) {
       local.reactions = updated
     }
   } catch (err) {
-    ui.showToast(formatApiError(err, 'Không thể thả cảm xúc'), 'error')
+    ui.showToast(formatApiError(err, t.value.reactionFailed), 'error')
   }
 }
 
@@ -1375,7 +1375,7 @@ async function copyMessageText() {
     await navigator.clipboard.writeText(activeMessage.value.body)
     ui.showToast(t.value.copiedMessage)
   } catch {
-    ui.showToast('Không thể sao chép', 'error')
+    ui.showToast(t.value.copyFailed, 'error')
   } finally {
     messageMenuOpen.value = false
   }
@@ -1430,7 +1430,7 @@ async function deleteConversation(convId?: string) {
   if (!id) return
   const confirmed = await ui.confirm({
     title: t.value.deleteChat,
-    message: 'Toàn bộ tin nhắn trong cuộc trò chuyện này sẽ bị xóa khỏi danh sách của bạn.',
+    message: t.value.deleteChatMessage,
     confirmLabel: t.value.remove,
     danger: true,
   })
@@ -1451,7 +1451,7 @@ async function deleteConversation(convId?: string) {
     chatWallpapers.value = next
     saveWallpapersToStorage(next)
   }
-  ui.showToast('Đã xóa đoạn chat')
+  ui.showToast(t.value.deleteChatSuccess)
 }
 
 async function changeNickname() {
@@ -1460,13 +1460,13 @@ async function changeNickname() {
   const currentNick = nicknames.value[selectedConversation.value.id] || conversationTitle(selectedConversation.value)
   const nick = await ui.prompt({
     title: t.value.changeNickname,
-    label: 'Biệt danh mới',
+    label: t.value.newNicknameLabel,
     initialValue: currentNick,
-    confirmLabel: 'Lưu',
+    confirmLabel: t.value.nicknameSave,
   })
   if (nick !== null) {
     nicknames.value[selectedConversation.value.id] = nick.trim()
-    ui.showToast('Đã cập nhật biệt danh')
+    ui.showToast(t.value.nicknameUpdated)
   }
 }
 
@@ -1490,7 +1490,7 @@ async function openPeekPreview(conv: ChatConversation) {
     const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${conv.id}/messages?limit=6`)
     peekMessages.value = out.messages
   } catch {
-    ui.showToast('Không thể tải tin nhắn xem trước', 'error')
+    ui.showToast(t.value.peekLoadError, 'error')
   } finally {
     peekLoading.value = false
   }
@@ -1628,10 +1628,10 @@ async function toggleActiveStatus() {
   const next = !current
   try {
     await auth.updateActiveStatus(next)
-    ui.showToast(next ? 'Đã bật trạng thái hoạt động' : 'Đã tắt trạng thái hoạt động')
+    ui.showToast(next ? t.value.activeStatusEnabled : t.value.activeStatusDisabled)
     await loadConversations()
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Không thể cập nhật trạng thái'), 'error')
+    ui.showToast(formatApiError(e, t.value.activeStatusUpdateError), 'error')
   }
 }
 
@@ -2271,7 +2271,7 @@ function initiateCall(isVideo: boolean) {
   if (!selectedConversation.value) return
   if (selectedConversation.value.type !== 'direct') return
   if (callStore.state !== 'idle') {
-    ui.showToast('Bạn đang trong cuộc gọi khác', 'info')
+    ui.showToast(t.value.callAlreadyActive, 'info')
     return
   }
   callStore.startCall(selectedConversation.value.id, {
@@ -2825,7 +2825,7 @@ watch(
 
                       <div v-else-if="item.status === 'failed'" class="pending-failed-content">
                         <span class="failed-badge-icon">⚠️</span>
-                        <span class="failed-msg">{{ item.error || 'Lỗi tải ảnh' }}</span>
+                        <span class="failed-msg">{{ item.error || t.uploadImageFailed }}</span>
                         <div class="failed-actions">
                           <button type="button" class="bubble-action-btn retry" @click="retryUpload(item.id)">
                             {{ t.retry }}
