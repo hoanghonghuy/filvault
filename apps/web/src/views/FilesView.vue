@@ -2079,8 +2079,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: transparent;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm, 8px);
-  width: 32px;
-  height: 32px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   display: inline-flex;
   align-items: center;
   justify-content: center;

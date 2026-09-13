@@ -12,4 +12,11 @@ describe('FilesView accessibility contract', () => {
     expect(actionRule).toContain('height: var(--touch-min);')
     expect(actionRule).toContain('flex-shrink: 0;')
   })
+
+  it('keeps sub-toolbar icon controls touch-accessible', () => {
+    const toolbarRule = source.match(/\.sub-icon-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+
+    expect(toolbarRule).toContain('width: var(--touch-min);')
+    expect(toolbarRule).toContain('height: var(--touch-min);')
+  })
 })
