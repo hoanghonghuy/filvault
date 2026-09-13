@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { formatVaultDate } from '@/lib/vaultDate'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -15,7 +16,7 @@ import type { VaultFile } from '@/api/types'
 const router = useRouter()
 const vault = useVaultStore()
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // Setup state
 const setupPin = ref('')
@@ -255,11 +256,6 @@ async function deleteSelectedFile() {
   }
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
 </script>
 
 <template>
@@ -445,8 +441,10 @@ function formatDate(iso: string): string {
             <h4 class="file-name" :title="file.name">{{ file.name }}</h4>
             <div class="file-subtext">
               <span>{{ formatBytes(file.sizeBytes) }}</span>
-              <span class="dot-sep">•</span>
-              <span>{{ formatDate(file.createdAt) }}</span>
+              <template v-if="formatVaultDate(file.createdAt, locale)">
+                <span class="dot-sep">•</span>
+                <span>{{ formatVaultDate(file.createdAt, locale) }}</span>
+              </template>
             </div>
           </div>
 
