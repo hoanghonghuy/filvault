@@ -13,6 +13,11 @@ describe('FilesView accessibility localization wiring', () => {
     expect(source).toContain(':aria-label="`${t.fileActionsAria}: ${file.name}`"')
   })
 
+  it('uses the shared reactive locale key for the Files search placeholder without a hardcoded fallback', () => {
+    expect(source).toContain(':placeholder="t.searchInFilvault"')
+    expect(source).not.toContain("t.searchInFilvault || 'Tìm kiếm trong Filvault…'")
+  })
+
   it('does not retain the audited English-only accessibility labels', () => {
     expect(source).not.toContain('aria-label="File views"')
     expect(source).not.toContain('aria-label="View hierarchy"')

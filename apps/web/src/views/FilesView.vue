@@ -1080,7 +1080,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-model="searchQuery"
         type="search"
         class="files-search-input"
-        :placeholder="t.searchInFilvault || 'Tìm kiếm trong Filvault…'"
+        :placeholder="t.searchInFilvault"
         :aria-label="t.searchByName"
         enterkeyhint="search"
       />
