@@ -707,8 +707,8 @@ onMounted(load)
   background: transparent;
   border: none;
   color: var(--muted);
-  width: 36px;
-  height: 36px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -756,7 +756,7 @@ onMounted(load)
 
 .browse-path-link {
   max-width: min(40vw, 220px);
-  min-height: 32px;
+  min-height: var(--touch-min);
   padding: 4px 6px;
   overflow: hidden;
   text-overflow: ellipsis;
