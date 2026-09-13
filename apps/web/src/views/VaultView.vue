@@ -441,8 +441,10 @@ async function deleteSelectedFile() {
             <h4 class="file-name" :title="file.name">{{ file.name }}</h4>
             <div class="file-subtext">
               <span>{{ formatBytes(file.sizeBytes) }}</span>
-              <span class="dot-sep">•</span>
-              <span>{{ formatVaultDate(file.createdAt, locale) }}</span>
+              <template v-if="formatVaultDate(file.createdAt, locale)">
+                <span class="dot-sep">•</span>
+                <span>{{ formatVaultDate(file.createdAt, locale) }}</span>
+              </template>
             </div>
           </div>
 

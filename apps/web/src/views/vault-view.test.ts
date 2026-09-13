@@ -66,4 +66,10 @@ describe('VaultView UX contract', () => {
     expect(vault).toContain('@click.stop="openFileMenu(file)"')
     expect(vault).toMatch(/\.vault-file-row:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)[\s\S]*?outline-offset:\s*2px/)
   })
+  it('keeps localized file dates reactive and hides their separator when no date can be rendered', () => {
+    expect(vault).toContain("const { t, locale } = useI18n()")
+    expect(vault).toContain('v-if="formatVaultDate(file.createdAt, locale)"')
+    expect(vault).toContain('{{ formatVaultDate(file.createdAt, locale) }}')
+  })
+
 })
