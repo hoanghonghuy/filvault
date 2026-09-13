@@ -93,6 +93,10 @@ load_prod_env() {
   export FILVAULT_INVITE_CODE
 }
 
+http_code() {
+  curl -sk -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || echo "000"
+}
+
 api_call() {
   local method="$1" path="$2" body="${3:-}" token="${4:-}"
   local tmp hdr
