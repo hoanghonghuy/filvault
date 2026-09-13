@@ -14,5 +14,7 @@ describe('SharedWithMeView accessibility contract', () => {
     expect(breadcrumbRule).toContain('min-height: var(--touch-min);')
     expect(breadcrumbRule).toContain('text-overflow: ellipsis;')
     expect(breadcrumbRule).toContain('white-space: nowrap;')
+    expect(source).toContain(':aria-label="`${t.download}: ${f.name}`"')
+    expect(source).not.toContain(':aria-label="t.download"')
   })
 })

@@ -422,7 +422,7 @@ onMounted(load)
               <button
                 class="share-action-btn"
                 type="button"
-                :aria-label="t.download"
+                :aria-label="`${t.download}: ${f.name}`"
                 @click.stop="downloadFile(f.id, f.name)"
               >
                 <Icon name="download" :size="18" />
