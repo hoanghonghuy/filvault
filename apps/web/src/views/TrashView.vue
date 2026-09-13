@@ -409,6 +409,11 @@ onMounted(load)
   background: var(--surface-card, rgba(255, 255, 255, 0.06));
 }
 
+.trash-item-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .trash-icon-badge {
   width: 44px;
   height: 44px;

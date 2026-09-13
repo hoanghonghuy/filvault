@@ -18,4 +18,10 @@ describe('TrashView semantic color contract', () => {
     expect(source).not.toContain('color: #f59e0b')
     expect(source).not.toContain('rgba(245, 158, 11')
   })
+
+  it('shows a semantic focus ring for keyboard-focusable trash rows', () => {
+    expect(source).toContain('.trash-item-card:focus-visible')
+    expect(source).toContain('outline: 2px solid var(--accent)')
+    expect(source).toContain('outline-offset: 2px')
+  })
 })
