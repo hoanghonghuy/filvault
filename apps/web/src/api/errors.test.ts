@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ApiError } from './client'
-import { formatApiError, formatAuthError } from './errors'
+import { formatApiError, formatAuthError, formatShareUserError } from './errors'
 
 describe('formatApiError', () => {
   it('maps fetch failures to a reachability message instead of the caller fallback', () => {
@@ -19,6 +19,26 @@ describe('formatApiError', () => {
   })
 })
 
+describe('formatShareUserError', () => {
+  it('maps duplicate share conflicts to an actionable message', () => {
+    expect(formatShareUserError(new ApiError('CONFLICT', 'Conflict', 409), 'Could not share')).toBe(
+      'This item is already shared with that user.',
+    )
+  })
+
+  it('maps validation errors for share input', () => {
+    expect(
+      formatShareUserError(new ApiError('VALIDATION_ERROR', 'Invalid request', 400), 'Could not share'),
+    ).toBe('Enter a valid email address.')
+  })
+
+  it('maps fetch failures to a reachability message', () => {
+    expect(formatShareUserError(new TypeError('Failed to fetch'), 'Could not share')).toBe(
+      "Can't reach the server. Try again in a moment.",
+    )
+  })
+})
+
 describe('formatAuthError', () => {
   it('maps known auth codes', () => {
     expect(formatAuthError(new ApiError('UNAUTHORIZED', 'Unauthorized', 401), 'fallback')).toBe(
@@ -30,6 +50,14 @@ describe('formatAuthError', () => {
     expect(formatAuthError(new ApiError('CONFLICT', 'Conflict', 409), 'fallback')).toBe(
       'An account with this email already exists.',
     )
+  })
+
+  it('allows localized known-code copy without changing code mapping semantics', () => {
+    expect(
+      formatAuthError(new ApiError('UNAUTHORIZED', 'Unauthorized', 401), 'fallback', {
+        unauthorized: 'Email hoặc mật khẩu không đúng.',
+      }),
+    ).toBe('Email hoặc mật khẩu không đúng.')
   })
 
   it('uses caller fallback for verify/validation instead of generic API copy', () => {

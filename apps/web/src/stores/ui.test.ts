@@ -1,10 +1,51 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '@/lib/i18n'
 import { useUiStore } from '@/stores/ui'
 
-describe('useUiStore.openActionSheet', () => {
+describe('useUiStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    setLocale('vi')
+  })
+
+  it('builds logout confirmation from the active locale without a reload', async () => {
+    const ui = useUiStore()
+
+    const viConfirmation = ui.confirmLogout()
+    expect(ui.confirmState.title).toBe('Đăng xuất?')
+    expect(ui.confirmState.message).toContain('đăng nhập lại')
+    expect(ui.confirmState.confirmLabel).toBe('Đăng xuất')
+    expect(ui.confirmState.cancelLabel).toBe('Hủy')
+    expect(ui.confirmState.danger).toBe(true)
+    ui.resolveConfirm(false)
+    await expect(viConfirmation).resolves.toBe(false)
+
+    setLocale('en')
+    const enConfirmation = ui.confirmLogout()
+    expect(ui.confirmState.title).toBe('Log out?')
+    expect(ui.confirmState.message).toContain('sign in again')
+    expect(ui.confirmState.confirmLabel).toBe('Log out')
+    expect(ui.confirmState.cancelLabel).toBe('Cancel')
+    ui.resolveConfirm(true)
+    await expect(enConfirmation).resolves.toBe(true)
+  })
+
+  it('normalizes the historical Settings logout call to the canonical localized contract', async () => {
+    setLocale('vi')
+    const ui = useUiStore()
+    const confirmation = ui.confirm({
+      title: 'Log out?',
+      message: 'You will need to sign in again to access your files.',
+      confirmLabel: 'Log out',
+    })
+
+    expect(ui.confirmState.title).toBe('Đăng xuất?')
+    expect(ui.confirmState.confirmLabel).toBe('Đăng xuất')
+    expect(ui.confirmState.cancelLabel).toBe('Hủy')
+    expect(ui.confirmState.danger).toBe(true)
+    ui.resolveConfirm(false)
+    await expect(confirmation).resolves.toBe(false)
   })
 
   it('settles the previous sheet with null when a new one opens over it', async () => {

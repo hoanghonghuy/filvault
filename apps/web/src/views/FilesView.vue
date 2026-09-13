@@ -19,6 +19,7 @@ import MediaLightbox from '@/components/MediaLightbox.vue'
 import { usePullToRefresh } from '@/lib/usePullToRefresh'
 import { useLongPress } from '@/lib/useLongPress'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { mimeCategoryColor } from '@/lib/mimeColors'
 import type {
   Browser,
   DownloadURL,
@@ -30,6 +31,8 @@ import type {
 } from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
+import { vaultMoveCopy } from '@/lib/vaultMoveCopy'
+import { filesOperationsCopy } from '@/lib/filesOperationsCopy'
 import {
   buildFilesRouteQuery,
   buildSearchApiQueryString,
@@ -47,7 +50,9 @@ import {
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
-const { t } = useI18n()
+const { locale, t } = useI18n()
+const vaultCopy = computed(() => vaultMoveCopy(locale.value))
+const operationsCopy = computed(() => filesOperationsCopy(locale.value))
 const reloadStorage = inject<() => Promise<void>>('reloadStorage')
 
 const browser = ref<Browser | null>(null)
@@ -245,17 +250,6 @@ function formatItemDate(iso?: string): string {
   })
 }
 
-function getFileTypeColor(mimeType?: string): string {
-  if (!mimeType) return '#64748b'
-  if (mimeType.startsWith('image/')) return '#8b5cf6'
-  if (mimeType.startsWith('video/')) return '#ec4899'
-  if (mimeType.startsWith('audio/')) return '#06b6d4'
-  if (mimeType.includes('pdf')) return '#ef4444'
-  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('rar') || mimeType.includes('7z') || mimeType.includes('compressed')) return '#f97316'
-  if (mimeType.includes('sheet') || mimeType.includes('excel') || mimeType.includes('csv')) return '#10b981'
-  if (mimeType.includes('word') || mimeType.includes('document')) return '#0084ff'
-  return '#3b82f6'
-}
 
 const currentSortLabel = computed(() => {
   if (sortBy.value === 'name') return t.value.sortByName
@@ -367,7 +361,11 @@ function onDrop(event: DragEvent) {
 const pickerOpen = ref(false)
 const pickerMode = ref<'file' | 'folder' | null>(null)
 const pickerTargetId = ref<string | null>(null)
-const pickerTitle = ref('Move to')
+const pickerTitle = computed(() => {
+  if (pickerTargetId.value === 'batch') return operationsCopy.value.moveBatchTitle(totalSelectedCount.value)
+  if (pickerMode.value === 'folder') return operationsCopy.value.moveFolderTitle
+  return operationsCopy.value.moveFileTitle
+})
 
 const folderId = computed(() => {
   const raw = route.query.folderId
@@ -605,42 +603,40 @@ async function downloadFile(id: string) {
 }
 
 async function renameFile(id: string, current: string) {
-  const name = await ui.prompt({ title: 'Rename file', label: 'Name', initialValue: current })
+  const name = await ui.prompt({ title: operationsCopy.value.renameFileTitle, label: operationsCopy.value.nameLabel, initialValue: current })
   if (!name || name === current) return
   error.value = ''
   try {
     await api(`/files/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-    ui.showToast('File renamed')
+    ui.showToast(operationsCopy.value.fileRenamed)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Rename failed')
+    error.value = formatApiError(e, operationsCopy.value.renameFailed)
   }
 }
 
 async function renameFolder(id: string, current: string) {
-  const name = await ui.prompt({ title: 'Rename folder', label: 'Name', initialValue: current })
+  const name = await ui.prompt({ title: operationsCopy.value.renameFolderTitle, label: operationsCopy.value.nameLabel, initialValue: current })
   if (!name || name === current) return
   error.value = ''
   try {
     await api(`/folders/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-    ui.showToast('Folder renamed')
+    ui.showToast(operationsCopy.value.folderRenamed)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Rename failed')
+    error.value = formatApiError(e, operationsCopy.value.renameFailed)
   }
 }
 
 function openMoveFile(id: string) {
   pickerTargetId.value = id
   pickerMode.value = 'file'
-  pickerTitle.value = 'Move file'
   pickerOpen.value = true
 }
 
 function openMoveFolder(id: string) {
   pickerTargetId.value = id
   pickerMode.value = 'folder'
-  pickerTitle.value = 'Move folder'
   pickerOpen.value = true
 }
 
@@ -667,7 +663,7 @@ async function onPickerSelect(targetFolderId: string | null) {
           body: JSON.stringify({ parentId: targetFolderId }),
         })
       }
-      ui.showToast(`Moved ${totalSelectedCount.value} items`)
+      ui.showToast(operationsCopy.value.movedBatch(totalSelectedCount.value))
       clearSelection()
       await loadBrowser()
       return
@@ -678,17 +674,17 @@ async function onPickerSelect(targetFolderId: string | null) {
         method: 'PATCH',
         body: JSON.stringify({ folderId: targetFolderId }),
       })
-      ui.showToast('File moved')
+      ui.showToast(operationsCopy.value.fileMoved)
     } else {
       await api(`/folders/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ parentId: targetFolderId }),
       })
-      ui.showToast('Folder moved')
+      ui.showToast(operationsCopy.value.folderMoved)
     }
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Move failed')
+    error.value = formatApiError(e, operationsCopy.value.moveFailed)
   }
 }
 
@@ -696,9 +692,9 @@ async function batchDelete() {
   const count = totalSelectedCount.value
   if (count === 0) return
   const ok = await ui.confirm({
-    title: `Move ${count} items to trash?`,
-    message: 'You can restore them from Trash later.',
-    confirmLabel: 'Move to trash',
+    title: operationsCopy.value.trashBatchTitle(count),
+    message: operationsCopy.value.trashBatchMessage,
+    confirmLabel: t.value.moveToTrash,
     danger: true,
   })
   if (!ok) return
@@ -712,12 +708,12 @@ async function batchDelete() {
       removeOptimistic(id)
       await api(`/folders/${id}`, { method: 'DELETE' })
     }
-    ui.showToast(`Moved ${count} items to trash`)
+    ui.showToast(operationsCopy.value.movedBatchToTrash(count))
     clearSelection()
     await loadBrowser()
     await reloadStorage?.()
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, operationsCopy.value.trashFailed)
     await loadBrowser()
   }
 }
@@ -745,7 +741,6 @@ function batchMove() {
   if (totalSelectedCount.value === 0) return
   pickerTargetId.value = 'batch'
   pickerMode.value = 'file'
-  pickerTitle.value = `Move ${totalSelectedCount.value} items`
   pickerOpen.value = true
 }
 
@@ -774,9 +769,9 @@ function removeOptimistic(id: string) {
 
 async function deleteFile(id: string) {
   const ok = await ui.confirm({
-    title: 'Move to trash?',
-    message: 'You can restore this file from Trash later.',
-    confirmLabel: 'Move to trash',
+    title: operationsCopy.value.trashFileTitle,
+    message: operationsCopy.value.trashFileMessage,
+    confirmLabel: t.value.moveToTrash,
     danger: true,
   })
   if (!ok) return
@@ -784,19 +779,19 @@ async function deleteFile(id: string) {
   removeOptimistic(id)
   try {
     await api(`/files/${id}`, { method: 'DELETE' })
-    ui.showToast('Moved to trash')
+    ui.showToast(operationsCopy.value.movedToTrash)
     await reloadStorage?.()
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, operationsCopy.value.trashFailed)
     await loadBrowser()
   }
 }
 
 async function deleteFolder(id: string) {
   const ok = await ui.confirm({
-    title: 'Move folder to trash?',
-    message: 'The folder must be empty. You can restore it from Trash later.',
-    confirmLabel: 'Move to trash',
+    title: operationsCopy.value.trashFolderTitle,
+    message: operationsCopy.value.trashFolderMessage,
+    confirmLabel: t.value.moveToTrash,
     danger: true,
   })
   if (!ok) return
@@ -804,19 +799,19 @@ async function deleteFolder(id: string) {
   removeOptimistic(id)
   try {
     await api(`/folders/${id}`, { method: 'DELETE' })
-    ui.showToast('Moved to trash')
+    ui.showToast(operationsCopy.value.movedToTrash)
   } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
+    error.value = formatApiError(e, operationsCopy.value.trashFailed)
     await loadBrowser()
   }
 }
 
 async function openFolderActions(folder: { id: string; name: string }) {
   const action = await ui.openActionSheet(folder.name, [
-    { id: 'open', label: 'Open', icon: 'arrow-right' },
-    { id: 'rename', label: 'Rename', icon: 'pencil' },
-    { id: 'move', label: 'Move', icon: 'move' },
-    { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
+    { id: 'open', label: t.value.open, icon: 'arrow-right' },
+    { id: 'rename', label: t.value.rename, icon: 'pencil' },
+    { id: 'move', label: t.value.move, icon: 'move' },
+    { id: 'delete', label: t.value.moveToTrash, icon: 'trash', danger: true },
   ])
   if (action === 'open') await openFolder(folder.id)
   if (action === 'rename') await renameFolder(folder.id, folder.name)
@@ -878,19 +873,19 @@ async function openFileActions(file: { id: string; name: string; mimeType?: stri
         file.mimeType.startsWith('audio/')),
   )
   const action = await ui.openActionSheet(file.name, [
-    ...(canPreview ? [{ id: 'preview', label: 'Preview', icon: 'eye' }] : []),
-    { id: 'download', label: 'Download', icon: 'download' },
+    ...(canPreview ? [{ id: 'preview', label: t.value.preview, icon: 'eye' }] : []),
+    { id: 'download', label: t.value.download, icon: 'download' },
     {
       id: 'favorite',
-      label: favorited ? 'Remove from favorites' : 'Add to favorites',
+      label: favorited ? t.value.removeFromFavorites : t.value.addToFavorites,
       icon: favorited ? 'star-filled' : 'star',
     },
-    { id: 'share', label: 'Share link', icon: 'share' },
-    { id: 'share-user', label: 'Share with user', icon: 'users' },
-    { id: 'rename', label: 'Rename', icon: 'pencil' },
-    { id: 'move', label: 'Move', icon: 'move' },
-    { id: 'vault', label: 'Move to vault', icon: 'lock' },
-    { id: 'delete', label: 'Move to trash', icon: 'trash', danger: true },
+    { id: 'share', label: t.value.shareLink, icon: 'share' },
+    { id: 'share-user', label: t.value.shareWithUser, icon: 'users' },
+    { id: 'rename', label: t.value.rename, icon: 'pencil' },
+    { id: 'move', label: t.value.move, icon: 'move' },
+    { id: 'vault', label: t.value.vaultMoveToVault, icon: 'lock' },
+    { id: 'delete', label: t.value.moveToTrash, icon: 'trash', danger: true },
   ])
   if (action === 'preview') await previewMediaFile({ id: file.id, name: file.name, mimeType: file.mimeType ?? '' })
   if (action === 'download') await downloadFile(file.id)
@@ -912,9 +907,9 @@ async function openFileActions(file: { id: string; name: string; mimeType?: stri
 
 async function moveFileToVault(id: string, name: string) {
   const ok = await ui.confirm({
-    title: 'Chuyển vào kho cá nhân?',
-    message: `"${name}" sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.`,
-    confirmLabel: 'Chuyển vào kho',
+    title: vaultCopy.value.confirmSingleTitle,
+    message: vaultCopy.value.confirmSingleMessage(name),
+    confirmLabel: vaultCopy.value.confirmSingleLabel,
   })
   if (!ok) return
   error.value = ''
@@ -924,10 +919,10 @@ async function moveFileToVault(id: string, name: string) {
       method: 'POST',
       body: JSON.stringify({ fileIds: [id] }),
     })
-    ui.showToast(t.value.vaultMoveInSuccess, 'success')
+    ui.showToast(vaultCopy.value.moveInSuccess, 'success')
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Không thể chuyển vào kho cá nhân')
+    error.value = formatApiError(e, vaultCopy.value.moveInFailed)
     await loadBrowser()
   }
 }
@@ -936,9 +931,9 @@ async function batchMoveToVault() {
   const fileIds = Array.from(selectedFileIds.value)
   if (fileIds.length === 0) return
   const ok = await ui.confirm({
-    title: `Chuyển ${fileIds.length} tệp vào kho cá nhân?`,
-    message: 'Các tệp này sẽ được bảo vệ bằng mật khẩu và không hiển thị trong danh sách tệp thông thường.',
-    confirmLabel: 'Chuyển vào kho',
+    title: vaultCopy.value.confirmBatchTitle(fileIds.length),
+    message: vaultCopy.value.confirmBatchMessage(fileIds.length),
+    confirmLabel: vaultCopy.value.confirmBatchLabel,
   })
   if (!ok) return
   error.value = ''
@@ -950,11 +945,11 @@ async function batchMoveToVault() {
       method: 'POST',
       body: JSON.stringify({ fileIds }),
     })
-    ui.showToast(`Đã chuyển ${fileIds.length} tệp vào kho cá nhân`, 'success')
+    ui.showToast(vaultCopy.value.moveInBatchSuccess(fileIds.length), 'success')
     clearSelection()
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, 'Không thể chuyển vào kho cá nhân')
+    error.value = formatApiError(e, vaultCopy.value.moveInFailed)
     await loadBrowser()
   }
 }
@@ -1046,24 +1041,12 @@ const shareUserOpen = ref(false)
 const shareUserFileName = ref('')
 const shareUserTargetId = ref<string | null>(null)
 
-async function shareWithUser(email: string) {
-  const fileId = shareUserTargetId.value
-  if (!fileId) return
+function onUserShared(result: { invited: boolean; email: string }) {
   const name = shareUserFileName.value
-  error.value = ''
-  try {
-    const res = await api<{ invited?: boolean }>(`/shares`, {
-      method: 'POST',
-      body: JSON.stringify({ resourceType: 'file', resourceId: fileId, email }),
-    })
-    shareUserOpen.value = false
-    if (res.invited) {
-      ui.showToast(`Invitation sent to ${email}`)
-    } else {
-      ui.showToast(`Shared "${name}" with ${email}`, 'success')
-    }
-  } catch (e) {
-    error.value = formatApiError(e, 'Could not share')
+  if (result.invited) {
+    ui.showToast(`Invitation sent to ${result.email}`)
+  } else {
+    ui.showToast(`Shared "${name}" with ${result.email}`, 'success')
   }
 }
 
@@ -1114,7 +1097,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <!-- TeraBox Segmented Tabs -->
     <div class="tabs-header">
-      <div class="tabs-pill-list" role="tablist" aria-label="File views">
+      <div class="tabs-pill-list" role="tablist" :aria-label="t.fileViewsAria">
         <button
           type="button"
           role="tab"
@@ -1151,7 +1134,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       <button
         type="button"
         class="folder-hierarchy-btn mobile-only"
-        aria-label="View hierarchy"
+        :aria-label="t.fileHierarchyAria"
         @click="breadcrumbSheetOpen = true"
       >
         <Icon name="more" :size="18" />
@@ -1250,7 +1233,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         @click="openFolder(folder.id)"
       >
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
-        <button class="btn icon-only" type="button" aria-label="Open folder" @click.stop="openFolder(folder.id)">
+        <button class="btn icon-only" type="button" :aria-label="`${t.openFolderAria}: ${folder.name}`" @click.stop="openFolder(folder.id)">
           <Icon name="arrow-right" :size="18" />
         </button>
       </div>
@@ -1262,7 +1245,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       >
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
-        <button class="btn icon-only" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+        <button class="btn icon-only" type="button" :aria-label="`${t.fileActionsAria}: ${file.name}`" @click.stop="openFileActions(file)">
           <Icon name="more" :size="18" />
         </button>
       </div>
@@ -1349,7 +1332,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           v-if="!isSelecting"
           class="file-item-more-btn"
           type="button"
-          aria-label="Folder actions"
+          :aria-label="`${t.folderActionsAria}: ${folder.name}`"
           @click.stop="openFolderActions(folder)"
         >
           <Icon name="more" :size="18" />
@@ -1379,8 +1362,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         <div
           class="file-icon-badge"
           :style="{
-            background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
-            color: getFileTypeColor(file.mimeType)
+            background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
+            color: mimeCategoryColor(file.mimeType, file.name)
           }"
         >
           <Icon
@@ -1396,7 +1379,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           v-if="!isSelecting"
           class="file-item-more-btn"
           type="button"
-          aria-label="File actions"
+          :aria-label="`${t.fileActionsAria}: ${file.name}`"
           @click.stop="openFileActions(file)"
         >
           <Icon name="more" :size="18" />
@@ -1431,8 +1414,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           <div
             class="file-icon-badge"
             :style="{
-              background: `color-mix(in srgb, ${getFileTypeColor(file.mimeType)} 14%, transparent)`,
-              color: getFileTypeColor(file.mimeType)
+              background: `color-mix(in srgb, ${mimeCategoryColor(file.mimeType, file.name)} 14%, transparent)`,
+              color: mimeCategoryColor(file.mimeType, file.name)
             }"
           >
             <Icon name="star-filled" :size="20" style="color: #f59e0b;" />
@@ -1441,7 +1424,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
             <span class="file-item-title">{{ file.name }}</span>
             <span class="file-item-sub">{{ formatItemDate(file.updatedAt) }} · {{ formatBytes(file.sizeBytes) }}</span>
           </div>
-          <button class="file-item-more-btn" type="button" aria-label="File actions" @click.stop="openFileActions(file)">
+          <button class="file-item-more-btn" type="button" :aria-label="`${t.fileActionsAria}: ${file.name}`" @click.stop="openFileActions(file)">
             <Icon name="more" :size="18" />
           </button>
         </div>
@@ -1545,7 +1528,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
     <ShareUserSheet
       :open="shareUserOpen"
       :name="shareUserFileName"
-      @share="shareWithUser"
+      :resource-id="shareUserTargetId"
+      @shared="onUserShared"
       @close="shareUserOpen = false"
     />
 

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import BottomSheet from '@/components/BottomSheet.vue'
 import type { Browser } from '@/api/types'
+import { useI18n } from '@/lib/i18n'
+import { folderPickerCopy } from '@/lib/folderPickerCopy'
 
 const props = defineProps<{
   open: boolean
@@ -17,6 +19,8 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { t, locale } = useI18n()
+const copy = computed(() => folderPickerCopy(locale.value))
 const browseFolderId = ref<string | null>(null)
 const browser = ref<Browser | null>(null)
 const loading = ref(false)
@@ -29,7 +33,7 @@ async function loadBrowser() {
     const q = browseFolderId.value ? `?folderId=${browseFolderId.value}` : ''
     browser.value = await api<Browser>(`/browser${q}`)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load folders')
+    error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
     loading.value = false
   }
@@ -77,8 +81,8 @@ watch(browseFolderId, () => {
 
 <template>
   <BottomSheet :open="open" :title="title" @close="onClose">
-    <nav v-if="browser" class="picker-breadcrumb" aria-label="Browse folders">
-      <button type="button" class="btn ghost crumb" @click="resetBrowse">Root</button>
+    <nav v-if="browser" class="picker-breadcrumb" :aria-label="copy.browseFolders">
+      <button type="button" class="btn ghost crumb" @click="resetBrowse">{{ copy.root }}</button>
       <template v-for="item in browser.breadcrumb" :key="item.id">
         <span aria-hidden="true">/</span>
         <button type="button" class="btn ghost crumb" @click="enterFolder(item.id)">
@@ -92,7 +96,7 @@ watch(browseFolderId, () => {
     </nav>
 
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+    <p v-if="loading" class="muted">{{ t.loading }}</p>
 
     <div v-else class="picker-list">
       <button
@@ -101,7 +105,7 @@ watch(browseFolderId, () => {
         class="row tappable picker-row"
         @click="goUp"
       >
-        <span class="name">.. Parent folder</span>
+        <span class="name">{{ copy.parentFolder }}</span>
       </button>
       <button
         v-for="folder in browser?.folders ?? []"
@@ -114,7 +118,7 @@ watch(browseFolderId, () => {
         <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
       </button>
       <p v-if="(browser?.folders.length ?? 0) === 0 && !loading" class="muted picker-empty">
-        No subfolders here.
+        {{ copy.empty }}
       </p>
     </div>
 
@@ -124,7 +128,7 @@ watch(browseFolderId, () => {
       :disabled="browseFolderId === excludeFolderId"
       @click="confirmSelection"
     >
-      {{ confirmLabel ?? 'Move here' }}
+      {{ confirmLabel ?? t.moveHere }}
     </button>
   </BottomSheet>
 </template>

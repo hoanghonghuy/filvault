@@ -7,6 +7,8 @@ import {
   setBubbleStyle,
   type ChatBubbleStyle,
 } from '@/lib/chatBubbles'
+import { chatBubblePickerCopy } from '@/lib/chatBubblePickerCopy'
+import { useI18n } from '@/lib/i18n'
 import { useUiStore } from '@/stores/ui'
 
 const props = defineProps<{
@@ -19,6 +21,8 @@ const emit = defineEmits<{
 }>()
 
 const ui = useUiStore()
+const { locale } = useI18n()
+const copy = computed(() => chatBubblePickerCopy(locale.value))
 
 const previewId = ref<string>(activeBubbleStyleId.value)
 const isChanged = computed(() => previewId.value !== activeBubbleStyleId.value)
@@ -40,7 +44,7 @@ function selectStyle(id: string) {
 
 function handleSave() {
   setBubbleStyle(previewId.value)
-  ui.showToast(`Đã đổi kiểu bong bóng sang "${activeStyle.value.name}"`, 'success')
+  ui.showToast(copy.value.savedToast(activeStyle.value.name), 'success')
   emit('saved', previewId.value)
   emit('close')
 }
@@ -59,16 +63,16 @@ function handleCancel() {
           <!-- Top Bar -->
           <header class="bubble-modal-header">
             <button type="button" class="action-btn cancel-btn" @click="handleCancel">
-              Hủy
+              {{ copy.cancel }}
             </button>
-            <h2 id="bubble-modal-title" class="modal-title">Chọn kiểu bong bóng</h2>
+            <h2 id="bubble-modal-title" class="modal-title">{{ copy.title }}</h2>
             <button
               type="button"
               class="action-btn save-btn"
               :class="{ changed: isChanged }"
               @click="handleSave"
             >
-              Lưu
+              {{ copy.save }}
             </button>
           </header>
 
@@ -100,7 +104,7 @@ function handleCancel() {
                   <div v-else-if="dec.svg" v-html="dec.svg" />
                 </div>
                 <p class="preview-text">
-                  Nay bạn có thể thay đổi kiểu bong bóng và cuộc trò chuyện sẽ có giao diện mới. Quá ngầu!
+                  {{ copy.preview }}
                 </p>
               </div>
             </div>
@@ -110,14 +114,14 @@ function handleCancel() {
           <div class="bubble-sheet-panel">
             <div class="sheet-drag-pill" aria-hidden="true" />
             <div class="sheet-header">
-              <h3 class="sheet-title">Gợi ý</h3>
+              <h3 class="sheet-title">{{ copy.suggestions }}</h3>
               <p class="sheet-subtext">
-                Bong bóng này áp dụng cho tất cả cuộc trò chuyện. Bong bóng này chỉ ảnh hưởng đến các tin nhắn bạn gửi sau khi lưu.
+                {{ copy.help }}
               </p>
             </div>
 
             <!-- 3-Column Grid of 21 Styles -->
-            <div class="styles-grid" role="radiogroup" aria-label="Kiểu bong bóng">
+            <div class="styles-grid" role="radiogroup" :aria-label="copy.stylesAria">
               <button
                 v-for="item in CHAT_BUBBLE_STYLES"
                 :key="item.id"

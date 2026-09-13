@@ -1,7 +1,7 @@
 # Filvault
 
-Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).  
-Checklist bàn giao Phase 1: [`docs/spec/08-phase-1-status.md`](docs/spec/08-phase-1-status.md).
+Personal cloud storage. **Current product/release handoff:** [`docs/CURRENT_PRODUCT_STATE.md`](docs/CURRENT_PRODUCT_STATE.md).  
+Specs: [`docs/spec/README.md`](docs/spec/README.md). Historical phase checklists are retained for traceability but their old “next work” sections are not the current source of truth.
 
 ## Chạy local
 

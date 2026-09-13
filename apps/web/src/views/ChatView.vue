@@ -42,7 +42,7 @@ const chatStore = useChatStore()
 const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
-const { resolvedIsDark, toggleResolvedAppearance } = useTheme()
+const { resolvedIsDark } = useTheme()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>((route.params.id as string) || null)
@@ -1617,9 +1617,6 @@ function backToVault() {
 
 const appMenuOpen = ref(false)
 
-function toggleDarkMode() {
-  toggleResolvedAppearance()
-}
 
 function toggleLanguage() {
   const next = locale.value === 'vi' ? 'en' : 'vi'
@@ -3248,7 +3245,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('customization')"
             >
-              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <span class="menu-section-label">{{ t.thisChatAppearance }}</span>
               <Icon
                 :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3866,12 +3863,13 @@ watch(
         <div class="menu-section">
           <span class="menu-section-label">{{ t.appearance }} &amp; {{ t.navSettings }}</span>
           <div class="menu-items-group">
-            <button type="button" class="menu-row-item" @click="toggleDarkMode">
+            <button type="button" class="menu-row-item" @click="navigateTo('/settings#appearance')">
               <span class="menu-item-icon badge-theme">
-                <Icon :name="resolvedIsDark ? 'sun' : 'moon'" :size="18" />
+                <Icon :name="resolvedIsDark ? 'moon' : 'sun'" :size="18" />
               </span>
-              <span class="menu-item-text">{{ t.darkMode }}</span>
-              <span class="menu-toggle-state">{{ resolvedIsDark ? 'Bật' : 'Tắt' }}</span>
+              <span class="menu-item-text">{{ t.appAppearance }}</span>
+              <span class="menu-toggle-state">{{ resolvedIsDark ? t.appearanceModeDark : t.appearanceModeLight }}</span>
+              <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
             </button>
             <button type="button" class="menu-row-item" @click="toggleLanguage">
               <span class="menu-item-icon badge-lang"><Icon name="chat" :size="18" /></span>
@@ -4191,7 +4189,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('customization')"
             >
-              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <span class="menu-section-label">{{ t.thisChatAppearance }}</span>
               <Icon
                 :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -4686,6 +4684,9 @@ watch(
 }
 
 .chat-app {
+  --chat-accent: var(--accent);
+  --chat-accent-secondary: var(--accent);
+  --chat-bubble-outgoing: linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-secondary) 100%);
   display: grid;
   height: 100vh;
   height: 100dvh;
@@ -4849,7 +4850,7 @@ watch(
   width: 48px;
   height: 48px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
   font-size: 18px;
   font-weight: 700;
@@ -5494,7 +5495,7 @@ watch(
   min-height: 36px;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
-  color: var(--chat-accent, #0084ff);
+  color: var(--chat-accent);
   transition: background var(--duration-short) var(--ease-standard), transform var(--duration-short) var(--ease-standard);
 }
 
@@ -6023,7 +6024,7 @@ watch(
 }
 
 .message-bubble.outgoing {
-  background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
 }
 
@@ -6340,7 +6341,7 @@ watch(
 }
 
 .attach-btn:focus-visible {
-  outline: 2px solid var(--chat-accent, #0084ff);
+  outline: 2px solid var(--chat-accent);
   outline-offset: 2px;
 }
 
@@ -6371,8 +6372,8 @@ watch(
 }
 
 .sticker-toggle-btn.active {
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 18%, transparent);
-  color: var(--chat-accent, #0084ff);
+  background: color-mix(in srgb, var(--chat-accent) 18%, transparent);
+  color: var(--chat-accent);
 }
 
 .sticker-picker-drawer {
@@ -6436,7 +6437,7 @@ img.avatar-img {
 }
 
 .chat-composer textarea:focus-visible {
-  outline: 2px solid var(--chat-accent, #0084ff);
+  outline: 2px solid var(--chat-accent);
   outline-offset: -1px;
 }
 
@@ -6451,7 +6452,7 @@ img.avatar-img {
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--chat-accent, #0084ff);
+  color: var(--chat-accent);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
@@ -6462,7 +6463,7 @@ img.avatar-img {
 
 .like-btn:hover {
   transform: scale(1.15);
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
+  background: color-mix(in srgb, var(--chat-accent) 10%, transparent);
 }
 
 .like-btn:active {
@@ -6470,7 +6471,7 @@ img.avatar-img {
 }
 
 .like-btn:focus-visible {
-  outline: 2px solid var(--chat-accent, #0084ff);
+  outline: 2px solid var(--chat-accent);
   outline-offset: 2px;
 }
 
@@ -6484,7 +6485,7 @@ img.avatar-img {
   min-height: 36px;
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--chat-bubble-outgoing, linear-gradient(135deg, var(--chat-accent, #0084ff) 0%, #0099ff 100%));
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
   opacity: 0.4;
   cursor: pointer;
@@ -7046,9 +7047,9 @@ img.avatar-img {
 
 /* Adaptive Seen Indicator when wallpaper is active */
 .message-thread.has-wallpaper .seen-indicator {
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 8%, rgba(255, 255, 255, 0.92));
-  border: 1px solid color-mix(in srgb, var(--chat-accent, #0084ff) 20%, rgba(0, 0, 0, 0.08));
-  color: color-mix(in srgb, var(--chat-accent, #0084ff) 85%, #000000);
+  background: color-mix(in srgb, var(--chat-accent) 8%, rgba(255, 255, 255, 0.92));
+  border: 1px solid color-mix(in srgb, var(--chat-accent) 20%, rgba(0, 0, 0, 0.08));
+  color: color-mix(in srgb, var(--chat-accent) 85%, #000000);
   font-weight: 600;
   padding: 2px 8px 2px 5px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -7280,7 +7281,7 @@ img.avatar-img {
 .reaction-badge-group.reacted-by-me {
   background: var(--surface);
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .rx-emoji {
@@ -7392,7 +7393,7 @@ img.avatar-img {
 }
 
 .rx-btn.rx-active {
-  background: rgba(0, 132, 255, 0.18);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   transform: scale(1.18);
 }
 
@@ -7461,7 +7462,7 @@ img.avatar-img {
 
 .message-bubble.active-elevated.outgoing {
   border-radius: 18px 18px 4px 18px;
-  background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
 }
 
@@ -7601,10 +7602,10 @@ img.avatar-img {
 
 @keyframes pulse-highlight {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 132, 255, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
   20%, 50% {
-    box-shadow: 0 0 0 4px rgba(0, 132, 255, 0.4), 0 4px 16px rgba(0, 132, 255, 0.25);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent), 0 4px 16px color-mix(in srgb, var(--accent) 25%, transparent);
     transform: scale(1.02);
   }
 }
@@ -7625,7 +7626,7 @@ img.avatar-img {
   gap: 4px;
   border: none;
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -7637,7 +7638,7 @@ img.avatar-img {
 }
 
 .subpage-back-btn:hover {
-  background: rgba(0, 132, 255, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .subpage-title {
@@ -7859,7 +7860,7 @@ img.avatar-img {
 }
 
 .wallpaper-action-btn.primary {
-  background: var(--accent, #0084ff);
+  background: var(--accent);
   color: #ffffff;
   border: none;
 }
@@ -7963,8 +7964,8 @@ img.avatar-img {
 }
 
 .wallpaper-preset-item.active .wallpaper-preset-thumb {
-  border-color: var(--accent, #0084ff);
-  box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.3);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .preset-check-badge {
@@ -7974,7 +7975,7 @@ img.avatar-img {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--accent, #0084ff);
+  background: var(--accent);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -8410,9 +8411,9 @@ img.avatar-img {
 
 .info-tab-btn.active {
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--accent, #0084ff);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .tab-badge {
@@ -8526,7 +8527,7 @@ img.avatar-img {
 }
 
 .shared-link-main:hover {
-  background: rgba(0, 132, 255, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .link-icon-wrap {
@@ -8537,7 +8538,7 @@ img.avatar-img {
   height: 32px;
   border-radius: var(--radius-sm);
   background: var(--surface-card);
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -8584,7 +8585,7 @@ img.avatar-img {
 .link-jump-btn {
   border: none;
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -8628,7 +8629,7 @@ img.avatar-img {
 
 .panel-tab-btn.active {
   background: var(--surface-soft);
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -8677,7 +8678,7 @@ img.avatar-img {
 }
 
 .file-row-icon {
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -8734,7 +8735,7 @@ img.avatar-img {
 }
 
 .panel-link-icon {
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -8780,7 +8781,7 @@ img.avatar-img {
 .panel-link-jump {
   border: none;
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-size: 10px;
   cursor: pointer;
   padding: 0;
@@ -8792,8 +8793,8 @@ img.avatar-img {
 
 /* Active state for info icon button on thread header */
 .thread-actions .icon-btn.active {
-  background: var(--accent-soft, rgba(0, 132, 255, 0.12));
-  color: var(--chat-accent, #0084ff);
+  background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, transparent));
+  color: var(--chat-accent);
 }
 
 /* Desktop Chat Info Sidebar */

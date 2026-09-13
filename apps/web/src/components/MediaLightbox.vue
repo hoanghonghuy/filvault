@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import Icon from '@/components/AppIcon.vue'
 import { useI18n } from '@/lib/i18n'
 import { isHeic, getHeicDisplayUrl, downloadHeicAsJpeg } from '@/lib/heic'
@@ -12,10 +12,12 @@ const props = withDefaults(
     url: string
     hasNext?: boolean
     hasPrev?: boolean
+    captionsUrl?: string
   }>(),
   {
     hasNext: false,
     hasPrev: false,
+    captionsUrl: '',
   },
 )
 
@@ -30,6 +32,7 @@ const isImage = computed(() => props.mimeType.startsWith('image/'))
 const isVideo = computed(() => props.mimeType.startsWith('video/'))
 const isPdf = computed(() => props.mimeType === 'application/pdf')
 const isAudio = computed(() => props.mimeType.startsWith('audio/'))
+const hasCaptions = computed(() => Boolean(props.captionsUrl))
 
 const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
 const heicLoading = ref(false)
@@ -62,22 +65,80 @@ async function resolveHeicImage() {
 }
 
 async function onDownloadJpeg() {
+  overflowOpen.value = false
   if (props.url) {
     await downloadHeicAsJpeg(props.url, props.name)
   }
 }
 
 const dialogRef = ref<HTMLDialogElement | null>(null)
+const closeButtonRef = ref<HTMLButtonElement | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const audioRef = ref<HTMLAudioElement | null>(null)
+const overflowOpen = ref(false)
+const isNarrowToolbar = ref(false)
+
+let previousFocus: HTMLElement | null = null
+let narrowMediaQuery: MediaQueryList | null = null
+
+const { t } = useI18n()
+
+const prefersReducedMotion = ref(false)
+let reducedMotionQuery: MediaQueryList | null = null
 
 function pauseMedia() {
   if (videoRef.value) videoRef.value.pause()
   if (audioRef.value) audioRef.value.pause()
 }
 
-const captionsUrl = 'data:text/vtt;charset=utf-8,WEBVTT%0A'
-const { t } = useI18n()
+function syncToolbarLayout() {
+  if (typeof window.matchMedia !== 'function') return
+  isNarrowToolbar.value = window.matchMedia('(max-width: 639px)').matches
+}
+
+function syncReducedMotion() {
+  if (typeof window.matchMedia !== 'function') return
+  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function focusInitialControl() {
+  void nextTick(() => {
+    closeButtonRef.value?.focus()
+  })
+}
+
+function restoreFocus() {
+  previousFocus?.focus()
+  previousFocus = null
+}
+
+function openDialog() {
+  previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  const revealDialog = () => {
+    if (!dialogRef.value?.open) {
+      dialogRef.value?.showModal()
+    }
+    focusInitialControl()
+  }
+  if (dialogRef.value) {
+    revealDialog()
+  } else {
+    void nextTick(revealDialog)
+  }
+  resolveHeicImage()
+}
+
+function closeDialog() {
+  pauseMedia()
+  heicLoading.value = false
+  heicError.value = false
+  heicDisplayUrl.value = ''
+  overflowOpen.value = false
+  if (dialogRef.value?.open) {
+    dialogRef.value.close()
+  }
+  restoreFocus()
+}
 
 // Touch gestures & zoom
 const scale = ref(1)
@@ -91,7 +152,22 @@ let touchStartY = 0
 let initialPinchDistance = 0
 let lastTapTime = 0
 
+const mediaTransformStyle = computed(() => ({
+  transform: `translate(${translateX.value}px, ${translateY.value}px) scale(${scale.value})`,
+  transition:
+    isTouching.value || prefersReducedMotion.value
+      ? 'none'
+      : 'transform 200ms var(--ease-standard)',
+}))
+
+function isGestureTargetBlocked(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+  return Boolean(target.closest('video, audio, iframe, button, input, textarea, select, a'))
+}
+
 function onTouchStart(e: TouchEvent) {
+  if (isGestureTargetBlocked(e.target)) return
+
   if (e.touches.length === 2) {
     const [t1, t2] = [e.touches[0], e.touches[1]]
     if (t1 && t2) {
@@ -106,7 +182,6 @@ function onTouchStart(e: TouchEvent) {
     touchStartY = e.touches[0].clientY
     isTouching.value = true
 
-    // Double tap to zoom
     const now = Date.now()
     if (now - lastTapTime < 300 && isImage.value) {
       scale.value = scale.value > 1 ? 1 : 2.2
@@ -120,6 +195,8 @@ function onTouchStart(e: TouchEvent) {
 }
 
 function onTouchMove(e: TouchEvent) {
+  if (isGestureTargetBlocked(e.target)) return
+
   if (e.touches.length === 2 && e.touches[0] && e.touches[1] && initialPinchDistance > 0 && isImage.value) {
     const dist = Math.hypot(
       e.touches[1].clientX - e.touches[0].clientX,
@@ -135,7 +212,6 @@ function onTouchMove(e: TouchEvent) {
     const dy = e.touches[0].clientY - touchStartY
 
     if (scale.value > 1) {
-      // Pan when zoomed
       translateX.value = dx
       translateY.value = dy
       if (e.cancelable) e.preventDefault()
@@ -169,16 +245,37 @@ function onTouchEnd() {
   translateY.value = 0
 }
 
+function isMediaControlFocused() {
+  const active = document.activeElement
+  if (!active) return false
+  if (active instanceof HTMLVideoElement || active instanceof HTMLAudioElement) return true
+  return Boolean(active.closest('video, audio'))
+}
+
 function onKeydown(event: KeyboardEvent) {
-  const target = event.target as HTMLElement | null
-  const isMediaControl = target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO' || target?.tagName === 'INPUT'
-  if (isMediaControl) return
+  if (isMediaControlFocused()) return
 
   if (event.key === 'ArrowRight' && props.hasNext) {
     emit('next')
   } else if (event.key === 'ArrowLeft' && props.hasPrev) {
     emit('prev')
   }
+}
+
+function onDownloadClick() {
+  overflowOpen.value = false
+  emit('download')
+}
+
+function toggleOverflow() {
+  overflowOpen.value = !overflowOpen.value
+}
+
+function onDocumentPointerDown(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  if (target.closest('.overflow-menu')) return
+  overflowOpen.value = false
 }
 
 watch(
@@ -190,19 +287,15 @@ watch(
     translateY.value = 0
     if (open) {
       window.addEventListener('keydown', onKeydown)
-      if (!dialogRef.value?.open) {
-        dialogRef.value?.showModal()
-      }
-      resolveHeicImage()
+      document.addEventListener('pointerdown', onDocumentPointerDown)
+      openDialog()
     } else {
-      pauseMedia()
-      heicLoading.value = false
-      heicError.value = false
-      heicDisplayUrl.value = ''
       window.removeEventListener('keydown', onKeydown)
-      if (dialogRef.value?.open) dialogRef.value.close()
+      document.removeEventListener('pointerdown', onDocumentPointerDown)
+      closeDialog()
     }
   },
+  { immediate: true },
 )
 
 watch(
@@ -219,10 +312,22 @@ watch(
   },
 )
 
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+  syncToolbarLayout()
+  syncReducedMotion()
+  narrowMediaQuery = window.matchMedia('(max-width: 639px)')
+  reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  narrowMediaQuery.addEventListener('change', syncToolbarLayout)
+  reducedMotionQuery.addEventListener('change', syncReducedMotion)
+}
+
 onUnmounted(() => {
   pauseMedia()
   document.body.style.overflow = ''
   window.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+  narrowMediaQuery?.removeEventListener('change', syncToolbarLayout)
+  reducedMotionQuery?.removeEventListener('change', syncReducedMotion)
 })
 </script>
 
@@ -233,6 +338,7 @@ onUnmounted(() => {
         v-show="open"
         ref="dialogRef"
         class="lightbox"
+        :class="{ 'lightbox-reduced-motion': prefersReducedMotion }"
         :aria-label="name"
         @close.prevent="emit('close')"
         @keydown.esc="emit('close')"
@@ -244,13 +350,13 @@ onUnmounted(() => {
               v-if="hasPrev"
               type="button"
               class="btn icon-only nav-btn"
-              title="Previous"
-              aria-label="Previous item"
+              :title="t.prevItem"
+              :aria-label="t.prevItem"
               @click="emit('prev')"
             >
               <Icon name="arrow-left" :size="18" />
             </button>
-            <p class="lightbox-title">
+            <p class="lightbox-title" :title="name">
               {{ name }}
               <span v-if="isHeicMedia" class="heic-pill">{{ t.heicBadge }}</span>
             </p>
@@ -258,25 +364,61 @@ onUnmounted(() => {
               v-if="hasNext"
               type="button"
               class="btn icon-only nav-btn"
-              title="Next"
-              aria-label="Next item"
+              :title="t.nextItem"
+              :aria-label="t.nextItem"
               @click="emit('next')"
             >
               <Icon name="arrow-right" :size="18" />
             </button>
-            <button
-              v-if="isHeicMedia"
-              type="button"
-              class="btn ghost heic-download-btn"
-              :title="t.downloadAsJpeg"
-              @click="onDownloadJpeg"
-            >
-              {{ t.downloadAsJpeg }}
-            </button>
-            <button type="button" class="btn ghost" @click="emit('download')">{{ t.download }}</button>
-            <button type="button" class="btn icon-only" :aria-label="t.closePreview" @click="emit('close')" :title="t.closePreview">
-              <Icon name="close" :size="18" />
-            </button>
+            <div class="lightbox-actions">
+              <button
+                v-if="isHeicMedia && !isNarrowToolbar"
+                type="button"
+                class="btn ghost heic-download-btn heic-desktop"
+                :title="t.downloadAsJpeg"
+                @click="onDownloadJpeg"
+              >
+                {{ t.downloadAsJpeg }}
+              </button>
+              <button
+                type="button"
+                class="btn ghost download-btn"
+                :class="{ 'icon-only': isNarrowToolbar }"
+                :title="t.download"
+                :aria-label="t.download"
+                @click="onDownloadClick"
+              >
+                <Icon v-if="isNarrowToolbar" name="download" :size="18" />
+                <span v-else>{{ t.download }}</span>
+              </button>
+              <div v-if="isHeicMedia && isNarrowToolbar" class="overflow-menu heic-overflow">
+                <button
+                  type="button"
+                  class="btn icon-only"
+                  :title="t.moreActions"
+                  :aria-label="t.moreActions"
+                  :aria-expanded="overflowOpen"
+                  @click="toggleOverflow"
+                >
+                  <Icon name="more" :size="18" />
+                </button>
+                <div v-if="overflowOpen" class="overflow-panel" role="menu">
+                  <button type="button" role="menuitem" class="overflow-item" @click="onDownloadJpeg">
+                    {{ t.downloadAsJpeg }}
+                  </button>
+                </div>
+              </div>
+              <button
+                ref="closeButtonRef"
+                type="button"
+                class="btn icon-only"
+                :aria-label="t.closePreview"
+                :title="t.closePreview"
+                @click="emit('close')"
+              >
+                <Icon name="close" :size="18" />
+              </button>
+            </div>
           </div>
           <div
             class="lightbox-media"
@@ -285,13 +427,7 @@ onUnmounted(() => {
             @touchend="onTouchEnd"
             @touchcancel="onTouchEnd"
           >
-            <div
-              class="media-wrapper"
-              :style="{
-                transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
-                transition: isTouching ? 'none' : 'transform 200ms var(--ease-standard)',
-              }"
-            >
+            <div class="media-wrapper" :style="mediaTransformStyle">
               <div v-if="isHeicMedia && heicLoading" class="heic-loading-state">
                 <div class="heic-spinner" />
                 <p>{{ t.heicConverting }}</p>
@@ -304,9 +440,16 @@ onUnmounted(() => {
                 draggable="false"
               />
               <video v-else-if="isVideo" ref="videoRef" :src="url" controls playsinline>
-                <track kind="captions" label="No captions" srclang="en" :src="captionsUrl" default />
+                <track
+                  v-if="hasCaptions"
+                  kind="captions"
+                  :label="t.captions"
+                  srclang="en"
+                  :src="captionsUrl"
+                  default
+                />
               </video>
-              <iframe v-else-if="isPdf" :src="url" class="pdf-frame" title="PDF preview" />
+              <iframe v-else-if="isPdf" :src="url" class="pdf-frame" :title="t.pdfPreview" />
               <audio v-else-if="isAudio" ref="audioRef" :src="url" controls class="audio-player" />
               <div v-else class="lightbox-fallback">
                 <Icon name="file" :size="36" />
@@ -369,6 +512,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  min-width: 0;
   padding: var(--space-sm);
   border-bottom: 1px solid var(--hairline);
 }
@@ -382,6 +526,14 @@ onUnmounted(() => {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lightbox-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
 }
 
 .lightbox-media {
@@ -422,8 +574,46 @@ onUnmounted(() => {
   width: min(400px, 90%);
 }
 
-.nav-btn {
+.nav-btn,
+.download-btn,
+.overflow-menu > .btn,
+.lightbox-actions > .btn.icon-only {
   flex-shrink: 0;
+}
+
+.overflow-menu {
+  position: relative;
+}
+
+.overflow-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 2;
+  min-width: 180px;
+  padding: var(--space-xs);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.overflow-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.overflow-item:hover,
+.overflow-item:focus-visible {
+  background: var(--surface-soft);
 }
 
 .lightbox-fallback {
@@ -483,6 +673,7 @@ onUnmounted(() => {
 .heic-download-btn {
   font-size: 13px;
   color: var(--accent);
+  white-space: nowrap;
 }
 
 .heic-loading-state {
@@ -507,6 +698,18 @@ onUnmounted(() => {
 @keyframes heic-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox-enter-active,
+  .lightbox-leave-active,
+  .lightbox-reduced-motion .media-wrapper {
+    transition: none !important;
+  }
+
+  .heic-spinner {
+    animation: none;
   }
 }
 </style>

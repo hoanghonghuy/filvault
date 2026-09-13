@@ -169,6 +169,15 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/deleteConversation/)
   })
 
+  it('separates app appearance from this-chat personalization', () => {
+    expect(chat).toMatch(/t\.thisChatAppearance/)
+    expect(chat).toMatch(/t\.appAppearance/)
+    expect(chat).toMatch(/navigateTo\('\/settings#appearance'\)/)
+    expect(router).toMatch(/if \(to\.hash\) return \{ el: to\.hash/)
+    expect(chat).not.toMatch(/toggleResolvedAppearance/)
+    expect(chat).not.toMatch(/function toggleDarkMode/)
+  })
+
   it('provides a Messenger-grade chat info sheet with theme picker and nicknames', () => {
     expect(chat).toMatch(/threadInfoOpen/)
     expect(chat).toMatch(/class="chat-info-content"/)
