@@ -6700,8 +6700,8 @@ img.avatar-img {
 
   .thread-header {
     padding: calc(6px + env(safe-area-inset-top)) 10px 6px;
-    gap: 6px;
-    min-height: 52px;
+    gap: 4px;
+    min-height: 56px;
   }
 
   .thread-peer-info {
@@ -6723,12 +6723,15 @@ img.avatar-img {
   }
 
   .thread-actions {
-    gap: 2px;
+    gap: 0;
   }
 
+  .back-btn,
   .thread-actions .icon-btn {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .sticker-picker-drawer {
