@@ -451,7 +451,7 @@ async function deleteSelectedFile() {
           <button
             type="button"
             class="more-btn"
-            :aria-label="t.vaultFileActions"
+            :aria-label="`${t.vaultFileActions}: ${file.name}`"
             @click.stop="openFileMenu(file)"
           >
             <Icon name="more" :size="20" />
