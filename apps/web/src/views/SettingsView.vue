@@ -518,7 +518,7 @@ onMounted(() => {
         </div>
       </RouterLink>
 
-      <!-- Quick Swatches Grid (balanced 6 columns, no clipping) -->
+      <!-- Quick Swatches Grid (wraps before touch targets shrink below 44px) -->
       <div class="quick-swatches-grid" role="radiogroup" :aria-label="settingsText.quickThemesGroup">
         <button
           v-for="th in THEMES.slice(0, 6)"
@@ -1232,16 +1232,15 @@ onMounted(() => {
 
 .quick-swatches-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
   gap: var(--space-xs);
   padding: 4px 2px;
 }
 
 .quick-swatch {
   position: relative;
-  aspect-ratio: 1 / 1;
-  width: 100%;
-  max-width: 44px;
+  width: 44px;
+  height: 44px;
   margin: 0 auto;
   border-radius: 12px;
   border: none;
