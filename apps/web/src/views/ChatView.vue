@@ -744,7 +744,7 @@ async function performInfoSearch() {
     infoSearchResults.value = out.messages
     infoSearchDone.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'Search failed')
+    error.value = formatApiError(e, t.value.chatSearchFailed)
   } finally {
     infoSearching.value = false
   }
@@ -1662,7 +1662,7 @@ async function loadConversations() {
       void router.replace(`/chat/${out.conversations[0].id}`)
     }
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load chats')
+    error.value = formatApiError(e, t.value.chatLoadFailed)
   } finally {
     loading.value = false
   }
@@ -1676,7 +1676,7 @@ async function createDirectConversation(email: string) {
     await selectConversation(conversation.id)
     void router.push(`/chat/${conversation.id}`)
   } catch (e) {
-    error.value = formatApiError(e, 'Could not open direct chat')
+    error.value = formatApiError(e, t.value.chatOpenDirectFailed)
   }
 }
 
@@ -1732,7 +1732,7 @@ async function loadMessages(id = selectedId.value) {
       void chatStore.markAsRead(id, out.messages[out.messages.length - 1]?.id)
     }
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load messages')
+    error.value = formatApiError(e, t.value.chatMessagesLoadFailed)
   } finally {
     loadingThread.value = false
   }
@@ -1760,7 +1760,7 @@ async function loadOlder() {
       container.scrollTop = container.scrollHeight - heightBefore + offsetBefore
     }
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load older messages')
+    error.value = formatApiError(e, t.value.chatOlderMessagesLoadFailed)
   } finally {
     loadingOlder.value = false
   }
@@ -1875,7 +1875,7 @@ async function searchMessages() {
     const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${selectedId.value}/messages/search?q=${q}`)
     searchResults.value = out.messages
   } catch (e) {
-    error.value = formatApiError(e, 'Search failed')
+    error.value = formatApiError(e, t.value.chatSearchFailed)
   }
 }
 
