@@ -56,4 +56,14 @@ describe('VaultView UX contract', () => {
     expect(lightbox).toMatch(/@keydown\.esc/)
     expect(vault).toMatch(/@close="previewOpen = false"/)
   })
+
+  it('makes vault file rows keyboard-operable with visible focus while isolating nested controls', () => {
+    expect(vault).toMatch(/class="vault-file-row tappable"[\s\S]*?role="button"[\s\S]*?tabindex="0"[\s\S]*?:aria-label="file\.name"/)
+    expect(vault).toContain('@keydown="onVaultFileKeydown($event, file)"')
+    expect(vault).toContain('if (event.target !== event.currentTarget) return')
+    expect(vault).toContain("if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return")
+    expect(vault).toContain('void previewMediaFile(file)')
+    expect(vault).toContain('@click.stop="openFileMenu(file)"')
+    expect(vault).toMatch(/\.vault-file-row:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)[\s\S]*?outline-offset:\s*2px/)
+  })
 })
