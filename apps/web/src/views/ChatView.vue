@@ -42,7 +42,7 @@ const chatStore = useChatStore()
 const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
-const { resolvedIsDark, toggleResolvedAppearance } = useTheme()
+const { resolvedIsDark } = useTheme()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>((route.params.id as string) || null)
@@ -1617,9 +1617,6 @@ function backToVault() {
 
 const appMenuOpen = ref(false)
 
-function toggleDarkMode() {
-  toggleResolvedAppearance()
-}
 
 function toggleLanguage() {
   const next = locale.value === 'vi' ? 'en' : 'vi'
@@ -3248,7 +3245,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('customization')"
             >
-              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <span class="menu-section-label">{{ t.thisChatAppearance }}</span>
               <Icon
                 :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3866,12 +3863,13 @@ watch(
         <div class="menu-section">
           <span class="menu-section-label">{{ t.appearance }} &amp; {{ t.navSettings }}</span>
           <div class="menu-items-group">
-            <button type="button" class="menu-row-item" @click="toggleDarkMode">
+            <button type="button" class="menu-row-item" @click="navigateTo('/settings#appearance')">
               <span class="menu-item-icon badge-theme">
-                <Icon :name="resolvedIsDark ? 'sun' : 'moon'" :size="18" />
+                <Icon :name="resolvedIsDark ? 'moon' : 'sun'" :size="18" />
               </span>
-              <span class="menu-item-text">{{ t.darkMode }}</span>
-              <span class="menu-toggle-state">{{ resolvedIsDark ? 'Bật' : 'Tắt' }}</span>
+              <span class="menu-item-text">{{ t.appAppearance }}</span>
+              <span class="menu-toggle-state">{{ resolvedIsDark ? t.appearanceModeDark : t.appearanceModeLight }}</span>
+              <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
             </button>
             <button type="button" class="menu-row-item" @click="toggleLanguage">
               <span class="menu-item-icon badge-lang"><Icon name="chat" :size="18" /></span>
@@ -4191,7 +4189,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('customization')"
             >
-              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <span class="menu-section-label">{{ t.thisChatAppearance }}</span>
               <Icon
                 :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
                 :size="16"
