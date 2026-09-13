@@ -136,6 +136,35 @@ describe('chat surface contract', () => {
     }
   })
 
+  it('localizes remaining Chat fallback and search-result copy', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    for (const key of [
+      'chatMediaFallbackName',
+      'personalPhotoFallbackName',
+      'uploadedImageFallbackName',
+      'chatSenderYou',
+      'chatSenderFallback',
+      'chatReplyAttachmentFallback',
+      'sendingImageAlt',
+      'searchResultsCount',
+    ]) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+
+    expect(chat).toMatch(/t\.value\.chatMediaFallbackName/)
+    expect(chat).toMatch(/t\.value\.personalPhotoFallbackName/)
+    expect(chat).toMatch(/t\.value\.uploadedImageFallbackName/)
+    expect(chat).toMatch(/t\.value\.chatSenderYou/)
+    expect(chat).toMatch(/t\.value\.chatSenderFallback/)
+    expect(chat).toMatch(/t\.value\.chatReplyAttachmentFallback/)
+    expect(chat).toMatch(/:alt="t\.sendingImageAlt"/)
+    expect(chat.match(/formatInfoSearchResults\(infoSearchResults\.length\)/g)).toHaveLength(2)
+
+    for (const stale of ['Ảnh đoạn chat', 'Ảnh kho cá nhân', 'Ảnh tải lên', 'Người gửi', 'Đang gửi ảnh...', 'kết quả']) {
+      expect(chat).not.toContain(stale)
+    }
+  })
+
   it('localizes Chat edit and remove message dialogs', () => {
     const i18n = readSrc('../lib/i18n.ts')
     for (const key of [
