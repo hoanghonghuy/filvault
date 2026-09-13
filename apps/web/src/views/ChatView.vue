@@ -1929,10 +1929,10 @@ function canMutateMessage(message: ChatMessage): boolean {
 
 async function editMessage(message: ChatMessage) {
   const body = await ui.prompt({
-    title: 'Edit message',
-    label: 'Message',
+    title: t.value.chatEditMessageTitle,
+    label: t.value.messageLabel,
     initialValue: message.body,
-    confirmLabel: 'Save',
+    confirmLabel: t.value.save,
   })
   if (!body?.trim() || body.trim() === message.body || !selectedId.value) return
   try {
@@ -1949,9 +1949,9 @@ async function editMessage(message: ChatMessage) {
 async function removeMessage(message: ChatMessage) {
   if (!selectedId.value) return
   const confirmed = await ui.confirm({
-    title: 'Remove message?',
-    message: 'This message will be replaced with a removal notice for everyone.',
-    confirmLabel: 'Remove',
+    title: t.value.chatRemoveMessageTitle,
+    message: t.value.chatRemoveMessageDescription,
+    confirmLabel: t.value.remove,
     danger: true,
   })
   if (!confirmed) return
