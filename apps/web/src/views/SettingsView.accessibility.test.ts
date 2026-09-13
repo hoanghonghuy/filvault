@@ -17,6 +17,15 @@ describe('SettingsView accessibility contract', () => {
     expect(swatchRule).toContain('height: 44px;')
   })
 
+  it('keeps the Activity retry action at the shared minimum touch height', () => {
+    expect(source).toContain('class="btn retry-btn"')
+
+    const rule = source.match(/\.retry-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(rule).toContain('min-height: var(--touch-min);')
+    expect(rule).toContain('padding: 0 var(--space-xs);')
+    expect(rule).not.toContain('min-height: auto;')
+  })
+
   it('keeps Profile navigation localized and at least 44px tappable', () => {
     expect(source).toContain('to="/profile"')
     expect(source).toContain(':title="t.profile"')

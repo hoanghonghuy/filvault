@@ -753,8 +753,8 @@ onMounted(() => {
 }
 
 .retry-btn {
-  padding: 0;
-  min-height: auto;
+  padding: 0 var(--space-xs);
+  min-height: var(--touch-min);
   border: none;
   background: none;
   color: var(--accent);
