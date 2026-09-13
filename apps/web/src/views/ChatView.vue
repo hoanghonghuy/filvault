@@ -1915,7 +1915,7 @@ async function loadMedia(id = selectedId.value) {
     media.value = out.media
     void resolveMediaThumbs(out.media)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load media')
+    error.value = formatApiError(e, t.value.chatMediaLoadFailed)
   }
 }
 
@@ -1942,7 +1942,7 @@ async function editMessage(message: ChatMessage) {
     )
     messages.value = messages.value.map((item) => item.id === updated.id ? updated : item)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to edit message')
+    error.value = formatApiError(e, t.value.chatMessageEditFailed)
   }
 }
 
@@ -1961,7 +1961,7 @@ async function removeMessage(message: ChatMessage) {
       item.id === message.id ? { ...item, body: '', removedAt: new Date().toISOString() } : item,
     )
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to remove message')
+    error.value = formatApiError(e, t.value.chatMessageRemoveFailed)
   }
 }
 
@@ -2007,8 +2007,8 @@ async function sendText() {
     selectedId.value = message.conversationId
   } catch (e) {
     draft.value = draft.value ? draft.value : body
-    pendingMessageError.value = formatApiError(e, 'Failed to send message')
-    error.value = formatApiError(e, 'Failed to send message')
+    pendingMessageError.value = formatApiError(e, t.value.chatMessageSendFailed)
+    error.value = formatApiError(e, t.value.chatMessageSendFailed)
   } finally {
     sendingText.value = false
   }
@@ -2115,11 +2115,11 @@ async function processAttachment(id: string) {
     }
     attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
     scrollToLatest({ smooth: true })
-    ui.showToast('Attachment sent')
+    ui.showToast(t.value.chatAttachmentSent)
   } catch (e) {
     if (item.status !== 'uploading') return
     item.status = 'failed'
-    item.error = formatApiError(e, 'Failed to send attachment')
+    item.error = formatApiError(e, t.value.chatAttachmentSendFailed)
   } finally {
     processNextInAttachmentQueue()
   }
@@ -2155,7 +2155,7 @@ async function openAttachment(attachmentId: string) {
     const targetUrl = normalizePresignedUrl(out.downloadUrl)
     window.open(targetUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, 'Download failed')
+    error.value = formatApiError(e, t.value.chatDownloadFailed)
   }
 }
 
@@ -2172,7 +2172,7 @@ async function openInlineImage(attachment: ChatAttachment) {
     lightboxUrl.value = normalizePresignedUrl(out.downloadUrl)
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'View failed')
+    error.value = formatApiError(e, t.value.chatViewFailed)
   }
 }
 
