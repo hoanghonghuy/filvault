@@ -136,6 +136,33 @@ describe('chat surface contract', () => {
     }
   })
 
+  it('localizes Chat edit and remove message dialogs', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    for (const key of [
+      'chatEditMessageTitle',
+      'save',
+      'chatRemoveMessageTitle',
+      'chatRemoveMessageDescription',
+    ]) {
+      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
+    }
+
+    expect(chat).toMatch(/title: t\.value\.chatEditMessageTitle/)
+    expect(chat).toMatch(/label: t\.value\.messageLabel/)
+    expect(chat).toMatch(/confirmLabel: t\.value\.save/)
+    expect(chat).toMatch(/title: t\.value\.chatRemoveMessageTitle/)
+    expect(chat).toMatch(/message: t\.value\.chatRemoveMessageDescription/)
+    expect(chat).toMatch(/confirmLabel: t\.value\.remove/)
+
+    for (const stale of [
+      'Edit message',
+      'Remove message?',
+      'This message will be replaced with a removal notice for everyone.',
+    ]) {
+      expect(chat).not.toContain(`'${stale}'`)
+    }
+  })
+
   it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
     const i18n = readSrc('../lib/i18n.ts')
 
