@@ -189,6 +189,7 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .type-switch-btn {
+  min-height: var(--touch-min);
   border: none;
   background: transparent;
   padding: 5px 14px;
@@ -220,8 +221,10 @@ function handleStickerClick(sticker: Sticker) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -253,6 +256,7 @@ function handleStickerClick(sticker: Sticker) {
 
 .picker-cat-btn {
   display: inline-flex;
+  min-height: var(--touch-min);
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
