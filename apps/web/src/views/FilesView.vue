@@ -326,7 +326,7 @@ async function previewMediaFile(file: { id: string; name: string; mimeType: stri
     previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
     previewOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'Could not preview file')
+    error.value = formatApiError(e, t.value.filesPreviewFailed)
   }
 }
 
@@ -477,7 +477,7 @@ async function runSearch() {
   try {
     searchResults.value = await api<SearchResult>(`/search?${buildSearchApiQueryString(searchQuery.value, filters.value)}`)
   } catch (e) {
-    error.value = formatApiError(e, 'Search failed')
+    error.value = formatApiError(e, t.value.filesSearchFailed)
   } finally {
     searchLoading.value = false
   }
