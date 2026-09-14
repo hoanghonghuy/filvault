@@ -63,6 +63,19 @@ describe('useVaultStore', () => {
     expect(vault.isUnlocked).toBe(false)
   })
 
+  it('loads files for the current unlocked Vault session', async () => {
+    apiMock.mockResolvedValue({ files: [secretFile('current-secret')] })
+    const vault = useVaultStore()
+    vault.vaultToken = 'current-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    await expect(vault.loadFiles()).resolves.toEqual([secretFile('current-secret')])
+
+    expect(vault.files).toEqual([secretFile('current-secret')])
+    expect(vault.loading).toBe(false)
+    expect(vault.error).toBe('')
+  })
+
   it('keeps lock authoritative when an older file hydration resolves late', async () => {
     const pendingFiles = deferred<{ files: VaultFile[] }>()
     apiMock.mockImplementation((path) => {
@@ -87,14 +100,12 @@ describe('useVaultStore', () => {
     expect(vault.isUnlocked).toBe(false)
   })
 
-  it('keeps a newer Vault session hydration authoritative over an older request', async () => {
+  it('keeps a newer Vault session hydration authoritative over an older failure and finally', async () => {
     const oldFiles = deferred<{ files: VaultFile[] }>()
     const newFiles = deferred<{ files: VaultFile[] }>()
-    apiMock.mockImplementation((path) => {
+    apiMock.mockImplementation((path, options) => {
       if (path === '/vault/files') {
-        const token = (apiMock.mock.calls.at(-1)?.[1] as { headers?: Record<string, string> } | undefined)?.headers?.[
-          'X-Vault-Token'
-        ]
+        const token = (options as { headers?: Record<string, string> } | undefined)?.headers?.['X-Vault-Token']
         return token === 'old-token' ? oldFiles.promise : newFiles.promise
       }
       if (path === '/vault/unlock') return Promise.resolve({ token: 'new-token' })
@@ -108,12 +119,13 @@ describe('useVaultStore', () => {
     await vault.unlock('1234')
     const newHydration = vault.loadFiles()
 
-    oldFiles.resolve({ files: [secretFile('old-secret')] })
-    await oldHydration
+    oldFiles.reject(new Error('stale old-session failure'))
+    await expect(oldHydration).resolves.toEqual([])
 
     expect(vault.vaultToken).toBe('new-token')
     expect(vault.files).toEqual([])
     expect(vault.loading).toBe(true)
+    expect(vault.error).toBe('')
 
     newFiles.resolve({ files: [secretFile('new-secret')] })
     await newHydration
