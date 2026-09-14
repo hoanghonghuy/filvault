@@ -157,8 +157,15 @@ onMounted(() => void load())
       <RouterLink class="btn" to="/photos">{{ t.all }}</RouterLink>
     </header>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error && groups.length > 0" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonPhotos v-if="loading" variant="initial" />
+
+    <div v-else-if="error && groups.length === 0" class="video-error-state" role="alert">
+      <p class="error">{{ error }}</p>
+      <button type="button" class="btn video-retry" :disabled="loading" @click="load">
+        {{ t.retry }}
+      </button>
+    </div>
 
     <main v-else aria-labelledby="video-timeline-heading">
       <h2 id="video-timeline-heading" class="sr-only">{{ t.filterTypeVideo }}</h2>
@@ -209,6 +216,10 @@ onMounted(() => void load())
 .video-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-lg); }
 .page-title { margin: 0; }
 .video-subtitle { margin: var(--space-2xs) 0 0; color: var(--text-muted); }
+.video-error-state { display: grid; justify-items: start; gap: var(--space-sm); }
+.video-error-state .error { margin: 0; }
+.video-retry { min-height: var(--touch-min); }
+.video-retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .timeline-date-group + .timeline-date-group { margin-top: var(--space-lg); }
 .timeline-sticky-header { display: flex; align-items: center; gap: var(--space-xs); margin-bottom: var(--space-sm); }
 .timeline-date-title { margin: 0; font-size: 0.95rem; }
