@@ -200,6 +200,75 @@ describe('ShareUserSheet', () => {
     wrapper.unmount()
   })
 
+  it('ignores stale success after close and reopen', async () => {
+    let resolveOld!: (value: unknown) => void
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+    const wrapper = mountSheet()
+    await fillEmail(wrapper, 'old@example.com')
+    await wrapper.get('button[type="submit"]').trigger('click')
+    await Promise.resolve()
+
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+
+    expect(wrapper.get('input[type="email"]').element.value).toBe('')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Share')
+
+    resolveOld({ invited: true })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('old@example.com')
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(wrapper.emitted('shared')).toBeUndefined()
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Share')
+    wrapper.unmount()
+  })
+
+  it('ignores stale failure after close and reopen', async () => {
+    let rejectOld!: (reason?: unknown) => void
+    apiMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject }))
+    const wrapper = mountSheet()
+    await fillEmail(wrapper, 'old@example.com')
+    await wrapper.get('button[type="submit"]').trigger('click')
+    await Promise.resolve()
+
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+
+    rejectOld(new ApiError('CONFLICT', 'Conflict', 409))
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.get('input[type="email"]').element.value).toBe('')
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Share')
+    expect(wrapper.emitted('shared')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('invalidates a pending share when the resource target changes', async () => {
+    let resolveOld!: (value: unknown) => void
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+    const wrapper = mountSheet()
+    await fillEmail(wrapper, 'old-target@example.com')
+    await wrapper.get('button[type="submit"]').trigger('click')
+    await Promise.resolve()
+
+    await wrapper.setProps({ resourceId: '01KFILE0000000000000000002' })
+    await flushPromises()
+    expect(wrapper.get('input[type="email"]').element.value).toBe('')
+
+    resolveOld({ invited: true })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('old-target@example.com')
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(wrapper.emitted('shared')).toBeUndefined()
+    expect(wrapper.get('button[type="submit"]').text()).toBe('Share')
+    wrapper.unmount()
+  })
+
   it('moves keyboard focus to the error alert on failure', async () => {
     apiMock.mockRejectedValueOnce(new ApiError('NOT_FOUND', 'Not found', 404))
     const wrapper = mountSheet()
