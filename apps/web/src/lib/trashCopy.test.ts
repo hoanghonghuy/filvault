@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { formatTrashItemDate, trashCopy } from './trashCopy'
 
 describe('trashCopy', () => {
+  it('formats result counts with locale-aware grammar', () => {
+    expect(trashCopy('en').resultCount(1)).toBe('1 result')
+    expect(trashCopy('en').resultCount(2)).toBe('2 results')
+    expect(trashCopy('vi').resultCount(1)).toBe('1 kết quả')
+    expect(trashCopy('vi').resultCount(2)).toBe('2 kết quả')
+  })
+
   it('keeps destructive confirmation explicit in English and Vietnamese', () => {
     const english = trashCopy('en')
     const vietnamese = trashCopy('vi')
