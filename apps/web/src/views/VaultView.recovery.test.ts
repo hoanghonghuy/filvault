@@ -8,8 +8,8 @@ import VaultView from './VaultView.vue'
 
 const loadFilesMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
 const fetchStatusMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
-const routerBackMock = vi.hoisted(() => vi.fn())
-const routerPushMock = vi.hoisted(() => vi.fn())
+const routerBackMock = vi.hoisted(() => vi.fn<() => void>())
+const routerPushMock = vi.hoisted(() => vi.fn<(path: string) => void>())
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -28,19 +28,19 @@ vi.mock('@/stores/vault', () => ({
     isUnlocked: true,
     fetchStatus: fetchStatusMock,
     loadFiles: loadFilesMock,
-    setup: vi.fn(),
-    unlock: vi.fn(),
-    lock: vi.fn(),
-    changePin: vi.fn(),
-    resetPin: vi.fn(),
-    removeFromVault: vi.fn(),
+    setup: vi.fn<(pin: string) => Promise<unknown>>(),
+    unlock: vi.fn<(pin: string) => Promise<unknown>>(),
+    lock: vi.fn<() => void>(),
+    changePin: vi.fn<(currentPin: string, newPin: string) => Promise<void>>(),
+    resetPin: vi.fn<(accountPassword: string, newPin: string) => Promise<unknown>>(),
+    removeFromVault: vi.fn<(fileIds: string[]) => Promise<void>>(),
   }),
 }))
 
 vi.mock('@/stores/ui', () => ({
   useUiStore: () => ({
-    showToast: vi.fn(),
-    confirm: vi.fn().mockResolvedValue(true),
+    showToast: vi.fn<(message: string, type?: string) => void>(),
+    confirm: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
   }),
 }))
 
