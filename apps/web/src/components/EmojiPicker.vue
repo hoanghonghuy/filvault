@@ -12,8 +12,6 @@ import {
   type Sticker,
   type StickerCategory,
 } from '@/lib/stickers'
-import { emojiPickerCopy } from '@/lib/emojiPickerCopy'
-import { useI18n } from '@/lib/i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -34,8 +32,6 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-const { locale } = useI18n()
-const copy = computed(() => emojiPickerCopy(locale.value))
 const activeType = ref<'emoji' | 'sticker'>('emoji')
 const activeEmojiCategory = ref<EmojiCategory['id']>('popular')
 const activeStickerCategory = ref<StickerCategory['id']>('expressions')
@@ -57,10 +53,10 @@ function handleStickerClick(sticker: Sticker) {
 </script>
 
 <template>
-  <div class="emoji-picker" role="region" :aria-label="copy.regionAria">
+  <div class="emoji-picker" role="region" aria-label="Bộ chọn biểu tượng cảm xúc và nhãn dán">
     <!-- Header with Type Switcher (if stickers enabled) and Close button -->
     <div v-if="showStickers || showClose" class="picker-top-bar">
-      <div v-if="showStickers" class="picker-type-switch" role="tablist" :aria-label="copy.typeAria">
+      <div v-if="showStickers" class="picker-type-switch" role="tablist" aria-label="Loại biểu tượng">
         <button
           type="button"
           class="type-switch-btn"
@@ -69,7 +65,7 @@ function handleStickerClick(sticker: Sticker) {
           :aria-selected="activeType === 'emoji'"
           @click="activeType = 'emoji'"
         >
-          <span>{{ copy.emojiType }}</span>
+          <span>Biểu tượng</span>
         </button>
         <button
           type="button"
@@ -79,7 +75,7 @@ function handleStickerClick(sticker: Sticker) {
           :aria-selected="activeType === 'sticker'"
           @click="activeType = 'sticker'"
         >
-          <span>{{ copy.stickerType }}</span>
+          <span>Nhãn dán</span>
         </button>
       </div>
 
@@ -87,7 +83,7 @@ function handleStickerClick(sticker: Sticker) {
         v-if="showClose"
         type="button"
         class="picker-close-btn"
-        :aria-label="copy.closeAria"
+        aria-label="Đóng"
         @click="emit('close')"
       >
         <AppIcon name="close" :size="16" />
@@ -95,7 +91,7 @@ function handleStickerClick(sticker: Sticker) {
     </div>
 
     <!-- Category Bar for Emojis -->
-    <div v-if="activeType === 'emoji'" class="picker-categories" role="tablist" :aria-label="copy.emojiCategoriesAria">
+    <div v-if="activeType === 'emoji'" class="picker-categories" role="tablist" aria-label="Danh mục biểu tượng">
       <button
         v-for="cat in EMOJI_CATEGORIES"
         :key="cat.id"
@@ -112,7 +108,7 @@ function handleStickerClick(sticker: Sticker) {
     </div>
 
     <!-- Category Bar for Stickers -->
-    <div v-else class="picker-categories" role="tablist" :aria-label="copy.stickerCategoriesAria">
+    <div v-else class="picker-categories" role="tablist" aria-label="Danh mục nhãn dán">
       <button
         v-for="cat in STICKER_CATEGORIES"
         :key="cat.id"
@@ -189,7 +185,6 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .type-switch-btn {
-  min-height: var(--touch-min);
   border: none;
   background: transparent;
   padding: 5px 14px;
@@ -221,10 +216,8 @@ function handleStickerClick(sticker: Sticker) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--touch-min);
-  height: var(--touch-min);
-  min-width: var(--touch-min);
-  min-height: var(--touch-min);
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -256,7 +249,6 @@ function handleStickerClick(sticker: Sticker) {
 
 .picker-cat-btn {
   display: inline-flex;
-  min-height: var(--touch-min);
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
@@ -284,10 +276,10 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .picker-cat-btn.active {
-  background: var(--chat-accent, var(--accent));
-  border-color: var(--chat-accent, var(--accent));
+  background: var(--accent, #0084ff);
+  border-color: var(--accent, #0084ff);
   color: #ffffff;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--chat-accent, var(--accent)) 35%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.35);
 }
 
 .cat-icon {
@@ -358,7 +350,7 @@ function handleStickerClick(sticker: Sticker) {
 }
 
 .picker-item-btn.item-reacted {
-  background: color-mix(in srgb, var(--chat-accent, var(--accent)) 20%, transparent);
-  box-shadow: inset 0 0 0 1.5px var(--chat-accent, var(--accent));
+  background: rgba(0, 132, 255, 0.2);
+  box-shadow: inset 0 0 0 1.5px var(--accent, #0084ff);
 }
 </style>

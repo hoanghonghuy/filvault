@@ -12,14 +12,12 @@ import EmptyState from '@/components/EmptyState.vue'
 import LoadingSkeletonAlbum from '@/components/LoadingSkeletonAlbum.vue'
 import { cellDelay } from '@/lib/motion'
 import { useI18n } from '@/lib/i18n'
-import { albumRuntimeCopy } from '@/lib/albumCopy'
 import type { AlbumDetail, DownloadURL, TimelineItem } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
-const { t, locale } = useI18n()
-const copy = computed(() => albumRuntimeCopy(locale.value))
+const { t } = useI18n()
 
 const album = ref<AlbumDetail | null>(null)
 const error = ref('')
@@ -38,7 +36,7 @@ async function load() {
   try {
     album.value = await api<AlbumDetail>(`/photos/albums/${albumId.value}`)
   } catch (e) {
-    error.value = formatApiError(e, copy.value.loadFailed)
+    error.value = formatApiError(e, 'Failed to load album')
   } finally {
     loading.value = false
   }
@@ -47,9 +45,9 @@ async function load() {
 async function openAlbumMenu() {
   if (!album.value) return
   const action = await ui.openActionSheet(album.value.name, [
-    { id: 'add', label: copy.value.addPhotos, icon: 'plus' },
-    { id: 'rename', label: copy.value.renameAlbum, icon: 'pencil' },
-    { id: 'delete', label: copy.value.deleteAlbum, icon: 'trash', danger: true },
+    { id: 'add', label: 'Add photos', icon: 'plus' },
+    { id: 'rename', label: 'Rename album', icon: 'pencil' },
+    { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
   ])
   if (!action) return
   if (action === 'add') pickerOpen.value = true
@@ -74,7 +72,7 @@ async function renameAlbum() {
     ui.showToast(t.value.renameAlbum)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.renameFailed)
+    error.value = formatApiError(e, 'Rename failed')
   }
 }
 
@@ -93,7 +91,7 @@ async function deleteAlbum() {
     ui.showToast(t.value.deleteAlbum)
     await router.push('/photos')
   } catch (e) {
-    error.value = formatApiError(e, copy.value.deleteFailed)
+    error.value = formatApiError(e, 'Delete failed')
   }
 }
 
@@ -108,20 +106,24 @@ async function addItem(fileId: string) {
     ui.showToast(t.value.addPhotos)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.addItemFailed)
+    error.value = formatApiError(e, 'Failed to add item')
   }
 }
 
 async function openItemActions(item: TimelineItem) {
   const isCover = album.value?.coverFileId === item.id
   const action = await ui.openActionSheet(item.name, [
-    { id: 'download', label: copy.value.download, icon: 'download' },
+    { id: 'view', label: 'View', icon: 'eye' },
+    { id: 'download', label: 'Download', icon: 'download' },
     isCover
-      ? { id: 'unset-cover', label: copy.value.removeCover, icon: 'restore' }
-      : { id: 'set-cover', label: copy.value.setCover, icon: 'image' },
-    { id: 'remove', label: copy.value.removeFromAlbum, icon: 'trash', danger: true },
+      ? { id: 'unset-cover', label: 'Remove cover', icon: 'restore' }
+      : { id: 'set-cover', label: 'Set cover', icon: 'image' },
+    { id: 'remove', label: 'Remove from this album', icon: 'trash', danger: true },
   ])
   if (!action) return
+  if (action === 'view') {
+    await openLightbox(item)
+  }
   if (action === 'download') {
     mediaItem.value = item
     await downloadMedia()
@@ -138,10 +140,10 @@ async function setCover(item: TimelineItem) {
       method: 'POST',
       body: JSON.stringify({ fileId: item.id }),
     })
-    ui.showToast(copy.value.coverUpdated)
+    ui.showToast('Cover updated')
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.setCoverFailed)
+    error.value = formatApiError(e, 'Failed to set cover')
   }
 }
 
@@ -149,17 +151,17 @@ async function removeCover() {
   error.value = ''
   try {
     await api(`/photos/albums/${albumId.value}/cover`, { method: 'DELETE' })
-    ui.showToast(copy.value.coverReset)
+    ui.showToast('Cover reset to automatic')
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.removeCoverFailed)
+    error.value = formatApiError(e, 'Failed to remove cover')
   }
 }
 
 async function removeItem(fileId: string, name: string) {
   const ok = await ui.confirm({
     title: `${t.value.removeFromAlbum}?`,
-    message: copy.value.removeConfirmation(name),
+    message: `"${name}" will be removed from this album only.`,
     confirmLabel: t.value.remove,
     danger: true,
   })
@@ -170,7 +172,7 @@ async function removeItem(fileId: string, name: string) {
     ui.showToast(t.value.removeFromAlbum)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.removeFailed)
+    error.value = formatApiError(e, 'Remove failed')
   }
 }
 
@@ -182,7 +184,7 @@ async function openLightbox(item: TimelineItem) {
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, copy.value.viewFailed)
+    error.value = formatApiError(e, 'View failed')
   }
 }
 
@@ -214,7 +216,7 @@ async function downloadMedia() {
     const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, copy.value.downloadFailed)
+    error.value = formatApiError(e, 'Download failed')
   }
 }
 
@@ -228,12 +230,11 @@ onBeforeUnmount(() => {
 <template>
   <div>
     <div class="album-header">
-      <RouterLink to="/photos" class="btn ghost album-back" :aria-label="`${t.back}: ${t.photosTitle}`">
-        <span aria-hidden="true">←</span>
-        <span>{{ t.photosTitle }}</span>
-      </RouterLink>
+      <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">
+        ← {{ t.photosTitle }}
+      </button>
       <h1 class="album-title">{{ album?.name ?? t.album }}</h1>
-      <button type="button" class="btn icon-only album-menu-btn" :aria-label="t.albumMenu" @click="openAlbumMenu">
+      <button type="button" class="btn icon-only" :aria-label="t.albumMenu" @click="openAlbumMenu">
         <Icon name="more" :size="18" />
       </button>
     </div>
@@ -242,28 +243,18 @@ onBeforeUnmount(() => {
     <LoadingSkeletonAlbum v-if="loading" />
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
-        <div
+        <PhotoThumb
           v-for="(item, index) in album.items"
           :key="item.id"
-          class="album-media-cell appear"
+          :mime-type="item.mimeType"
+          :name="item.name"
+          :thumbnail-url="item.thumbnailUrl"
+          class="appear"
           :style="{ animationDelay: cellDelay(index) }"
-        >
-          <PhotoThumb
-            :mime-type="item.mimeType"
-            :name="item.name"
-            :thumbnail-url="item.thumbnailUrl"
-            @click="openLightbox(item)"
-            @contextmenu.prevent="openItemActions(item)"
-          />
-          <button
-            type="button"
-            class="album-media-more"
-            :aria-label="`${t.moreActions}: ${item.name}`"
-            @click="openItemActions(item)"
-          >
-            <Icon name="more" :size="18" />
-          </button>
-        </div>
+          :aria-label="`Actions for ${item.name}`"
+          @click="openItemActions(item)"
+          @contextmenu.prevent="openItemActions(item)"
+        />
       </div>
 
       <EmptyState
@@ -304,7 +295,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
-  min-width: 0;
 }
 
 .album-title {
@@ -320,49 +310,19 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.album-back {
+.mobile-back {
   min-height: var(--touch-min);
-  min-width: var(--touch-min);
   padding: 0 var(--space-sm);
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
-.album-menu-btn { min-width: var(--touch-min); min-height: var(--touch-min); flex-shrink: 0; }
-.album-media-cell { position: relative; min-width: 0; }
-.album-media-more {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(17, 24, 39, 0.72);
-  color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--duration-short) var(--ease-standard);
-}
-.album-media-cell:hover .album-media-more,
-.album-media-more:focus-visible { opacity: 1; }
-.album-media-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-@media (hover: none), (pointer: coarse) {
-  .album-media-more { opacity: 1; }
 }
 
 @media (min-width: 768px) {
+  .mobile-back {
+    display: none;
+  }
+
   .album-title {
     font-size: 1.5rem;
     letter-spacing: -0.02em;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .album-media-more { transition: none; }
 }
 </style>

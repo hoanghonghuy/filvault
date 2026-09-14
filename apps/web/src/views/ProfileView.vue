@@ -6,53 +6,22 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
-import { profileAvatarCopy } from '@/lib/profileAvatarCopy'
 import { isHeic, convertHeicBlobToJpeg, checkIsHeicBlob } from '@/lib/heic'
 import Icon from '@/components/AppIcon.vue'
-import PasswordInput from '@/components/PasswordInput.vue'
 import type { User } from '@/api/types'
 
 const auth = useAuthStore()
 const ui = useUiStore()
-const { t, locale } = useI18n()
-const avatarCopy = computed(() => profileAvatarCopy(locale.value))
+const { t } = useI18n()
 
 const displayName = ref(auth.user?.displayName ?? '')
 const currentPassword = ref('')
 const newPassword = ref('')
-const confirmPassword = ref('')
-const passwordError = ref('')
 const error = ref('')
 const savingProfile = ref(false)
 const changingPassword = ref(false)
 const updatingAvatar = ref(false)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
-
-const passwordCopy = computed(() =>
-  locale.value === 'vi'
-    ? {
-        confirm: 'Xác nhận mật khẩu mới',
-        requirement: 'Mật khẩu mới phải có ít nhất 8 ký tự.',
-        mismatch: 'Mật khẩu xác nhận không khớp.',
-        tooShort: 'Mật khẩu mới phải có ít nhất 8 ký tự.',
-        failed: 'Không thể đổi mật khẩu',
-      }
-    : {
-        confirm: 'Confirm new password',
-        requirement: 'New password must be at least 8 characters.',
-        mismatch: 'Password confirmation does not match.',
-        tooShort: 'New password must be at least 8 characters.',
-        failed: 'Password change failed',
-      },
-)
-
-const passwordSubmitDisabled = computed(
-  () =>
-    changingPassword.value ||
-    !currentPassword.value ||
-    !newPassword.value ||
-    !confirmPassword.value,
-)
 
 const initials = computed(() =>
   userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
@@ -68,11 +37,11 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
     /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name) ||
     isHeic(file.name, file.type)
   if (!isImage) {
-    throw new Error(avatarCopy.value.invalidType)
+    throw new Error('Vui lòng chọn file hình ảnh (JPG, PNG, WebP, HEIC)')
   }
 
   if (file.size > 25 * 1024 * 1024) {
-    throw new Error(avatarCopy.value.tooLarge)
+    throw new Error('Kích thước ảnh quá lớn (tối đa 25MB)')
   }
 
   let sourceBlob: Blob = file
@@ -82,7 +51,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
       sourceBlob = await convertHeicBlobToJpeg(file, 0.9)
     } catch (err) {
       console.error('HEIC conversion failed:', err)
-      throw new Error(avatarCopy.value.heicDecodeFailed)
+      throw new Error('Không thể giải mã file ảnh HEIC. Vui lòng chọn ảnh JPG, PNG hoặc thử lại.')
     }
   }
 
@@ -93,11 +62,11 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
     } catch {
       // Fallback to FileReader if createObjectURL fails
       const reader = new FileReader()
-      reader.onerror = () => reject(new Error(avatarCopy.value.readFailed))
+      reader.onerror = () => reject(new Error('Không thể đọc file ảnh từ thiết bị'))
       reader.onload = () => {
         const result = reader.result
         if (typeof result !== 'string' || !result) {
-          reject(new Error(avatarCopy.value.invalidData))
+          reject(new Error('Dữ liệu ảnh không hợp lệ'))
           return
         }
         loadImageAndCompress(result, null)
@@ -117,7 +86,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
         let width = img.naturalWidth || img.width
         let height = img.naturalHeight || img.height
         if (!width || !height) {
-          reject(new Error(avatarCopy.value.dimensionsFailed))
+          reject(new Error('Không thể xác định kích thước ảnh'))
           return
         }
 
@@ -138,7 +107,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
         canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) {
-          reject(new Error(avatarCopy.value.graphicsFailed))
+          reject(new Error('Không thể xử lý đồ họa ảnh'))
           return
         }
 
@@ -171,7 +140,7 @@ async function compressImage(file: File, maxSize = 256): Promise<string> {
         if (urlToRevoke) {
           URL.revokeObjectURL(urlToRevoke)
         }
-        reject(new Error(avatarCopy.value.decodeFailed))
+        reject(new Error('Không thể giải mã định dạng ảnh này. Vui lòng chọn ảnh JPG, PNG hoặc WebP.'))
       }
 
       img.src = src
@@ -188,15 +157,15 @@ async function handleAvatarSelected(e: Event) {
   try {
     const dataUrl = await compressImage(file, 256)
     if (!dataUrl) {
-      throw new Error(avatarCopy.value.processFailed)
+      throw new Error('Không thể xử lý ảnh')
     }
     await auth.updateAvatar(dataUrl)
-    ui.showToast(avatarCopy.value.uploadSuccess, 'success')
+    ui.showToast('Đã cập nhật ảnh đại diện', 'success')
   } catch (err) {
     const message =
       err instanceof ApiError
-        ? formatApiError(err, avatarCopy.value.uploadFailed)
-        : (err as Error)?.message || avatarCopy.value.uploadFailed
+        ? formatApiError(err, 'Không thể tải ảnh lên')
+        : (err as Error)?.message || 'Không thể tải ảnh lên'
     error.value = message
     ui.showToast(message, 'error')
   } finally {
@@ -210,12 +179,12 @@ async function removeAvatar() {
   updatingAvatar.value = true
   try {
     await auth.updateAvatar('')
-    ui.showToast(avatarCopy.value.removeSuccess, 'success')
+    ui.showToast('Đã xóa ảnh đại diện', 'success')
   } catch (err) {
     const message =
       err instanceof ApiError
-        ? formatApiError(err, avatarCopy.value.removeFailed)
-        : (err as Error)?.message || avatarCopy.value.removeFailed
+        ? formatApiError(err, 'Không thể xóa ảnh')
+        : (err as Error)?.message || 'Không thể xóa ảnh'
     error.value = message
     ui.showToast(message, 'error')
   } finally {
@@ -241,19 +210,7 @@ async function saveProfile() {
 }
 
 async function changePassword() {
-  if (changingPassword.value) return
-
-  passwordError.value = ''
   error.value = ''
-  if (newPassword.value.length < 8) {
-    passwordError.value = passwordCopy.value.tooShort
-    return
-  }
-  if (newPassword.value !== confirmPassword.value) {
-    passwordError.value = passwordCopy.value.mismatch
-    return
-  }
-
   changingPassword.value = true
   try {
     const tokens = await api<{ accessToken: string; refreshToken: string }>('/users/me/password', {
@@ -267,17 +224,15 @@ async function changePassword() {
     await auth.loadMe()
     currentPassword.value = ''
     newPassword.value = ''
-    confirmPassword.value = ''
     ui.showToast(t.value.changePassword, 'success')
   } catch (e) {
-    passwordError.value = formatApiError(e, passwordCopy.value.failed)
+    error.value = formatApiError(e, 'Password change failed')
   } finally {
     changingPassword.value = false
   }
 }
 
 async function logout() {
-  if (!(await ui.confirmLogout())) return
   await auth.logout()
   window.location.href = '/login'
 }
@@ -294,19 +249,19 @@ async function logout() {
           <img
             v-if="auth.user?.avatarUrl"
             :src="auth.user.avatarUrl"
-            :alt="auth.user.displayName || avatarCopy.avatarAlt"
+            :alt="auth.user.displayName || 'Avatar'"
             class="avatar-image"
           />
           <span v-else class="avatar" aria-hidden="true">{{ initials }}</span>
           <button
             type="button"
             class="avatar-action-btn"
-            :title="avatarCopy.changeAvatar"
-            :aria-label="avatarCopy.changeAvatar"
+            :title="'Đổi ảnh đại diện'"
+            :aria-label="'Đổi ảnh đại diện'"
             :disabled="updatingAvatar"
             @click="triggerAvatarPick"
           >
-            <Icon name="camera" :size="18" />
+            <Icon name="camera" :size="15" />
           </button>
           <input
             ref="avatarInputRef"
@@ -318,7 +273,7 @@ async function logout() {
         </div>
         <div class="identity-copy">
           <h2 id="profile-identity-heading" class="identity-name">
-            {{ auth.user?.displayName || avatarCopy.fallbackAccount }}
+            {{ auth.user?.displayName || 'Your account' }}
           </h2>
           <p class="identity-email">{{ auth.user?.email }}</p>
           <button
@@ -328,7 +283,7 @@ async function logout() {
             :disabled="updatingAvatar"
             @click="removeAvatar"
           >
-            {{ avatarCopy.removeAvatar }}
+            Xóa ảnh đại diện
           </button>
         </div>
       </div>
@@ -343,62 +298,15 @@ async function logout() {
 
     <section class="card section" aria-labelledby="profile-password-heading">
       <h2 id="profile-password-heading" class="section-title">{{ t.password }}</h2>
-      <div class="field">
-        <label class="field-label" for="profile-current-password">{{ t.currentPassword }}</label>
-        <PasswordInput
-          id="profile-current-password"
-          v-model="currentPassword"
-          name="current-password"
-          autocomplete="current-password"
-          :disabled="changingPassword"
-          required
-        />
-      </div>
-      <div class="field">
-        <label class="field-label" for="profile-new-password">{{ t.newPassword }}</label>
-        <PasswordInput
-          id="profile-new-password"
-          v-model="newPassword"
-          name="new-password"
-          autocomplete="new-password"
-          :disabled="changingPassword"
-          :aria-invalid="Boolean(passwordError)"
-          :aria-describedby="passwordError ? 'profile-password-requirement profile-password-error' : 'profile-password-requirement'"
-          :minlength="8"
-          required
-        />
-      </div>
-      <p id="profile-password-requirement" class="field-hint">{{ passwordCopy.requirement }}</p>
-      <div class="field">
-        <label class="field-label" for="profile-confirm-password">{{ passwordCopy.confirm }}</label>
-        <PasswordInput
-          id="profile-confirm-password"
-          v-model="confirmPassword"
-          name="confirm-password"
-          autocomplete="new-password"
-          :disabled="changingPassword"
-          :aria-invalid="Boolean(passwordError)"
-          :aria-describedby="passwordError ? 'profile-password-error' : undefined"
-          :minlength="8"
-          required
-        />
-      </div>
-      <p
-        v-if="passwordError"
-        id="profile-password-error"
-        class="error password-error"
-        role="alert"
-        aria-live="assertive"
-      >
-        {{ passwordError }}
-      </p>
-      <button
-        class="btn ink save-btn"
-        type="button"
-        :disabled="passwordSubmitDisabled"
-        :aria-busy="changingPassword ? 'true' : undefined"
-        @click="changePassword"
-      >
+      <label class="field">
+        <span>{{ t.currentPassword }}</span>
+        <input v-model="currentPassword" type="password" autocomplete="current-password" />
+      </label>
+      <label class="field">
+        <span>{{ t.newPassword }}</span>
+        <input v-model="newPassword" type="password" minlength="8" autocomplete="new-password" />
+      </label>
+      <button class="btn ink save-btn" type="button" :disabled="changingPassword" @click="changePassword">
         {{ changingPassword ? t.changing : t.changePassword }}
       </button>
     </section>
@@ -445,10 +353,10 @@ async function logout() {
 
 .avatar-action-btn {
   position: absolute;
-  right: -12px;
-  bottom: -12px;
-  width: var(--touch-min);
-  height: var(--touch-min);
+  right: -4px;
+  bottom: -4px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent, #ffffff);
@@ -458,53 +366,23 @@ async function logout() {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  transition:
-    transform var(--duration-short) var(--ease-standard),
-    opacity var(--duration-short) var(--ease-standard);
+  transition: transform var(--duration-short) var(--ease-standard);
 }
 
-.avatar-action-btn:not(:disabled):hover {
-  transform: scale(1.06);
-}
-
-.avatar-action-btn:focus-visible,
-.remove-avatar-btn:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.avatar-action-btn:disabled,
-.remove-avatar-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
+.avatar-action-btn:hover {
+  transform: scale(1.1);
 }
 
 .remove-avatar-btn {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--touch-min);
-  margin: 2px 0 -6px calc(-1 * var(--space-xs));
-  padding: 0 var(--space-xs);
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
   border: none;
-  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--danger, #ef4444);
-  font-size: 0.8125rem;
-  line-height: 1.25;
+  font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.field-hint {
-  margin: calc(-1 * var(--space-xs)) 0 var(--space-sm);
-  color: var(--muted);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-}
-
-.password-error {
-  margin: calc(-1 * var(--space-xs)) 0 var(--space-sm);
 }
 
 .sr-only {
@@ -535,7 +413,6 @@ async function logout() {
 
 .identity-copy {
   min-width: 0;
-  flex: 1;
 }
 
 .identity-name {
@@ -565,12 +442,6 @@ async function logout() {
   display: none;
 }
 
-@media (max-width: 359px) {
-  .identity-row {
-    gap: var(--space-sm);
-  }
-}
-
 @media (min-width: 768px) {
   .save-btn {
     width: auto;
@@ -578,12 +449,6 @@ async function logout() {
 
   .desktop-only {
     display: block;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .avatar-action-btn {
-    transition: none;
   }
 }
 </style>

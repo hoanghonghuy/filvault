@@ -3,20 +3,13 @@ import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  scrollBehavior(to, _from, savedPosition) {
+  scrollBehavior(_to, _from, savedPosition) {
     if (savedPosition) return savedPosition
-    if (to.hash) return { el: to.hash, top: 16, behavior: 'smooth' }
     return { left: 0, top: 0 }
   },
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { guest: true } },
     { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { guest: true } },
-    {
-      path: '/forgot-password',
-      name: 'forgot-password',
-      component: () => import('@/views/ForgotPasswordView.vue'),
-      meta: { guest: true },
-    },
     {
       path: '/verify-email',
       name: 'verify-email',
@@ -27,13 +20,7 @@ const router = createRouter({
     { path: '/overview', name: 'overview', redirect: '/' },
     { path: '/files', name: 'files', component: () => import('@/views/FilesView.vue'), meta: { auth: true, verified: true } },
     { path: '/vault', name: 'vault', component: () => import('@/views/VaultView.vue'), meta: { auth: true, verified: true } },
-    { path: '/photos', name: 'photos', component: () => import('@/views/PhotosRouteView.vue'), meta: { auth: true, verified: true } },
-    {
-      path: '/photos/preview/:id',
-      name: 'photo-preview',
-      component: () => import('@/views/PhotoPreviewView.vue'),
-      meta: { auth: true, verified: true },
-    },
+    { path: '/photos', name: 'photos', component: () => import('@/views/PhotosView.vue'), meta: { auth: true, verified: true } },
     { path: '/chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
     { path: '/chat/:id', name: 'chat-thread', component: () => import('@/views/ChatView.vue'), meta: { auth: true, verified: true, bare: true } },
     {
@@ -57,11 +44,7 @@ const router = createRouter({
       name: 'public-share',
       component: () => import('@/views/PublicShareView.vue'),
     },
-    {
-      path: '/:pathMatch(.*)*',
-      name: 'not-found',
-      component: () => import('@/views/NotFoundView.vue'),
-    },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 

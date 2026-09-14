@@ -1,7 +1,7 @@
 # Filvault
 
-Personal cloud storage. **Current product/release handoff:** [`docs/CURRENT_PRODUCT_STATE.md`](docs/CURRENT_PRODUCT_STATE.md).  
-Specs: [`docs/spec/README.md`](docs/spec/README.md). Historical phase checklists are retained for traceability but their old “next work” sections are not the current source of truth.
+Personal cloud storage. Spec: [`docs/spec/README.md`](docs/spec/README.md).  
+Checklist bàn giao Phase 1: [`docs/spec/08-phase-1-status.md`](docs/spec/08-phase-1-status.md).
 
 ## Chạy local
 
@@ -30,6 +30,13 @@ make prod-like-up
 ```
 
 Chi tiết operator: [`deploy/production/README.md`](deploy/production/README.md). Health/readiness: [`docs/ops/health-readiness-migration.md`](docs/ops/health-readiness-migration.md).
+
+Release smoke + rollback runbook (#43):
+
+```bash
+make prod-like-release-smoke      # core path + app restart persistence
+make prod-like-rollback-verify    # post-rollback health gates
+```
 
 ## Tài khoản dev (test xuyên suốt)
 

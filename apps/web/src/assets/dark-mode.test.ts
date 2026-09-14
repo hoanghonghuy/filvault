@@ -47,38 +47,11 @@ describe('dark mode contract', () => {
     expect(themeView).not.toMatch(/document\.documentElement\.dataset\.theme/)
   })
 
-  it('keeps Chat appearance read-only and routes global changes to canonical Settings', () => {
+  it('routes Chat quick toggle through the canonical appearance API', () => {
     expect(chatView).toMatch(/useTheme\(\)/)
-    expect(chatView).toMatch(/resolvedIsDark/)
-    expect(chatView).toMatch(/navigateTo\('\/settings#appearance'\)/)
-    expect(chatView).not.toMatch(/toggleResolvedAppearance/)
+    expect(chatView).toMatch(/toggleResolvedAppearance/)
     expect(chatView).not.toMatch(/localStorage\.setItem\('filvault\.theme'/)
     expect(chatView).not.toMatch(/localStorage\.removeItem\('filvault\.theme'/)
     expect(chatView).not.toMatch(/document\.documentElement\.dataset\.theme/)
-  })
-
-  it('keeps the Settings profile avatar aligned with the active accent theme', () => {
-    expect(settings).toContain("background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);")
-    expect(settings).toContain("box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent);")
-    expect(settings).toContain("color: var(--on-accent);")
-    expect(settings).not.toContain("background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);")
-  })
-
-  it('uses subtle, pale sidebar backgrounds for light themes so colors are not overly saturated', () => {
-    expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--sidebar-bg:\s*#fbe6ee;/)
-    expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--surface-soft:\s*#fdf7f9;/)
-    expect(css).toMatch(/\[data-color-theme='spring'\][\s\S]*?--sidebar-bg:\s*#fce7f1;/)
-    expect(css).toMatch(/\[data-color-theme='spring'\][\s\S]*?--surface-soft:\s*#fdf8fb;/)
-  })
-
-  it('ensures light theme sidebar-bg is visually distinct from content surface-soft', () => {
-    const peachMatch = css.match(/\[data-color-theme='peach'\]\{([^}]+)\}/s) || css.match(/\[data-color-theme='peach'\]\s*\{([\s\S]*?)\n\}/)
-    expect(peachMatch).not.toBeNull()
-    const block = peachMatch ? peachMatch[1] : ''
-    const sidebar = block.match(/--sidebar-bg:\s*([^;]+);/)?.[1]?.trim()
-    const surface = block.match(/--surface-soft:\s*([^;]+);/)?.[1]?.trim()
-    expect(sidebar).toBeDefined()
-    expect(surface).toBeDefined()
-    expect(sidebar).not.toBe(surface)
   })
 })

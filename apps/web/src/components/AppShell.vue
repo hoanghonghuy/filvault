@@ -11,7 +11,6 @@ import GlobalPrompt from '@/components/GlobalPrompt.vue'
 import GlobalActionSheet from '@/components/GlobalActionSheet.vue'
 import CallModal from '@/components/CallModal.vue'
 import { HOME_PATH, PROFILE_PATH, SHELL_NAV, pageTitleForRoute, showStorageBar } from '@/lib/shellNav'
-import { shellAccessibilityCopy } from '@/lib/shellAccessibilityCopy'
 import { userInitials } from '@/lib/userInitials'
 import { useI18n } from '@/lib/i18n'
 
@@ -19,8 +18,7 @@ const auth = useAuthStore()
 const chatStore = useChatStore()
 const route = useRoute()
 const storageBarRef = ref<InstanceType<typeof StorageBar> | null>(null)
-const { t, locale } = useI18n()
-const shellCopy = computed(() => shellAccessibilityCopy(locale.value))
+const { t } = useI18n()
 
 watch(
   () => auth.isAuthenticated && auth.isVerified,
@@ -61,10 +59,8 @@ const storageVisible = computed(() => showStorageBar(route.path))
 const avatarInitials = computed(() =>
   userInitials(auth.user?.displayName ?? '', auth.user?.email ?? ''),
 )
-const profileLabel = computed(() =>
-  shellCopy.value.openProfileFor(
-    auth.user?.displayName || auth.user?.email || shellCopy.value.accountFallback,
-  ),
+const profileLabel = computed(
+  () => `Open profile for ${auth.user?.displayName || auth.user?.email || 'account'}`,
 )
 const navLabels = computed<Record<string, string>>(() => ({
   '/': t.value.navHome,
@@ -83,12 +79,12 @@ const navLabels = computed<Record<string, string>>(() => ({
   <CallModal />
 
   <div v-if="showShell" class="shell">
-    <aside class="side-nav" :aria-label="shellCopy.mainNavigation">
-      <RouterLink :to="HOME_PATH" class="brand" :aria-label="shellCopy.goToOverview">
+    <aside class="side-nav" aria-label="Main navigation">
+      <RouterLink :to="HOME_PATH" class="brand" aria-label="Go to overview">
         <span class="header-brand-mark" aria-hidden="true">F</span>
         <span class="brand-wordmark">Filvault</span>
       </RouterLink>
-      <nav class="side-links" :aria-label="shellCopy.destinations">
+      <nav class="side-links" aria-label="Destinations">
         <RouterLink
           v-for="item in SHELL_NAV"
           :key="item.to"
@@ -113,7 +109,7 @@ const navLabels = computed<Record<string, string>>(() => ({
 
     <div class="shell-main">
       <header class="header">
-        <RouterLink :to="HOME_PATH" class="header-home" :aria-label="shellCopy.goToOverview">
+        <RouterLink :to="HOME_PATH" class="header-home" aria-label="Go to overview">
           <span class="header-brand-mark" aria-hidden="true">F</span>
         </RouterLink>
         <div class="header-text">
@@ -138,7 +134,7 @@ const navLabels = computed<Record<string, string>>(() => ({
       </main>
     </div>
 
-    <nav class="bottom-nav" :aria-label="shellCopy.mainNavigation">
+    <nav class="bottom-nav" aria-label="Main navigation">
       <RouterLink
         v-for="item in SHELL_NAV"
         :key="item.to"
@@ -251,8 +247,8 @@ const navLabels = computed<Record<string, string>>(() => ({
 }
 
 .header-chat-btn:hover {
-  background: var(--accent-soft);
-  color: var(--chat-accent, var(--accent));
+  background: rgba(0, 132, 255, 0.1);
+  color: #0084ff;
   transform: scale(1.05);
 }
 

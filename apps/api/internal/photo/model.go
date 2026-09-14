@@ -12,12 +12,6 @@ type TimelineItem struct {
 	CreatedAt    time.Time
 	ObjectKey    string
 	ThumbnailURL string
-	IsFavorite   bool
-}
-
-type TimelineCursor struct {
-	CreatedAt time.Time
-	ID        string
 }
 
 type TimelineGroup struct {

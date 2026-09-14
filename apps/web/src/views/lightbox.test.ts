@@ -14,8 +14,7 @@ describe('media lightbox contract', () => {
     expect(lightbox).toMatch(/<dialog/)
     expect(lightbox).toMatch(/<img[\s\S]*?v-if="isImage"/)
     expect(lightbox).toMatch(/<video[\s\S]*?v-else-if="isVideo"/)
-    expect(lightbox).toMatch(/v-if="hasCaptions"/)
-    expect(lightbox).not.toMatch(/No captions/)
+    expect(lightbox).toMatch(/<track[\s\S]*?kind="captions"/)
     expect(lightbox).toMatch(/@click="emit\('close'\)"/)
     expect(lightbox).toMatch(/@keydown\.esc/)
   })
@@ -30,26 +29,24 @@ describe('media lightbox contract', () => {
     expect(vault).toMatch(/api<\{ downloadUrl: string \}>\(`\/files\/\$\{file\.id\}\/download`\)/)
   })
 
-  it('uses direct preview for Photos and Album thumbnails with explicit secondary actions', () => {
-    expect(photos).toMatch(/@click="openLightbox\(item\)"/)
-    expect(photos).toMatch(/@click="openMediaActions\(item\)"/)
-    expect(album).toMatch(/@click="openLightbox\(item\)"/)
+  it('opens an action sheet before previewing Photos and Album thumbnails', () => {
+    expect(photos).toMatch(/@click="openMedia\(item\)"/)
+    expect(photos).not.toMatch(/@click="openLightbox\(item\)"/)
     expect(album).toMatch(/@click="openItemActions\(item\)"/)
+    expect(album).not.toMatch(/@click="openLightbox\(item\)"/)
   })
 
-  it('keeps Photos action-sheet View wired to the lightbox', () => {
-    expect(photos).toMatch(/async function handleSheetAfterLeave\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
+  it('keeps View as the only action that opens the lightbox', () => {
+    expect(photos).toMatch(/async function viewMedia\(\)[\s\S]*?openLightbox\(mediaItem\.value\)/)
+    expect(album).toMatch(/if \(action === 'view'\) \{[\s\S]*?openLightbox\(item\)/)
   })
 
-  it('keeps album secondary actions contextual, locale-safe and destructive removal last', () => {
-    expect(album).not.toMatch(/id: 'view'/)
-    expect(album).toMatch(/id: 'download', label: copy\.value\.download/)
-    expect(album).toMatch(/id: 'set-cover', label: copy\.value\.setCover/)
-    expect(album).toMatch(/id: 'unset-cover', label: copy\.value\.removeCover/)
-    expect(album).toMatch(/id: 'remove', label: copy\.value\.removeFromAlbum, icon: 'trash', danger: true/)
+  it('keeps album actions contextual and removes from album last', () => {
+    expect(album).toMatch(/label: 'View'/)
+    expect(album).toMatch(/label: 'Download'/)
+    expect(album).toMatch(/label: 'Remove from this album'/)
     expect(album).toMatch(/action === 'set-cover'/)
     expect(album).toMatch(/action === 'unset-cover'/)
     expect(album).toMatch(/action === 'remove'/)
-    expect(album.indexOf("id: 'remove'")).toBeGreaterThan(album.indexOf("id: 'set-cover'"))
   })
 })

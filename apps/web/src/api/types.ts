@@ -117,7 +117,6 @@ export interface TimelineItem {
   sizeBytes: number
   createdAt: string
   thumbnailUrl?: string
-  isFavorite?: boolean
 }
 
 export interface TimelineGroup {
@@ -270,16 +269,6 @@ export interface IncomingShare {
   resourceName: string
   owner: ShareUserRef
   createdAt: string
-}
-
-/** POST /shares — existing user gets a share row; unknown email returns invited=true only. */
-export interface CreateUserShareResponse {
-  id?: string
-  resourceType?: ShareResourceType
-  resourceId?: string
-  recipient?: ShareUserRef
-  createdAt?: string
-  invited?: boolean
 }
 
 export interface SharedFolderInfo {

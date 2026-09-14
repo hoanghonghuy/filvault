@@ -2,7 +2,6 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useCallStore } from '@/stores/call'
 import { useAuthStore } from '@/stores/auth'
-import { useI18n } from '@/lib/i18n'
 import Icon from '@/components/AppIcon.vue'
 import {
   Track,
@@ -15,63 +14,6 @@ import {
 
 const callStore = useCallStore()
 const auth = useAuthStore()
-const { locale } = useI18n()
-
-const copy = computed(() => locale.value === 'en' ? {
-  incomingVideo: 'Incoming video call',
-  incomingAudio: 'Incoming voice call',
-  outgoingVideo: 'Calling video…',
-  outgoingAudio: 'Calling…',
-  videoCall: 'Video call',
-  audioCall: 'Voice call',
-  member: 'Member',
-  conversation: 'Conversation',
-  declineCall: 'Decline call',
-  decline: 'Decline',
-  answerCall: 'Answer call',
-  answer: 'Answer',
-  ringing: 'Ringing…',
-  cancelCall: 'Cancel call',
-  cancel: 'Cancel',
-  minimize: 'Exit full screen',
-  fullscreen: 'Full screen',
-  remoteCameraOff: 'Their camera is off',
-  inCall: 'In call',
-  cameraOff: 'Camera off',
-  muteMic: 'Mute microphone',
-  unmuteMic: 'Unmute microphone',
-  turnCameraOff: 'Turn camera off',
-  turnCameraOn: 'Turn camera on',
-  endCall: 'End call',
-  callEnded: 'Call ended',
-} : {
-  incomingVideo: 'Cuộc gọi video đến',
-  incomingAudio: 'Cuộc gọi thoại đến',
-  outgoingVideo: 'Đang gọi video…',
-  outgoingAudio: 'Đang gọi thoại…',
-  videoCall: 'Cuộc gọi video',
-  audioCall: 'Cuộc gọi thoại',
-  member: 'Thành viên',
-  conversation: 'Cuộc trò chuyện',
-  declineCall: 'Từ chối cuộc gọi',
-  decline: 'Từ chối',
-  answerCall: 'Trả lời cuộc gọi',
-  answer: 'Trả lời',
-  ringing: 'Đang đổ chuông…',
-  cancelCall: 'Hủy cuộc gọi',
-  cancel: 'Hủy',
-  minimize: 'Thu nhỏ',
-  fullscreen: 'Toàn màn hình',
-  remoteCameraOff: 'Camera đối phương đang tắt',
-  inCall: 'Đang trong cuộc gọi',
-  cameraOff: 'Camera tắt',
-  muteMic: 'Tắt mic',
-  unmuteMic: 'Bật mic',
-  turnCameraOff: 'Tắt camera',
-  turnCameraOn: 'Bật camera',
-  endCall: 'Kết thúc cuộc gọi',
-  callEnded: 'Cuộc gọi đã kết thúc',
-})
 
 const localVideoRef = ref<HTMLVideoElement | null>(null)
 const remoteVideoRef = ref<HTMLVideoElement | null>(null)
@@ -84,21 +26,21 @@ const isOpen = computed(() => callStore.state !== 'idle')
 
 const callTitle = computed(() => {
   if (callStore.state === 'incoming') {
-    return callStore.isVideo ? copy.value.incomingVideo : copy.value.incomingAudio
+    return callStore.isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến'
   }
   if (callStore.state === 'outgoing') {
-    return callStore.isVideo ? copy.value.outgoingVideo : copy.value.outgoingAudio
+    return callStore.isVideo ? 'Đang gọi video...' : 'Đang gọi thoại...'
   }
-  return callStore.isVideo ? copy.value.videoCall : copy.value.audioCall
+  return callStore.isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại'
 })
 
 const peerName = computed(() => {
   if (callStore.callerName) return callStore.callerName
   if (callStore.participants.size > 0) {
     const first = callStore.participants.values().next().value
-    return first?.name || copy.value.member
+    return first?.name || 'Thành viên'
   }
-  return copy.value.conversation
+  return 'Cuộc trò chuyện'
 })
 
 const peerAvatar = computed(() => callStore.callerAvatar || null)
@@ -147,6 +89,7 @@ if (typeof document !== 'undefined') {
   document.addEventListener('fullscreenchange', onFullscreenChange)
 }
 
+// Watch for connected state & room instance
 watch(
   [() => callStore.state, () => callStore.room],
   async ([state, room]) => {
@@ -158,14 +101,17 @@ watch(
     const activeRoom = room as Room
     await nextTick()
 
+    // Unlock autoplay if browser suspended Web Audio
     try {
       await activeRoom.startAudio()
     } catch {
       // Ignored if user hasn't interacted yet
     }
 
+    // Attach initial local video track
     attachLocalCamera(activeRoom)
 
+    // Attach initial remote video and audio tracks
     activeRoom.remoteParticipants.forEach((participant: RemoteParticipant) => {
       participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
         if (pub.track) {
@@ -179,6 +125,7 @@ watch(
     })
     updateRemoteVideoState(activeRoom)
 
+    // Listen to local track published / unpublished
     activeRoom.on(RoomEvent.LocalTrackPublished, (pub) => {
       if (pub.kind === Track.Kind.Video && localVideoRef.value) {
         pub.track?.attach(localVideoRef.value)
@@ -191,6 +138,7 @@ watch(
       }
     })
 
+    // Listen to remote tracks subscribed
     activeRoom.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
       if (track.kind === Track.Kind.Video) {
         if (remoteVideoRef.value) track.attach(remoteVideoRef.value)
@@ -220,6 +168,7 @@ watch(
   { immediate: true },
 )
 
+// Re-attach local video if camera is re-enabled
 watch(
   () => callStore.isCamEnabled,
   async (enabled) => {
@@ -241,8 +190,10 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="call-overlay" role="dialog" :aria-label="callTitle" aria-modal="true">
+      <!-- Offscreen audio element for remote audio tracks (never display: none to prevent browser mute) -->
       <audio ref="remoteAudioRef" autoplay playsinline class="offscreen-audio"></audio>
 
+      <!-- 1. Incoming Call Prompt -->
       <div v-if="callStore.state === 'incoming'" class="call-incoming-card">
         <div class="caller-avatar-pulse">
           <div class="avatar-circle">
@@ -257,8 +208,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="call-btn btn-decline"
-            :aria-label="copy.declineCall"
-            :title="copy.decline"
+            aria-label="Từ chối cuộc gọi"
+            title="Từ chối"
             @click="() => callStore.declineCall()"
           >
             <Icon name="phone-off" :size="26" />
@@ -266,8 +217,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="call-btn btn-accept"
-            :aria-label="copy.answerCall"
-            :title="copy.answer"
+            aria-label="Trả lời cuộc gọi"
+            title="Trả lời"
             @click="() => callStore.acceptCall()"
           >
             <Icon name="phone" :size="26" />
@@ -275,6 +226,7 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 2. Outgoing Call Screen -->
       <div v-else-if="callStore.state === 'outgoing'" class="call-outgoing-card">
         <div class="caller-avatar-pulse outgoing">
           <div class="avatar-circle">
@@ -283,14 +235,14 @@ onUnmounted(() => {
           </div>
         </div>
         <h2 class="caller-name">{{ peerName }}</h2>
-        <p class="call-subtitle">{{ copy.ringing }}</p>
+        <p class="call-subtitle">Đang đổ chuông...</p>
 
         <div class="call-actions">
           <button
             type="button"
             class="call-btn btn-decline"
-            :aria-label="copy.cancelCall"
-            :title="copy.cancel"
+            aria-label="Hủy cuộc gọi"
+            title="Hủy"
             @click="() => callStore.endCall()"
           >
             <Icon name="phone-off" :size="26" />
@@ -298,7 +250,9 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 3. Connected Call Screen -->
       <div v-else-if="callStore.state === 'connected'" class="call-active-room">
+        <!-- Call Header Bar -->
         <header class="call-header-bar">
           <div class="header-peer-info">
             <div class="status-indicator">
@@ -310,15 +264,17 @@ onUnmounted(() => {
           <button
             type="button"
             class="header-action-btn"
-            :aria-label="isFullscreen ? copy.minimize : copy.fullscreen"
-            :title="isFullscreen ? copy.minimize : copy.fullscreen"
+            :aria-label="isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'"
+            :title="isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'"
             @click="toggleFullscreen"
           >
             <Icon :name="isFullscreen ? 'minimize' : 'maximize'" :size="20" />
           </button>
         </header>
 
+        <!-- Media Surface Area -->
         <div class="call-media-container" :class="{ 'audio-only': !callStore.isVideo || !hasRemoteVideo }">
+          <!-- Remote Video Element -->
           <video
             v-show="callStore.isVideo && hasRemoteVideo"
             ref="remoteVideoRef"
@@ -327,6 +283,7 @@ onUnmounted(() => {
             class="remote-video"
           ></video>
 
+          <!-- Audio-only / Camera off fallback presentation -->
           <div v-if="!callStore.isVideo || !hasRemoteVideo" class="audio-caller-display">
             <div class="avatar-circle large" :class="{ speaking: callStore.activeSpeaker && callStore.activeSpeaker !== auth.user?.id }">
               <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
@@ -334,10 +291,11 @@ onUnmounted(() => {
             </div>
             <h2 class="active-peer-name">{{ peerName }}</h2>
             <p class="call-timer-label">
-              {{ callStore.isVideo && !hasRemoteVideo ? copy.remoteCameraOff : copy.inCall }}
+              {{ callStore.isVideo && !hasRemoteVideo ? 'Camera đối phương đang tắt' : 'Đang trong cuộc gọi' }}
             </p>
           </div>
 
+          <!-- Local Video PiP (Picture in Picture) -->
           <div v-show="callStore.isVideo" class="local-video-wrapper">
             <video
               ref="localVideoRef"
@@ -349,42 +307,44 @@ onUnmounted(() => {
             ></video>
             <div v-if="!callStore.isCamEnabled" class="cam-off-overlay">
               <Icon name="camera-off" :size="20" />
-              <span class="cam-off-badge">{{ copy.cameraOff }}</span>
+              <span class="cam-off-badge">Camera tắt</span>
             </div>
           </div>
         </div>
 
+        <!-- Floating Controls Dock -->
         <div class="call-controls-dock">
+          <!-- Mic Toggle -->
           <button
             type="button"
             class="control-btn"
             :class="{ muted: !callStore.isMicEnabled }"
-            :aria-pressed="callStore.isMicEnabled"
-            :aria-label="callStore.isMicEnabled ? copy.muteMic : copy.unmuteMic"
-            :title="callStore.isMicEnabled ? copy.muteMic : copy.unmuteMic"
+            :aria-label="callStore.isMicEnabled ? 'Tắt mic' : 'Bật mic'"
+            :title="callStore.isMicEnabled ? 'Tắt mic' : 'Bật mic'"
             @click="callStore.toggleMicrophone"
           >
             <Icon :name="callStore.isMicEnabled ? 'mic' : 'mic-off'" :size="22" />
           </button>
 
+          <!-- Camera Toggle (if video enabled) -->
           <button
             v-if="callStore.isVideo"
             type="button"
             class="control-btn"
             :class="{ muted: !callStore.isCamEnabled }"
-            :aria-pressed="callStore.isCamEnabled"
-            :aria-label="callStore.isCamEnabled ? copy.turnCameraOff : copy.turnCameraOn"
-            :title="callStore.isCamEnabled ? copy.turnCameraOff : copy.turnCameraOn"
+            :aria-label="callStore.isCamEnabled ? 'Tắt camera' : 'Bật camera'"
+            :title="callStore.isCamEnabled ? 'Tắt camera' : 'Bật camera'"
             @click="callStore.toggleCamera"
           >
             <Icon :name="callStore.isCamEnabled ? 'camera' : 'camera-off'" :size="22" />
           </button>
 
+          <!-- Hangup / End Call -->
           <button
             type="button"
             class="control-btn btn-hangup"
-            :aria-label="copy.endCall"
-            :title="copy.endCall"
+            aria-label="Kết thúc cuộc gọi"
+            title="Kết thúc cuộc gọi"
             @click="() => callStore.endCall()"
           >
             <Icon name="phone-off" :size="24" />
@@ -392,13 +352,14 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 4. Call Ended Screen -->
       <div v-else-if="callStore.state === 'ended'" class="call-ended-card">
         <div class="avatar-circle">
           <img v-if="peerAvatar && !avatarError" :src="peerAvatar" :alt="peerName" class="avatar-img" @error="avatarError = true" />
           <span v-else>{{ peerName.charAt(0).toUpperCase() }}</span>
         </div>
         <h2 class="caller-name">{{ peerName }}</h2>
-        <p class="call-subtitle">{{ copy.callEnded }}</p>
+        <p class="call-subtitle">Cuộc gọi đã kết thúc</p>
         <p class="call-duration-summary">{{ callStore.formattedDuration }}</p>
       </div>
     </div>
@@ -421,6 +382,7 @@ onUnmounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Offscreen audio avoids Chromium/WebKit suppression of display:none elements */
 .offscreen-audio {
   position: fixed;
   top: -9999px;
@@ -431,6 +393,7 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
+/* Incoming & Outgoing cards */
 .call-incoming-card,
 .call-outgoing-card,
 .call-ended-card {
@@ -481,7 +444,7 @@ onUnmounted(() => {
   position: absolute;
   inset: -14px;
   border-radius: 50%;
-  border: 2px solid var(--chat-accent, var(--accent));
+  border: 2px solid #0084ff;
   opacity: 0.8;
   animation: ripple 1.8s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -492,7 +455,7 @@ onUnmounted(() => {
 
 .caller-avatar-pulse.outgoing::before,
 .caller-avatar-pulse.outgoing::after {
-  border-color: var(--chat-accent, var(--accent));
+  border-color: #3b82f6;
 }
 
 @keyframes ripple {
@@ -510,11 +473,7 @@ onUnmounted(() => {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--chat-accent, var(--accent)) 0%,
-    color-mix(in srgb, var(--chat-accent, var(--accent)) 72%, white) 100%
-  );
+  background: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -522,7 +481,7 @@ onUnmounted(() => {
   font-size: 32px;
   font-weight: 700;
   overflow: hidden;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--chat-accent, var(--accent)) 30%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 132, 255, 0.3);
 }
 
 .avatar-img {
@@ -535,7 +494,7 @@ onUnmounted(() => {
   width: 120px;
   height: 120px;
   font-size: 48px;
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--chat-accent, var(--accent)) 40%, transparent);
+  box-shadow: 0 12px 32px rgba(0, 132, 255, 0.4);
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   margin-bottom: 16px;
 }
@@ -590,10 +549,11 @@ onUnmounted(() => {
 }
 
 .btn-decline {
-  background: var(--danger);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--danger) 45%, transparent);
+  background: #ef4444;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
 }
 
+/* 3. Connected Call Room */
 .call-active-room {
   position: relative;
   width: 100%;
@@ -615,16 +575,16 @@ onUnmounted(() => {
 
 .call-header-bar {
   position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  left: max(16px, env(safe-area-inset-left));
-  right: max(16px, env(safe-area-inset-right));
+  top: 16px;
+  left: 16px;
+  right: 16px;
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(12px);
-  padding: 8px 12px 8px 16px;
+  padding: 8px 16px;
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
@@ -633,7 +593,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
 }
 
 .status-indicator {
@@ -643,7 +602,6 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.3);
   padding: 3px 8px;
   border-radius: 12px;
-  flex: 0 0 auto;
 }
 
 .status-dot {
@@ -671,9 +629,6 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: #ffffff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .header-action-btn {
@@ -681,20 +636,16 @@ onUnmounted(() => {
   border: none;
   color: #94a3b8;
   cursor: pointer;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+  padding: 4px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background 0.15s ease;
-  touch-action: manipulation;
+  transition: color 0.15s ease;
 }
 
 .header-action-btn:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
 }
 
 .call-media-container {
@@ -730,8 +681,8 @@ onUnmounted(() => {
 
 .local-video-wrapper {
   position: absolute;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 64px);
+  right: 16px;
+  bottom: 88px;
   width: 110px;
   height: 150px;
   border-radius: 14px;
@@ -749,7 +700,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1);
+  transform: scaleX(-1); /* Mirror camera preview */
 }
 
 .cam-off-overlay {
@@ -771,11 +722,10 @@ onUnmounted(() => {
   text-align: center;
 }
 
+/* Floating Controls Dock */
 .call-controls-dock {
   position: absolute;
-  bottom: max(24px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 24px;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -795,8 +745,6 @@ onUnmounted(() => {
   justify-content: center;
   width: 50px;
   height: 50px;
-  min-width: 44px;
-  min-height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.14);
@@ -811,53 +759,23 @@ onUnmounted(() => {
 }
 
 .control-btn.muted {
-  background: var(--danger);
+  background: #ef4444;
   color: #ffffff;
 }
 
 .control-btn.btn-hangup {
-  background: var(--danger);
+  background: #ef4444;
   color: #ffffff;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--danger) 50%, transparent);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
 }
 
 @media (max-width: 767px) {
   .local-video-wrapper {
-    top: calc(max(16px, env(safe-area-inset-top)) + 56px);
+    top: 72px;
     bottom: auto;
-    right: max(12px, env(safe-area-inset-right));
+    right: 12px;
     width: 90px;
     height: 125px;
-  }
-}
-
-@media (max-width: 767px) and (orientation: landscape) {
-  .call-active-room {
-    border-radius: 16px;
-  }
-
-  .call-header-bar {
-    top: max(8px, env(safe-area-inset-top));
-    left: max(8px, env(safe-area-inset-left));
-    right: max(8px, env(safe-area-inset-right));
-  }
-
-  .local-video-wrapper {
-    top: calc(max(8px, env(safe-area-inset-top)) + 52px);
-    right: max(8px, env(safe-area-inset-right));
-    width: 96px;
-    height: 72px;
-  }
-
-  .call-controls-dock {
-    bottom: max(8px, env(safe-area-inset-bottom));
-    gap: 10px;
-    padding: 6px 12px;
-  }
-
-  .control-btn {
-    width: 44px;
-    height: 44px;
   }
 }
 
@@ -878,37 +796,8 @@ onUnmounted(() => {
   .local-video-wrapper {
     width: 150px;
     height: 200px;
-    right: max(24px, env(safe-area-inset-right));
-    bottom: calc(max(24px, env(safe-area-inset-bottom)) + 72px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .call-incoming-card,
-  .call-outgoing-card,
-  .call-ended-card,
-  .caller-avatar-pulse::before,
-  .caller-avatar-pulse::after,
-  .status-dot {
-    animation: none;
-  }
-
-  .caller-avatar-pulse::before,
-  .caller-avatar-pulse::after {
-    opacity: 0.35;
-  }
-
-  .avatar-circle.large,
-  .call-btn,
-  .header-action-btn,
-  .control-btn {
-    transition: none;
-  }
-
-  .avatar-circle.speaking,
-  .call-btn:active,
-  .control-btn:active {
-    transform: none;
+    right: 24px;
+    bottom: 96px;
   }
 }
 </style>

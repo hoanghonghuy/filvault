@@ -123,7 +123,6 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	engine.GET("/metrics", metrics.Handler)
 	v1 := engine.Group("/api/v1")
 	authHandlers.RegisterRoutes(v1)
-	authHandlers.RegisterRecoveryRoutes(v1)
 
 	storage := []gin.HandlerFunc{
 		authHandlers.AuthRequired(),
@@ -133,7 +132,6 @@ func NewWithDeps(cfg config.Config, pool *pgxpool.Pool, m mailer.Mailer, obj obj
 	fileHandlers.RegisterRoutes(v1, storage...)
 	trashHandlers.RegisterRoutes(v1, storage...)
 	photoHandlers.RegisterRoutes(v1, storage...)
-	photo.RegisterFilteredTimelineRoute(v1, photoSvc, storage...)
 	searchHandlers.RegisterRoutes(v1, storage...)
 	shareHandlers.RegisterRoutes(v1, storage...)
 	chatHandlers.RegisterRoutes(v1, storage...)

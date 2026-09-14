@@ -427,11 +427,11 @@ export const useChatStore = defineStore('chat', () => {
       if (!signal.aborted) scheduleReconnect()
     } finally {
       if (connectTimeout !== null) {
-        if (typeof window !== 'undefined') window.clearTimeout(connectTimeout)
+        window.clearTimeout(connectTimeout)
         connectTimeout = null
       }
       if (watchdogTimer !== null) {
-        if (typeof window !== 'undefined') window.clearTimeout(watchdogTimer)
+        window.clearTimeout(watchdogTimer)
         watchdogTimer = null
       }
     }
@@ -460,3 +460,4 @@ export const useChatStore = defineStore('chat', () => {
     lastReactionUpdate,
   }
 })
+
