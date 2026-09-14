@@ -214,8 +214,11 @@ defineExpose({ reload: storage.reload })
 }
 
 .action-link {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
   align-self: center;
+  min-height: var(--touch-min);
   padding: 2px var(--space-sm);
   border-radius: var(--radius-pill);
   background: var(--danger-soft, rgba(239, 68, 68, 0.12));
