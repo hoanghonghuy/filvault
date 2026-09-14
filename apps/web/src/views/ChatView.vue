@@ -1820,7 +1820,7 @@ function conversationPreview(conv: ChatConversation): string {
   if (conv.preview?.body) {
     if (isStickerMessage(conv.preview.body)) {
       const sym = parseStickerSymbol(conv.preview.body)
-      return sym ? `[Sticker ${sym}]` : '[Sticker]'
+      return sym ? `[${t.value.stickerPreview} ${sym}]` : `[${t.value.stickerPreview}]`
     }
     return conv.preview.body
   }

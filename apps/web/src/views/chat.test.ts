@@ -529,6 +529,15 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/shared-file-item/)
   })
 
+  it('keeps sticker conversation previews locale-aware', () => {
+    const i18n = readSrc('../lib/i18n.ts')
+    expect(i18n).toContain("stickerPreview: 'Nhãn dán'")
+    expect(i18n).toContain("stickerPreview: 'Sticker'")
+    expect(chat).toMatch(/t\.value\.stickerPreview/)
+    expect(chat).not.toContain("'[Sticker]'")
+    expect(chat).not.toContain('`[Sticker ${sym}]`')
+  })
+
   it('supports custom wallpaper collection, safe unlinking, and storage picker modal', () => {
     expect(chat).toMatch(/chatCustomWallpapers/)
     expect(chat).toMatch(/currentConversationCustomWallpapers/)
