@@ -130,6 +130,7 @@ function onTrashFileKeydown(event: KeyboardEvent, file: { id: string; name: stri
 }
 
 const totalCount = computed(() => (trash.value?.folders.length ?? 0) + (trash.value?.files.length ?? 0))
+const resultCountLabel = computed(() => copy.value.resultCount(totalCount.value))
 
 function formatItemDate(iso?: string): string {
   return formatTrashItemDate(iso, locale.value)
@@ -206,7 +207,7 @@ onMounted(load)
 
       <template v-else>
         <div class="trash-toolbar">
-          <span class="trash-count-text">{{ totalCount }} {{ t.results }}</span>
+          <span class="trash-count-text">{{ resultCountLabel }}</span>
           <button
             type="button"
             class="empty-trash-btn"
