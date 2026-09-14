@@ -516,6 +516,7 @@ onMounted(load)
 .tab-pill {
   background: transparent;
   border: none;
+  min-height: var(--touch-min);
   padding: 6px 0;
   font-size: 15px;
   font-weight: 600;
