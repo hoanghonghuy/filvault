@@ -27,6 +27,7 @@ const purgeTotal = ref(0)
 
 const retentionNotice = computed(() => trashRetentionNotice(auth.user, locale.value))
 const copy = computed(() => trashCopy(locale.value))
+const initialLoadFailed = computed(() => Boolean(error.value) && trash.value === null)
 
 const isEmpty = computed(() => {
   if (!trash.value) return false
@@ -195,9 +196,21 @@ onMounted(load)
       <span>{{ retentionNotice }}</span>
     </div>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <div v-if="initialLoadFailed" class="trash-load-error" role="alert">
+      <span>{{ error }}</span>
+      <button
+        type="button"
+        class="trash-retry-btn"
+        :disabled="loading"
+        :aria-busy="loading ? 'true' : undefined"
+        @click="load"
+      >
+        {{ t.retry }}
+      </button>
+    </div>
+    <p v-else-if="error" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonTrash v-if="loading && !emptyingTrash" />
-    <div v-else>
+    <div v-else-if="trash">
       <EmptyState
         v-if="isEmpty"
         :title="t.trashEmpty"
@@ -220,7 +233,7 @@ onMounted(load)
           </button>
         </div>
 
-        <TransitionGroup v-if="trash?.folders.length" name="row" tag="section" class="trash-list">
+        <TransitionGroup v-if="trash.folders.length" name="row" tag="section" class="trash-list">
           <h2 key="folders-title" class="section-title">{{ t.folders }}</h2>
           <div
             v-for="folder in trash.folders"
@@ -264,7 +277,7 @@ onMounted(load)
           </div>
         </TransitionGroup>
 
-        <TransitionGroup v-if="trash?.files.length" name="row" tag="section" class="trash-list files-section">
+        <TransitionGroup v-if="trash.files.length" name="row" tag="section" class="trash-list files-section">
           <h2 key="files-title" class="section-title">{{ t.files }}</h2>
           <div
             v-for="file in trash.files"
@@ -341,6 +354,41 @@ onMounted(load)
 .notice-icon {
   color: var(--accent, #0084ff);
   flex-shrink: 0;
+}
+
+.trash-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--hairline));
+  border-radius: var(--radius-md, 12px);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.trash-retry-btn {
+  flex-shrink: 0;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-md);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--canvas);
+  color: var(--danger);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trash-retry-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.trash-retry-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .trash-toolbar {
@@ -498,11 +546,13 @@ onMounted(load)
 }
 
 @media (max-width: 479px) {
+  .trash-load-error,
   .trash-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .trash-retry-btn,
   .empty-trash-btn {
     width: 100%;
   }
