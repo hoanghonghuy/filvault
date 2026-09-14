@@ -8,11 +8,11 @@ import { nextTick, reactive } from 'vue'
 import type { AlbumDetail } from '@/api/types'
 import AlbumView from './AlbumView.vue'
 
-const { apiMock, routeMock, routerPushMock } = vi.hoisted(() => ({
+const { apiMock, routerPushMock } = vi.hoisted(() => ({
   apiMock: vi.fn<(path: string, options?: unknown) => Promise<unknown>>(),
-  routeMock: reactive({ params: { id: 'album-a' } as { id: string } }),
   routerPushMock: vi.fn(),
 }))
+const routeMock = reactive({ params: { id: 'album-a' } as { id: string } })
 
 vi.mock('@/api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/client')>()
