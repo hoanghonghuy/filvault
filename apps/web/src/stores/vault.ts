@@ -13,11 +13,13 @@ export const useVaultStore = defineStore('vault', () => {
   const files = ref<VaultFile[]>([])
   const loading = ref(false)
   const error = ref('')
+  let fileHydrationSequence = 0
 
   const isInitialized = computed(() => status.value?.initialized ?? false)
   const isUnlocked = computed(() => Boolean(vaultToken.value && status.value?.unlocked))
 
   function setToken(token: string) {
+    fileHydrationSequence += 1
     vaultToken.value = token
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(VAULT_TOKEN_KEY, token)
@@ -25,7 +27,10 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   function clearToken() {
+    fileHydrationSequence += 1
     vaultToken.value = null
+    loading.value = false
+    error.value = ''
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(VAULT_TOKEN_KEY)
     }
@@ -126,23 +131,33 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function loadFiles(): Promise<VaultFile[]> {
-    if (!vaultToken.value) {
+    const requestToken = vaultToken.value
+    if (!requestToken) {
       files.value = []
       return []
     }
+    const requestSequence = ++fileHydrationSequence
     loading.value = true
     error.value = ''
     try {
       const res = await api<{ files: VaultFile[] }>('/vault/files', {
         headers: getHeaders(),
       })
+      if (requestSequence !== fileHydrationSequence || requestToken !== vaultToken.value || !isUnlocked.value) {
+        return files.value
+      }
       files.value = res.files ?? []
       return files.value
     } catch (e) {
+      if (requestSequence !== fileHydrationSequence || requestToken !== vaultToken.value || !isUnlocked.value) {
+        return files.value
+      }
       error.value = 'Failed to load vault files'
       throw e
     } finally {
-      loading.value = false
+      if (requestSequence === fileHydrationSequence && requestToken === vaultToken.value) {
+        loading.value = false
+      }
     }
   }
 
