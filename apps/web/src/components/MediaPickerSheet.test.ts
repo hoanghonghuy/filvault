@@ -83,9 +83,10 @@ describe('MediaPickerSheet', () => {
       })
 
     const wrapper = mount(MediaPickerSheet, {
-      props: { open: true },
+      props: { open: false },
       global: { stubs: globalStubs },
     })
+    await wrapper.setProps({ open: true })
     await flushPromises()
 
     expect(apiMock).toHaveBeenCalledTimes(1)
