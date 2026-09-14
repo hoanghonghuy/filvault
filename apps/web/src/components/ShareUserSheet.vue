@@ -96,6 +96,15 @@ function invalidateSubmit() {
   submitGeneration += 1
 }
 
+function isCurrentSubmit(generation: number, resourceId: string, resourceType: ShareResourceType) {
+  return (
+    generation === submitGeneration &&
+    props.open &&
+    props.resourceId === resourceId &&
+    props.resourceType === resourceType
+  )
+}
+
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
@@ -142,14 +151,7 @@ async function onSubmit() {
       }),
     })
 
-    if (
-      generation !== submitGeneration ||
-      !props.open ||
-      props.resourceId !== resourceId ||
-      props.resourceType !== resourceType
-    ) {
-      return
-    }
+    if (!isCurrentSubmit(generation, resourceId, resourceType)) return
 
     successInvited.value = Boolean(res.invited)
     if (res.invited) {
@@ -161,16 +163,10 @@ async function onSubmit() {
 
     phase.value = 'success'
     emit('shared', { invited: successInvited.value, email: value })
-    await focusRef(successRef)
+    await nextTick()
+    if (isCurrentSubmit(generation, resourceId, resourceType)) successRef.value?.focus()
   } catch (e) {
-    if (
-      generation !== submitGeneration ||
-      !props.open ||
-      props.resourceId !== resourceId ||
-      props.resourceType !== resourceType
-    ) {
-      return
-    }
+    if (!isCurrentSubmit(generation, resourceId, resourceType)) return
 
     phase.value = 'form'
     error.value = formatShareUserError(e, copy.value.fallback, {
@@ -179,7 +175,8 @@ async function onSubmit() {
       validation: copy.value.invalidEmail,
       network: copy.value.network,
     })
-    await focusRef(errorRef)
+    await nextTick()
+    if (isCurrentSubmit(generation, resourceId, resourceType)) errorRef.value?.focus()
   }
 }
 
