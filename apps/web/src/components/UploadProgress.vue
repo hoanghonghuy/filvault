@@ -235,6 +235,7 @@ watch(
             v-if="item.status === 'failed'"
             type="button"
             class="upload-action-btn"
+            :aria-label="`${t.retry}: ${displayName(item)}`"
             @click="emit('retry', item.id)"
           >
             {{ t.retry }}
@@ -243,7 +244,7 @@ watch(
             v-if="item.status === 'failed'"
             type="button"
             class="upload-action-btn subtle"
-            :aria-label="t.uploadDismissFailedAria"
+            :aria-label="`${t.uploadDismissFailedAria}: ${displayName(item)}`"
             @click="emit('dismissFailed', item.id)"
           >
             {{ t.uploadDismissFailed }}
@@ -252,6 +253,7 @@ watch(
             v-if="item.status === 'queued' || item.status === 'uploading'"
             type="button"
             class="upload-action-btn subtle"
+            :aria-label="`${t.cancel}: ${displayName(item)}`"
             @click="emit('cancel', item.id)"
           >
             {{ t.cancel }}
