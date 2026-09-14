@@ -7677,10 +7677,10 @@ img.avatar-img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border: none;
   border-radius: var(--radius-pill);
   background: var(--surface-soft);
