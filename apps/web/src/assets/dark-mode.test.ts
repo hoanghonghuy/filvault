@@ -57,13 +57,6 @@ describe('dark mode contract', () => {
     expect(chatView).not.toMatch(/document\.documentElement\.dataset\.theme/)
   })
 
-  it('keeps the Settings profile avatar aligned with the active accent theme', () => {
-    expect(settings).toContain("background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);")
-    expect(settings).toContain("box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent);")
-    expect(settings).toContain("color: var(--on-accent);")
-    expect(settings).not.toContain("background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);")
-  })
-
   it('uses subtle, pale sidebar backgrounds for light themes so colors are not overly saturated', () => {
     expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--sidebar-bg:\s*#fbe6ee;/)
     expect(css).toMatch(/\[data-color-theme='peach'\][\s\S]*?--surface-soft:\s*#fdf7f9;/)

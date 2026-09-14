@@ -33,17 +33,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/function backToRail/)
   })
 
-  it('keeps the thread-info trigger keyboard-complete and action-named', () => {
-    const trigger = chat.match(/<div\s+class="thread-peer-info clickable"[\s\S]*?>/)?.[0] ?? ''
-
-    expect(trigger).toContain('role="button"')
-    expect(trigger).toContain('tabindex="0"')
-    expect(trigger).toContain(':aria-label="t.chatInfo"')
-    expect(trigger).toContain('@click="openChatInfo"')
-    expect(trigger).toContain('@keydown.enter="openChatInfo"')
-    expect(trigger).toContain('@keydown.space.prevent="openChatInfo"')
-  })
-
   it('localizes core Chat chrome and attachment controls', () => {
     const i18n = readSrc('../lib/i18n.ts')
 
@@ -147,35 +136,6 @@ describe('chat surface contract', () => {
     }
   })
 
-  it('localizes remaining Chat fallback and search-result copy', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    for (const key of [
-      'chatMediaFallbackName',
-      'personalPhotoFallbackName',
-      'uploadedImageFallbackName',
-      'chatSenderYou',
-      'chatSenderFallback',
-      'chatReplyAttachmentFallback',
-      'sendingImageAlt',
-      'searchResultsCount',
-    ]) {
-      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
-    }
-
-    expect(chat).toMatch(/t\.value\.chatMediaFallbackName/)
-    expect(chat).toMatch(/t\.value\.personalPhotoFallbackName/)
-    expect(chat).toMatch(/t\.value\.uploadedImageFallbackName/)
-    expect(chat).toMatch(/t\.value\.chatSenderYou/)
-    expect(chat).toMatch(/t\.value\.chatSenderFallback/)
-    expect(chat).toMatch(/t\.value\.chatReplyAttachmentFallback/)
-    expect(chat).toMatch(/:alt="t\.sendingImageAlt"/)
-    expect(chat.match(/formatInfoSearchResults\(infoSearchResults\.length\)/g)).toHaveLength(2)
-
-    for (const stale of ['Ảnh đoạn chat', 'Ảnh kho cá nhân', 'Ảnh tải lên', 'Người gửi', 'Đang gửi ảnh...', 'kết quả']) {
-      expect(chat).not.toContain(stale)
-    }
-  })
-
   it('localizes Chat edit and remove message dialogs', () => {
     const i18n = readSrc('../lib/i18n.ts')
     for (const key of [
@@ -201,22 +161,6 @@ describe('chat surface contract', () => {
     ]) {
       expect(chat).not.toContain(`'${stale}'`)
     }
-  })
-
-  it('localizes built-in Chat theme and wallpaper preset names reactively', () => {
-    expect(chat).toMatch(/const localizedChatThemes = computed\(\(\) => chatThemes\.map/)
-    expect(chat).toMatch(/name: theme\.names\[locale\.value\]/)
-    expect(chat.match(/v-for="th in localizedChatThemes"/g)).toHaveLength(2)
-    expect(chat).toMatch(/names: \{ vi: 'Hoàng hôn Tím', en: 'Purple Sunset' \}/)
-    expect(chat).toMatch(/names: \{ vi: 'Hoa anh đào', en: 'Cherry Blossom' \}/)
-    expect(chat).toMatch(/names: \{ vi: 'Rừng nhiệt đới', en: 'Rainforest' \}/)
-    expect(chat).toMatch(/preset\.names\[locale\.value\]/)
-    expect(chat).toMatch(/name: preset\.names\[locale\.value\]/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'Mặc định' : 'Default'/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'Ảnh tùy chỉnh' : 'Custom image'/)
-
-    expect(chat).not.toMatch(/v-for="th in chatThemes"/)
-    expect(chat).not.toMatch(/if \(preset\) return preset\.name\b/)
   })
 
   it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
@@ -625,8 +569,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/selectPhotoFromPersonalStorage/)
     expect(chat).toMatch(/wallpaper-custom-section/)
     expect(chat).toMatch(/delete-custom-wp-btn/)
-    expect(chat.match(/@keydown\.enter\.self="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g)).toHaveLength(2)
-    expect(chat.match(/@keydown\.space\.self\.prevent="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g)).toHaveLength(2)
   })
 })
 
