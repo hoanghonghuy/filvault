@@ -28,6 +28,15 @@ describe('AlbumView accessibility contract', () => {
     expect(source).toContain('.album-retry { min-height: var(--touch-min); }')
   })
 
+  it('clears stale album UI when the route target changes before loading the new album', () => {
+    expect(source).toContain('() => route.params.id')
+    expect(source).toContain('album.value = null')
+    expect(source).toContain('pickerOpen.value = false')
+    expect(source).toContain('lightboxOpen.value = false')
+    expect(source).toContain('void load()')
+    expect(source).toContain('{ immediate: true }')
+  })
+
   it('keeps touch and keyboard affordances explicit', () => {
     expect(source).toMatch(/\.album-media-more\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/)
     expect(source).toContain('.album-media-more:focus-visible')
