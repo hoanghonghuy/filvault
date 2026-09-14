@@ -8,8 +8,8 @@ import { useAuthStore } from '@/stores/auth'
 
 const { apiMock, clearTokensMock, setTokensMock } = vi.hoisted(() => ({
   apiMock: vi.fn<(path: string, options?: unknown, config?: unknown) => Promise<unknown>>(),
-  clearTokensMock: vi.fn(),
-  setTokensMock: vi.fn(),
+  clearTokensMock: vi.fn<() => void>(),
+  setTokensMock: vi.fn<(accessToken: string, refreshToken: string) => void>(),
 }))
 
 vi.mock('@/api/client', () => ({
