@@ -14,12 +14,18 @@ export const useVaultStore = defineStore('vault', () => {
   const loading = ref(false)
   const error = ref('')
   let fileHydrationSequence = 0
+  let statusRequestSequence = 0
 
   const isInitialized = computed(() => status.value?.initialized ?? false)
   const isUnlocked = computed(() => Boolean(vaultToken.value && status.value?.unlocked))
 
-  function setToken(token: string) {
+  function invalidateSessionRequests() {
     fileHydrationSequence += 1
+    statusRequestSequence += 1
+  }
+
+  function setToken(token: string) {
+    invalidateSessionRequests()
     vaultToken.value = token
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(VAULT_TOKEN_KEY, token)
@@ -27,7 +33,7 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   function clearToken() {
-    fileHydrationSequence += 1
+    invalidateSessionRequests()
     vaultToken.value = null
     loading.value = false
     error.value = ''
@@ -45,17 +51,24 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function fetchStatus(): Promise<VaultStatus> {
+    const requestToken = vaultToken.value
+    const requestSequence = ++statusRequestSequence
     try {
       const res = await api<VaultStatus>('/vault/status', {
         headers: getHeaders(),
       })
+      if (requestSequence !== statusRequestSequence || requestToken !== vaultToken.value) {
+        return status.value ?? res
+      }
       status.value = res
       if (!res.unlocked && vaultToken.value) {
         clearToken()
       }
       return res
     } catch (e) {
-      status.value = { initialized: false, unlocked: false }
+      if (requestSequence === statusRequestSequence && requestToken === vaultToken.value) {
+        status.value = { initialized: false, unlocked: false }
+      }
       throw e
     }
   }
