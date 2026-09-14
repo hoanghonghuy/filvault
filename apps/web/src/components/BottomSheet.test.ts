@@ -62,4 +62,37 @@ describe('BottomSheet', () => {
 
     wrapper.unmount()
   })
+
+  it('restores the pre-existing body overflow after the final sheet releases its lock', () => {
+    document.body.style.overflow = 'clip'
+
+    const first = mount(BottomSheet, {
+      props: { open: true, title: 'First' },
+      attachTo: document.body,
+    })
+    expect(document.body.style.overflow).toBe('hidden')
+
+    const second = mount(BottomSheet, {
+      props: { open: true, title: 'Second' },
+      attachTo: document.body,
+    })
+    expect(document.body.style.overflow).toBe('hidden')
+
+    second.unmount()
+    expect(document.body.style.overflow).toBe('hidden')
+
+    first.unmount()
+    expect(document.body.style.overflow).toBe('clip')
+  })
+
+  it('restores the default empty body overflow value', () => {
+    const wrapper = mount(BottomSheet, {
+      props: { open: true, title: 'Move' },
+      attachTo: document.body,
+    })
+
+    expect(document.body.style.overflow).toBe('hidden')
+    wrapper.unmount()
+    expect(document.body.style.overflow).toBe('')
+  })
 })
