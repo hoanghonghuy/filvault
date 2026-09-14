@@ -65,7 +65,6 @@ export const useVaultStore = defineStore('vault', () => {
       })
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
-      await loadFiles()
       return session
     } finally {
       loading.value = false
@@ -82,7 +81,6 @@ export const useVaultStore = defineStore('vault', () => {
       })
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
-      await loadFiles()
       return session
     } finally {
       loading.value = false
@@ -121,7 +119,6 @@ export const useVaultStore = defineStore('vault', () => {
       })
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
-      await loadFiles()
       return session
     } finally {
       loading.value = false
