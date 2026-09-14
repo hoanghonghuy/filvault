@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useVaultStore } from '@/stores/vault'
-import type { VaultFile } from '@/api/types'
+import type { VaultFile, VaultStatus } from '@/api/types'
 
 const apiMock = vi.hoisted(() => vi.fn<(path: string, options?: unknown) => Promise<unknown>>())
 
@@ -60,6 +60,76 @@ describe('useVaultStore', () => {
 
     expect(vault.vaultToken).toBeNull()
     expect(vault.files).toEqual([])
+    expect(vault.isUnlocked).toBe(false)
+  })
+
+  it('discovers initialized locked state with an authoritative no-token status refresh', async () => {
+    apiMock.mockResolvedValue({ initialized: true, unlocked: false } satisfies VaultStatus)
+    const vault = useVaultStore()
+
+    await expect(vault.fetchStatus()).resolves.toEqual({ initialized: true, unlocked: false })
+
+    expect(vault.status).toEqual({ initialized: true, unlocked: false })
+    expect(vault.vaultToken).toBeNull()
+  })
+
+  it('keeps a newer unlocked session authoritative over a stale locked status response', async () => {
+    const oldStatus = deferred<VaultStatus>()
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/status') return oldStatus.promise
+      if (path === '/vault/unlock') return Promise.resolve({ token: 'new-token' })
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+    vault.vaultToken = 'old-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    const statusRefresh = vault.fetchStatus()
+    await vault.unlock('1234')
+
+    oldStatus.resolve({ initialized: true, unlocked: false })
+    await statusRefresh
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.status).toEqual({ initialized: true, unlocked: true })
+    expect(vault.isUnlocked).toBe(true)
+  })
+
+  it('keeps a newer status refresh authoritative over an older failure', async () => {
+    const oldStatus = deferred<VaultStatus>()
+    const newStatus = deferred<VaultStatus>()
+    let statusCalls = 0
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/status') {
+        statusCalls += 1
+        return statusCalls === 1 ? oldStatus.promise : newStatus.promise
+      }
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+
+    const oldRefresh = vault.fetchStatus()
+    const newRefresh = vault.fetchStatus()
+
+    newStatus.resolve({ initialized: true, unlocked: false })
+    await newRefresh
+    oldStatus.reject(new Error('stale status failure'))
+    await expect(oldRefresh).rejects.toThrow('stale status failure')
+
+    expect(vault.status).toEqual({ initialized: true, unlocked: false })
+    expect(vault.vaultToken).toBeNull()
+  })
+
+  it('clears the current token when an authoritative current-session status says locked', async () => {
+    apiMock.mockResolvedValue({ initialized: true, unlocked: false } satisfies VaultStatus)
+    const vault = useVaultStore()
+    vault.vaultToken = 'current-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    await vault.fetchStatus()
+
+    expect(vault.status).toEqual({ initialized: true, unlocked: false })
+    expect(vault.vaultToken).toBeNull()
     expect(vault.isUnlocked).toBe(false)
   })
 
