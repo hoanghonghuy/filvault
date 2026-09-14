@@ -5,6 +5,7 @@ import { useVaultStore } from '@/stores/vault'
 import { useUiStore } from '@/stores/ui'
 import { useI18n } from '@/lib/i18n'
 import { getVaultStatusCopy } from '@/lib/vaultStatusCopy'
+import { formatVaultFileCount } from '@/lib/vaultFileCount'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
@@ -19,6 +20,7 @@ const vault = useVaultStore()
 const ui = useUiStore()
 const { t, locale } = useI18n()
 const vaultStatusCopy = computed(() => getVaultStatusCopy(locale.value))
+const vaultFileCountLabel = computed(() => formatVaultFileCount(vault.files.length, locale.value))
 
 // Initial Vault status state
 const statusLoading = ref(true)
@@ -438,7 +440,7 @@ async function deleteSelectedFile() {
       <!-- Toolbar -->
       <div class="vault-toolbar">
         <div class="vault-meta-info">
-          <span class="file-count">{{ vault.files.length }} {{ t.vaultFilesUnit }}</span>
+          <span class="file-count">{{ vaultFileCountLabel }}</span>
           <span class="dot-sep">•</span>
           <span class="total-size">{{ formatBytes(totalVaultSize) }}</span>
         </div>
