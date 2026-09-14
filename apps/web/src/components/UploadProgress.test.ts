@@ -96,7 +96,7 @@ describe('UploadProgress', () => {
     await flushPromises()
 
     expect(failedButtons[0]!.attributes('aria-label')).toBe('Thử lại: bad.txt')
-    expect(failedButtons[1]!.attributes('aria-label')).toBe('Xóa mục tải lên thất bại: bad.txt')
+    expect(failedButtons[1]!.attributes('aria-label')).toBe('Bỏ qua tệp tải lên thất bại: bad.txt')
     expect(wrapper.get('[data-status="queued"] .upload-action-btn').attributes('aria-label')).toBe('Hủy: wait.txt')
   })
 
