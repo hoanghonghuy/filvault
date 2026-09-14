@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLocale } from '@/lib/i18n'
 import FolderPickerSheet from './FolderPickerSheet.vue'
 
-const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }))
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn<(path: string) => Promise<unknown>>() }))
 
 vi.mock('@/api/client', () => ({
   api: apiMock,
