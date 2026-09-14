@@ -7,7 +7,6 @@ import { useI18n } from '@/lib/i18n'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
-import { formatVaultDate } from '@/lib/vaultDate'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -16,7 +15,7 @@ import type { VaultFile } from '@/api/types'
 const router = useRouter()
 const vault = useVaultStore()
 const ui = useUiStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 // Setup state
 const setupPin = ref('')
@@ -202,7 +201,7 @@ async function downloadFile(id: string) {
     const out = await api<{ downloadUrl: string }>(`/files/${id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    ui.showToast(formatApiError(e, t.value.vaultDownloadFailed), 'error')
+    ui.showToast(formatApiError(e, 'Download failed'), 'error')
   }
 }
 
@@ -214,13 +213,6 @@ async function previewMediaFile(file: VaultFile) {
   } catch (e) {
     ui.showToast(formatApiError(e, t.value.vaultPreviewFailed), 'error')
   }
-}
-
-function onVaultFileKeydown(event: KeyboardEvent, file: VaultFile) {
-  if (event.target !== event.currentTarget) return
-  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
-  event.preventDefault()
-  void previewMediaFile(file)
 }
 
 async function removeSelectedFileFromVault() {
@@ -256,6 +248,11 @@ async function deleteSelectedFile() {
   }
 }
 
+function formatDate(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
 </script>
 
 <template>
@@ -427,11 +424,7 @@ async function deleteSelectedFile() {
           v-for="file in vault.files"
           :key="file.id"
           class="vault-file-row tappable"
-          role="button"
-          tabindex="0"
-          :aria-label="file.name"
           @click="previewMediaFile(file)"
-          @keydown="onVaultFileKeydown($event, file)"
         >
           <div class="file-icon-box" :class="mimeIcon(file.mimeType)">
             <Icon :name="mimeIcon(file.mimeType)" :size="24" />
@@ -441,17 +434,15 @@ async function deleteSelectedFile() {
             <h4 class="file-name" :title="file.name">{{ file.name }}</h4>
             <div class="file-subtext">
               <span>{{ formatBytes(file.sizeBytes) }}</span>
-              <template v-if="formatVaultDate(file.createdAt, locale)">
-                <span class="dot-sep">•</span>
-                <span>{{ formatVaultDate(file.createdAt, locale) }}</span>
-              </template>
+              <span class="dot-sep">•</span>
+              <span>{{ formatDate(file.createdAt) }}</span>
             </div>
           </div>
 
           <button
             type="button"
             class="more-btn"
-            :aria-label="`${t.vaultFileActions}: ${file.name}`"
+            :aria-label="t.vaultFileActions"
             @click.stop="openFileMenu(file)"
           >
             <Icon name="more" :size="20" />
@@ -931,11 +922,6 @@ async function deleteSelectedFile() {
 .vault-file-row:hover {
   background: var(--surface-soft);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.vault-file-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .file-icon-box {
