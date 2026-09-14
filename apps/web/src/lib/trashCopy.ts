@@ -1,6 +1,7 @@
 import type { Locale } from '@/lib/i18n'
 
 export interface TrashCopy {
+  resultCount: (count: number) => string
   deleting: (completed: number, total: number) => string
   partial: (deleted: number, failed: number) => string
   emptyFailed: string
@@ -15,6 +16,7 @@ export interface TrashCopy {
 export function trashCopy(locale: Locale): TrashCopy {
   if (locale === 'vi') {
     return {
+      resultCount: (count) => `${count} kết quả`,
       deleting: (completed, total) => `Đang xóa ${completed}/${total}…`,
       partial: (deleted, failed) =>
         `Đã xóa vĩnh viễn ${deleted} mục; ${failed} mục không thể xóa.`,
@@ -31,6 +33,7 @@ export function trashCopy(locale: Locale): TrashCopy {
   }
 
   return {
+    resultCount: (count) => `${count} ${count === 1 ? 'result' : 'results'}`,
     deleting: (completed, total) => `Deleting ${completed}/${total}…`,
     partial: (deleted, failed) =>
       `Permanently deleted ${deleted} items; ${failed} could not be deleted.`,
