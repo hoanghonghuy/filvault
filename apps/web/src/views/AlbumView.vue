@@ -184,14 +184,14 @@ async function removeItem(fileId: string, name: string) {
 async function openLightbox(item: TimelineItem) {
   const requestSequence = ++previewSequence
   error.value = ''
-  mediaItem.value = item
   try {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
-    if (requestSequence !== previewSequence || mediaItem.value?.id !== item.id) return
+    if (requestSequence !== previewSequence) return
+    mediaItem.value = item
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    if (requestSequence !== previewSequence || mediaItem.value?.id !== item.id) return
+    if (requestSequence !== previewSequence) return
     error.value = formatApiError(e, copy.value.viewFailed)
   }
 }
