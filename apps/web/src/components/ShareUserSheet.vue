@@ -33,6 +33,7 @@ const phase = ref<Phase>('form')
 const error = ref('')
 const successInvited = ref(false)
 const successRecipientLabel = ref('')
+let submitGeneration = 0
 
 const emailInputRef = ref<HTMLInputElement | null>(null)
 const errorRef = ref<HTMLElement | null>(null)
@@ -91,6 +92,10 @@ function resetState() {
   successRecipientLabel.value = ''
 }
 
+function invalidateSubmit() {
+  submitGeneration += 1
+}
+
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
@@ -109,6 +114,9 @@ async function onSubmit() {
   if (!canSubmit.value || !props.resourceId) return
 
   const value = trimmedEmail.value
+  const resourceId = props.resourceId
+  const resourceType = props.resourceType
+  const generation = ++submitGeneration
   error.value = ''
 
   if (!isValidEmail(value)) {
@@ -128,11 +136,20 @@ async function onSubmit() {
     const res = await api<CreateUserShareResponse>('/shares', {
       method: 'POST',
       body: JSON.stringify({
-        resourceType: props.resourceType,
-        resourceId: props.resourceId,
+        resourceType,
+        resourceId,
         email: value,
       }),
     })
+
+    if (
+      generation !== submitGeneration ||
+      !props.open ||
+      props.resourceId !== resourceId ||
+      props.resourceType !== resourceType
+    ) {
+      return
+    }
 
     successInvited.value = Boolean(res.invited)
     if (res.invited) {
@@ -146,6 +163,15 @@ async function onSubmit() {
     emit('shared', { invited: successInvited.value, email: value })
     await focusRef(successRef)
   } catch (e) {
+    if (
+      generation !== submitGeneration ||
+      !props.open ||
+      props.resourceId !== resourceId ||
+      props.resourceType !== resourceType
+    ) {
+      return
+    }
+
     phase.value = 'form'
     error.value = formatShareUserError(e, copy.value.fallback, {
       conflict: copy.value.conflict,
@@ -167,13 +193,17 @@ function onShareAnother() {
 }
 
 function onClose() {
+  invalidateSubmit()
   emit('close')
 }
 
 watch(
-  () => props.open,
-  (open) => {
-    if (open) {
+  () => [props.open, props.resourceId, props.resourceType] as const,
+  ([open, resourceId, resourceType], [previousOpen, previousResourceId, previousResourceType]) => {
+    const targetChanged = resourceId !== previousResourceId || resourceType !== previousResourceType
+    if (open !== previousOpen || targetChanged) invalidateSubmit()
+
+    if (open && (!previousOpen || targetChanged)) {
       resetState()
       void nextTick(() => {
         if (phase.value === 'form') emailInputRef.value?.focus()
