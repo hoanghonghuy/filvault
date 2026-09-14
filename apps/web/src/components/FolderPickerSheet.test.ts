@@ -107,4 +107,60 @@ describe('FolderPickerSheet', () => {
 
     wrapper.unmount()
   })
+
+  it('ignores a stale load when the picker is closed and reopened', async () => {
+    setLocale('en')
+    let resolveOld: ((value: unknown) => void) | undefined
+    let resolveCurrent: ((value: unknown) => void) | undefined
+
+    apiMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveCurrent = resolve
+          }),
+      )
+
+    const wrapper = mount(FolderPickerSheet, {
+      props: { open: false, title: 'Move' },
+      global: { stubs: { BottomSheet: BottomSheetStub } },
+    })
+
+    await wrapper.setProps({ open: true })
+    await nextTick()
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    resolveOld?.({
+      folder: null,
+      breadcrumb: [],
+      folders: [{ id: 'old', name: 'Old session', parentId: null }],
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.picker-list').exists()).toBe(false)
+    expect(wrapper.find('.picker-confirm').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).not.toContain('Old session')
+
+    resolveCurrent?.({
+      folder: null,
+      breadcrumb: [],
+      folders: [{ id: 'current', name: 'Current session', parentId: null }],
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.picker-list').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Current session')
+    expect(wrapper.text()).not.toContain('Old session')
+    expect(wrapper.find('.picker-confirm').attributes('disabled')).toBeUndefined()
+
+    wrapper.unmount()
+  })
 })
