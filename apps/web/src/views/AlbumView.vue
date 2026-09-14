@@ -218,7 +218,16 @@ async function downloadMedia() {
   }
 }
 
-watch(() => route.params.id, load, { immediate: true })
+watch(
+  () => route.params.id,
+  () => {
+    album.value = null
+    pickerOpen.value = false
+    lightboxOpen.value = false
+    void load()
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   pickerOpen.value = false
