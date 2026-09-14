@@ -10,8 +10,8 @@ import MediaLightbox from './MediaLightbox.vue'
 import { setLocale } from '@/lib/i18n'
 
 const heicMocks = vi.hoisted(() => ({
-  getHeicDisplayUrl: vi.fn(),
-  downloadHeicAsJpeg: vi.fn(),
+  getHeicDisplayUrl: vi.fn<(source: string | Blob) => Promise<string>>(),
+  downloadHeicAsJpeg: vi.fn<(url: string, originalName: string) => Promise<void>>(),
 }))
 
 vi.mock('@/lib/heic', async (importOriginal) => {
