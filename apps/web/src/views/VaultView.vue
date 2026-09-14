@@ -15,7 +15,7 @@ import type { VaultFile } from '@/api/types'
 const router = useRouter()
 const vault = useVaultStore()
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // Setup state
 const setupPin = ref('')
@@ -61,12 +61,15 @@ let hiddenTimeout: ReturnType<typeof setTimeout> | null = null
 function onVisibilityChange() {
   if (document.hidden) {
     if (vault.isUnlocked) {
-      hiddenTimeout = setTimeout(() => {
-        if (vault.isUnlocked) {
-          vault.lock()
-          ui.showToast(t.value.vaultAutoLockedToast, 'info')
-        }
-      }, 2 * 60 * 1000)
+      hiddenTimeout = setTimeout(
+        () => {
+          if (vault.isUnlocked) {
+            vault.lock()
+            ui.showToast(t.value.vaultAutoLockedToast, 'info')
+          }
+        },
+        2 * 60 * 1000,
+      )
     }
   } else {
     if (hiddenTimeout) {
@@ -208,7 +211,12 @@ async function downloadFile(id: string) {
 async function previewMediaFile(file: VaultFile) {
   try {
     const out = await api<{ downloadUrl: string }>(`/files/${file.id}/download`)
-    previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
+    previewFile.value = {
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      url: out.downloadUrl,
+    }
     previewOpen.value = true
   } catch (e) {
     ui.showToast(formatApiError(e, t.value.vaultPreviewFailed), 'error')
@@ -258,7 +266,12 @@ async function deleteSelectedFile() {
 function formatDate(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(locale.value === 'vi' ? 'vi-VN' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 </script>
 
@@ -266,7 +279,13 @@ function formatDate(iso: string): string {
   <div class="vault-page">
     <!-- Top Header -->
     <header class="vault-header">
-      <button type="button" class="back-btn" :title="t.back" :aria-label="t.back" @click="router.back()">
+      <button
+        type="button"
+        class="back-btn"
+        :title="t.back"
+        :aria-label="t.back"
+        @click="router.back()"
+      >
         <Icon name="arrow-left" :size="20" />
       </button>
       <div class="header-titles">
@@ -382,7 +401,11 @@ function formatDate(iso: string): string {
           </div>
         </label>
 
-        <button type="submit" class="btn primary submit-btn" :disabled="vault.loading || !unlockPin">
+        <button
+          type="submit"
+          class="btn primary submit-btn"
+          :disabled="vault.loading || !unlockPin"
+        >
           {{ vault.loading ? t.vaultUnlocking : t.vaultUnlock }}
         </button>
 
@@ -472,7 +495,10 @@ function formatDate(iso: string): string {
         <button
           type="button"
           class="sheet-row"
-          @click="selectedFile && previewMediaFile(selectedFile); fileActionOpen = false"
+          @click="
+            selectedFile && previewMediaFile(selectedFile)
+            fileActionOpen = false
+          "
         >
           <Icon name="eye" :size="20" />
           <span>{{ t.preview }}</span>
@@ -480,24 +506,19 @@ function formatDate(iso: string): string {
         <button
           type="button"
           class="sheet-row"
-          @click="selectedFile && downloadFile(selectedFile.id); fileActionOpen = false"
+          @click="
+            selectedFile && downloadFile(selectedFile.id)
+            fileActionOpen = false
+          "
         >
           <Icon name="download" :size="20" />
           <span>{{ t.download }}</span>
         </button>
-        <button
-          type="button"
-          class="sheet-row"
-          @click="removeSelectedFileFromVault"
-        >
+        <button type="button" class="sheet-row" @click="removeSelectedFileFromVault">
           <Icon name="arrow-right" :size="20" />
           <span>{{ t.vaultMoveOutOfVault }}</span>
         </button>
-        <button
-          type="button"
-          class="sheet-row danger"
-          @click="deleteSelectedFile"
-        >
+        <button type="button" class="sheet-row danger" @click="deleteSelectedFile">
           <Icon name="trash" :size="20" />
           <span>{{ t.delete }}</span>
         </button>
@@ -505,11 +526,7 @@ function formatDate(iso: string): string {
     </BottomSheet>
 
     <!-- Bottom Sheet: Change PIN -->
-    <BottomSheet
-      :open="changePinOpen"
-      :title="t.vaultChangePin"
-      @close="changePinOpen = false"
-    >
+    <BottomSheet :open="changePinOpen" :title="t.vaultChangePin" @close="changePinOpen = false">
       <form class="modal-form" @submit.prevent="handleChangePin">
         <p v-if="changePinError" class="form-error" role="alert">{{ changePinError }}</p>
 
@@ -529,7 +546,9 @@ function formatDate(iso: string): string {
         </label>
 
         <div class="modal-actions">
-          <button type="button" class="btn text-btn" @click="changePinOpen = false">{{ t.cancel }}</button>
+          <button type="button" class="btn text-btn" @click="changePinOpen = false">
+            {{ t.cancel }}
+          </button>
           <button type="submit" class="btn primary" :disabled="changingPin">
             {{ changingPin ? t.saving : t.vaultSaveNewPassword }}
           </button>
@@ -538,18 +557,19 @@ function formatDate(iso: string): string {
     </BottomSheet>
 
     <!-- Bottom Sheet: Reset PIN (using account password) -->
-    <BottomSheet
-      :open="resetPinOpen"
-      :title="t.vaultResetTitle"
-      @close="resetPinOpen = false"
-    >
+    <BottomSheet :open="resetPinOpen" :title="t.vaultResetTitle" @close="resetPinOpen = false">
       <form class="modal-form" @submit.prevent="handleResetPin">
         <p class="modal-desc">{{ t.vaultResetDesc }}</p>
         <p v-if="resetPinError" class="form-error" role="alert">{{ resetPinError }}</p>
 
         <label class="field">
           <span>{{ t.vaultAccountPassword }}</span>
-          <input v-model="accountPassword" type="password" required autocomplete="current-password" />
+          <input
+            v-model="accountPassword"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
         </label>
 
         <label class="field">
@@ -563,7 +583,9 @@ function formatDate(iso: string): string {
         </label>
 
         <div class="modal-actions">
-          <button type="button" class="btn text-btn" @click="resetPinOpen = false">{{ t.cancel }}</button>
+          <button type="button" class="btn text-btn" @click="resetPinOpen = false">
+            {{ t.cancel }}
+          </button>
           <button type="submit" class="btn primary" :disabled="resettingPin">
             {{ resettingPin ? t.vaultProcessing : t.vaultResetAndEnter }}
           </button>
@@ -926,7 +948,9 @@ function formatDate(iso: string): string {
   border-radius: var(--radius-lg);
   background: var(--surface);
   border: 1px solid var(--hairline-soft, #f1f5f9);
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
   cursor: pointer;
 }
 
