@@ -67,10 +67,15 @@ describe('VaultView load recovery', () => {
     setLocale('en')
   })
 
-  it('shows load failure instead of the empty state, then recovers to the genuine empty state on retry', async () => {
+  it('keeps the load error visible while retry is pending, then shows the genuine empty state on success', async () => {
+    let resolveRetry: (() => void) | undefined
+    const retryRequest = new Promise<unknown>((resolve) => {
+      resolveRetry = () => resolve([])
+    })
+
     loadFilesMock
       .mockRejectedValueOnce(new Error('vault files offline'))
-      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => retryRequest)
 
     const wrapper = await mountVault()
 
@@ -85,6 +90,13 @@ describe('VaultView load recovery', () => {
     await flushPromises()
 
     expect(loadFilesMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Personal Vault is empty')
+
+    expect(resolveRetry).toBeTypeOf('function')
+    resolveRetry?.()
+    await flushPromises()
+
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Personal Vault is empty')
 
