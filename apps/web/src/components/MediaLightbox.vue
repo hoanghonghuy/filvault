@@ -38,6 +38,7 @@ const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
 const heicLoading = ref(false)
 const heicError = ref(false)
 const heicDisplayUrl = ref('')
+let heicRequestSequence = 0
 
 const displayImageUrl = computed(() => {
   if (isHeicMedia.value && heicDisplayUrl.value) {
@@ -46,21 +47,35 @@ const displayImageUrl = computed(() => {
   return props.url
 })
 
+function invalidateHeicResolution() {
+  heicRequestSequence++
+  heicLoading.value = false
+  heicError.value = false
+  heicDisplayUrl.value = ''
+}
+
 async function resolveHeicImage() {
+  const requestSequence = ++heicRequestSequence
+  heicDisplayUrl.value = ''
+  heicError.value = false
+
   if (!props.open || !isHeicMedia.value || !props.url) {
     heicLoading.value = false
-    heicError.value = false
     return
   }
+
   heicLoading.value = true
-  heicError.value = false
   try {
     const objectUrl = await getHeicDisplayUrl(props.url)
+    if (requestSequence !== heicRequestSequence) return
     heicDisplayUrl.value = objectUrl
   } catch {
+    if (requestSequence !== heicRequestSequence) return
     heicError.value = true
   } finally {
-    heicLoading.value = false
+    if (requestSequence === heicRequestSequence) {
+      heicLoading.value = false
+    }
   }
 }
 
@@ -130,9 +145,7 @@ function openDialog() {
 
 function closeDialog() {
   pauseMedia()
-  heicLoading.value = false
-  heicError.value = false
-  heicDisplayUrl.value = ''
+  invalidateHeicResolution()
   overflowOpen.value = false
   if (dialogRef.value?.open) {
     dialogRef.value.close()
@@ -308,6 +321,8 @@ watch(
     translateY.value = 0
     if (props.open) {
       resolveHeicImage()
+    } else {
+      invalidateHeicResolution()
     }
   },
 )
@@ -323,6 +338,7 @@ if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
 
 onUnmounted(() => {
   pauseMedia()
+  invalidateHeicResolution()
   document.body.style.overflow = ''
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('pointerdown', onDocumentPointerDown)
