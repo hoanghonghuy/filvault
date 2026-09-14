@@ -23,4 +23,15 @@ describe('ChatView accessibility contract', () => {
     expect(desktopRule).toContain('width: 36px;')
     expect(desktopRule).toContain('height: 36px;')
   })
+  it('keeps reaction picker controls at the shared touch minimum', () => {
+    const reactionButtonRule = source.match(/\.rx-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(reactionButtonRule).toContain('width: var(--touch-min);')
+    expect(reactionButtonRule).toContain('height: var(--touch-min);')
+
+    const reactionPlusRule = source.match(/\.rx-plus-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(reactionPlusRule).not.toMatch(/(?:width|height):\s*\d+px;/)
+    expect(source).toContain('class="rx-btn rx-plus-btn"')
+    expect(source).toContain(':aria-label="t.addReaction"')
+  })
+
 })
