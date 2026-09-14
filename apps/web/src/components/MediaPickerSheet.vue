@@ -94,8 +94,15 @@ watch(
 <template>
   <BottomSheet :open="open" :title="copy.title" @close="emit('close')">
     <p class="muted hint">{{ copy.hint }}</p>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error && groups.length > 0" class="error" role="alert">{{ error }}</p>
     <p v-if="loading" class="muted">{{ t.loading }}</p>
+
+    <div v-else-if="error" class="picker-error" role="alert">
+      <p class="error">{{ error }}</p>
+      <button type="button" class="btn block" @click="loadInitial">
+        {{ t.retry }}
+      </button>
+    </div>
 
     <div v-else class="grid photos picker-grid">
       <PhotoThumb
@@ -109,7 +116,7 @@ watch(
     </div>
 
     <EmptyState
-      v-if="!loading && flattenItems().length === 0"
+      v-if="!loading && !error && flattenItems().length === 0"
       :title="copy.emptyTitle"
       :description="copy.emptyDescription"
     />
@@ -129,6 +136,15 @@ watch(
 <style scoped>
 .hint {
   margin: 0 0 var(--space-sm);
+}
+
+.picker-error {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.picker-error .error {
+  margin: 0;
 }
 
 .picker-grid {
