@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -26,6 +26,7 @@ const error = ref<PreviewError | null>(null)
 const item = ref<OwnedFile | null>(null)
 const previewUrl = ref('')
 const lightboxOpen = ref(false)
+let loadGeneration = 0
 
 const copy = computed(() =>
   locale.value === 'vi'
@@ -57,35 +58,59 @@ function isPhotosMedia(file: OwnedFile) {
   return file.status === 'READY' && (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/'))
 }
 
+function currentRouteId() {
+  return typeof route.params.id === 'string' ? route.params.id : ''
+}
+
+function ownsLoad(generation: number, id: string) {
+  return generation === loadGeneration && id === currentRouteId()
+}
+
 async function loadPreview() {
+  const generation = ++loadGeneration
+  const id = currentRouteId()
   loading.value = true
   error.value = null
-  const id = typeof route.params.id === 'string' ? route.params.id : ''
+  item.value = null
+  previewUrl.value = ''
+  lightboxOpen.value = false
+
   if (!id) {
-    error.value = 'unavailable'
-    loading.value = false
+    if (ownsLoad(generation, id)) {
+      error.value = 'unavailable'
+      loading.value = false
+    }
     return
   }
 
   try {
     const file = await api<OwnedFile>(`/files/${encodeURIComponent(id)}`)
+    if (!ownsLoad(generation, id)) return
     if (!isPhotosMedia(file)) {
       error.value = 'unsupported'
       return
     }
     const out = await api<DownloadURL>(`/files/${encodeURIComponent(id)}/download`)
+    if (!ownsLoad(generation, id)) return
     item.value = file
     previewUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch {
-    error.value = 'unavailable'
+    if (ownsLoad(generation, id)) {
+      error.value = 'unavailable'
+    }
   } finally {
-    loading.value = false
+    if (ownsLoad(generation, id)) {
+      loading.value = false
+    }
   }
 }
 
 function closePreview() {
+  loadGeneration += 1
   lightboxOpen.value = false
+  item.value = null
+  previewUrl.value = ''
   void router.replace('/photos')
 }
 
@@ -94,8 +119,16 @@ function download() {
   window.open(previewUrl.value, '_blank', 'noopener')
 }
 
-onMounted(() => {
-  void loadPreview()
+watch(
+  () => route.params.id,
+  () => {
+    void loadPreview()
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  loadGeneration += 1
 })
 </script>
 
