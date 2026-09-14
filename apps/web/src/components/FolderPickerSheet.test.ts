@@ -3,13 +3,24 @@
  */
 import { nextTick } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLocale } from '@/lib/i18n'
 import FolderPickerSheet from './FolderPickerSheet.vue'
 
-vi.mock('@/api/client', () => ({
-  api: async () => ({ folder: null, breadcrumb: [], folders: [] }),
-}))
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn<(path: string) => Promise<unknown>>() }))
+
+vi.mock('@/api/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    api: apiMock,
+  }
+})
+
+beforeEach(() => {
+  apiMock.mockReset()
+  apiMock.mockResolvedValue({ folder: null, breadcrumb: [], folders: [] })
+})
 
 afterEach(() => {
   setLocale('vi')
@@ -54,6 +65,46 @@ describe('FolderPickerSheet', () => {
     })
 
     expect(wrapper.find('.picker-confirm').text()).toBe('Copy here')
+    wrapper.unmount()
+  })
+
+  it('blocks stale selection during loading and exposes localized retry after failure', async () => {
+    setLocale('en')
+    let rejectLoad: ((reason?: unknown) => void) | undefined
+    apiMock.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectLoad = reject
+        }),
+    )
+
+    const wrapper = mount(FolderPickerSheet, {
+      props: { open: false, title: 'Move' },
+      global: { stubs: { BottomSheet: BottomSheetStub } },
+    })
+
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    expect(wrapper.find('.picker-confirm').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.picker-list').exists()).toBe(false)
+
+    rejectLoad?.(new Error('network down'))
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    expect(wrapper.find('.picker-list').exists()).toBe(false)
+    expect(wrapper.find('.picker-confirm').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.picker-retry').text()).toBe('Retry')
+
+    apiMock.mockResolvedValueOnce({ folder: null, breadcrumb: [], folders: [] })
+    await wrapper.find('.picker-retry').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('.picker-list').exists()).toBe(true)
+    expect(wrapper.find('.picker-confirm').attributes('disabled')).toBeUndefined()
+
     wrapper.unmount()
   })
 })

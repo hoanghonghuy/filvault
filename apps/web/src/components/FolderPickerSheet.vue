@@ -29,6 +29,7 @@ const error = ref('')
 async function loadBrowser() {
   loading.value = true
   error.value = ''
+  browser.value = null
   try {
     const q = browseFolderId.value ? `?folderId=${browseFolderId.value}` : ''
     browser.value = await api<Browser>(`/browser${q}`)
@@ -55,6 +56,7 @@ function goUp() {
 }
 
 function confirmSelection() {
+  if (loading.value || error.value) return
   emit('select', browseFolderId.value)
 }
 
@@ -95,8 +97,13 @@ watch(browseFolderId, () => {
       </template>
     </nav>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="loading" class="muted">{{ t.loading }}</p>
+    <div v-if="error" class="picker-error" role="alert">
+      <p class="error">{{ error }}</p>
+      <button type="button" class="btn ghost picker-retry" :disabled="loading" @click="loadBrowser">
+        {{ t.retry }}
+      </button>
+    </div>
+    <p v-else-if="loading" class="muted" aria-live="polite">{{ t.loading }}</p>
 
     <div v-else class="picker-list">
       <button
@@ -117,7 +124,7 @@ watch(browseFolderId, () => {
       >
         <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
       </button>
-      <p v-if="(browser?.folders.length ?? 0) === 0 && !loading" class="muted picker-empty">
+      <p v-if="(browser?.folders.length ?? 0) === 0" class="muted picker-empty">
         {{ copy.empty }}
       </p>
     </div>
@@ -125,7 +132,7 @@ watch(browseFolderId, () => {
     <button
       type="button"
       class="btn block ink picker-confirm"
-      :disabled="browseFolderId === excludeFolderId"
+      :disabled="loading || Boolean(error) || browseFolderId === excludeFolderId"
       @click="confirmSelection"
     >
       {{ confirmLabel ?? t.moveHere }}
@@ -177,6 +184,14 @@ watch(browseFolderId, () => {
 .picker-empty {
   margin: var(--space-sm) 0;
   text-align: center;
+}
+
+.picker-error {
+  margin-bottom: var(--space-md);
+}
+
+.picker-error .error {
+  margin: 0 0 var(--space-sm);
 }
 
 .picker-confirm {
