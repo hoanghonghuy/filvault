@@ -23,6 +23,16 @@ describe('ChatView accessibility contract', () => {
     expect(desktopRule).toContain('width: 36px;')
     expect(desktopRule).toContain('height: 36px;')
   })
+  it('keeps Chat search fields at the shared touch minimum', () => {
+    const railFilterRule = source.match(/\.rail-filter input\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(railFilterRule).toContain('min-height: var(--touch-min);')
+    expect(railFilterRule).not.toContain('min-height: 40px;')
+
+    const threadSearchRule = source.match(/\.chat-search input\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(threadSearchRule).toContain('min-height: var(--touch-min);')
+    expect(threadSearchRule).not.toContain('min-height: 40px;')
+  })
+
   it('keeps reaction picker controls at the shared touch minimum', () => {
     const reactionButtonRule = source.match(/\.rx-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     expect(reactionButtonRule).toContain('width: var(--touch-min);')
