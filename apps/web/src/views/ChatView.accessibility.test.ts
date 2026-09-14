@@ -23,4 +23,17 @@ describe('ChatView accessibility contract', () => {
     expect(desktopRule).toContain('width: 36px;')
     expect(desktopRule).toContain('height: 36px;')
   })
+
+  it('keeps custom wallpaper selectors keyboard-complete on desktop and mobile', () => {
+    const selectors = source.match(/class="wallpaper-preset-item custom-wallpaper-item"[\s\S]*?@keydown\.space\.prevent="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g) ?? []
+
+    expect(selectors).toHaveLength(2)
+    for (const selector of selectors) {
+      expect(selector).toContain('role="button"')
+      expect(selector).toContain('tabindex="0"')
+      expect(selector).toContain('@click="setConversationWallpaper(selectedConversation.id, wp.url)"')
+      expect(selector).toContain('@keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"')
+      expect(selector).toContain('@keydown.space.prevent="setConversationWallpaper(selectedConversation.id, wp.url)"')
+    }
+  })
 })

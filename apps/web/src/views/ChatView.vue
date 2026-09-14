@@ -3654,6 +3654,7 @@ watch(
                 :title="wp.name"
                 @click="setConversationWallpaper(selectedConversation.id, wp.url)"
                 @keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.space.prevent="setConversationWallpaper(selectedConversation.id, wp.url)"
               >
                 <div class="wallpaper-preset-thumb custom-thumb" :style="{ backgroundImage: `url('${wp.url}')` }">
                   <span v-if="threadWallpaper === wp.url" class="preset-check-badge">
@@ -4598,6 +4599,7 @@ watch(
                 :title="wp.name"
                 @click="setConversationWallpaper(selectedConversation.id, wp.url)"
                 @keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.space.prevent="setConversationWallpaper(selectedConversation.id, wp.url)"
               >
                 <div class="wallpaper-preset-thumb custom-thumb" :style="{ backgroundImage: `url('${wp.url}')` }">
                   <span v-if="threadWallpaper === wp.url" class="preset-check-badge">
