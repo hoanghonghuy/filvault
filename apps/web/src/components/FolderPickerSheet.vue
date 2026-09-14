@@ -75,8 +75,11 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
-      resetBrowse()
-      void loadBrowser()
+      if (browseFolderId.value !== null) {
+        resetBrowse()
+      } else {
+        void loadBrowser()
+      }
       return
     }
 
