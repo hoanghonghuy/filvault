@@ -33,6 +33,7 @@ import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
 import { vaultMoveCopy } from '@/lib/vaultMoveCopy'
 import { filesOperationsCopy } from '@/lib/filesOperationsCopy'
+import { formatSearchResultCount } from '@/lib/searchResultCount'
 import {
   buildFilesRouteQuery,
   buildSearchApiQueryString,
@@ -57,6 +58,12 @@ const reloadStorage = inject<() => Promise<void>>('reloadStorage')
 
 const browser = ref<Browser | null>(null)
 const searchResults = ref<SearchResult | null>(null)
+const searchResultCountLabel = computed(() =>
+  formatSearchResultCount(
+    (searchResults.value?.folders.length ?? 0) + (searchResults.value?.files.length ?? 0),
+    locale.value,
+  ),
+)
 const loading = ref(false)
 const searchLoading = ref(false)
 const error = ref('')
@@ -278,7 +285,6 @@ function formatItemDate(iso?: string): string {
     year: 'numeric',
   })
 }
-
 
 const currentSortLabel = computed(() => {
   if (sortBy.value === 'name') return t.value.sortByName
@@ -1248,7 +1254,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 
     <TransitionGroup v-if="segment === 'all' && !loading && searchResults" name="row" tag="section" class="list">
       <h2 key="search-title" class="section-title">
-        {{ searchResults.folders.length + searchResults.files.length }} {{ t.results }}
+        {{ searchResultCountLabel }}
         <template v-if="hasActiveFilters"> · {{ t.filtered }}<!-- · filtered --></template>
       </h2>
       <div v-if="hasActiveFilters" key="filter-chips" class="filter-chips">
