@@ -233,13 +233,25 @@ onBeforeUnmount(() => {
         <span>{{ t.photosTitle }}</span>
       </RouterLink>
       <h1 class="album-title">{{ album?.name ?? t.album }}</h1>
-      <button type="button" class="btn icon-only album-menu-btn" :aria-label="t.albumMenu" @click="openAlbumMenu">
+      <button
+        type="button"
+        class="btn icon-only album-menu-btn"
+        :aria-label="t.albumMenu"
+        :disabled="!album || loading"
+        @click="openAlbumMenu"
+      >
         <Icon name="more" :size="18" />
       </button>
     </div>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error && album" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonAlbum v-if="loading" />
+    <div v-else-if="error && !album" class="album-error-state" role="alert">
+      <p class="error">{{ error }}</p>
+      <button type="button" class="btn album-retry" :disabled="loading" @click="load">
+        {{ t.retry }}
+      </button>
+    </div>
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
         <div
@@ -329,6 +341,10 @@ onBeforeUnmount(() => {
 }
 
 .album-menu-btn { min-width: var(--touch-min); min-height: var(--touch-min); flex-shrink: 0; }
+.album-error-state { display: grid; justify-items: start; gap: var(--space-sm); }
+.album-error-state .error { margin: 0; }
+.album-retry { min-height: var(--touch-min); }
+.album-retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .album-media-cell { position: relative; min-width: 0; }
 .album-media-more {
   position: absolute;
