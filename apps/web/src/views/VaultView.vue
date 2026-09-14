@@ -52,6 +52,7 @@ const fileActionOpen = ref(false)
 // In-app preview
 const previewOpen = ref(false)
 const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
+const loadError = ref(false)
 
 const totalVaultSize = computed(() => {
   return vault.files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0)
@@ -77,15 +78,24 @@ function onVisibilityChange() {
   }
 }
 
+async function loadVaultFiles() {
+  try {
+    await vault.loadFiles()
+    loadError.value = false
+  } catch {
+    loadError.value = true
+  }
+}
+
 onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibilityChange)
   try {
     await vault.fetchStatus()
     if (vault.isUnlocked) {
-      await vault.loadFiles()
+      await loadVaultFiles()
     }
   } catch {
-    // ignore
+    // Status failure is handled by the existing locked/setup state contract.
   }
 })
 
@@ -408,8 +418,19 @@ async function deleteSelectedFile() {
         </div>
       </div>
 
+      <!-- Error State -->
+      <div v-if="loadError" class="vault-empty-box" role="alert">
+        <div class="empty-icon-wrap">
+          <Icon name="info" :size="48" />
+        </div>
+        <h3 class="empty-title">{{ t.filesLoadFailed }}</h3>
+        <button type="button" class="btn primary" :disabled="vault.loading" @click="loadVaultFiles">
+          <span>{{ t.retry }}</span>
+        </button>
+      </div>
+
       <!-- Empty State -->
-      <div v-if="vault.files.length === 0" class="vault-empty-box">
+      <div v-else-if="vault.files.length === 0" class="vault-empty-box">
         <div class="empty-icon-wrap">
           <Icon name="shield" :size="48" />
         </div>
