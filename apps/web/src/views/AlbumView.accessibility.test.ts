@@ -18,6 +18,16 @@ describe('AlbumView accessibility contract', () => {
     expect(source).toContain(":aria-label=\"`${t.moreActions}: ${item.name}`\"")
   })
 
+  it('keeps initial load failure separate from a true-empty album and exposes retry', () => {
+    expect(source).toContain('v-if="error && album"')
+    expect(source).toContain('v-else-if="error && !album"')
+    expect(source).toContain('class="album-error-state" role="alert"')
+    expect(source).toContain('@click="load"')
+    expect(source).toContain('{{ t.retry }}')
+    expect(source).toContain(':disabled="!album || loading"')
+    expect(source).toContain('.album-retry { min-height: var(--touch-min); }')
+  })
+
   it('keeps touch and keyboard affordances explicit', () => {
     expect(source).toMatch(/\.album-media-more\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/)
     expect(source).toContain('.album-media-more:focus-visible')
