@@ -1716,8 +1716,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   padding: 0;
   border: none;
   border-radius: var(--radius-pill);
@@ -1734,7 +1734,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 }
 
 .chip-clear {
-  min-height: 28px;
+  min-height: var(--touch-min);
   padding: 0 var(--space-xs);
   border: none;
   background: transparent;

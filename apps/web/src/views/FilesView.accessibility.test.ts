@@ -26,4 +26,14 @@ describe('FilesView accessibility contract', () => {
     expect(clearRule).toContain('height: var(--touch-min);')
   })
 
+  it('keeps active-filter actions touch-accessible', () => {
+    const removeRule = source.match(/\.chip-remove\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    const clearRule = source.match(/\.chip-clear\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+
+    expect(removeRule).toContain('width: var(--touch-min);')
+    expect(removeRule).toContain('height: var(--touch-min);')
+    expect(clearRule).toContain('min-height: var(--touch-min);')
+    expect(source).toContain('class="chip-remove" :aria-label="t.removeFilterAria"')
+  })
+
 })
