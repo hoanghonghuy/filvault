@@ -30,9 +30,9 @@ vi.mock('@/stores/auth', () => ({
 
 vi.mock('@/stores/ui', () => ({
   useUiStore: () => ({
-    confirm: vi.fn().mockResolvedValue(true),
-    showToast: vi.fn(),
-    openActionSheet: vi.fn().mockResolvedValue(null),
+    confirm: vi.fn<(options: unknown) => Promise<boolean>>().mockResolvedValue(true),
+    showToast: vi.fn<(message: string) => void>(),
+    openActionSheet: vi.fn<(title: string, actions: unknown[]) => Promise<string | null>>().mockResolvedValue(null),
   }),
 }))
 
