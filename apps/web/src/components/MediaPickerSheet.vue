@@ -97,7 +97,7 @@ watch(
     <p v-if="error && groups.length > 0" class="error" role="alert">{{ error }}</p>
     <p v-if="loading" class="muted">{{ t.loading }}</p>
 
-    <div v-else-if="error" class="picker-error" role="alert">
+    <div v-else-if="error && groups.length === 0" class="picker-error" role="alert">
       <p class="error">{{ error }}</p>
       <button type="button" class="btn block" @click="loadInitial">
         {{ t.retry }}
