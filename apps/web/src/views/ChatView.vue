@@ -6731,11 +6731,15 @@ img.avatar-img {
   }
 
   .back-btn,
-  .thread-actions .icon-btn {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    min-height: 44px;
+  .thread-actions .icon-btn,
+  .attach-btn,
+  .sticker-toggle-btn,
+  .like-btn,
+  .send-btn {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
   }
 
   .sticker-picker-drawer {
