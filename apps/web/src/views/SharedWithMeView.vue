@@ -422,7 +422,7 @@ onMounted(load)
               <button
                 class="share-action-btn"
                 type="button"
-                :aria-label="`${t.download}: ${f.name}`"
+                :aria-label="t.download"
                 @click.stop="downloadFile(f.id, f.name)"
               >
                 <Icon name="download" :size="18" />
@@ -516,7 +516,6 @@ onMounted(load)
 .tab-pill {
   background: transparent;
   border: none;
-  min-height: var(--touch-min);
   padding: 6px 0;
   font-size: 15px;
   font-weight: 600;
@@ -708,8 +707,8 @@ onMounted(load)
   background: transparent;
   border: none;
   color: var(--muted);
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -757,7 +756,7 @@ onMounted(load)
 
 .browse-path-link {
   max-width: min(40vw, 220px);
-  min-height: var(--touch-min);
+  min-height: 32px;
   padding: 4px 6px;
   overflow: hidden;
   text-overflow: ellipsis;
