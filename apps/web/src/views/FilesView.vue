@@ -217,35 +217,6 @@ function onFileItemKeydown(
   }
 }
 
-function onFavoriteFileKeydown(
-  event: KeyboardEvent,
-  file: { id: string; name: string; mimeType?: string },
-) {
-  if (event.target !== event.currentTarget) return
-  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
-  event.preventDefault()
-  void openFileActions(file)
-}
-
-function isPrimaryKeyboardActivation(event: KeyboardEvent) {
-  return event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar'
-}
-
-function onSearchFolderKeydown(event: KeyboardEvent, folderId: string) {
-  if (event.target !== event.currentTarget || !isPrimaryKeyboardActivation(event)) return
-  event.preventDefault()
-  void openFolder(folderId)
-}
-
-function onSearchFileKeydown(
-  event: KeyboardEvent,
-  file: { id: string; name: string; mimeType?: string },
-) {
-  if (event.target !== event.currentTarget || !isPrimaryKeyboardActivation(event)) return
-  event.preventDefault()
-  void openFileActions(file)
-}
-
 // Long-press detection
 const { start: startLongPress, move: moveLongPress, end: endLongPress, cancel: cancelLongPress, shouldIgnoreClick } = useLongPress({
   onLongPress: (payload) => {
@@ -355,7 +326,7 @@ async function previewMediaFile(file: { id: string; name: string; mimeType: stri
     previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
     previewOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, t.value.filesPreviewFailed)
+    error.value = formatApiError(e, 'Could not preview file')
   }
 }
 
@@ -506,7 +477,7 @@ async function runSearch() {
   try {
     searchResults.value = await api<SearchResult>(`/search?${buildSearchApiQueryString(searchQuery.value, filters.value)}`)
   } catch (e) {
-    error.value = formatApiError(e, t.value.filesSearchFailed)
+    error.value = formatApiError(e, 'Search failed')
   } finally {
     searchLoading.value = false
   }
@@ -750,7 +721,7 @@ async function batchDelete() {
 async function batchFavorite() {
   const fileIds = Array.from(selectedFileIds.value)
   if (fileIds.length === 0) {
-    ui.showToast(t.value.favoriteNoneSelected, 'info')
+    ui.showToast('No files selected to favorite', 'info')
     return
   }
   error.value = ''
@@ -758,11 +729,11 @@ async function batchFavorite() {
     for (const id of fileIds) {
       await api(`/files/${id}/favorite`, { method: 'PUT' })
     }
-    ui.showToast(t.value.favoriteBatchAdded.replace('{n}', String(fileIds.length)))
+    ui.showToast(`Added ${fileIds.length} files to favorites`)
     clearSelection()
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, t.value.favoriteBatchFailed)
+    error.value = formatApiError(e, 'Failed to favorite items')
   }
 }
 
@@ -855,7 +826,7 @@ async function loadFavorites() {
     const out = await api<{ files: FavoriteFile[] }>('/files/favorites')
     favorites.value = out.files
   } catch (e) {
-    error.value = formatApiError(e, t.value.favoritesLoadFailed)
+    error.value = formatApiError(e, 'Failed to load favorites')
   } finally {
     favoritesLoading.value = false
   }
@@ -881,14 +852,14 @@ async function toggleFavorite(fileId: string, name: string) {
   try {
     if (wasFavorited) {
       await api(`/files/${fileId}/favorite`, { method: 'DELETE' })
-      ui.showToast(t.value.favoriteRemoved.replace('{name}', () => name))
+      ui.showToast(`Removed "${name}" from favorites`)
     } else {
       await api(`/files/${fileId}/favorite`, { method: 'PUT' })
-      ui.showToast(t.value.favoriteAdded.replace('{name}', () => name))
+      ui.showToast(`Added "${name}" to favorites`)
     }
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, t.value.favoriteUpdateFailed)
+    error.value = formatApiError(e, 'Failed to update favorite')
   }
 }
 
@@ -1030,18 +1001,18 @@ async function createShareLink(ttl: ShareLinkTTL | null) {
     const entry = { url: created.url ?? '', expiresAt: created.expiresAt, createdAt: created.createdAt }
     sessionLinks.set(fileId, entry)
     existingLink.value = entry
-    ui.showToast(t.value.shareLinkCreated)
+    ui.showToast('Share link created')
   } catch (e) {
-    error.value = formatApiError(e, t.value.shareLinkCreateFailed)
+    error.value = formatApiError(e, 'Could not create link')
   }
 }
 
 async function copyShareLink(url: string) {
   try {
     await navigator.clipboard.writeText(window.location.origin + url)
-    ui.showToast(t.value.shareLinkCopied)
+    ui.showToast('Link copied')
   } catch {
-    ui.showToast(t.value.shareLinkCopyFailed, 'info')
+    ui.showToast('Copy failed', 'info')
   }
 }
 
@@ -1049,9 +1020,9 @@ async function revokeShareLink() {
   const fileId = shareTargetId.value
   if (!fileId) return
   const ok = await ui.confirm({
-    title: t.value.shareLinkRevokeTitle,
-    message: t.value.shareLinkRevokeMessage,
-    confirmLabel: t.value.shareLinkRevokeConfirm,
+    title: 'Revoke link?',
+    message: 'Anyone who has this link will lose access immediately.',
+    confirmLabel: 'Revoke link',
     danger: true,
   })
   if (!ok) return
@@ -1060,9 +1031,9 @@ async function revokeShareLink() {
     await api(`/files/${fileId}/share`, { method: 'DELETE' })
     sessionLinks.delete(fileId)
     existingLink.value = null
-    ui.showToast(t.value.shareLinkRevoked)
+    ui.showToast('Link revoked')
   } catch (e) {
-    error.value = formatApiError(e, t.value.shareLinkRevokeFailed)
+    error.value = formatApiError(e, 'Could not revoke link')
   }
 }
 
@@ -1073,14 +1044,9 @@ const shareUserTargetId = ref<string | null>(null)
 function onUserShared(result: { invited: boolean; email: string }) {
   const name = shareUserFileName.value
   if (result.invited) {
-    ui.showToast(t.value.shareInvitationSent.replace('{email}', () => result.email))
+    ui.showToast(`Invitation sent to ${result.email}`)
   } else {
-    ui.showToast(
-      t.value.shareUserSuccess
-        .replace('{name}', () => name)
-        .replace('{email}', () => result.email),
-      'success',
-    )
+    ui.showToast(`Shared "${name}" with ${result.email}`, 'success')
   }
 }
 
@@ -1264,11 +1230,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-for="folder in searchResults.folders"
         :key="folder.id"
         class="row tappable"
-        role="button"
-        tabindex="0"
-        :aria-label="folder.name"
         @click="openFolder(folder.id)"
-        @keydown="onSearchFolderKeydown($event, folder.id)"
       >
         <span class="name"><Icon name="folder" :size="18" class="row-icon" />{{ folder.name }}</span>
         <button class="btn icon-only" type="button" :aria-label="`${t.openFolderAria}: ${folder.name}`" @click.stop="openFolder(folder.id)">
@@ -1279,11 +1241,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
         v-for="file in searchResults.files"
         :key="file.id"
         class="row tappable"
-        role="button"
-        tabindex="0"
-        :aria-label="file.name"
         @click="openFileActions(file)"
-        @keydown="onSearchFileKeydown($event, file)"
       >
         <span class="name"><Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />{{ file.name }}</span>
         <span class="meta">{{ formatBytes(file.sizeBytes) }}</span>
@@ -1451,11 +1409,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
           v-for="file in favorites ?? []"
           :key="file.id"
           class="file-item-card tappable"
-          role="button"
-          tabindex="0"
-          :aria-label="file.name"
           @click="openFileActions(file)"
-          @keydown="onFavoriteFileKeydown($event, file)"
         >
           <div
             class="file-icon-badge"
@@ -1716,8 +1670,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   border-radius: var(--radius-pill);
@@ -1734,7 +1688,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 }
 
 .chip-clear {
-  min-height: var(--touch-min);
+  min-height: 28px;
   padding: 0 var(--space-xs);
   border: none;
   background: transparent;
@@ -1953,9 +1907,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  width: var(--touch-min);
-  height: var(--touch-min);
-  padding: 0;
+  padding: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1977,7 +1929,6 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
 .tab-pill {
   background: transparent;
   border: none;
-  min-height: var(--touch-min);
   padding: 6px 0;
   font-size: 15px;
   font-weight: 600;
@@ -2082,8 +2033,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: transparent;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm, 8px);
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2127,8 +2078,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2259,8 +2210,8 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
   background: transparent;
   border: none;
   color: var(--muted);
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
