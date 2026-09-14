@@ -79,9 +79,9 @@ function onVisibilityChange() {
 }
 
 async function loadVaultFiles() {
-  loadError.value = false
   try {
     await vault.loadFiles()
+    loadError.value = false
   } catch {
     loadError.value = true
   }
