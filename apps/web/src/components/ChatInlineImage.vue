@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ChatAttachment } from '@/api/types'
 import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 import { normalizePresignedUrl } from '@/api/client'
@@ -20,6 +20,7 @@ const isHeicImage = computed(() => isHeic(props.attachment.name, props.attachmen
 const heicUrl = ref<string>('')
 const loading = ref(false)
 const failed = ref(false)
+let resolveSequence = 0
 
 const displaySrc = computed(() => {
   if (isHeicImage.value && heicUrl.value) {
@@ -29,22 +30,36 @@ const displaySrc = computed(() => {
 })
 
 async function resolveImage() {
-  if (!isHeicImage.value || !props.attachment.thumbnailUrl) return
-  loading.value = true
+  const requestSequence = ++resolveSequence
+  heicUrl.value = ''
   failed.value = false
+
+  if (!isHeicImage.value || !props.attachment.thumbnailUrl) {
+    loading.value = false
+    return
+  }
+
+  const sourceUrl = normalizePresignedUrl(props.attachment.thumbnailUrl)
+  loading.value = true
   try {
-    const sourceUrl = normalizePresignedUrl(props.attachment.thumbnailUrl)
     const url = await getHeicDisplayUrl(sourceUrl, 0.7)
+    if (requestSequence !== resolveSequence) return
     heicUrl.value = url
   } catch {
+    if (requestSequence !== resolveSequence) return
     failed.value = true
   } finally {
-    loading.value = false
+    if (requestSequence === resolveSequence) {
+      loading.value = false
+    }
   }
 }
 
-watch(() => props.attachment.thumbnailUrl, resolveImage)
-onMounted(resolveImage)
+watch(
+  () => [props.attachment.id, props.attachment.thumbnailUrl, props.attachment.name, props.attachment.mimeType],
+  resolveImage,
+  { immediate: true },
+)
 </script>
 
 <template>
