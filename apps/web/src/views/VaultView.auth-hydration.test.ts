@@ -79,7 +79,7 @@ describe('VaultView auth hydration separation', () => {
     })
     await flushPromises()
 
-    const input = wrapper.get('input[placeholder="Enter your PIN"]')
+    const input = wrapper.get('form.vault-form input[type="password"]')
     await input.setValue('1234')
     await wrapper.get('form.vault-form').trigger('submit')
     await flushPromises()
