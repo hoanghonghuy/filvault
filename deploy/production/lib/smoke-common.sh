@@ -9,8 +9,8 @@ SMOKE_ROOT="$(cd "$SMOKE_SCRIPT_DIR/../../.." && pwd)"
 COMPOSE="${COMPOSE:-docker compose -f docker-compose.prod.yml --env-file deploy/production/.env}"
 MAILPIT_API="${MAILPIT_API:-http://127.0.0.1:8025/api/v1}"
 
-# Deterministic smoke email for login-or-register within a run (not a deployment secret).
-SMOKE_USER_EMAIL="${SMOKE_USER_EMAIL:-release-smoke@filvault.local}"
+# Smoke identity: operator may pin the email; otherwise generate a unique address per run so persisted volumes remain rerunnable.
+SMOKE_USER_EMAIL="${SMOKE_USER_EMAIL:-}"
 SMOKE_USER_DISPLAY="${SMOKE_USER_DISPLAY:-Release Smoke}"
 # SMOKE_USER_PASSWORD: inject via env or generate once per process in ensure_smoke_password() — never commit/log.
 SMOKE_USER_PASSWORD="${SMOKE_USER_PASSWORD:-}"
@@ -58,16 +58,34 @@ require_cmd() {
   fi
 }
 
+http_code() {
+  local url="$1"
+  curl -sk -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || printf '000'
+}
+
+presigned_host() {
+  local authority="${1#*://}"
+  authority="${authority%%/*}"
+  printf '%s' "$authority"
+}
+
 ensure_smoke_password() {
   if $SMOKE_PASSWORD_RESOLVED; then
     return 0
+  fi
+  require_cmd openssl
+  if [[ -z "$SMOKE_USER_EMAIL" ]]; then
+    local email_suffix=""
+    email_suffix="$(openssl rand -hex 6 2>/dev/null)" || smoke_fail "could not generate ephemeral smoke email suffix"
+    SMOKE_USER_EMAIL="release-smoke-${email_suffix}@filvault.local"
+    unset email_suffix
+    smoke_log "smoke user: ephemeral address for this run"
   fi
   if [[ -n "$SMOKE_USER_PASSWORD" ]]; then
     SMOKE_PASSWORD_RESOLVED=true
     smoke_log "smoke password: operator-provided via SMOKE_USER_PASSWORD (value not logged)"
     return 0
   fi
-  require_cmd openssl
   local generated=""
   if ! generated="$(openssl rand -hex 16 2>/dev/null)" || [[ -z "$generated" ]]; then
     smoke_fail "could not generate ephemeral smoke password (openssl rand failed)"
@@ -91,10 +109,6 @@ load_prod_env() {
   ORIGIN="https://${FILVAULT_PUBLIC_HOST:-filvault.local}:${FILVAULT_PUBLIC_PORT:-8443}"
   export ORIGIN
   export FILVAULT_INVITE_CODE
-}
-
-http_code() {
-  curl -sk -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || echo "000"
 }
 
 api_call() {
@@ -135,20 +149,6 @@ wait_readyz() {
     sleep 2
   done
   smoke_fail "$label: API /readyz did not return ready within 120s"
-}
-
-wait_origin() {
-  local label="${1:-origin}"
-  local i code
-  for i in $(seq 1 30); do
-    code="$(http_code "$ORIGIN/")"
-    if [[ "$code" == "200" ]]; then
-      smoke_log "$label: edge reachable (${i} attempts)"
-      return 0
-    fi
-    sleep 1
-  done
-  smoke_fail "$label: edge did not return HTTP 200 within 30s"
 }
 
 mailpit_verification_code() {

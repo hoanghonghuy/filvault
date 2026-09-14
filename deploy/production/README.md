@@ -91,10 +91,10 @@ Smoke identity:
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `SMOKE_USER_EMAIL` | `release-smoke@filvault.local` | Stable email for login-or-register within a run |
+| `SMOKE_USER_EMAIL` | generated per run | Optional fixed email; default uniqueness keeps persisted stacks rerunnable |
 | `SMOKE_USER_PASSWORD` | *(generated per run)* | Inject to reuse an existing smoke account; otherwise a strong ephemeral password is generated in-memory (never logged or written to disk) |
 
-If a prior run left `SMOKE_USER_EMAIL` in the database with a different ephemeral password, export `SMOKE_USER_PASSWORD` for that account or reset the smoke user / postgres volume before re-running.
+If you pin `SMOKE_USER_EMAIL` for repeatable identity, also pin `SMOKE_USER_PASSWORD`; the default generated identity avoids collisions on persisted stacks.
 
 | Command | Purpose |
 |---------|---------|
@@ -105,7 +105,7 @@ If a prior run left `SMOKE_USER_EMAIL` in the database with a different ephemera
 Forced failure (prove non-zero exit + diagnostics):
 
 ```bash
-./deploy/production/release-smoke.sh --fail-at=download
+./deploy/production/release-smoke.sh --fail-at=verify
 ```
 
 Static self-check (no Docker):

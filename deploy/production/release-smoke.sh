@@ -4,7 +4,7 @@
 # Usage:
 #   ./deploy/production/release-smoke.sh              # full gate (stack must be up)
 #   ./deploy/production/release-smoke.sh --self-check # static validation only
-#   ./deploy/production/release-smoke.sh --fail-at=download  # prove non-zero exit
+#   ./deploy/production/release-smoke.sh --fail-at=verify    # prove non-zero exit
 #
 # Prerequisites: make prod-like-up (or equivalent), jq, curl, docker compose.
 set -euo pipefail
@@ -27,7 +27,7 @@ Filvault production-like release smoke (#43).
 Steps (--fail-at values): reachable, authenticate, browse, upload, verify, restart, persist, cleanup
 
 Environment:
-  SMOKE_USER_EMAIL       smoke account email (default: release-smoke@filvault.local)
+  SMOKE_USER_EMAIL       optional fixed smoke account email; if unset, a unique per-run address is generated
   SMOKE_USER_PASSWORD    optional; if unset, a strong ephemeral password is generated in-memory per run (never logged)
 EOF
 }
@@ -43,6 +43,11 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+case "$SMOKE_FAIL_AT" in
+  ""|reachable|authenticate|browse|upload|verify|restart|persist|cleanup) ;;
+  *) smoke_fail "invalid --fail-at step: $SMOKE_FAIL_AT" ;;
+esac
+
 if $SELF_CHECK; then
   smoke_log "self-check: bash syntax"
   bash -n "$ROOT/deploy/production/lib/smoke-common.sh"
@@ -51,6 +56,10 @@ if $SELF_CHECK; then
   require_cmd jq
   require_cmd curl
   require_cmd openssl
+  [[ "$SMOKE_ROOT" == "$ROOT" ]] || smoke_fail "smoke helper root mismatch: $SMOKE_ROOT"
+  declare -F http_code >/dev/null || smoke_fail "smoke helper missing: http_code"
+  declare -F presigned_host >/dev/null || smoke_fail "smoke helper missing: presigned_host"
+  [[ "$(presigned_host 'https://filvault.local:8443/filvault/key?signature=redacted')" == "filvault.local:8443" ]] || smoke_fail "presigned host parsing failed"
   [[ -f "$ROOT/deploy/production/fixtures/release-smoke.txt" ]] || smoke_fail "missing fixture"
   grep -q 'release-smoke-persistence-v1' "$ROOT/deploy/production/fixtures/release-smoke.txt" || smoke_fail "fixture marker missing"
   if grep -q 'release-smoke-password' "$ROOT/deploy/production/lib/smoke-common.sh"; then
@@ -139,10 +148,9 @@ assert_http "$API_LAST_CODE" "201" "upload session"
 FILE_ID="$(jq -r '.fileId' <<<"$API_LAST_BODY")"
 UPLOAD_URL="$(jq -r '.uploadUrl' <<<"$API_LAST_BODY")"
 
-upload_host="${UPLOAD_URL#*://}"
-upload_host="${upload_host%%/*}"
 put_code="$(curl -sk -o /dev/null -w '%{http_code}' -X PUT "$UPLOAD_URL" \
-  -H 'Content-Type: text/plain' -H "X-Presigned-Host: $upload_host" --data-binary @"$FIXTURE")"
+  -H "X-Presigned-Host: $(presigned_host "$UPLOAD_URL")" \
+  -H 'Content-Type: text/plain' --data-binary @"$FIXTURE")"
 if [[ "$put_code" != "200" ]]; then
   smoke_fail "S3 PUT failed HTTP $put_code (presigned upload)"
 fi
@@ -162,7 +170,8 @@ api_call GET "/api/v1/files/$FILE_ID/download" "" "$TOKEN"
 assert_http "$API_LAST_CODE" "200" "download URL"
 DOWNLOAD_URL="$(jq -r '.downloadUrl' <<<"$API_LAST_BODY")"
 TMP_DL="$(mktemp)"
-dl_code="$(curl -sk -o "$TMP_DL" -w '%{http_code}' "$DOWNLOAD_URL")"
+dl_code="$(curl -sk -o "$TMP_DL" -w '%{http_code}' \
+  -H "X-Presigned-Host: $(presigned_host "$DOWNLOAD_URL")" "$DOWNLOAD_URL")"
 if [[ "$dl_code" != "200" ]]; then
   smoke_fail "download GET failed HTTP $dl_code"
 fi
@@ -175,7 +184,6 @@ smoke_log "download verified (sha256 match)"
 
 smoke_step "restart"
 restart_app_services
-wait_origin "post-restart edge"
 
 smoke_step "persist"
 smoke_login
@@ -196,7 +204,12 @@ api_call GET "/api/v1/files/$FILE_ID/download" "" "$TOKEN"
 assert_http "$API_LAST_CODE" "200" "download after restart"
 DOWNLOAD_URL="$(jq -r '.downloadUrl' <<<"$API_LAST_BODY")"
 TMP_DL="$(mktemp)"
-curl -sk -o "$TMP_DL" "$DOWNLOAD_URL"
+dl_code="$(curl -sk -o "$TMP_DL" -w '%{http_code}' \
+  -H "X-Presigned-Host: $(presigned_host "$DOWNLOAD_URL")" "$DOWNLOAD_URL")"
+if [[ "$dl_code" != "200" ]]; then
+  rm -f "$TMP_DL"
+  smoke_fail "download GET after restart failed HTTP $dl_code"
+fi
 DL_SHA="$(sha256sum "$TMP_DL" | awk '{print $1}')"
 rm -f "$TMP_DL"
 if [[ "$DL_SHA" != "$FIXTURE_SHA" ]]; then
