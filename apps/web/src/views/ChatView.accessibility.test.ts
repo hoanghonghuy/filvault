@@ -34,4 +34,15 @@ describe('ChatView accessibility contract', () => {
     expect(source).toContain(':aria-label="t.addReaction"')
   })
 
+  it('keeps Chat Info subpage close actions at the shared touch minimum', () => {
+    expect(source.match(/class="subpage-close-btn"/g)?.length).toBe(2)
+    expect(source.match(/class="subpage-close-btn" :aria-label="t.close"/g)?.length).toBe(2)
+
+    const closeRule = source.match(/\.subpage-close-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(closeRule).toContain('width: var(--touch-min);')
+    expect(closeRule).toContain('height: var(--touch-min);')
+    expect(closeRule).toContain('min-width: var(--touch-min);')
+    expect(closeRule).toContain('min-height: var(--touch-min);')
+  })
+
 })
