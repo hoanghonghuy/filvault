@@ -26,6 +26,14 @@ describe('SettingsView accessibility contract', () => {
     expect(rule).not.toContain('min-height: auto;')
   })
 
+
+  it('distinguishes repeated share-link controls by file name', () => {
+    expect(source).toContain(':aria-label="`${settingsText.copyLink}: ${link.fileName}`"')
+    expect(source).toContain(':aria-label="`${settingsText.revokeLink}: ${link.fileName}`"')
+    expect(source).not.toContain(':aria-label="settingsText.copyLink"')
+    expect(source).not.toContain(':aria-label="settingsText.revokeLink"')
+  })
+
   it('keeps Profile navigation localized and at least 44px tappable', () => {
     expect(source).toContain('to="/profile"')
     expect(source).toContain(':title="t.profile"')

@@ -612,10 +612,10 @@ onMounted(() => {
           <span class="link-meta muted">
             {{ shareExpiryLabel(link) }} · {{ formatBytes(link.sizeBytes ?? 0) }}
           </span>
-          <button type="button" class="btn icon-only" :aria-label="settingsText.copyLink" @click="copyLink(link)">
+          <button type="button" class="btn icon-only" :aria-label="`${settingsText.copyLink}: ${link.fileName}`" @click="copyLink(link)">
             <Icon name="file" :size="18" />
           </button>
-          <button type="button" class="btn icon-only danger-text" :aria-label="settingsText.revokeLink" @click="revokeFromSettings(link)">
+          <button type="button" class="btn icon-only danger-text" :aria-label="`${settingsText.revokeLink}: ${link.fileName}`" @click="revokeFromSettings(link)">
             <Icon name="trash" :size="18" />
           </button>
         </li>
