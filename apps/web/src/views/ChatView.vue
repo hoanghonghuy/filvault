@@ -4757,7 +4757,7 @@ watch(
 
 .rail-filter input {
   width: 100%;
-  min-height: 40px;
+  min-height: var(--touch-min);
   padding: 8px 14px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
@@ -5541,7 +5541,7 @@ watch(
 .chat-search input {
   min-width: 0;
   flex: 1;
-  min-height: 40px;
+  min-height: var(--touch-min);
   padding: 8px 12px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
