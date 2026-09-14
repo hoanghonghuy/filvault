@@ -26,6 +26,7 @@ const nextBefore = ref<string | undefined>()
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
+let loadGeneration = 0
 
 function flattenItems(): TimelineItem[] {
   const ids = new Set(props.excludeIds ?? [])
@@ -47,33 +48,45 @@ async function fetchTimeline(before?: string) {
 }
 
 async function loadInitial() {
+  const generation = ++loadGeneration
   loading.value = true
+  loadingMore.value = false
   error.value = ''
   groups.value = []
   nextBefore.value = undefined
   try {
     const data = await fetchTimeline()
+    if (generation !== loadGeneration || !props.open) return
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
+    if (generation !== loadGeneration || !props.open) return
     error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
-    loading.value = false
+    if (generation === loadGeneration && props.open) {
+      loading.value = false
+    }
   }
 }
 
 async function loadMore() {
   if (!nextBefore.value || loadingMore.value) return
+  const generation = ++loadGeneration
+  const before = nextBefore.value
   loadingMore.value = true
   error.value = ''
   try {
-    const data = await fetchTimeline(nextBefore.value)
+    const data = await fetchTimeline(before)
+    if (generation !== loadGeneration || !props.open) return
     groups.value = [...groups.value, ...data.groups]
     nextBefore.value = data.nextBefore
   } catch (e) {
+    if (generation !== loadGeneration || !props.open) return
     error.value = formatApiError(e, copy.value.loadMoreFailed)
   } finally {
-    loadingMore.value = false
+    if (generation === loadGeneration && props.open) {
+      loadingMore.value = false
+    }
   }
 }
 
@@ -86,7 +99,12 @@ watch(
   (open) => {
     if (open) {
       void loadInitial()
+      return
     }
+
+    loadGeneration += 1
+    loading.value = false
+    loadingMore.value = false
   },
 )
 </script>
