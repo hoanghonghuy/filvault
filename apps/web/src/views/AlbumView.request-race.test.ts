@@ -10,7 +10,7 @@ import AlbumView from './AlbumView.vue'
 
 const { apiMock, routerPushMock } = vi.hoisted(() => ({
   apiMock: vi.fn<(path: string, options?: unknown) => Promise<unknown>>(),
-  routerPushMock: vi.fn(),
+  routerPushMock: vi.fn<(to: unknown) => void>(),
 }))
 const routeMock = reactive({ params: { id: 'album-a' } as { id: string } })
 
