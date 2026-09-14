@@ -26,8 +26,7 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('@/stores/vault', () => ({
-  useVaultStore: () => ({
-    ...vaultStore,
+  useVaultStore: () => Object.assign(vaultStore, {
     fetchStatus: fetchStatusMock,
     loadFiles: loadFilesMock,
     setup: vi.fn<(pin: string) => Promise<unknown>>(),
