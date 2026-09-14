@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ApiError, api, formatBytes } from '@/api/client'
 import type { PublicShareMeta } from '@/api/types'
@@ -21,7 +21,9 @@ const previewError = ref(false)
 const previewUrl = ref('')
 const lightboxOpen = ref(false)
 
-let objectUrlRequest: Promise<string> | null = null
+let metadataSequence = 0
+let objectOperationSequence = 0
+let objectUrlRequest: { token: string; promise: Promise<string> } | null = null
 
 const copy = computed(() =>
   locale.value === 'vi'
@@ -77,50 +79,82 @@ const canPreview = computed(() => {
 
 const preparingObject = computed(() => downloading.value || previewing.value)
 
+function currentToken(): string {
+  return String(route.params.token ?? '')
+}
+
 function isTerminalMetadataError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 404 || error.code === 'NOT_FOUND')
 }
 
+function invalidateObjectOperations() {
+  objectOperationSequence++
+  objectUrlRequest = null
+  downloading.value = false
+  previewing.value = false
+  downloadError.value = false
+  previewError.value = false
+  previewUrl.value = ''
+  lightboxOpen.value = false
+}
+
 async function loadMeta() {
+  const token = currentToken()
+  const requestSequence = ++metadataSequence
   metaState.value = 'loading'
+  meta.value = null
   downloadError.value = false
   previewError.value = false
   previewUrl.value = ''
   lightboxOpen.value = false
   try {
-    meta.value = await api<PublicShareMeta>(`/public/shares/${route.params.token}`)
+    const nextMeta = await api<PublicShareMeta>(`/public/shares/${token}`)
+    if (requestSequence !== metadataSequence || token !== currentToken()) return
+    meta.value = nextMeta
     metaState.value = 'ready'
   } catch (error) {
+    if (requestSequence !== metadataSequence || token !== currentToken()) return
     meta.value = null
     metaState.value = isTerminalMetadataError(error) ? 'unavailable' : 'retryable-error'
   }
 }
 
-async function requestObjectUrl(): Promise<string> {
-  if (!objectUrlRequest) {
-    objectUrlRequest = api<{ downloadUrl: string }>(`/public/shares/${route.params.token}/download`).then(
+async function requestObjectUrl(token: string): Promise<string> {
+  if (!objectUrlRequest || objectUrlRequest.token !== token) {
+    const promise = api<{ downloadUrl: string }>(`/public/shares/${token}/download`).then(
       (out) => out.downloadUrl,
     )
+    objectUrlRequest = { token, promise }
   }
 
+  const request = objectUrlRequest
   try {
-    return await objectUrlRequest
+    return await request.promise
   } finally {
-    objectUrlRequest = null
+    if (objectUrlRequest === request) {
+      objectUrlRequest = null
+    }
   }
 }
 
 async function preview() {
   if (!meta.value || !canPreview.value || preparingObject.value) return
+  const token = currentToken()
+  const operationSequence = ++objectOperationSequence
   previewing.value = true
   previewError.value = false
   try {
-    previewUrl.value = await requestObjectUrl()
+    const nextPreviewUrl = await requestObjectUrl(token)
+    if (operationSequence !== objectOperationSequence || token !== currentToken()) return
+    previewUrl.value = nextPreviewUrl
     lightboxOpen.value = true
   } catch {
+    if (operationSequence !== objectOperationSequence || token !== currentToken()) return
     previewError.value = true
   } finally {
-    previewing.value = false
+    if (operationSequence === objectOperationSequence && token === currentToken()) {
+      previewing.value = false
+    }
   }
 }
 
@@ -130,19 +164,32 @@ function closePreview() {
 
 async function download() {
   if (!meta.value || preparingObject.value) return
+  const token = currentToken()
+  const operationSequence = ++objectOperationSequence
   downloading.value = true
   downloadError.value = false
   try {
-    const downloadUrl = await requestObjectUrl()
+    const downloadUrl = await requestObjectUrl(token)
+    if (operationSequence !== objectOperationSequence || token !== currentToken()) return
     window.location.href = downloadUrl
   } catch {
+    if (operationSequence !== objectOperationSequence || token !== currentToken()) return
     downloadError.value = true
   } finally {
-    downloading.value = false
+    if (operationSequence === objectOperationSequence && token === currentToken()) {
+      downloading.value = false
+    }
   }
 }
 
-onMounted(loadMeta)
+watch(
+  () => currentToken(),
+  () => {
+    invalidateObjectOperations()
+    void loadMeta()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
