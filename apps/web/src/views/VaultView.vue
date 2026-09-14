@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useVaultStore } from '@/stores/vault'
 import { useUiStore } from '@/stores/ui'
 import { useI18n } from '@/lib/i18n'
+import { getVaultStatusCopy } from '@/lib/vaultStatusCopy'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
@@ -17,6 +18,11 @@ const router = useRouter()
 const vault = useVaultStore()
 const ui = useUiStore()
 const { t, locale } = useI18n()
+const vaultStatusCopy = computed(() => getVaultStatusCopy(locale.value))
+
+// Initial Vault status state
+const statusLoading = ref(true)
+const statusError = ref(false)
 
 // Setup state
 const setupPin = ref('')
@@ -87,16 +93,24 @@ async function loadVaultFiles() {
   }
 }
 
-onMounted(async () => {
-  document.addEventListener('visibilitychange', onVisibilityChange)
+async function loadVaultStatus() {
+  statusLoading.value = true
   try {
-    await vault.fetchStatus()
-    if (vault.isUnlocked) {
+    const status = await vault.fetchStatus()
+    statusError.value = false
+    if (status.unlocked) {
       await loadVaultFiles()
     }
   } catch {
-    // Status failure is handled by the existing locked/setup state contract.
+    statusError.value = true
+  } finally {
+    statusLoading.value = false
   }
+}
+
+onMounted(async () => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  await loadVaultStatus()
 })
 
 onUnmounted(() => {
@@ -277,11 +291,11 @@ async function deleteSelectedFile() {
       </button>
       <div class="header-titles">
         <h1 class="page-title">{{ t.vaultTitle }}</h1>
-        <span v-if="vault.isUnlocked" class="status-badge unlocked">
+        <span v-if="!statusLoading && !statusError && vault.isUnlocked" class="status-badge unlocked">
           <Icon name="unlock" :size="13" />
           {{ t.vaultUnlockedNotice }}
         </span>
-        <span v-else class="status-badge locked">
+        <span v-else-if="!statusLoading && !statusError" class="status-badge locked">
           <Icon name="lock" :size="13" />
           {{ t.vaultLockedTitle }}
         </span>
@@ -289,7 +303,7 @@ async function deleteSelectedFile() {
 
       <div class="header-actions">
         <button
-          v-if="vault.isUnlocked"
+          v-if="!statusLoading && !statusError && vault.isUnlocked"
           type="button"
           class="lock-btn"
           :title="t.vaultLockNow"
@@ -302,8 +316,27 @@ async function deleteSelectedFile() {
       </div>
     </header>
 
+    <!-- Initial status loading -->
+    <div v-if="statusLoading" class="vault-state-card" aria-live="polite" aria-busy="true">
+      <div class="shield-icon-box">
+        <Icon name="shield" :size="40" class="shield-icon" />
+      </div>
+      <h2 class="state-title">{{ vaultStatusCopy.loading }}</h2>
+    </div>
+
+    <!-- Initial status recovery -->
+    <div v-else-if="statusError" class="vault-state-card" role="alert">
+      <div class="lock-icon-box">
+        <Icon name="info" :size="44" class="lock-icon" />
+      </div>
+      <h2 class="state-title">{{ vaultStatusCopy.loadFailed }}</h2>
+      <button type="button" class="btn primary" :disabled="statusLoading" @click="loadVaultStatus">
+        {{ t.retry }}
+      </button>
+    </div>
+
     <!-- Main Content State 1: Setup PIN (First time) -->
-    <div v-if="!vault.isInitialized" class="vault-state-card setup-card">
+    <div v-else-if="!vault.isInitialized" class="vault-state-card setup-card">
       <div class="shield-icon-box">
         <Icon name="shield" :size="40" class="shield-icon" />
       </div>
