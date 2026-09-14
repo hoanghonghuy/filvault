@@ -143,6 +143,7 @@ async function onSubmit() {
     }
 
     phase.value = 'success'
+    emit('shared', { invited: successInvited.value, email: value })
     await focusRef(successRef)
   } catch (e) {
     phase.value = 'form'
