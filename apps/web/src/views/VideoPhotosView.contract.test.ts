@@ -45,6 +45,16 @@ describe('video-focused Photos route contract', () => {
     expect(videoSource).toContain('formatApiError(e, errorCopy.value.favorite)')
   })
 
+  it('keeps initial load failure separate from a true-empty success and exposes retry', () => {
+    expect(videoSource).toContain('v-if="error && groups.length > 0"')
+    expect(videoSource).toContain('v-else-if="error && groups.length === 0"')
+    expect(videoSource).toContain('class="video-error-state" role="alert"')
+    expect(videoSource).toContain('@click="load"')
+    expect(videoSource).toContain('{{ t.retry }}')
+    expect(videoSource).toContain('.video-retry { min-height: var(--touch-min); }')
+    expect(videoSource).toContain('<main v-else aria-labelledby="video-timeline-heading">')
+  })
+
   it('keeps preview, secondary actions, load-more and responsive density', () => {
     expect(videoSource).toContain('@click="openLightbox(item)"')
     expect(videoSource).toContain('@click="openActions(item)"')
