@@ -2,15 +2,17 @@
  * @vitest-environment jsdom
  */
 import { flushPromises, mount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/client'
 import { setLocale } from '@/lib/i18n'
 import PublicShareView from './PublicShareView.vue'
 
 const apiMock = vi.fn<(path: string) => Promise<unknown>>()
+const routeMock = reactive({ params: { token: 'public-token' } })
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { token: 'public-token' } }),
+  useRoute: () => routeMock,
 }))
 
 vi.mock('@/api/client', async (importOriginal) => {
@@ -26,6 +28,16 @@ const meta = {
   mimeType: 'application/pdf',
   sizeBytes: 1024,
   expiresAt: '2026-09-12T08:30:00.000Z',
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
 }
 
 async function mountView() {
@@ -49,6 +61,7 @@ async function mountView() {
 describe('PublicShareView', () => {
   beforeEach(() => {
     setLocale('en')
+    routeMock.params.token = 'public-token'
     apiMock.mockReset()
   })
 
@@ -178,6 +191,62 @@ describe('PublicShareView', () => {
     expect(wrapper.text()).toContain('Hết hạn')
     expect(wrapper.text()).toContain('Xem trước')
     expect(wrapper.text()).toContain('Được chia sẻ qua Filvault')
+    wrapper.unmount()
+  })
+
+  it('loads a changed token and ignores stale metadata completion from the previous token', async () => {
+    const oldRequest = deferred<typeof meta>()
+    const nextMeta = { ...meta, name: 'new-share.pdf' }
+    apiMock.mockReturnValueOnce(oldRequest.promise).mockResolvedValueOnce(nextMeta)
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        stubs: { Icon: true, MediaLightbox: true },
+      },
+    })
+    await Promise.resolve()
+    expect(apiMock).toHaveBeenCalledWith('/public/shares/public-token')
+
+    routeMock.params.token = 'next-token'
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('new-share.pdf')
+    expect(wrapper.text()).not.toContain('quarterly-report.pdf')
+    expect(apiMock).toHaveBeenCalledWith('/public/shares/next-token')
+
+    oldRequest.resolve(meta)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('new-share.pdf')
+    expect(wrapper.text()).not.toContain('quarterly-report.pdf')
+    wrapper.unmount()
+  })
+
+  it('invalidates a pending preview when the public-share token changes', async () => {
+    const previewRequest = deferred<{ downloadUrl: string }>()
+    const nextMeta = { ...meta, name: 'next-report.pdf' }
+    apiMock
+      .mockResolvedValueOnce(meta)
+      .mockReturnValueOnce(previewRequest.promise)
+      .mockResolvedValueOnce(nextMeta)
+
+    const wrapper = await mountView()
+    await wrapper.get('.preview-btn').trigger('click')
+    await Promise.resolve()
+    expect(wrapper.get('.preview-btn').attributes('aria-busy')).toBe('true')
+
+    routeMock.params.token = 'next-token'
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('next-report.pdf')
+    expect(wrapper.find('.media-lightbox-stub').exists()).toBe(false)
+    expect(wrapper.get('.preview-btn').attributes('aria-busy')).toBeUndefined()
+
+    previewRequest.resolve({ downloadUrl: 'https://objects.example.test/old-report.pdf' })
+    await flushPromises()
+
+    expect(wrapper.find('.media-lightbox-stub').exists()).toBe(false)
+    expect(wrapper.text()).toContain('next-report.pdf')
     wrapper.unmount()
   })
 })
