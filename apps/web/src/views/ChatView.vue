@@ -7393,8 +7393,8 @@ img.avatar-img {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -7426,8 +7426,6 @@ img.avatar-img {
 }
 
 .rx-plus-btn {
-  width: 36px;
-  height: 36px;
   background: rgba(255, 255, 255, 0.1);
   color: #e4e6eb;
 }
