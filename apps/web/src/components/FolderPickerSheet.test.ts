@@ -9,9 +9,13 @@ import FolderPickerSheet from './FolderPickerSheet.vue'
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn<(path: string) => Promise<unknown>>() }))
 
-vi.mock('@/api/client', () => ({
-  api: apiMock,
-}))
+vi.mock('@/api/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    api: apiMock,
+  }
+})
 
 beforeEach(() => {
   apiMock.mockReset()
