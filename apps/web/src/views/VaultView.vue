@@ -136,6 +136,7 @@ async function handleSetup() {
 
   try {
     await vault.setup(setupPin.value.trim())
+    await loadVaultFiles()
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     setupPin.value = ''
     confirmSetupPin.value = ''
@@ -150,6 +151,7 @@ async function handleUnlock() {
 
   try {
     await vault.unlock(unlockPin.value.trim())
+    await loadVaultFiles()
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     unlockPin.value = ''
   } catch (e) {
@@ -206,6 +208,7 @@ async function handleResetPin() {
   resettingPin.value = true
   try {
     await vault.resetPin(accountPassword.value, resetNewPin.value.trim())
+    await loadVaultFiles()
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     resetPinOpen.value = false
     accountPassword.value = ''
