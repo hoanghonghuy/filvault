@@ -9,8 +9,32 @@ import { nextTick } from 'vue'
 import MediaLightbox from './MediaLightbox.vue'
 import { setLocale } from '@/lib/i18n'
 
+const heicMocks = vi.hoisted(() => ({
+  getHeicDisplayUrl: vi.fn(),
+  downloadHeicAsJpeg: vi.fn(),
+}))
+
+vi.mock('@/lib/heic', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/heic')>()
+  return {
+    ...actual,
+    getHeicDisplayUrl: heicMocks.getHeicDisplayUrl,
+    downloadHeicAsJpeg: heicMocks.downloadHeicAsJpeg,
+  }
+})
+
 const readSrc = (relativePath: string) =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf-8')
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
 
 function mockMatchMedia(matchesByQuery: Record<string, boolean> = {}) {
   window.matchMedia = vi.fn<(query: string) => MediaQueryList>().mockImplementation((query: string) => ({
@@ -36,6 +60,10 @@ describe('MediaLightbox', () => {
     document.body.innerHTML = ''
     mockMatchMedia()
     mockDialogElement()
+    heicMocks.getHeicDisplayUrl.mockReset()
+    heicMocks.getHeicDisplayUrl.mockResolvedValue('blob:converted')
+    heicMocks.downloadHeicAsJpeg.mockReset()
+    heicMocks.downloadHeicAsJpeg.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -222,6 +250,113 @@ describe('MediaLightbox', () => {
     expect(wrapper.emitted('next')).toBeTruthy()
     activeElementSpy.mockRestore()
 
+    wrapper.unmount()
+  })
+
+  it('keeps the current HEIC preview authoritative when an older conversion finishes later', async () => {
+    const firstConversion = deferred<string>()
+    const secondConversion = deferred<string>()
+    heicMocks.getHeicDisplayUrl
+      .mockReturnValueOnce(firstConversion.promise)
+      .mockReturnValueOnce(secondConversion.promise)
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'first.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/first.heic',
+      },
+      attachTo: document.body,
+    })
+    await nextTick()
+
+    await wrapper.setProps({ name: 'second.heic', url: 'https://example.com/second.heic' })
+    await nextTick()
+
+    secondConversion.resolve('blob:second')
+    await flushPromises()
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('blob:second')
+
+    firstConversion.resolve('blob:first')
+    await flushPromises()
+    expect(image.getAttribute('src')).toBe('blob:second')
+    wrapper.unmount()
+  })
+
+  it('invalidates a pending HEIC conversion across close and reopen', async () => {
+    const firstConversion = deferred<string>()
+    const reopenedConversion = deferred<string>()
+    heicMocks.getHeicDisplayUrl
+      .mockReturnValueOnce(firstConversion.promise)
+      .mockReturnValueOnce(reopenedConversion.promise)
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'photo.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/photo.heic',
+      },
+      attachTo: document.body,
+    })
+    await nextTick()
+
+    await wrapper.setProps({ open: false })
+    await nextTick()
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    reopenedConversion.resolve('blob:reopened')
+    await flushPromises()
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('blob:reopened')
+
+    firstConversion.resolve('blob:stale')
+    await flushPromises()
+    expect(image.getAttribute('src')).toBe('blob:reopened')
+    wrapper.unmount()
+  })
+
+  it('clears the converted HEIC display identity before switching media', async () => {
+    heicMocks.getHeicDisplayUrl.mockResolvedValueOnce('blob:first')
+    const nextConversion = deferred<string>()
+    heicMocks.getHeicDisplayUrl.mockReturnValueOnce(nextConversion.promise)
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'first.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/first.heic',
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('blob:first')
+
+    await wrapper.setProps({
+      name: 'plain.jpg',
+      mimeType: 'image/jpeg',
+      url: 'https://example.com/plain.jpg',
+    })
+    await nextTick()
+    expect(image.getAttribute('src')).toBe('https://example.com/plain.jpg')
+
+    await wrapper.setProps({
+      name: 'second.heic',
+      mimeType: 'image/heic',
+      url: 'https://example.com/second.heic',
+    })
+    await nextTick()
+    expect(image.getAttribute('src')).toBe('https://example.com/second.heic')
+
+    nextConversion.resolve('blob:second')
+    await flushPromises()
+    expect(image.getAttribute('src')).toBe('blob:second')
     wrapper.unmount()
   })
 
