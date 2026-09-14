@@ -518,7 +518,7 @@ onMounted(() => {
         </div>
       </RouterLink>
 
-      <!-- Quick Swatches Grid (wraps before touch targets shrink below 44px) -->
+      <!-- Quick Swatches Grid (balanced 6 columns, no clipping) -->
       <div class="quick-swatches-grid" role="radiogroup" :aria-label="settingsText.quickThemesGroup">
         <button
           v-for="th in THEMES.slice(0, 6)"
@@ -612,10 +612,10 @@ onMounted(() => {
           <span class="link-meta muted">
             {{ shareExpiryLabel(link) }} · {{ formatBytes(link.sizeBytes ?? 0) }}
           </span>
-          <button type="button" class="btn icon-only" :aria-label="`${settingsText.copyLink}: ${link.fileName}`" @click="copyLink(link)">
+          <button type="button" class="btn icon-only" :aria-label="settingsText.copyLink" @click="copyLink(link)">
             <Icon name="file" :size="18" />
           </button>
-          <button type="button" class="btn icon-only danger-text" :aria-label="`${settingsText.revokeLink}: ${link.fileName}`" @click="revokeFromSettings(link)">
+          <button type="button" class="btn icon-only danger-text" :aria-label="settingsText.revokeLink" @click="revokeFromSettings(link)">
             <Icon name="trash" :size="18" />
           </button>
         </li>
@@ -753,8 +753,8 @@ onMounted(() => {
 }
 
 .retry-btn {
-  padding: 0 var(--space-xs);
-  min-height: var(--touch-min);
+  padding: 0;
+  min-height: auto;
   border: none;
   background: none;
   color: var(--accent);
@@ -921,13 +921,13 @@ onMounted(() => {
   width: 52px;
   height: 52px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2);
 }
 
 .profile-avatar-img {
@@ -939,7 +939,7 @@ onMounted(() => {
 .profile-avatar-initials {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--on-accent);
+  color: #ffffff;
   letter-spacing: 0.5px;
 }
 
@@ -976,8 +976,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-pill);
   background: var(--surface-soft);
   color: var(--muted);
@@ -1232,15 +1232,16 @@ onMounted(() => {
 
 .quick-swatches-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-xs);
   padding: 4px 2px;
 }
 
 .quick-swatch {
   position: relative;
-  width: 44px;
-  height: 44px;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  max-width: 44px;
   margin: 0 auto;
   border-radius: 12px;
   border: none;

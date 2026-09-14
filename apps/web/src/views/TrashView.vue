@@ -115,20 +115,6 @@ async function openFileActions(file: { id: string; name: string }) {
   if (action === 'delete') await permanentDelete('files', file.id, file.name)
 }
 
-function onTrashFolderKeydown(event: KeyboardEvent, folder: { id: string; name: string }) {
-  if (event.target !== event.currentTarget) return
-  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
-  event.preventDefault()
-  void openFolderActions(folder)
-}
-
-function onTrashFileKeydown(event: KeyboardEvent, file: { id: string; name: string }) {
-  if (event.target !== event.currentTarget) return
-  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
-  event.preventDefault()
-  void openFileActions(file)
-}
-
 const totalCount = computed(() => (trash.value?.folders.length ?? 0) + (trash.value?.files.length ?? 0))
 
 function formatItemDate(iso?: string): string {
@@ -225,11 +211,7 @@ onMounted(load)
             v-for="folder in trash.folders"
             :key="folder.id"
             class="trash-item-card tappable"
-            role="button"
-            tabindex="0"
-            :aria-label="folder.name"
             @click="openFolderActions(folder)"
-            @keydown="onTrashFolderKeydown($event, folder)"
           >
             <div class="trash-icon-badge folder-badge">
               <Icon name="folder" :size="22" />
@@ -269,11 +251,7 @@ onMounted(load)
             v-for="file in trash.files"
             :key="file.id"
             class="trash-item-card tappable"
-            role="button"
-            tabindex="0"
-            :aria-label="file.name"
             @click="openFileActions(file)"
-            @keydown="onTrashFileKeydown($event, file)"
           >
             <div
               class="trash-icon-badge"
@@ -407,11 +385,6 @@ onMounted(load)
 
 .trash-item-card:active {
   background: var(--surface-card, rgba(255, 255, 255, 0.06));
-}
-
-.trash-item-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .trash-icon-badge {
