@@ -65,7 +65,42 @@ describe('UploadProgress', () => {
     expect(wrapper.get('[role="progressbar"]').attributes('aria-label')).toBe('Tiến trình tải lên tổng')
   })
 
-  it('exposes dismiss-failed and clear-settled actions', async () => {
+  it('exposes file-specific action labels and preserves action events', async () => {
+    const wrapper = mount(UploadProgress, {
+      props: {
+        aggregateProgress: 0.2,
+        items: [
+          { id: 'failed-1', name: 'bad.txt', status: 'failed', progress: 0, error: 'Upload failed' },
+          { id: 'queued-1', name: 'wait.txt', status: 'queued', progress: 0 },
+          { id: 'uploading-1', name: 'big.bin', status: 'uploading', progress: 0.2 },
+        ],
+      },
+    })
+
+    const failedButtons = wrapper.get('[data-status="failed"] .upload-item-actions').findAll('.upload-action-btn')
+    expect(failedButtons[0]!.attributes('aria-label')).toBe('Retry: bad.txt')
+    expect(failedButtons[1]!.attributes('aria-label')).toBe('Remove failed upload: bad.txt')
+    expect(wrapper.get('[data-status="queued"] .upload-action-btn').attributes('aria-label')).toBe('Cancel: wait.txt')
+    expect(wrapper.get('[data-status="uploading"] .upload-action-btn').attributes('aria-label')).toBe('Cancel: big.bin')
+
+    await failedButtons[0]!.trigger('click')
+    expect(wrapper.emitted('retry')?.[0]).toEqual(['failed-1'])
+
+    await failedButtons[1]!.trigger('click')
+    expect(wrapper.emitted('dismissFailed')?.[0]).toEqual(['failed-1'])
+
+    await wrapper.get('[data-status="queued"] .upload-action-btn').trigger('click')
+    expect(wrapper.emitted('cancel')?.[0]).toEqual(['queued-1'])
+
+    setLocale('vi')
+    await flushPromises()
+
+    expect(failedButtons[0]!.attributes('aria-label')).toBe('Thử lại: bad.txt')
+    expect(failedButtons[1]!.attributes('aria-label')).toBe('Xóa mục tải lên thất bại: bad.txt')
+    expect(wrapper.get('[data-status="queued"] .upload-action-btn').attributes('aria-label')).toBe('Hủy: wait.txt')
+  })
+
+  it('shows clear-settled after active transfers finish', async () => {
     const wrapper = mount(UploadProgress, {
       props: {
         aggregateProgress: 0.2,
@@ -76,12 +111,7 @@ describe('UploadProgress', () => {
       },
     })
 
-    const failedButtons = wrapper.get('[data-status="failed"] .upload-item-actions').findAll('.upload-action-btn')
-    await failedButtons[0]!.trigger('click')
-    expect(wrapper.emitted('retry')?.[0]).toEqual(['failed-1'])
-
-    await failedButtons[1]!.trigger('click')
-    expect(wrapper.emitted('dismissFailed')?.[0]).toEqual(['failed-1'])
+    expect(wrapper.find('.upload-dismiss-btn').exists()).toBe(false)
 
     await wrapper.setProps({
       items: [{ id: 'failed-1', name: 'bad.txt', status: 'failed', progress: 0, error: 'Upload failed' }],
