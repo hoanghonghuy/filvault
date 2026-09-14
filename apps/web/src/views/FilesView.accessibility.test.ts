@@ -26,6 +26,16 @@ describe('FilesView accessibility contract', () => {
     expect(clearRule).toContain('height: var(--touch-min);')
   })
 
+  it('keeps segmented file-view tabs touch-accessible', () => {
+    const tabRule = source.match(/\.tab-pill\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+
+    expect(tabRule).toContain('min-height: var(--touch-min);')
+    expect(source).toContain('role="tablist"')
+    expect(source).toContain('role="tab"')
+    expect(source).toContain(`:aria-selected="segment === 'all'"`)
+    expect(source).toContain(`:aria-selected="segment === 'favorites'"`)
+  })
+
   it('keeps active-filter actions touch-accessible', () => {
     const removeRule = source.match(/\.chip-remove\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     const clearRule = source.match(/\.chip-clear\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
