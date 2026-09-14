@@ -25,18 +25,25 @@ const browseFolderId = ref<string | null>(null)
 const browser = ref<Browser | null>(null)
 const loading = ref(false)
 const error = ref('')
+let loadGeneration = 0
 
 async function loadBrowser() {
+  const generation = ++loadGeneration
   loading.value = true
   error.value = ''
   browser.value = null
   try {
     const q = browseFolderId.value ? `?folderId=${browseFolderId.value}` : ''
-    browser.value = await api<Browser>(`/browser${q}`)
+    const nextBrowser = await api<Browser>(`/browser${q}`)
+    if (generation !== loadGeneration || !props.open) return
+    browser.value = nextBrowser
   } catch (e) {
+    if (generation !== loadGeneration || !props.open) return
     error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
-    loading.value = false
+    if (generation === loadGeneration && props.open) {
+      loading.value = false
+    }
   }
 }
 
@@ -68,9 +75,16 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
-      resetBrowse()
-      void loadBrowser()
+      if (browseFolderId.value !== null) {
+        resetBrowse()
+      } else {
+        void loadBrowser()
+      }
+      return
     }
+
+    loadGeneration += 1
+    loading.value = false
   },
 )
 
