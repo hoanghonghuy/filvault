@@ -115,20 +115,6 @@ async function openFileActions(file: { id: string; name: string }) {
   if (action === 'delete') await permanentDelete('files', file.id, file.name)
 }
 
-function onTrashFolderKeydown(event: KeyboardEvent, folder: { id: string; name: string }) {
-  if (event.target !== event.currentTarget) return
-  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
-  event.preventDefault()
-  void openFolderActions(folder)
-}
-
-function onTrashFileKeydown(event: KeyboardEvent, file: { id: string; name: string }) {
-  if (event.target !== event.currentTarget) return
-  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
-  event.preventDefault()
-  void openFileActions(file)
-}
-
 const totalCount = computed(() => (trash.value?.folders.length ?? 0) + (trash.value?.files.length ?? 0))
 
 function formatItemDate(iso?: string): string {
@@ -225,11 +211,7 @@ onMounted(load)
             v-for="folder in trash.folders"
             :key="folder.id"
             class="trash-item-card tappable"
-            role="button"
-            tabindex="0"
-            :aria-label="folder.name"
             @click="openFolderActions(folder)"
-            @keydown="onTrashFolderKeydown($event, folder)"
           >
             <div class="trash-icon-badge folder-badge">
               <Icon name="folder" :size="22" />
@@ -269,11 +251,7 @@ onMounted(load)
             v-for="file in trash.files"
             :key="file.id"
             class="trash-item-card tappable"
-            role="button"
-            tabindex="0"
-            :aria-label="file.name"
             @click="openFileActions(file)"
-            @keydown="onTrashFileKeydown($event, file)"
           >
             <div
               class="trash-icon-badge"
@@ -362,9 +340,9 @@ onMounted(load)
   justify-content: center;
   min-height: var(--touch-min);
   gap: 6px;
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: var(--radius-pill, 9999px);
   padding: 6px 14px;
   font-size: 13px;
@@ -380,7 +358,7 @@ onMounted(load)
 }
 
 .empty-trash-btn:active:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 20%, transparent);
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .trash-list {
@@ -409,11 +387,6 @@ onMounted(load)
   background: var(--surface-card, rgba(255, 255, 255, 0.06));
 }
 
-.trash-item-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .trash-icon-badge {
   width: 44px;
   height: 44px;
@@ -425,8 +398,8 @@ onMounted(load)
 }
 
 .folder-badge {
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
-  color: var(--warning);
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
 }
 
 .trash-item-info {
@@ -481,11 +454,11 @@ onMounted(load)
 }
 
 .trash-action-btn.danger {
-  color: var(--danger);
+  color: #ef4444;
 }
 
 .trash-action-btn.danger:active:not(:disabled) {
-  background: var(--danger-soft);
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .files-section {
