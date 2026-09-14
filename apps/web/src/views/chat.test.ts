@@ -176,6 +176,19 @@ describe('chat surface contract', () => {
     expect(chat).not.toMatch(/t(?:\.value)?\.[A-Za-z0-9_]+\s*\|\|\s*['"][^'"]*[À-ỹ]/u)
   })
 
+  it('localizes built-in Chat theme and wallpaper names without translating custom names', () => {
+    expect(chat).toMatch(/chatThemeName\(locale, th\.id\)/)
+    expect(chat).toMatch(/chatWallpaperName\(locale, wp\.id\)/)
+    expect(chat).toMatch(/chatWallpaperName\(locale\.value, 'none'\)/)
+    expect(chat).toMatch(/chatCustomWallpaperLabel\(locale\.value\)/)
+    expect(chat).toMatch(/chatStorageWallpaperFallback\(locale\.value\)/)
+    expect(chat).toMatch(/v-for="wp in currentConversationCustomWallpapers"/)
+    expect(chat).toMatch(/\{\{ wp\.name \}\}/)
+    expect(chat).not.toMatch(/:title="th\.name"/)
+    expect(chat.match(/\{\{ chatWallpaperName\(locale, wp\.id\) \}\}/g)).toHaveLength(2)
+    expect(chat.match(/chatThemeName\(locale, th\.id\)/g)).toHaveLength(4)
+  })
+
   it('localizes Chat details and reaction controls', () => {
     const i18n = readSrc('../lib/i18n.ts')
     for (const key of [

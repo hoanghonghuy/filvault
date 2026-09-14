@@ -28,6 +28,7 @@ import {
   type Sticker,
 } from '@/lib/stickers'
 import { useI18n } from '@/lib/i18n'
+import { chatThemeName, chatWallpaperName, chatCustomWallpaperLabel, chatStorageWallpaperFallback } from '@/lib/chatPersonalizationCopy'
 import { useTheme } from '@/lib/theme'
 import { generateUUID } from '@/lib/uuid'
 import type { UploadItemStatus } from '@/lib/uploadQueue'
@@ -79,15 +80,15 @@ const mutedConversations = ref<Record<string, boolean>>({})
 const nicknames = ref<Record<string, string>>({})
 
 const chatThemes = [
-  { id: 'blue', name: 'Messenger Blue', color: '#0084ff', gradient: 'linear-gradient(135deg, #0084ff 0%, #0099ff 100%)' },
-  { id: 'purple', name: 'Hoàng hôn Tím', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' },
-  { id: 'emerald', name: 'Ngọc lục bảo', color: '#10b981', gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' },
-  { id: 'rose', name: 'Hồng ngọt ngào', color: '#f43f5e', gradient: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' },
-  { id: 'amber', name: 'Hổ phách ấm', color: '#f59e0b', gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)' },
-  { id: 'cyan', name: 'Đại dương xanh', color: '#06b6d4', gradient: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' },
-  { id: 'indigo', name: 'Chàm huyền bí', color: '#6366f1', gradient: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' },
-  { id: 'coral', name: 'Cam san hô', color: '#f97316', gradient: 'linear-gradient(135deg, #ea580c 0%, #fb923c 100%)' },
-  { id: 'slate', name: 'Than chì thanh lịch', color: '#64748b', gradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)' },
+  { id: 'blue', color: '#0084ff', gradient: 'linear-gradient(135deg, #0084ff 0%, #0099ff 100%)' },
+  { id: 'purple', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' },
+  { id: 'emerald', color: '#10b981', gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' },
+  { id: 'rose', color: '#f43f5e', gradient: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' },
+  { id: 'amber', color: '#f59e0b', gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)' },
+  { id: 'cyan', color: '#06b6d4', gradient: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' },
+  { id: 'indigo', color: '#6366f1', gradient: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' },
+  { id: 'coral', color: '#f97316', gradient: 'linear-gradient(135deg, #ea580c 0%, #fb923c 100%)' },
+  { id: 'slate', color: '#64748b', gradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)' },
 ] as const
 const activeTheme = ref<string>('blue')
 const currentTheme = computed(() => chatThemes.find((entry) => entry.id === activeTheme.value) ?? chatThemes[0]!)
@@ -130,7 +131,6 @@ const threadThemeStyle = computed(() => {
 
 export interface ChatWallpaperPreset {
   id: string
-  name: string
   value: string
   preview: string
   isDark?: boolean
@@ -139,7 +139,6 @@ export interface ChatWallpaperPreset {
 const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
   {
     id: 'none',
-    name: 'Mặc định',
     value: '',
     preview: 'var(--canvas)',
   },
@@ -147,49 +146,41 @@ const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
   // --- Chế độ Sáng (Light Mode Presets) ---
   {
     id: 'doodle',
-    name: 'Doodle họa tiết',
     value: `radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 60%), radial-gradient(circle at 10% 20%, rgba(236, 72, 153, 0.08) 0%, transparent 40%), url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.09' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")`,
     preview: 'linear-gradient(135deg, #e0e7ff 0%, #fce7f3 100%)',
   },
   {
     id: 'sakura',
-    name: 'Hoa anh đào',
     value: 'radial-gradient(circle at 30% 20%, rgba(251, 113, 133, 0.25) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(192, 132, 252, 0.2) 0%, transparent 50%), linear-gradient(135deg, #fdf2f8 0%, #fae8ff 50%, #f5f3ff 100%)',
     preview: 'linear-gradient(135deg, #fdf2f8 0%, #f43f5e 100%)',
   },
   {
     id: 'sky_breeze',
-    name: 'Mây trời sáng',
     value: 'radial-gradient(ellipse at top, rgba(186, 230, 253, 0.45) 0%, transparent 60%), radial-gradient(ellipse at bottom, rgba(224, 231, 255, 0.45) 0%, transparent 50%), linear-gradient(140deg, #f0f9ff 0%, #e0f2fe 50%, #eff6ff 100%)',
     preview: 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)',
   },
   {
     id: 'matcha',
-    name: 'Trà xanh Matcha',
     value: 'radial-gradient(circle at 15% 15%, rgba(134, 239, 172, 0.35) 0%, transparent 50%), radial-gradient(circle at 85% 85%, rgba(187, 247, 208, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #f7fee7 100%)',
     preview: 'linear-gradient(135deg, #86efac 0%, #bbf7d0 100%)',
   },
   {
     id: 'terracotta',
-    name: 'Gốm ấm áp',
     value: 'radial-gradient(circle at top right, rgba(253, 186, 116, 0.35) 0%, transparent 60%), radial-gradient(circle at bottom left, rgba(254, 215, 170, 0.4) 0%, transparent 50%), linear-gradient(135deg, #fff7ed 0%, #ffedd5 50%, #fef3c7 100%)',
     preview: 'linear-gradient(135deg, #fdba74 0%, #fed7aa 100%)',
   },
   {
     id: 'lavender_mist',
-    name: 'Oải hương sương mai',
     value: 'radial-gradient(circle at 30% 20%, rgba(216, 180, 254, 0.35) 0%, transparent 60%), radial-gradient(circle at 70% 80%, rgba(233, 213, 255, 0.35) 0%, transparent 50%), linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #f5f3ff 100%)',
     preview: 'linear-gradient(135deg, #d8b4fe 0%, #e9d5ff 100%)',
   },
   {
     id: 'notebook_grid',
-    name: 'Giấy kẻ ô',
     value: `radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%), linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, #f8fafc 1px)`,
     preview: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
   },
   {
     id: 'geometric_pastel',
-    name: 'Hình học tối giản',
     value: 'radial-gradient(circle at 20% 80%, rgba(244, 114, 182, 0.2) 0%, transparent 40%), radial-gradient(circle at 80% 20%, rgba(96, 165, 250, 0.2) 0%, transparent 40%), linear-gradient(135deg, #fdf4ff 0%, #eff6ff 100%)',
     preview: 'linear-gradient(135deg, #f472b6 0%, #60a5fa 100%)',
   },
@@ -197,63 +188,54 @@ const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
   // --- Chế độ Tối (Dark Mode Presets) ---
   {
     id: 'aurora',
-    name: 'Cực quang xanh',
     value: 'radial-gradient(ellipse at 20% 20%, rgba(16, 185, 129, 0.35) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(59, 130, 246, 0.35) 0%, transparent 50%), linear-gradient(160deg, #091a24 0%, #0d2838 50%, #07131b 100%)',
     preview: 'linear-gradient(135deg, #0d2838 0%, #10b981 100%)',
     isDark: true,
   },
   {
     id: 'sunset',
-    name: 'Hoàng hôn',
     value: 'radial-gradient(circle at top right, rgba(244, 63, 94, 0.3) 0%, transparent 60%), radial-gradient(circle at bottom left, rgba(251, 146, 60, 0.3) 0%, transparent 60%), linear-gradient(145deg, #1e112a 0%, #2d1b4e 50%, #140924 100%)',
     preview: 'linear-gradient(135deg, #2d1b4e 0%, #f43f5e 100%)',
     isDark: true,
   },
   {
     id: 'cosmos',
-    name: 'Vũ trụ huyền ảo',
     value: 'radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.35) 0%, transparent 60%), radial-gradient(circle at 80% 90%, rgba(236, 72, 153, 0.25) 0%, transparent 50%), linear-gradient(180deg, #0a0818 0%, #130e2e 50%, #070512 100%)',
     preview: 'linear-gradient(135deg, #130e2e 0%, #8b5cf6 100%)',
     isDark: true,
   },
   {
     id: 'emerald',
-    name: 'Rừng nhiệt đới',
     value: 'radial-gradient(circle at 20% 80%, rgba(5, 150, 105, 0.3) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(52, 211, 153, 0.2) 0%, transparent 50%), linear-gradient(150deg, #061a14 0%, #0a2f24 50%, #04100c 100%)',
     preview: 'linear-gradient(135deg, #0a2f24 0%, #10b981 100%)',
     isDark: true,
   },
   {
     id: 'cyber',
-    name: 'Đêm Neon',
     value: 'radial-gradient(circle at top left, rgba(6, 182, 212, 0.35) 0%, transparent 55%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.35) 0%, transparent 55%), linear-gradient(135deg, #09090b 0%, #18181b 50%, #09090b 100%)',
     preview: 'linear-gradient(135deg, #06b6d4 0%, #ec4899 100%)',
     isDark: true,
   },
   {
     id: 'amoled_carbon',
-    name: 'Lưới Carbon AMOLED',
     value: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 70%), linear-gradient(45deg, #121214 25%, transparent 25%), linear-gradient(-45deg, #121214 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #121214 75%), linear-gradient(-45deg, transparent 75%, #121214 75%), #070709',
     preview: 'linear-gradient(135deg, #09090b 0%, #27272a 100%)',
     isDark: true,
   },
   {
     id: 'obsidian_gold',
-    name: 'Hắc diện kim',
     value: 'radial-gradient(circle at 75% 25%, rgba(234, 179, 8, 0.25) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(161, 98, 7, 0.2) 0%, transparent 55%), linear-gradient(150deg, #09090b 0%, #171510 50%, #090805 100%)',
     preview: 'linear-gradient(135deg, #171510 0%, #eab308 100%)',
     isDark: true,
   },
   {
     id: 'ocean_abyss',
-    name: 'Vực thẳm đại dương',
     value: 'radial-gradient(ellipse at 50% 10%, rgba(14, 165, 233, 0.28) 0%, transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(2, 132, 199, 0.22) 0%, transparent 50%), linear-gradient(165deg, #030712 0%, #082f49 50%, #020617 100%)',
     preview: 'linear-gradient(135deg, #082f49 0%, #0ea5e9 100%)',
     isDark: true,
   },
   {
     id: 'twilight_violet',
-    name: 'Hoàng hôn Tím đêm',
     value: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.3) 0%, transparent 55%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.25) 0%, transparent 55%), linear-gradient(140deg, #0f0728 0%, #1e1035 50%, #0b051b 100%)',
     preview: 'linear-gradient(135deg, #1e1035 0%, #a855f7 100%)',
     isDark: true,
@@ -429,7 +411,7 @@ async function selectPhotoFromPersonalStorage(item: TimelineItem) {
   const customItem: ChatCustomWallpaper = {
     id: generateUUID(),
     url: photoUrl,
-    name: item.name || 'Ảnh kho cá nhân',
+    name: item.name || chatStorageWallpaperFallback(locale.value),
     source: 'storage',
     sourceId: item.id,
     createdAt: new Date().toISOString(),
@@ -452,10 +434,10 @@ const threadWallpaperBackground = computed(() => {
 })
 
 const currentWallpaperPresetName = computed(() => {
-  if (!threadWallpaper.value || threadWallpaper.value === 'none') return 'Mặc định'
+  if (!threadWallpaper.value || threadWallpaper.value === 'none') return chatWallpaperName(locale.value, 'none')
   const preset = CHAT_WALLPAPER_PRESETS.find((p) => p.id === threadWallpaper.value)
-  if (preset) return preset.name
-  return 'Ảnh tùy chỉnh'
+  if (preset) return chatWallpaperName(locale.value, preset.id)
+  return chatCustomWallpaperLabel(locale.value)
 })
 
 const activePreviewStyle = computed(() => {
@@ -3266,8 +3248,8 @@ watch(
                     class="theme-dot"
                     :style="{ backgroundColor: th.color }"
                     :class="{ active: activeTheme === th.id }"
-                    :title="th.name"
-                    :aria-label="th.name"
+                    :title="chatThemeName(locale, th.id)"
+                    :aria-label="chatThemeName(locale, th.id)"
                     @click="activeTheme = th.id"
                   />
                 </div>
@@ -3709,7 +3691,7 @@ watch(
                     <Icon name="check" :size="14" />
                   </span>
                 </div>
-                <span class="wallpaper-preset-name">{{ wp.name }}</span>
+                <span class="wallpaper-preset-name">{{ chatWallpaperName(locale, wp.id) }}</span>
               </button>
             </div>
           </div>
@@ -4210,8 +4192,8 @@ watch(
                     class="theme-dot"
                     :style="{ backgroundColor: th.color }"
                     :class="{ active: activeTheme === th.id }"
-                    :title="th.name"
-                    :aria-label="th.name"
+                    :title="chatThemeName(locale, th.id)"
+                    :aria-label="chatThemeName(locale, th.id)"
                     @click="activeTheme = th.id"
                   />
                 </div>
@@ -4653,7 +4635,7 @@ watch(
                     <Icon name="check" :size="14" />
                   </span>
                 </div>
-                <span class="wallpaper-preset-label">{{ wp.name }}</span>
+                <span class="wallpaper-preset-label">{{ chatWallpaperName(locale, wp.id) }}</span>
               </button>
             </div>
           </div>
