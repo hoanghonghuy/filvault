@@ -31,6 +31,16 @@ describe('VaultView UX contract', () => {
     expect(vault).not.toContain("formatApiError(e, 'Download failed')")
   })
 
+  it('shows a localized retryable load-error state before the genuine empty state', () => {
+    expect(vault).toContain('const loadError = ref(false)')
+    expect(vault).toMatch(/async function loadVaultFiles\(\)[\s\S]*?loadError\.value = false[\s\S]*?await vault\.loadFiles\(\)[\s\S]*?loadError\.value = true/)
+    expect(vault).toContain('v-if="loadError" class="vault-empty-box" role="alert"')
+    expect(vault).toContain('{{ t.filesLoadFailed }}')
+    expect(vault).toContain('@click="loadVaultFiles"')
+    expect(vault).toContain('{{ t.retry }}')
+    expect(vault).toMatch(/v-if="loadError"[\s\S]*?v-else-if="vault\.files\.length === 0"/)
+  })
+
   it('shows distinct credential visibility icons and accessible labels', () => {
     expect(vault).toMatch(/showSetupPin \? 'eye-off' : 'eye'/)
     expect(vault).toMatch(/showUnlockPin \? 'eye-off' : 'eye'/)
