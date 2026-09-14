@@ -27,7 +27,10 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   function clearToken() {
+    fileHydrationSequence += 1
     vaultToken.value = null
+    loading.value = false
+    error.value = ''
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(VAULT_TOKEN_KEY)
     }
@@ -90,11 +93,8 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   function lock(): void {
-    fileHydrationSequence += 1
     clearToken()
     files.value = []
-    loading.value = false
-    error.value = ''
     if (status.value) {
       status.value.unlocked = false
     }
