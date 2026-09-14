@@ -34,6 +34,19 @@ describe('ChatView accessibility contract', () => {
     expect(source).toContain(':aria-label="t.addReaction"')
   })
 
+  it('keeps desktop Chat Info close action at the shared touch minimum', () => {
+    expect(source).toContain('class="icon-btn desktop-info-close-btn"')
+    expect(source).toContain(':aria-label="t.close"')
+    expect(source).toContain(':title="t.close"')
+    expect(source).toContain('@click="closeDesktopInfo"')
+
+    const desktopInfoCloseRule = source.match(/\.desktop-info-close-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(desktopInfoCloseRule).toContain('width: var(--touch-min);')
+    expect(desktopInfoCloseRule).toContain('height: var(--touch-min);')
+    expect(desktopInfoCloseRule).toContain('min-width: var(--touch-min);')
+    expect(desktopInfoCloseRule).toContain('min-height: var(--touch-min);')
+  })
+
   it('keeps Chat Info subpage close actions at the shared touch minimum', () => {
     expect(source.match(/class="subpage-close-btn"/g)?.length).toBe(2)
     expect(source.match(/class="subpage-close-btn" :aria-label="t.close"/g)?.length).toBe(2)

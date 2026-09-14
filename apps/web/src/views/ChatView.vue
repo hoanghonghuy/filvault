@@ -8858,10 +8858,10 @@ img.avatar-img {
 }
 
 .desktop-info-close-btn {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
