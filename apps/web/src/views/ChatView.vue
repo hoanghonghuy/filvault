@@ -8048,25 +8048,46 @@ img.avatar-img {
 
 .delete-custom-wp-btn {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
+  top: -7px;
+  right: -7px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.65);
+  background: transparent;
   color: #ffffff;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
   z-index: 2;
 }
 
-.delete-custom-wp-btn:hover {
+.delete-custom-wp-btn::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  transition: background var(--duration-short) var(--ease-standard), transform var(--duration-short) var(--ease-standard);
+}
+
+.delete-custom-wp-btn svg {
+  position: relative;
+  z-index: 1;
+}
+
+.delete-custom-wp-btn:hover::before {
   background: var(--danger, #ef4444);
   transform: scale(1.15);
+}
+
+.delete-custom-wp-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -8px;
 }
 
 /* Storage & Media Picker BottomSheet */

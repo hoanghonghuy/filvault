@@ -57,6 +57,23 @@ describe('ChatView accessibility contract', () => {
     expect(desktopInfoCloseRule).toContain('min-height: var(--touch-min);')
   })
 
+  it('keeps custom wallpaper remove controls touch-safe while preserving compact visual chrome', () => {
+    expect(source.match(/class="delete-custom-wp-btn"/g)?.length).toBe(2)
+    expect(source.match(/:aria-label="t.removeWallpaperFromChat"/g)?.length).toBe(2)
+
+    const removeRule = source.match(/\.delete-custom-wp-btn\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(removeRule).toContain('width: var(--touch-min);')
+    expect(removeRule).toContain('height: var(--touch-min);')
+    expect(removeRule).toContain('min-width: var(--touch-min);')
+    expect(removeRule).toContain('min-height: var(--touch-min);')
+    expect(removeRule).toContain('background: transparent;')
+
+    const visualRule = source.match(/\.delete-custom-wp-btn::before\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(visualRule).toContain('width: 22px;')
+    expect(visualRule).toContain('height: 22px;')
+    expect(source).toContain('.delete-custom-wp-btn:focus-visible')
+  })
+
   it('keeps Chat Info subpage close actions at the shared touch minimum', () => {
     expect(source.match(/class="subpage-close-btn"/g)?.length).toBe(2)
     expect(source.match(/class="subpage-close-btn" :aria-label="t.close"/g)?.length).toBe(2)
