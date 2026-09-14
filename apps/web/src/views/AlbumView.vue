@@ -28,19 +28,26 @@ const pickerOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
+let loadSequence = 0
+let previewSequence = 0
 
 const albumId = computed(() => (Array.isArray(route.params.id) ? route.params.id[0] : (route.params.id ?? '')))
 const itemIds = computed(() => album.value?.items.map((i) => i.id) ?? [])
 
 async function load() {
+  const requestSequence = ++loadSequence
+  const requestAlbumId = albumId.value
   loading.value = true
   error.value = ''
   try {
-    album.value = await api<AlbumDetail>(`/photos/albums/${albumId.value}`)
+    const nextAlbum = await api<AlbumDetail>(`/photos/albums/${requestAlbumId}`)
+    if (requestSequence !== loadSequence || requestAlbumId !== albumId.value) return
+    album.value = nextAlbum
   } catch (e) {
+    if (requestSequence !== loadSequence || requestAlbumId !== albumId.value) return
     error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
-    loading.value = false
+    if (requestSequence === loadSequence && requestAlbumId === albumId.value) loading.value = false
   }
 }
 
@@ -175,15 +182,25 @@ async function removeItem(fileId: string, name: string) {
 }
 
 async function openLightbox(item: TimelineItem) {
+  const requestSequence = ++previewSequence
   error.value = ''
   mediaItem.value = item
   try {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
+    if (requestSequence !== previewSequence || mediaItem.value?.id !== item.id) return
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
+    if (requestSequence !== previewSequence || mediaItem.value?.id !== item.id) return
     error.value = formatApiError(e, copy.value.viewFailed)
   }
+}
+
+function closeLightbox() {
+  previewSequence += 1
+  lightboxOpen.value = false
+  lightboxUrl.value = ''
+  mediaItem.value = null
 }
 
 const allAlbumItems = computed(() => album.value?.items ?? [])
@@ -221,15 +238,20 @@ async function downloadMedia() {
 watch(
   () => route.params.id,
   () => {
+    previewSequence += 1
     album.value = null
     pickerOpen.value = false
     lightboxOpen.value = false
+    lightboxUrl.value = ''
+    mediaItem.value = null
     void load()
   },
   { immediate: true },
 )
 
 onBeforeUnmount(() => {
+  loadSequence += 1
+  previewSequence += 1
   pickerOpen.value = false
 })
 </script>
@@ -307,7 +329,7 @@ onBeforeUnmount(() => {
       @next="nextMedia"
       @prev="prevMedia"
       @download="downloadMedia"
-      @close="lightboxOpen = false"
+      @close="closeLightbox"
     />
 
     <MediaPickerSheet
