@@ -92,6 +92,7 @@ describe('ShareUserSheet', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('Enter a valid email address')
     expect(wrapper.get('button[type="submit"]').text()).toBe('Share')
     expect(wrapper.get('input[type="email"]').element.value).toBe('user@domain')
+    expect(wrapper.emitted('shared')).toBeUndefined()
     wrapper.unmount()
   })
 
@@ -102,36 +103,40 @@ describe('ShareUserSheet', () => {
     expect(apiMock).not.toHaveBeenCalled()
     expect(wrapper.get('[role="alert"]').text()).toContain("You can't share with yourself")
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.emitted('shared')).toBeUndefined()
     wrapper.unmount()
   })
 
-  it('shows success for an existing user and prevents duplicate submission', async () => {
+  it('shows success for an existing user and emits the parent completion event once', async () => {
     apiMock.mockResolvedValueOnce({
       id: '01KSHARE000000000000000001',
       recipient: { id: '01KUSER2', email: 'peer@example.com', displayName: 'Peer' },
     })
     const wrapper = mountSheet()
-    await fillEmail(wrapper, 'peer@example.com')
+    await fillEmail(wrapper, ' peer@example.com ')
     await submitShare(wrapper)
     expect(wrapper.text()).toContain('Shared with Peer')
     expect(wrapper.text()).toContain('read access')
     expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
+    expect(wrapper.emitted('shared')).toEqual([[{ invited: false, email: 'peer@example.com' }]])
     await wrapper.get('.btn.ink').trigger('click')
     expect(wrapper.emitted('close')).toEqual([[]])
+    expect(wrapper.emitted('shared')).toHaveLength(1)
     wrapper.unmount()
   })
 
-  it('shows invite success when the recipient is not registered yet', async () => {
+  it('shows invite success and emits the invitation completion event once', async () => {
     apiMock.mockResolvedValueOnce({ invited: true })
     const wrapper = mountSheet()
     await fillEmail(wrapper, 'new@example.com')
     await submitShare(wrapper)
     expect(wrapper.text()).toContain('Invitation sent to new@example.com')
     expect(wrapper.text()).toContain('sign up')
+    expect(wrapper.emitted('shared')).toEqual([[{ invited: true, email: 'new@example.com' }]])
     wrapper.unmount()
   })
 
-  it('recovers from API failure with email preserved and CTA re-enabled', async () => {
+  it('recovers from API failure with email preserved and CTA re-enabled without emitting success', async () => {
     apiMock.mockRejectedValueOnce(new ApiError('CONFLICT', 'Conflict', 409))
     const wrapper = mountSheet()
     await fillEmail(wrapper, 'peer@example.com')
@@ -140,6 +145,7 @@ describe('ShareUserSheet', () => {
     expect(wrapper.get('button[type="submit"]').text()).toBe('Share')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('input[type="email"]').element.value).toBe('peer@example.com')
+    expect(wrapper.emitted('shared')).toBeUndefined()
     wrapper.unmount()
   })
 
@@ -151,10 +157,11 @@ describe('ShareUserSheet', () => {
     await submitShare(wrapper)
     expect(wrapper.get('[role="alert"]').text()).toContain('đã được chia sẻ')
     expect(wrapper.get('input[type="email"]').element.value).toBe('peer@example.com')
+    expect(wrapper.emitted('shared')).toBeUndefined()
     wrapper.unmount()
   })
 
-  it('allows retry after failure and share another after success', async () => {
+  it('allows retry after failure and emits only after the successful retry', async () => {
     apiMock
       .mockRejectedValueOnce(new ApiError('VALIDATION_ERROR', 'Invalid request', 400))
       .mockResolvedValueOnce({ invited: true })
@@ -162,12 +169,15 @@ describe('ShareUserSheet', () => {
     await fillEmail(wrapper, 'retry@example.com')
     await submitShare(wrapper)
     expect(wrapper.get('[role="alert"]').exists()).toBe(true)
+    expect(wrapper.emitted('shared')).toBeUndefined()
     await submitShare(wrapper)
     expect(wrapper.text()).toContain('Invitation sent to retry@example.com')
+    expect(wrapper.emitted('shared')).toEqual([[{ invited: true, email: 'retry@example.com' }]])
     await wrapper.get('.btn.ghost').trigger('click')
     await flushPromises()
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
     expect(wrapper.get('input[type="email"]').element.value).toBe('')
+    expect(wrapper.emitted('shared')).toHaveLength(1)
     wrapper.unmount()
   })
 
@@ -181,10 +191,12 @@ describe('ShareUserSheet', () => {
     const submit = wrapper.get('button[type="submit"]')
     expect(submit.text()).toBe('Sharing…')
     expect(submit.attributes('aria-busy')).toBe('true')
+    expect(wrapper.emitted('shared')).toBeUndefined()
     resolveRequest({ invited: true })
     await promise
     await flushPromises()
     expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
+    expect(wrapper.emitted('shared')).toEqual([[{ invited: true, email: 'pending@example.com' }]])
     wrapper.unmount()
   })
 
@@ -194,6 +206,7 @@ describe('ShareUserSheet', () => {
     await fillEmail(wrapper, 'missing@example.com')
     await submitShare(wrapper)
     expect(document.activeElement).toBe(wrapper.get('[role="alert"]').element)
+    expect(wrapper.emitted('shared')).toBeUndefined()
     wrapper.unmount()
   })
 })
