@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLocale } from '@/lib/i18n'
 import MediaPickerSheet from './MediaPickerSheet.vue'
 
-const apiMock = vi.hoisted(() => vi.fn())
+const apiMock = vi.hoisted(() => vi.fn<(path: string) => Promise<unknown>>())
 
 vi.mock('@/api/client', () => ({
   api: apiMock,
