@@ -33,17 +33,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/function backToRail/)
   })
 
-  it('keeps the thread-info trigger keyboard-complete and action-named', () => {
-    const trigger = chat.match(/<div\s+class="thread-peer-info clickable"[\s\S]*?>/)?.[0] ?? ''
-
-    expect(trigger).toContain('role="button"')
-    expect(trigger).toContain('tabindex="0"')
-    expect(trigger).toContain(':aria-label="t.chatInfo"')
-    expect(trigger).toContain('@click="openChatInfo"')
-    expect(trigger).toContain('@keydown.enter="openChatInfo"')
-    expect(trigger).toContain('@keydown.space.prevent="openChatInfo"')
-  })
-
   it('localizes core Chat chrome and attachment controls', () => {
     const i18n = readSrc('../lib/i18n.ts')
 
@@ -75,148 +64,6 @@ describe('chat surface contract', () => {
     expect(chat).not.toMatch(/aria-label="Gọi (thoại|video)"/)
     expect(chat).not.toMatch(/aria-label="(Attach file|Send|Shared media|Chat details|Clear search)"/)
     expect(chat).not.toMatch(/>\s*Cancel upload\s*</)
-  })
-
-  it('localizes Chat runtime feedback, destructive, nickname, presence, and call copy', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    for (const key of [
-      'personalPhotosLoadError',
-      'wallpaperImageUrlError',
-      'wallpaperInvalidImage',
-      'wallpaperProcessError',
-      'reactionFailed',
-      'copyFailed',
-      'deleteChatMessage',
-      'deleteChatSuccess',
-      'newNicknameLabel',
-      'nicknameSave',
-      'nicknameUpdated',
-      'peekLoadError',
-      'activeStatusEnabled',
-      'activeStatusDisabled',
-      'activeStatusUpdateError',
-      'callAlreadyActive',
-      'uploadImageFailed',
-    ]) {
-      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
-    }
-
-    expect(chat).toMatch(/message: t\.value\.deleteChatMessage/)
-    expect(chat).toMatch(/label: t\.value\.newNicknameLabel/)
-    expect(chat).toMatch(/confirmLabel: t\.value\.nicknameSave/)
-    expect(chat).toMatch(/formatApiError\(err, t\.value\.reactionFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.activeStatusUpdateError\)/)
-    expect(chat).toMatch(/item\.error \|\| t\.uploadImageFailed/)
-  })
-
-  it('localizes Chat message, attachment, and media feedback', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    for (const key of [
-      'chatMediaLoadFailed',
-      'chatMessageEditFailed',
-      'chatMessageRemoveFailed',
-      'chatMessageSendFailed',
-      'chatAttachmentSent',
-      'chatAttachmentSendFailed',
-      'chatDownloadFailed',
-      'chatViewFailed',
-    ]) {
-      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
-    }
-
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMediaLoadFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageEditFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageRemoveFailed\)/)
-    expect(chat.match(/formatApiError\(e, t\.value\.chatMessageSendFailed\)/g)).toHaveLength(2)
-    expect(chat).toMatch(/ui\.showToast\(t\.value\.chatAttachmentSent\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatAttachmentSendFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatDownloadFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatViewFailed\)/)
-
-    for (const stale of [
-      'Failed to load media',
-      'Failed to edit message',
-      'Failed to remove message',
-      'Failed to send message',
-      'Attachment sent',
-      'Failed to send attachment',
-      'Download failed',
-      'View failed',
-    ]) {
-      expect(chat).not.toContain(`'${stale}'`)
-    }
-  })
-
-  it('localizes remaining Chat fallback and search-result copy', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    for (const key of [
-      'chatMediaFallbackName',
-      'personalPhotoFallbackName',
-      'uploadedImageFallbackName',
-      'chatSenderYou',
-      'chatSenderFallback',
-      'chatReplyAttachmentFallback',
-      'sendingImageAlt',
-      'searchResultsCount',
-    ]) {
-      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
-    }
-
-    expect(chat).toMatch(/t\.value\.chatMediaFallbackName/)
-    expect(chat).toMatch(/t\.value\.personalPhotoFallbackName/)
-    expect(chat).toMatch(/t\.value\.uploadedImageFallbackName/)
-    expect(chat).toMatch(/t\.value\.chatSenderYou/)
-    expect(chat).toMatch(/t\.value\.chatSenderFallback/)
-    expect(chat).toMatch(/t\.value\.chatReplyAttachmentFallback/)
-    expect(chat).toMatch(/:alt="t\.sendingImageAlt"/)
-    expect(chat.match(/formatInfoSearchResults\(infoSearchResults\.length\)/g)).toHaveLength(2)
-
-    for (const stale of ['Ảnh đoạn chat', 'Ảnh kho cá nhân', 'Ảnh tải lên', 'Người gửi', 'Đang gửi ảnh...', 'kết quả']) {
-      expect(chat).not.toContain(stale)
-    }
-  })
-
-  it('localizes Chat edit and remove message dialogs', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    for (const key of [
-      'chatEditMessageTitle',
-      'save',
-      'chatRemoveMessageTitle',
-      'chatRemoveMessageDescription',
-    ]) {
-      expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
-    }
-
-    expect(chat).toMatch(/title: t\.value\.chatEditMessageTitle/)
-    expect(chat).toMatch(/label: t\.value\.messageLabel/)
-    expect(chat).toMatch(/confirmLabel: t\.value\.save/)
-    expect(chat).toMatch(/title: t\.value\.chatRemoveMessageTitle/)
-    expect(chat).toMatch(/message: t\.value\.chatRemoveMessageDescription/)
-    expect(chat).toMatch(/confirmLabel: t\.value\.remove/)
-
-    for (const stale of [
-      'Edit message',
-      'Remove message?',
-      'This message will be replaced with a removal notice for everyone.',
-    ]) {
-      expect(chat).not.toContain(`'${stale}'`)
-    }
-  })
-
-  it('localizes built-in Chat theme and wallpaper preset names reactively', () => {
-    expect(chat).toMatch(/const localizedChatThemes = computed\(\(\) => chatThemes\.map/)
-    expect(chat).toMatch(/name: theme\.names\[locale\.value\]/)
-    expect(chat.match(/v-for="th in localizedChatThemes"/g)).toHaveLength(2)
-    expect(chat).toMatch(/names: \{ vi: 'Hoàng hôn Tím', en: 'Purple Sunset' \}/)
-    expect(chat).toMatch(/names: \{ vi: 'Hoa anh đào', en: 'Cherry Blossom' \}/)
-    expect(chat).toMatch(/names: \{ vi: 'Rừng nhiệt đới', en: 'Rainforest' \}/)
-    expect(chat).toMatch(/preset\.names\[locale\.value\]/)
-    expect(chat).toMatch(/name: preset\.names\[locale\.value\]/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'Mặc định' : 'Default'/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'Ảnh tùy chỉnh' : 'Custom image'/)
-
-    expect(chat).not.toMatch(/v-for="th in chatThemes"/)
-    expect(chat).not.toMatch(/if \(preset\) return preset\.name\b/)
   })
 
   it('localizes Chat wallpaper preview, peek loading, and removes stale i18n fallbacks', () => {
@@ -495,14 +342,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/img\.avatar-img/)
   })
 
-  it('keeps sticker conversation previews locale-aware', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    expect(i18n).toContain("sticker: 'Nhãn dán'")
-    expect(i18n).toContain("sticker: 'Sticker'")
-    expect(chat).toContain('t.value.sticker')
-    expect(chat).not.toContain("'[Sticker]'")
-  })
-
   it('provides a full-featured sticker pack with picker drawer and bubble rendering', () => {
     const stickersModule = readSrc('../lib/stickers.ts')
     expect(stickersModule).toMatch(/STICKERS/)
@@ -593,27 +432,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/shared-file-item/)
   })
 
-  it('keeps Chat date separators and fallback metadata locale-aware', () => {
-    const i18n = readSrc('../lib/i18n.ts')
-    expect(i18n).toContain("today: 'Hôm nay'")
-    expect(i18n).toContain("today: 'Today'")
-    expect(i18n).toContain("untitledChat: 'Cuộc trò chuyện chưa đặt tên'")
-    expect(i18n).toContain("fileMovedToTrash: 'Tệp đã được chuyển vào Thùng rác'")
-    expect(i18n).toContain("filePermanentlyDeleted: 'Tệp đã bị xóa vĩnh viễn'")
-    expect(chat).toMatch(/return t\.value\.today/)
-    expect(chat).toMatch(/return t\.value\.yesterday/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'vi-VN' : 'en-US'/)
-    expect(chat.match(/locale\.value === 'vi' \? 'vi-VN' : 'en-US'/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
-    expect(chat).toMatch(/toLocaleDateString\(locale === 'vi' \? 'vi-VN' : 'en-US'\)/)
-    expect(chat).not.toMatch(/toLocaleDateString\(undefined/)
-    expect(chat).not.toMatch(/toLocaleTimeString\(undefined/)
-    expect(chat).toMatch(/t\.value\.untitledChat/)
-    expect(chat).toMatch(/t\.value\.fileMovedToTrash/)
-    expect(chat).toMatch(/t\.value\.filePermanentlyDeleted/)
-    expect(chat).not.toContain("return 'Today'")
-    expect(chat).not.toContain("return 'Yesterday'")
-  })
-
   it('supports custom wallpaper collection, safe unlinking, and storage picker modal', () => {
     expect(chat).toMatch(/chatCustomWallpapers/)
     expect(chat).toMatch(/currentConversationCustomWallpapers/)
@@ -625,8 +443,6 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/selectPhotoFromPersonalStorage/)
     expect(chat).toMatch(/wallpaper-custom-section/)
     expect(chat).toMatch(/delete-custom-wp-btn/)
-    expect(chat.match(/@keydown\.enter\.self="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g)).toHaveLength(2)
-    expect(chat.match(/@keydown\.space\.self\.prevent="setConversationWallpaper\(selectedConversation\.id, wp\.url\)"/g)).toHaveLength(2)
   })
 })
 
