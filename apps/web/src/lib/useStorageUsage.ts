@@ -16,6 +16,7 @@ export function useStorageUsage(formatBytes: (bytes: number) => string) {
   const usage = ref<StorageUsage | null>(null)
   const loading = ref(true)
   const unavailable = ref(false)
+  let reloadSequence = 0
 
   const usedBytes = computed(() => usage.value?.usedBytes ?? 0)
   const quotaBytes = computed(() => usage.value?.quotaBytes ?? 0)
@@ -35,15 +36,21 @@ export function useStorageUsage(formatBytes: (bytes: number) => string) {
   )
 
   async function reload() {
+    const requestSequence = ++reloadSequence
     loading.value = true
     unavailable.value = false
     try {
-      usage.value = await api<StorageUsage>('/storage')
+      const nextUsage = await api<StorageUsage>('/storage')
+      if (requestSequence !== reloadSequence) return
+      usage.value = nextUsage
     } catch {
+      if (requestSequence !== reloadSequence) return
       usage.value = null
       unavailable.value = true
     } finally {
-      loading.value = false
+      if (requestSequence === reloadSequence) {
+        loading.value = false
+      }
     }
   }
 
