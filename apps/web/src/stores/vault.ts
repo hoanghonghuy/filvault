@@ -15,6 +15,7 @@ export const useVaultStore = defineStore('vault', () => {
   const error = ref('')
   let fileHydrationSequence = 0
   let statusRequestSequence = 0
+  let sessionMutationSequence = 0
 
   const isInitialized = computed(() => status.value?.initialized ?? false)
   const isUnlocked = computed(() => Boolean(vaultToken.value && status.value?.unlocked))
@@ -22,6 +23,7 @@ export const useVaultStore = defineStore('vault', () => {
   function invalidateSessionRequests() {
     fileHydrationSequence += 1
     statusRequestSequence += 1
+    sessionMutationSequence += 1
   }
 
   function setToken(token: string) {
@@ -74,6 +76,7 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function setup(pin: string): Promise<VaultSession> {
+    const requestSequence = ++sessionMutationSequence
     loading.value = true
     error.value = ''
     try {
@@ -81,15 +84,18 @@ export const useVaultStore = defineStore('vault', () => {
         method: 'POST',
         body: JSON.stringify({ pin }),
       })
+      if (requestSequence !== sessionMutationSequence) return session
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
+      loading.value = false
       return session
     } finally {
-      loading.value = false
+      if (requestSequence === sessionMutationSequence) loading.value = false
     }
   }
 
   async function unlock(pin: string): Promise<VaultSession> {
+    const requestSequence = ++sessionMutationSequence
     loading.value = true
     error.value = ''
     try {
@@ -97,11 +103,13 @@ export const useVaultStore = defineStore('vault', () => {
         method: 'POST',
         body: JSON.stringify({ pin }),
       })
+      if (requestSequence !== sessionMutationSequence) return session
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
+      loading.value = false
       return session
     } finally {
-      loading.value = false
+      if (requestSequence === sessionMutationSequence) loading.value = false
     }
   }
 
@@ -128,6 +136,7 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function resetPin(accountPassword: string, newPin: string): Promise<VaultSession> {
+    const requestSequence = ++sessionMutationSequence
     loading.value = true
     error.value = ''
     try {
@@ -135,11 +144,13 @@ export const useVaultStore = defineStore('vault', () => {
         method: 'POST',
         body: JSON.stringify({ accountPassword, newPin }),
       })
+      if (requestSequence !== sessionMutationSequence) return session
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
+      loading.value = false
       return session
     } finally {
-      loading.value = false
+      if (requestSequence === sessionMutationSequence) loading.value = false
     }
   }
 

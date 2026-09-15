@@ -204,6 +204,56 @@ describe('useVaultStore', () => {
     expect(vault.loading).toBe(false)
   })
 
+  it('keeps a newer unlock authoritative when an older unlock resolves late', async () => {
+    const oldUnlock = deferred<{ token: string }>()
+    const newUnlock = deferred<{ token: string }>()
+    let unlockCalls = 0
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/unlock') {
+        unlockCalls += 1
+        return unlockCalls === 1 ? oldUnlock.promise : newUnlock.promise
+      }
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+
+    const oldRequest = vault.unlock('1111')
+    const newRequest = vault.unlock('2222')
+    newUnlock.resolve({ token: 'new-token' })
+    await newRequest
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.isUnlocked).toBe(true)
+
+    oldUnlock.resolve({ token: 'old-token' })
+    await oldRequest
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.status).toEqual({ initialized: true, unlocked: true })
+    expect(vault.loading).toBe(false)
+  })
+
+  it('keeps an explicit lock authoritative when a pending unlock resolves late', async () => {
+    const pendingUnlock = deferred<{ token: string }>()
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/unlock') return pendingUnlock.promise
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+    vault.status = { initialized: true, unlocked: false }
+
+    const request = vault.unlock('1234')
+    expect(vault.loading).toBe(true)
+
+    vault.lock()
+    pendingUnlock.resolve({ token: 'stale-token' })
+    await request
+
+    expect(vault.vaultToken).toBeNull()
+    expect(vault.isUnlocked).toBe(false)
+    expect(vault.loading).toBe(false)
+  })
+
   it.each([
     {
       name: 'setup',
