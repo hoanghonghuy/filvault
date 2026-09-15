@@ -1,3 +1,4 @@
+import type { ApiErrorCopy } from '@/api/errors'
 import type { Locale } from '@/lib/i18n'
 
 export type ProfileAvatarCopy = {
@@ -18,6 +19,8 @@ export type ProfileAvatarCopy = {
   uploadSuccess: string
   removeFailed: string
   removeSuccess: string
+  saveFailed: string
+  apiError: ApiErrorCopy
 }
 
 const COPY: Record<Locale, ProfileAvatarCopy> = {
@@ -39,6 +42,17 @@ const COPY: Record<Locale, ProfileAvatarCopy> = {
     uploadSuccess: 'Đã cập nhật ảnh đại diện',
     removeFailed: 'Không thể xóa ảnh',
     removeSuccess: 'Đã xóa ảnh đại diện',
+    saveFailed: 'Không thể lưu hồ sơ',
+    apiError: {
+      network: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.',
+      codes: {
+        UNAUTHORIZED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+        NOT_FOUND: 'Không tìm thấy tài nguyên được yêu cầu.',
+        CONFLICT: 'Dữ liệu đã thay đổi. Vui lòng tải lại và thử lại.',
+        RATE_LIMITED: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.',
+      },
+    },
   },
   en: {
     avatarAlt: 'Profile picture',
@@ -58,6 +72,8 @@ const COPY: Record<Locale, ProfileAvatarCopy> = {
     uploadSuccess: 'Profile picture updated',
     removeFailed: 'Could not remove the profile picture',
     removeSuccess: 'Profile picture removed',
+    saveFailed: 'Save failed',
+    apiError: {},
   },
 }
 
