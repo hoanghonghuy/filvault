@@ -32,7 +32,7 @@ describe('profileAvatarCopy', () => {
 
   it('formats common API codes with Vietnamese copy', () => {
     const copy = profileAvatarCopy('vi')
-    const error = new ApiError(403, 'FORBIDDEN', 'Forbidden')
+    const error = new ApiError('FORBIDDEN', 'Forbidden', 403)
 
     expect(formatApiError(error, copy.saveFailed, copy.apiError)).toBe(
       'Bạn không có quyền thực hiện thao tác này.',
