@@ -23,12 +23,21 @@ function isNetworkError(e: unknown): boolean {
   return e instanceof TypeError
 }
 
-export function formatApiError(e: unknown, fallback: string): string {
+export interface ApiErrorCopy {
+  network?: string
+  codes?: Partial<Record<string, string>>
+}
+
+export function formatApiError(e: unknown, fallback: string, copy: ApiErrorCopy = {}): string {
   if (isNetworkError(e)) {
-    return NETWORK_UNAVAILABLE
+    return copy.network ?? NETWORK_UNAVAILABLE
   }
   if (!(e instanceof ApiError)) {
     return fallback
+  }
+  const localized = copy.codes?.[e.code]
+  if (localized) {
+    return localized
   }
   if (e.code === 'CONFLICT') {
     if (e.message && e.message.toLowerCase() !== 'conflict') {

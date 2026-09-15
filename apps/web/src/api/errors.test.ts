@@ -12,6 +12,28 @@ describe('formatApiError', () => {
     )
   })
 
+  it('allows localized network copy', () => {
+    expect(
+      formatApiError(new TypeError('Failed to fetch'), 'Không thể tải ảnh.', {
+        network: 'Không thể kết nối máy chủ. Vui lòng thử lại.',
+      }),
+    ).toBe('Không thể kết nối máy chủ. Vui lòng thử lại.')
+  })
+
+  it('allows localized common API-code copy', () => {
+    expect(
+      formatApiError(new ApiError('QUOTA_EXCEEDED', 'quota exceeded', 413), 'Tải lên thất bại.', {
+        codes: { QUOTA_EXCEEDED: 'Dung lượng lưu trữ đã đầy. Hãy giải phóng dung lượng rồi thử lại.' },
+      }),
+    ).toBe('Dung lượng lưu trữ đã đầy. Hãy giải phóng dung lượng rồi thử lại.')
+  })
+
+  it('keeps existing common-code defaults when localized copy is omitted', () => {
+    expect(formatApiError(new ApiError('NOT_FOUND', 'not found', 404), 'Failed to load')).toBe(
+      'Item not found.',
+    )
+  })
+
   it('keeps the caller fallback for unknown non-API errors', () => {
     expect(formatApiError(new Error('unexpected json'), 'Failed to load photos')).toBe(
       'Failed to load photos',
