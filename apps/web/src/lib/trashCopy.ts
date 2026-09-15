@@ -1,3 +1,4 @@
+import type { ApiErrorCopy } from '@/api/errors'
 import type { Locale } from '@/lib/i18n'
 
 export interface TrashCopy {
@@ -11,6 +12,7 @@ export interface TrashCopy {
   deleteConfirmTitle: string
   deleteConfirmMessage: (name: string) => string
   emptyConfirmMessage: string
+  apiError: ApiErrorCopy
 }
 
 export function trashCopy(locale: Locale): TrashCopy {
@@ -29,6 +31,16 @@ export function trashCopy(locale: Locale): TrashCopy {
         `“${name}” sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`,
       emptyConfirmMessage:
         'Tất cả tệp và thư mục trong thùng rác sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.',
+      apiError: {
+        network: 'Không thể kết nối đến máy chủ. Hãy kiểm tra kết nối mạng và thử lại.',
+        codes: {
+          unauthorized: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          forbidden: 'Bạn không có quyền thực hiện thao tác này.',
+          not_found: 'Không tìm thấy mục này hoặc mục đã bị thay đổi.',
+          conflict: 'Mục đã thay đổi. Hãy tải lại và thử lại.',
+          rate_limited: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.',
+        },
+      },
     }
   }
 
@@ -46,6 +58,7 @@ export function trashCopy(locale: Locale): TrashCopy {
       `“${name}” will be permanently deleted. This cannot be undone.`,
     emptyConfirmMessage:
       'All files and folders in Trash will be permanently deleted. This cannot be undone.',
+    apiError: {},
   }
 }
 

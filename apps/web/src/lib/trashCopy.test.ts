@@ -26,6 +26,19 @@ describe('trashCopy', () => {
     expect(trashCopy('vi').restoreFailed).toBe('Không thể khôi phục mục')
   })
 
+  it('provides Vietnamese shared API error copy while preserving English defaults', () => {
+    const english = trashCopy('en').apiError
+    const vietnamese = trashCopy('vi').apiError
+
+    expect(english).toEqual({})
+    expect(vietnamese.network).toContain('kết nối')
+    expect(vietnamese.codes?.unauthorized).toContain('đăng nhập')
+    expect(vietnamese.codes?.forbidden).toContain('quyền')
+    expect(vietnamese.codes?.not_found).toContain('Không tìm thấy')
+    expect(vietnamese.codes?.conflict).toContain('thay đổi')
+    expect(vietnamese.codes?.rate_limited).toContain('thử lại')
+  })
+
   it('formats deleted dates with the active locale and rejects invalid input', () => {
     const iso = '2026-09-10T12:00:00Z'
     const en = formatTrashItemDate(iso, 'en')
