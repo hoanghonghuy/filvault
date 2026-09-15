@@ -1,6 +1,8 @@
+import type { ApiErrorCopy } from '@/api/errors'
 import type { Locale } from '@/lib/i18n'
 
 export type AlbumRuntimeCopy = {
+  apiError: ApiErrorCopy
   loadFailed: string
   addPhotos: string
   renameAlbum: string
@@ -24,6 +26,16 @@ export type AlbumRuntimeCopy = {
 
 const copy: Record<Locale, AlbumRuntimeCopy> = {
   vi: {
+    apiError: {
+      network: 'Không thể kết nối. Hãy kiểm tra mạng và thử lại.',
+      codes: {
+        unauthorized: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        forbidden: 'Bạn không có quyền thực hiện thao tác này.',
+        not_found: 'Không tìm thấy nội dung này hoặc nội dung đã bị xóa.',
+        conflict: 'Nội dung đã thay đổi. Hãy tải lại và thử lại.',
+        rate_limited: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.',
+      },
+    },
     loadFailed: 'Không thể tải album',
     addPhotos: 'Thêm ảnh',
     renameAlbum: 'Đổi tên album',
@@ -45,6 +57,7 @@ const copy: Record<Locale, AlbumRuntimeCopy> = {
     downloadFailed: 'Không thể tải xuống',
   },
   en: {
+    apiError: {},
     loadFailed: 'Failed to load album',
     addPhotos: 'Add photos',
     renameAlbum: 'Rename album',
