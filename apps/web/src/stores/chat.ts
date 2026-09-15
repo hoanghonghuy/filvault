@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { API_BASE, api, getAccessToken, refreshAccessToken } from '@/api/client'
 import type { ChatConversation, ChatMessage, ChatMessageReaction } from '@/api/types'
@@ -38,26 +38,78 @@ export const useChatStore = defineStore('chat', () => {
   const typingUsers = ref<Record<string, { userId: string; userName: string; timer?: number }>>({})
   let lastTypingTime = 0
   const lastReactionUpdate = ref<{ conversationId: string; messageId: string; reactions: ChatMessageReaction[] } | null>(null)
+  let hydrationGeneration = 0
+  let conversationLoadSequence = 0
+  let messageHydrationSequence = 0
+
+  function canCommitHydration(ownerId: string | null, generation: number): boolean {
+    if (!ownerId || auth.user?.id !== ownerId) return false
+    return generation === hydrationGeneration
+  }
+
+  function clearTypingTimers(): void {
+    for (const key of Object.keys(typingUsers.value)) {
+      const entry = typingUsers.value[key]
+      if (entry?.timer) window.clearTimeout(entry.timer)
+    }
+    typingUsers.value = {}
+  }
+
+  function resetAccountSession(): void {
+    hydrationGeneration += 1
+    conversationLoadSequence += 1
+    messageHydrationSequence += 1
+    clearTypingTimers()
+    conversations.value = []
+    messages.value = {}
+    selectedId.value = null
+    lastReactionUpdate.value = null
+    isLoadingConversations.value = false
+    lastEventId.value = auth.user?.id ? getInitialLastEventId() : 0
+  }
+
+  watch(
+    () => auth.user?.id ?? null,
+    (nextId, previousId) => {
+      if (nextId !== previousId) resetAccountSession()
+    },
+  )
 
   const selectedConversation = computed(() =>
     conversations.value.find((conversation) => conversation.id === selectedId.value) ?? null,
   )
 
   async function loadConversations(): Promise<void> {
-    if (isLoadingConversations.value) return
+    const ownerId = auth.user?.id ?? null
+    if (!ownerId) return
+    const generation = hydrationGeneration
+    const requestSequence = ++conversationLoadSequence
     isLoadingConversations.value = true
     try {
       const out = await api<{ conversations: ChatConversation[] }>('/chat/conversations?includePreview=true')
+      if (requestSequence !== conversationLoadSequence || !canCommitHydration(ownerId, generation)) return
       conversations.value = out.conversations
     } finally {
-      isLoadingConversations.value = false
+      if (requestSequence === conversationLoadSequence) {
+        isLoadingConversations.value = false
+      }
     }
   }
 
   async function openConversation(id: string): Promise<void> {
+    const ownerId = auth.user?.id ?? null
+    if (!ownerId) return
+    const generation = hydrationGeneration
+    const requestSequence = ++messageHydrationSequence
     selectedId.value = id
     const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${id}/messages?limit=50`)
-    if (selectedId.value !== id) return
+    if (
+      requestSequence !== messageHydrationSequence ||
+      !canCommitHydration(ownerId, generation) ||
+      selectedId.value !== id
+    ) {
+      return
+    }
     messages.value[id] = out.messages
   }
 
