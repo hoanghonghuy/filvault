@@ -352,11 +352,13 @@ describe('MediaLightbox', () => {
       url: 'https://example.com/second.heic',
     })
     await nextTick()
-    expect(image.getAttribute('src')).toBe('https://example.com/second.heic')
+    expect(document.body.querySelector('.heic-loading-state')).toBeTruthy()
+    expect(document.body.querySelector('.media-wrapper img')).toBeFalsy()
 
     nextConversion.resolve('blob:second')
     await flushPromises()
-    expect(image.getAttribute('src')).toBe('blob:second')
+    const convertedImage = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(convertedImage.getAttribute('src')).toBe('blob:second')
     wrapper.unmount()
   })
 
@@ -364,5 +366,154 @@ describe('MediaLightbox', () => {
     const source = readSrc('./MediaLightbox.vue')
     expect(source).toMatch(/@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)/)
     expect(source).toMatch(/prefersReducedMotion/)
+  })
+
+  it('shows a localized HEIC conversion failure instead of the raw HEIC URL', async () => {
+    heicMocks.getHeicDisplayUrl.mockRejectedValueOnce(new Error('decode failed'))
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'vacation.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/vacation.heic',
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const errorState = document.body.querySelector('.heic-error-state')
+    expect(errorState).toBeTruthy()
+    expect(errorState?.getAttribute('role')).toBe('alert')
+    expect(errorState?.textContent).toContain('Could not decode this HEIC image for preview.')
+
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement | null
+    expect(image).toBeFalsy()
+
+    wrapper.unmount()
+  })
+
+  it('localizes the HEIC conversion failure copy in Vietnamese', async () => {
+    setLocale('vi')
+    heicMocks.getHeicDisplayUrl.mockRejectedValueOnce(new Error('decode failed'))
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'vacation.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/vacation.heic',
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const errorState = document.body.querySelector('.heic-error-state')
+    expect(errorState?.textContent).toContain('Không thể giải mã ảnh HEIC để xem trước.')
+    wrapper.unmount()
+  })
+
+  it('recovers from HEIC conversion failure via retry without closing the lightbox', async () => {
+    heicMocks.getHeicDisplayUrl
+      .mockRejectedValueOnce(new Error('decode failed'))
+      .mockResolvedValueOnce('blob:recovered')
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'vacation.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/vacation.heic',
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const retryButton = document.body.querySelector('.heic-retry-btn') as HTMLButtonElement
+    expect(retryButton).toBeTruthy()
+    expect(retryButton.textContent).toContain('Retry')
+
+    await retryButton.click()
+    await flushPromises()
+
+    expect(document.body.querySelector('.heic-error-state')).toBeFalsy()
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('blob:recovered')
+    expect(wrapper.emitted('close')).toBeFalsy()
+
+    wrapper.unmount()
+  })
+
+  it('does not show a stale HEIC failure after switching to another media item', async () => {
+    const firstConversion = deferred<string>()
+    heicMocks.getHeicDisplayUrl
+      .mockReturnValueOnce(firstConversion.promise)
+      .mockResolvedValueOnce('blob:second')
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'first.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/first.heic',
+      },
+      attachTo: document.body,
+    })
+    await nextTick()
+
+    await wrapper.setProps({
+      name: 'second.heic',
+      url: 'https://example.com/second.heic',
+    })
+    await flushPromises()
+
+    expect(document.body.querySelector('.heic-error-state')).toBeFalsy()
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('blob:second')
+
+    firstConversion.reject(new Error('stale failure'))
+    await flushPromises()
+
+    expect(document.body.querySelector('.heic-error-state')).toBeFalsy()
+    expect(image.getAttribute('src')).toBe('blob:second')
+    wrapper.unmount()
+  })
+
+  it('does not show a stale HEIC failure after close and reopen', async () => {
+    const firstConversion = deferred<string>()
+    const reopenedConversion = deferred<string>()
+    heicMocks.getHeicDisplayUrl
+      .mockReturnValueOnce(firstConversion.promise)
+      .mockReturnValueOnce(reopenedConversion.promise)
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        open: true,
+        name: 'photo.heic',
+        mimeType: 'image/heic',
+        url: 'https://example.com/photo.heic',
+      },
+      attachTo: document.body,
+    })
+    await nextTick()
+
+    await wrapper.setProps({ open: false })
+    await nextTick()
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    reopenedConversion.resolve('blob:reopened')
+    await flushPromises()
+
+    expect(document.body.querySelector('.heic-error-state')).toBeFalsy()
+    const image = document.body.querySelector('.media-wrapper img') as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('blob:reopened')
+
+    firstConversion.reject(new Error('stale failure'))
+    await flushPromises()
+
+    expect(document.body.querySelector('.heic-error-state')).toBeFalsy()
+    expect(image.getAttribute('src')).toBe('blob:reopened')
+    wrapper.unmount()
   })
 })
