@@ -45,7 +45,7 @@ async function load() {
   try {
     trash.value = await api<TrashList>('/trash')
   } catch (e) {
-    error.value = formatApiError(e, copy.value.loadFailed)
+    error.value = formatApiError(e, copy.value.loadFailed, copy.value.apiError)
   } finally {
     loading.value = false
   }
@@ -64,7 +64,7 @@ async function restoreFile(id: string) {
     await api(`/files/${id}/restore`, { method: 'POST', body: '{}' })
     ui.showToast(t.value.fileRestored)
   } catch (e) {
-    error.value = formatApiError(e, copy.value.restoreFailed)
+    error.value = formatApiError(e, copy.value.restoreFailed, copy.value.apiError)
     await load()
   }
 }
@@ -75,7 +75,7 @@ async function restoreFolder(id: string) {
     await api(`/folders/${id}/restore`, { method: 'POST', body: '{}' })
     ui.showToast(t.value.folderRestored)
   } catch (e) {
-    error.value = formatApiError(e, copy.value.restoreFailed)
+    error.value = formatApiError(e, copy.value.restoreFailed, copy.value.apiError)
     await load()
   }
 }
@@ -93,7 +93,7 @@ async function permanentDelete(type: 'files' | 'folders', id: string, name: stri
     await api(`/trash/${type}/${id}`, { method: 'DELETE' })
     ui.showToast(t.value.deleteForever)
   } catch (e) {
-    error.value = formatApiError(e, copy.value.deleteFailed)
+    error.value = formatApiError(e, copy.value.deleteFailed, copy.value.apiError)
     await load()
   }
 }
@@ -176,7 +176,7 @@ async function emptyAllTrash() {
     }
   } catch (e) {
     await load()
-    error.value = formatApiError(e, copy.value.emptyFailed)
+    error.value = formatApiError(e, copy.value.emptyFailed, copy.value.apiError)
   } finally {
     emptyingTrash.value = false
     purgeCompleted.value = 0
