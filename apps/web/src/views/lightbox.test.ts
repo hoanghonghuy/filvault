@@ -12,7 +12,9 @@ describe('media lightbox contract', () => {
 
   it('renders a dialog with image/video support and close controls', () => {
     expect(lightbox).toMatch(/<dialog/)
-    expect(lightbox).toMatch(/<img[\s\S]*?v-if="isImage"/)
+    expect(lightbox).toMatch(/<img[\s\S]*?v-if="isImage &&/)
+    expect(lightbox).toMatch(/heic-error-state/)
+    expect(lightbox).toMatch(/heicConversionFailed/)
     expect(lightbox).toMatch(/<video[\s\S]*?v-else-if="isVideo"/)
     expect(lightbox).toMatch(/v-if="hasCaptions"/)
     expect(lightbox).not.toMatch(/No captions/)
