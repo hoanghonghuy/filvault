@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { useI18n } from '@/lib/i18n'
 
 export type ConfirmOptions = {
   title: string
@@ -32,7 +33,22 @@ type ActionSheetState = {
   items: ActionSheetItem[]
 }
 
+const LEGACY_LOGOUT_CONFIRMATION = {
+  title: 'Log out?',
+  message: 'You will need to sign in again to access your files.',
+  confirmLabel: 'Log out',
+} as const
+
+function isLegacyLogoutConfirmation(options: ConfirmOptions): boolean {
+  return (
+    options.title === LEGACY_LOGOUT_CONFIRMATION.title &&
+    options.message === LEGACY_LOGOUT_CONFIRMATION.message &&
+    options.confirmLabel === LEGACY_LOGOUT_CONFIRMATION.confirmLabel
+  )
+}
+
 export const useUiStore = defineStore('ui', () => {
+  const { t } = useI18n()
   const toastMessage = ref<string | null>(null)
   const toastType = ref<'success' | 'error' | 'info'>('info')
   let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -40,8 +56,6 @@ export const useUiStore = defineStore('ui', () => {
   const confirmState = ref<ConfirmState>({
     open: false,
     title: '',
-    confirmLabel: 'Confirm',
-    cancelLabel: 'Cancel',
   })
   let confirmResolve: ((value: boolean) => void) | null = null
 
@@ -50,8 +64,6 @@ export const useUiStore = defineStore('ui', () => {
     title: '',
     label: '',
     value: '',
-    confirmLabel: 'Save',
-    cancelLabel: 'Cancel',
   })
   let promptResolve: ((value: string | null) => void) | null = null
 
@@ -75,16 +87,29 @@ export const useUiStore = defineStore('ui', () => {
     }, durationMs)
   }
 
+  function logoutConfirmation(): ConfirmOptions {
+    return {
+      title: t.value.logoutConfirmTitle,
+      message: t.value.logoutConfirmMessage,
+      confirmLabel: t.value.logOut,
+      cancelLabel: t.value.cancel,
+      danger: true,
+    }
+  }
+
   function confirm(options: ConfirmOptions): Promise<boolean> {
     return new Promise((resolve) => {
       confirmResolve = resolve
+      const normalizedOptions = isLegacyLogoutConfirmation(options) ? logoutConfirmation() : options
       confirmState.value = {
         open: true,
-        confirmLabel: 'Confirm',
-        cancelLabel: 'Cancel',
-        ...options,
+        ...normalizedOptions,
       }
     })
+  }
+
+  function confirmLogout(): Promise<boolean> {
+    return confirm(logoutConfirmation())
   }
 
   function resolveConfirm(value: boolean) {
@@ -101,8 +126,8 @@ export const useUiStore = defineStore('ui', () => {
         title: options.title,
         label: options.label ?? '',
         value: options.initialValue ?? '',
-        confirmLabel: options.confirmLabel ?? 'Save',
-        cancelLabel: options.cancelLabel ?? 'Cancel',
+        confirmLabel: options.confirmLabel,
+        cancelLabel: options.cancelLabel,
       }
     })
   }
@@ -158,6 +183,7 @@ export const useUiStore = defineStore('ui', () => {
     actionSheetState,
     showToast,
     confirm,
+    confirmLogout,
     resolveConfirm,
     prompt,
     resolvePrompt,

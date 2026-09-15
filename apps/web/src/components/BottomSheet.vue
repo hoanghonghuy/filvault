@@ -4,10 +4,12 @@
 const openSheets: number[] = []
 let sheetCounter = 0
 let lockedCount = 0
+let previousBodyOverflow = ''
 </script>
 
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref, useId, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
+import { useI18n } from '@/lib/i18n'
 
 const props = defineProps<{
   open: boolean
@@ -19,6 +21,8 @@ const emit = defineEmits<{
   'after-leave': []
 }>()
 
+const { locale } = useI18n()
+const fallbackDialogLabel = computed(() => (locale.value === 'vi' ? 'Hộp thoại' : 'Dialog'))
 const titleId = useId()
 const panelRef = ref<HTMLElement | null>(null)
 const sheetId = sheetCounter++
@@ -123,7 +127,10 @@ function lockPage() {
   }
   released = false
   openSheets.push(sheetId)
-  if (lockedCount === 0) document.body.style.overflow = 'hidden'
+  if (lockedCount === 0) {
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
   lockedCount++
   previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   document.addEventListener('keydown', onKeydown)
@@ -137,7 +144,8 @@ function unlockPage() {
   lockedCount--
   if (lockedCount <= 0) {
     lockedCount = 0
-    document.body.style.overflow = ''
+    document.body.style.overflow = previousBodyOverflow
+    previousBodyOverflow = ''
   }
   document.removeEventListener('keydown', onKeydown)
   previousFocus?.focus()
@@ -185,7 +193,7 @@ onUnmounted(unlockPage)
           aria-modal="true"
           tabindex="-1"
           :aria-labelledby="title ? titleId : undefined"
-          :aria-label="title ? undefined : 'Dialog'"
+          :aria-label="title ? undefined : fallbackDialogLabel"
           @touchstart="onTouchStart"
           @touchmove="onTouchMove"
           @touchend="onTouchEnd"
@@ -215,8 +223,6 @@ onUnmounted(unlockPage)
   inset: 0;
   background: var(--overlay);
 }
-
-
 
 .sheet-panel {
   position: relative;

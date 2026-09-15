@@ -152,7 +152,7 @@ watch(
 
     <div class="upload-progress-head">
       <div class="upload-progress-title">
-        <span>{{ label || t.uploadProgressLabel }}</span>
+        <span>{{ label ?? t.uploadProgressLabel }}</span>
         <span v-if="queueMode" class="upload-progress-summary">
           {{ summary.completed }}/{{ summary.total }}
           <template v-if="summary.failed > 0">
@@ -179,7 +179,7 @@ watch(
       :aria-valuenow="percent"
       aria-valuemin="0"
       aria-valuemax="100"
-      :aria-label="label || t.uploadProgressAggregateAria"
+      :aria-label="label ?? t.uploadProgressAggregateAria"
     >
       <div class="fill" :style="{ transform: `scaleX(${effectiveProgress ?? 0})` }" />
     </div>
@@ -235,6 +235,7 @@ watch(
             v-if="item.status === 'failed'"
             type="button"
             class="upload-action-btn"
+            :aria-label="`${t.retry}: ${displayName(item)}`"
             @click="emit('retry', item.id)"
           >
             {{ t.retry }}
@@ -243,7 +244,7 @@ watch(
             v-if="item.status === 'failed'"
             type="button"
             class="upload-action-btn subtle"
-            :aria-label="t.uploadDismissFailedAria"
+            :aria-label="`${t.uploadDismissFailedAria}: ${displayName(item)}`"
             @click="emit('dismissFailed', item.id)"
           >
             {{ t.uploadDismissFailed }}
@@ -252,6 +253,7 @@ watch(
             v-if="item.status === 'queued' || item.status === 'uploading'"
             type="button"
             class="upload-action-btn subtle"
+            :aria-label="`${t.cancel}: ${displayName(item)}`"
             @click="emit('cancel', item.id)"
           >
             {{ t.cancel }}

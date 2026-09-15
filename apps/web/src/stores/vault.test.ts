@@ -4,12 +4,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useVaultStore } from '@/stores/vault'
+import type { VaultFile, VaultStatus } from '@/api/types'
+
+const apiMock = vi.hoisted(() => vi.fn<(path: string, options?: unknown) => Promise<unknown>>())
+
+vi.mock('@/api/client', () => ({
+  api: apiMock,
+}))
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+function secretFile(id: string): VaultFile {
+  return {
+    id,
+    name: `${id}.txt`,
+    mimeType: 'text/plain',
+    sizeBytes: 100,
+    createdAt: '',
+    updatedAt: '',
+  }
+}
 
 describe('useVaultStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     sessionStorage.clear()
-    vi.restoreAllMocks()
+    apiMock.mockReset()
   })
 
   it('starts with not initialized and locked', () => {
@@ -23,7 +51,7 @@ describe('useVaultStore', () => {
   it('lock clears token and files', () => {
     const vault = useVaultStore()
     vault.vaultToken = 'test-token'
-    vault.files = [{ id: '1', name: 'secret.txt', mimeType: 'text/plain', sizeBytes: 100, createdAt: '', updatedAt: '' }]
+    vault.files = [secretFile('1')]
     vault.status = { initialized: true, unlocked: true }
 
     expect(vault.isUnlocked).toBe(true)
@@ -33,5 +61,225 @@ describe('useVaultStore', () => {
     expect(vault.vaultToken).toBeNull()
     expect(vault.files).toEqual([])
     expect(vault.isUnlocked).toBe(false)
+  })
+
+  it('discovers initialized locked state with an authoritative no-token status refresh', async () => {
+    apiMock.mockResolvedValue({ initialized: true, unlocked: false } satisfies VaultStatus)
+    const vault = useVaultStore()
+
+    await expect(vault.fetchStatus()).resolves.toEqual({ initialized: true, unlocked: false })
+
+    expect(vault.status).toEqual({ initialized: true, unlocked: false })
+    expect(vault.vaultToken).toBeNull()
+  })
+
+  it('keeps a newer unlocked session authoritative over a stale locked status response', async () => {
+    const oldStatus = deferred<VaultStatus>()
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/status') return oldStatus.promise
+      if (path === '/vault/unlock') return Promise.resolve({ token: 'new-token' })
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+    vault.vaultToken = 'old-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    const statusRefresh = vault.fetchStatus()
+    await vault.unlock('1234')
+
+    oldStatus.resolve({ initialized: true, unlocked: false })
+    await statusRefresh
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.status).toEqual({ initialized: true, unlocked: true })
+    expect(vault.isUnlocked).toBe(true)
+  })
+
+  it('keeps a newer status refresh authoritative over an older failure', async () => {
+    const oldStatus = deferred<VaultStatus>()
+    const newStatus = deferred<VaultStatus>()
+    let statusCalls = 0
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/status') {
+        statusCalls += 1
+        return statusCalls === 1 ? oldStatus.promise : newStatus.promise
+      }
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+
+    const oldRefresh = vault.fetchStatus()
+    const newRefresh = vault.fetchStatus()
+
+    newStatus.resolve({ initialized: true, unlocked: false })
+    await newRefresh
+    oldStatus.reject(new Error('stale status failure'))
+    await expect(oldRefresh).rejects.toThrow('stale status failure')
+
+    expect(vault.status).toEqual({ initialized: true, unlocked: false })
+    expect(vault.vaultToken).toBeNull()
+  })
+
+  it('clears the current token when an authoritative current-session status says locked', async () => {
+    apiMock.mockResolvedValue({ initialized: true, unlocked: false } satisfies VaultStatus)
+    const vault = useVaultStore()
+    vault.vaultToken = 'current-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    await vault.fetchStatus()
+
+    expect(vault.status).toEqual({ initialized: true, unlocked: false })
+    expect(vault.vaultToken).toBeNull()
+    expect(vault.isUnlocked).toBe(false)
+  })
+
+  it('loads files for the current unlocked Vault session', async () => {
+    apiMock.mockResolvedValue({ files: [secretFile('current-secret')] })
+    const vault = useVaultStore()
+    vault.vaultToken = 'current-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    await expect(vault.loadFiles()).resolves.toEqual([secretFile('current-secret')])
+
+    expect(vault.files).toEqual([secretFile('current-secret')])
+    expect(vault.loading).toBe(false)
+    expect(vault.error).toBe('')
+  })
+
+  it('keeps lock authoritative when an older file hydration resolves late', async () => {
+    const pendingFiles = deferred<{ files: VaultFile[] }>()
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/files') return pendingFiles.promise
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+    vault.vaultToken = 'old-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    const hydration = vault.loadFiles()
+    expect(vault.loading).toBe(true)
+
+    vault.lock()
+    pendingFiles.resolve({ files: [secretFile('stale-secret')] })
+    await hydration
+
+    expect(vault.vaultToken).toBeNull()
+    expect(vault.files).toEqual([])
+    expect(vault.loading).toBe(false)
+    expect(vault.error).toBe('')
+    expect(vault.isUnlocked).toBe(false)
+  })
+
+  it('keeps a newer Vault session hydration authoritative over an older failure and finally', async () => {
+    const oldFiles = deferred<{ files: VaultFile[] }>()
+    const newFiles = deferred<{ files: VaultFile[] }>()
+    apiMock.mockImplementation((path, options) => {
+      if (path === '/vault/files') {
+        const token = (options as { headers?: Record<string, string> } | undefined)?.headers?.['X-Vault-Token']
+        return token === 'old-token' ? oldFiles.promise : newFiles.promise
+      }
+      if (path === '/vault/unlock') return Promise.resolve({ token: 'new-token' })
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+    vault.vaultToken = 'old-token'
+    vault.status = { initialized: true, unlocked: true }
+
+    const oldHydration = vault.loadFiles()
+    await vault.unlock('1234')
+    const newHydration = vault.loadFiles()
+
+    oldFiles.reject(new Error('stale old-session failure'))
+    await expect(oldHydration).resolves.toEqual([])
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.files).toEqual([])
+    expect(vault.loading).toBe(true)
+    expect(vault.error).toBe('')
+
+    newFiles.resolve({ files: [secretFile('new-secret')] })
+    await newHydration
+
+    expect(vault.files).toEqual([secretFile('new-secret')])
+    expect(vault.loading).toBe(false)
+  })
+
+  it('keeps a newer unlock authoritative when an older unlock resolves late', async () => {
+    const oldUnlock = deferred<{ token: string }>()
+    const newUnlock = deferred<{ token: string }>()
+    let unlockCalls = 0
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/unlock') {
+        unlockCalls += 1
+        return unlockCalls === 1 ? oldUnlock.promise : newUnlock.promise
+      }
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+
+    const oldRequest = vault.unlock('1111')
+    const newRequest = vault.unlock('2222')
+    newUnlock.resolve({ token: 'new-token' })
+    await newRequest
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.isUnlocked).toBe(true)
+
+    oldUnlock.resolve({ token: 'old-token' })
+    await oldRequest
+
+    expect(vault.vaultToken).toBe('new-token')
+    expect(vault.status).toEqual({ initialized: true, unlocked: true })
+    expect(vault.loading).toBe(false)
+  })
+
+  it('keeps an explicit lock authoritative when a pending unlock resolves late', async () => {
+    const pendingUnlock = deferred<{ token: string }>()
+    apiMock.mockImplementation((path) => {
+      if (path === '/vault/unlock') return pendingUnlock.promise
+      return Promise.reject(new Error(`Unexpected path: ${path}`))
+    })
+    const vault = useVaultStore()
+    vault.status = { initialized: true, unlocked: false }
+
+    const request = vault.unlock('1234')
+    expect(vault.loading).toBe(true)
+
+    vault.lock()
+    pendingUnlock.resolve({ token: 'stale-token' })
+    await request
+
+    expect(vault.vaultToken).toBeNull()
+    expect(vault.isUnlocked).toBe(false)
+    expect(vault.loading).toBe(false)
+  })
+
+  it.each([
+    {
+      name: 'setup',
+      path: '/vault/setup',
+      run: (vault: ReturnType<typeof useVaultStore>) => vault.setup('1234'),
+    },
+    {
+      name: 'unlock',
+      path: '/vault/unlock',
+      run: (vault: ReturnType<typeof useVaultStore>) => vault.unlock('1234'),
+    },
+    {
+      name: 'reset',
+      path: '/vault/reset',
+      run: (vault: ReturnType<typeof useVaultStore>) => vault.resetPin('account-password', '1234'),
+    },
+  ])('$name establishes an unlocked session without implicitly hydrating files', async ({ path, run }) => {
+    apiMock.mockResolvedValue({ token: 'vault-token' })
+    const vault = useVaultStore()
+
+    await run(vault)
+
+    expect(apiMock).toHaveBeenCalledTimes(1)
+    expect(apiMock).toHaveBeenCalledWith(path, expect.any(Object))
+    expect(apiMock).not.toHaveBeenCalledWith('/vault/files', expect.anything())
+    expect(vault.vaultToken).toBe('vault-token')
+    expect(vault.isUnlocked).toBe(true)
   })
 })

@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Tài liệu lịch sử — không dùng làm current handoff hoặc backlog.** File này ghi lại trạng thái/next-step của Phase 1 tại thời điểm 2026-08. Hướng triển khai hiện tại, workstream đang active và release blockers được quản lý tại [`../CURRENT_PRODUCT_STATE.md`](../CURRENT_PRODUCT_STATE.md) và các GitHub issue/PR đang mở. Những câu “việc tiếp theo”, “chưa sang Phase 2” hoặc “không phải deploy/AWS” bên dưới chỉ có giá trị lịch sử.
+
 # Phase 1 — Checklist bàn giao
 
 Cập nhật: **2026-08-18**.  

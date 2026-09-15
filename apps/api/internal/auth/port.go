@@ -22,6 +22,8 @@ type Repository interface {
 	GetUserByID(ctx context.Context, id string) (*user.User, error)
 	SetVerificationCode(ctx context.Context, userID, codeHash string, expiresAt time.Time) error
 	MarkEmailVerified(ctx context.Context, userID string, at time.Time) error
+	SetPasswordResetToken(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error
+	ConsumePasswordReset(ctx context.Context, tokenHash, passwordHash string, at time.Time) (string, error)
 	InsertRefreshToken(ctx context.Context, tok RefreshToken) error
 	GetRefreshTokenByHash(ctx context.Context, hash string) (*RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, hash string, at time.Time) error

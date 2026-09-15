@@ -42,7 +42,7 @@ const chatStore = useChatStore()
 const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
-const { resolvedIsDark, toggleResolvedAppearance } = useTheme()
+const { resolvedIsDark } = useTheme()
 
 const conversations = ref<ChatConversation[]>([])
 const selectedId = ref<string | null>((route.params.id as string) || null)
@@ -78,17 +78,20 @@ const activeConv = ref<ChatConversation | null>(null)
 const mutedConversations = ref<Record<string, boolean>>({})
 const nicknames = ref<Record<string, string>>({})
 
+type LocalizedPresetName = { vi: string; en: string }
+
 const chatThemes = [
-  { id: 'blue', name: 'Messenger Blue', color: '#0084ff', gradient: 'linear-gradient(135deg, #0084ff 0%, #0099ff 100%)' },
-  { id: 'purple', name: 'Hoàng hôn Tím', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' },
-  { id: 'emerald', name: 'Ngọc lục bảo', color: '#10b981', gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' },
-  { id: 'rose', name: 'Hồng ngọt ngào', color: '#f43f5e', gradient: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' },
-  { id: 'amber', name: 'Hổ phách ấm', color: '#f59e0b', gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)' },
-  { id: 'cyan', name: 'Đại dương xanh', color: '#06b6d4', gradient: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' },
-  { id: 'indigo', name: 'Chàm huyền bí', color: '#6366f1', gradient: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' },
-  { id: 'coral', name: 'Cam san hô', color: '#f97316', gradient: 'linear-gradient(135deg, #ea580c 0%, #fb923c 100%)' },
-  { id: 'slate', name: 'Than chì thanh lịch', color: '#64748b', gradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)' },
-] as const
+  { id: 'blue', names: { vi: 'Xanh Messenger', en: 'Messenger Blue' }, color: '#0084ff', gradient: 'linear-gradient(135deg, #0084ff 0%, #0099ff 100%)' },
+  { id: 'purple', names: { vi: 'Hoàng hôn Tím', en: 'Purple Sunset' }, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' },
+  { id: 'emerald', names: { vi: 'Ngọc lục bảo', en: 'Emerald' }, color: '#10b981', gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' },
+  { id: 'rose', names: { vi: 'Hồng ngọt ngào', en: 'Sweet Rose' }, color: '#f43f5e', gradient: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' },
+  { id: 'amber', names: { vi: 'Hổ phách ấm', en: 'Warm Amber' }, color: '#f59e0b', gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)' },
+  { id: 'cyan', names: { vi: 'Đại dương xanh', en: 'Ocean Cyan' }, color: '#06b6d4', gradient: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' },
+  { id: 'indigo', names: { vi: 'Chàm huyền bí', en: 'Mystic Indigo' }, color: '#6366f1', gradient: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' },
+  { id: 'coral', names: { vi: 'Cam san hô', en: 'Coral Orange' }, color: '#f97316', gradient: 'linear-gradient(135deg, #ea580c 0%, #fb923c 100%)' },
+  { id: 'slate', names: { vi: 'Than chì thanh lịch', en: 'Elegant Slate' }, color: '#64748b', gradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)' },
+] as const satisfies ReadonlyArray<{ id: string; names: LocalizedPresetName; color: string; gradient: string }>
+const localizedChatThemes = computed(() => chatThemes.map((theme) => ({ ...theme, name: theme.names[locale.value] })))
 const activeTheme = ref<string>('blue')
 const currentTheme = computed(() => chatThemes.find((entry) => entry.id === activeTheme.value) ?? chatThemes[0]!)
 const activeWallpaperTheme = ref<WallpaperTheme | null>(null)
@@ -130,7 +133,7 @@ const threadThemeStyle = computed(() => {
 
 export interface ChatWallpaperPreset {
   id: string
-  name: string
+  names: LocalizedPresetName
   value: string
   preview: string
   isDark?: boolean
@@ -139,7 +142,7 @@ export interface ChatWallpaperPreset {
 const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
   {
     id: 'none',
-    name: 'Mặc định',
+    names: { vi: 'Mặc định', en: 'Default' },
     value: '',
     preview: 'var(--canvas)',
   },
@@ -147,49 +150,49 @@ const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
   // --- Chế độ Sáng (Light Mode Presets) ---
   {
     id: 'doodle',
-    name: 'Doodle họa tiết',
+    names: { vi: 'Doodle họa tiết', en: 'Pattern Doodle' },
     value: `radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 60%), radial-gradient(circle at 10% 20%, rgba(236, 72, 153, 0.08) 0%, transparent 40%), url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.09' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")`,
     preview: 'linear-gradient(135deg, #e0e7ff 0%, #fce7f3 100%)',
   },
   {
     id: 'sakura',
-    name: 'Hoa anh đào',
+    names: { vi: 'Hoa anh đào', en: 'Cherry Blossom' },
     value: 'radial-gradient(circle at 30% 20%, rgba(251, 113, 133, 0.25) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(192, 132, 252, 0.2) 0%, transparent 50%), linear-gradient(135deg, #fdf2f8 0%, #fae8ff 50%, #f5f3ff 100%)',
     preview: 'linear-gradient(135deg, #fdf2f8 0%, #f43f5e 100%)',
   },
   {
     id: 'sky_breeze',
-    name: 'Mây trời sáng',
+    names: { vi: 'Mây trời sáng', en: 'Bright Sky' },
     value: 'radial-gradient(ellipse at top, rgba(186, 230, 253, 0.45) 0%, transparent 60%), radial-gradient(ellipse at bottom, rgba(224, 231, 255, 0.45) 0%, transparent 50%), linear-gradient(140deg, #f0f9ff 0%, #e0f2fe 50%, #eff6ff 100%)',
     preview: 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)',
   },
   {
     id: 'matcha',
-    name: 'Trà xanh Matcha',
+    names: { vi: 'Trà xanh Matcha', en: 'Matcha Green' },
     value: 'radial-gradient(circle at 15% 15%, rgba(134, 239, 172, 0.35) 0%, transparent 50%), radial-gradient(circle at 85% 85%, rgba(187, 247, 208, 0.4) 0%, transparent 50%), linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #f7fee7 100%)',
     preview: 'linear-gradient(135deg, #86efac 0%, #bbf7d0 100%)',
   },
   {
     id: 'terracotta',
-    name: 'Gốm ấm áp',
+    names: { vi: 'Gốm ấm áp', en: 'Warm Terracotta' },
     value: 'radial-gradient(circle at top right, rgba(253, 186, 116, 0.35) 0%, transparent 60%), radial-gradient(circle at bottom left, rgba(254, 215, 170, 0.4) 0%, transparent 50%), linear-gradient(135deg, #fff7ed 0%, #ffedd5 50%, #fef3c7 100%)',
     preview: 'linear-gradient(135deg, #fdba74 0%, #fed7aa 100%)',
   },
   {
     id: 'lavender_mist',
-    name: 'Oải hương sương mai',
+    names: { vi: 'Oải hương sương mai', en: 'Lavender Mist' },
     value: 'radial-gradient(circle at 30% 20%, rgba(216, 180, 254, 0.35) 0%, transparent 60%), radial-gradient(circle at 70% 80%, rgba(233, 213, 255, 0.35) 0%, transparent 50%), linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #f5f3ff 100%)',
     preview: 'linear-gradient(135deg, #d8b4fe 0%, #e9d5ff 100%)',
   },
   {
     id: 'notebook_grid',
-    name: 'Giấy kẻ ô',
+    names: { vi: 'Giấy kẻ ô', en: 'Grid Paper' },
     value: `radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%), linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, #f8fafc 1px)`,
     preview: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
   },
   {
     id: 'geometric_pastel',
-    name: 'Hình học tối giản',
+    names: { vi: 'Hình học tối giản', en: 'Minimal Geometry' },
     value: 'radial-gradient(circle at 20% 80%, rgba(244, 114, 182, 0.2) 0%, transparent 40%), radial-gradient(circle at 80% 20%, rgba(96, 165, 250, 0.2) 0%, transparent 40%), linear-gradient(135deg, #fdf4ff 0%, #eff6ff 100%)',
     preview: 'linear-gradient(135deg, #f472b6 0%, #60a5fa 100%)',
   },
@@ -197,63 +200,63 @@ const CHAT_WALLPAPER_PRESETS: ChatWallpaperPreset[] = [
   // --- Chế độ Tối (Dark Mode Presets) ---
   {
     id: 'aurora',
-    name: 'Cực quang xanh',
+    names: { vi: 'Cực quang xanh', en: 'Green Aurora' },
     value: 'radial-gradient(ellipse at 20% 20%, rgba(16, 185, 129, 0.35) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(59, 130, 246, 0.35) 0%, transparent 50%), linear-gradient(160deg, #091a24 0%, #0d2838 50%, #07131b 100%)',
     preview: 'linear-gradient(135deg, #0d2838 0%, #10b981 100%)',
     isDark: true,
   },
   {
     id: 'sunset',
-    name: 'Hoàng hôn',
+    names: { vi: 'Hoàng hôn', en: 'Sunset' },
     value: 'radial-gradient(circle at top right, rgba(244, 63, 94, 0.3) 0%, transparent 60%), radial-gradient(circle at bottom left, rgba(251, 146, 60, 0.3) 0%, transparent 60%), linear-gradient(145deg, #1e112a 0%, #2d1b4e 50%, #140924 100%)',
     preview: 'linear-gradient(135deg, #2d1b4e 0%, #f43f5e 100%)',
     isDark: true,
   },
   {
     id: 'cosmos',
-    name: 'Vũ trụ huyền ảo',
+    names: { vi: 'Vũ trụ huyền ảo', en: 'Mystic Cosmos' },
     value: 'radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.35) 0%, transparent 60%), radial-gradient(circle at 80% 90%, rgba(236, 72, 153, 0.25) 0%, transparent 50%), linear-gradient(180deg, #0a0818 0%, #130e2e 50%, #070512 100%)',
     preview: 'linear-gradient(135deg, #130e2e 0%, #8b5cf6 100%)',
     isDark: true,
   },
   {
     id: 'emerald',
-    name: 'Rừng nhiệt đới',
+    names: { vi: 'Rừng nhiệt đới', en: 'Rainforest' },
     value: 'radial-gradient(circle at 20% 80%, rgba(5, 150, 105, 0.3) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(52, 211, 153, 0.2) 0%, transparent 50%), linear-gradient(150deg, #061a14 0%, #0a2f24 50%, #04100c 100%)',
     preview: 'linear-gradient(135deg, #0a2f24 0%, #10b981 100%)',
     isDark: true,
   },
   {
     id: 'cyber',
-    name: 'Đêm Neon',
+    names: { vi: 'Đêm Neon', en: 'Neon Night' },
     value: 'radial-gradient(circle at top left, rgba(6, 182, 212, 0.35) 0%, transparent 55%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.35) 0%, transparent 55%), linear-gradient(135deg, #09090b 0%, #18181b 50%, #09090b 100%)',
     preview: 'linear-gradient(135deg, #06b6d4 0%, #ec4899 100%)',
     isDark: true,
   },
   {
     id: 'amoled_carbon',
-    name: 'Lưới Carbon AMOLED',
+    names: { vi: 'Lưới Carbon AMOLED', en: 'AMOLED Carbon Grid' },
     value: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 70%), linear-gradient(45deg, #121214 25%, transparent 25%), linear-gradient(-45deg, #121214 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #121214 75%), linear-gradient(-45deg, transparent 75%, #121214 75%), #070709',
     preview: 'linear-gradient(135deg, #09090b 0%, #27272a 100%)',
     isDark: true,
   },
   {
     id: 'obsidian_gold',
-    name: 'Hắc diện kim',
+    names: { vi: 'Hắc diện kim', en: 'Obsidian Gold' },
     value: 'radial-gradient(circle at 75% 25%, rgba(234, 179, 8, 0.25) 0%, transparent 50%), radial-gradient(circle at 20% 80%, rgba(161, 98, 7, 0.2) 0%, transparent 55%), linear-gradient(150deg, #09090b 0%, #171510 50%, #090805 100%)',
     preview: 'linear-gradient(135deg, #171510 0%, #eab308 100%)',
     isDark: true,
   },
   {
     id: 'ocean_abyss',
-    name: 'Vực thẳm đại dương',
+    names: { vi: 'Vực thẳm đại dương', en: 'Ocean Abyss' },
     value: 'radial-gradient(ellipse at 50% 10%, rgba(14, 165, 233, 0.28) 0%, transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(2, 132, 199, 0.22) 0%, transparent 50%), linear-gradient(165deg, #030712 0%, #082f49 50%, #020617 100%)',
     preview: 'linear-gradient(135deg, #082f49 0%, #0ea5e9 100%)',
     isDark: true,
   },
   {
     id: 'twilight_violet',
-    name: 'Hoàng hôn Tím đêm',
+    names: { vi: 'Hoàng hôn Tím đêm', en: 'Twilight Violet' },
     value: 'radial-gradient(circle at top left, rgba(168, 85, 247, 0.3) 0%, transparent 55%), radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.25) 0%, transparent 55%), linear-gradient(140deg, #0f0728 0%, #1e1035 50%, #0b051b 100%)',
     preview: 'linear-gradient(135deg, #1e1035 0%, #a855f7 100%)',
     isDark: true,
@@ -337,7 +340,7 @@ function removeCustomWallpaperItem(conversationId: string, wallpaperId: string) 
   if (threadWallpaper.value === target.url) {
     setConversationWallpaper(conversationId, '')
   }
-  ui.showToast(t.value.wallpaperRemoved || 'Đã gỡ hình nền khỏi đoạn chat')
+  ui.showToast(t.value.wallpaperRemoved)
 }
 
 // Storage & Media Picker for Chat Wallpaper
@@ -361,7 +364,7 @@ async function loadPersonalPhotos() {
     personalPhotos.value = allItems
     personalPhotosLoaded.value = true
   } catch (e) {
-    personalPhotosError.value = formatApiError(e, 'Không thể tải ảnh từ kho lưu trữ cá nhân')
+    personalPhotosError.value = formatApiError(e, t.value.personalPhotosLoadError)
   } finally {
     loadingPersonalPhotos.value = false
   }
@@ -395,20 +398,20 @@ async function selectPhotoFromChatMedia(photo: ChatAttachment) {
     }
   }
   if (!photoUrl) {
-    ui.showToast('Không thể lấy đường dẫn ảnh')
+    ui.showToast(t.value.wallpaperImageUrlError)
     return
   }
   const customItem: ChatCustomWallpaper = {
     id: generateUUID(),
     url: photoUrl,
-    name: photo.name || photo.originalName || 'Ảnh đoạn chat',
+    name: photo.name || photo.originalName || t.value.chatMediaFallbackName,
     source: 'chat_media',
     sourceId: photo.id,
     createdAt: new Date().toISOString(),
   }
   addCustomWallpaperToConversation(convId, customItem)
   setConversationWallpaper(convId, photoUrl)
-  ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+  ui.showToast(t.value.wallpaperUpdated)
 }
 
 async function selectPhotoFromPersonalStorage(item: TimelineItem) {
@@ -423,20 +426,20 @@ async function selectPhotoFromPersonalStorage(item: TimelineItem) {
     // fallback
   }
   if (!photoUrl) {
-    ui.showToast('Không thể lấy đường dẫn ảnh')
+    ui.showToast(t.value.wallpaperImageUrlError)
     return
   }
   const customItem: ChatCustomWallpaper = {
     id: generateUUID(),
     url: photoUrl,
-    name: item.name || 'Ảnh kho cá nhân',
+    name: item.name || t.value.personalPhotoFallbackName,
     source: 'storage',
     sourceId: item.id,
     createdAt: new Date().toISOString(),
   }
   addCustomWallpaperToConversation(convId, customItem)
   setConversationWallpaper(convId, photoUrl)
-  ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+  ui.showToast(t.value.wallpaperUpdated)
 }
 
 const threadWallpaper = computed(() => {
@@ -452,10 +455,10 @@ const threadWallpaperBackground = computed(() => {
 })
 
 const currentWallpaperPresetName = computed(() => {
-  if (!threadWallpaper.value || threadWallpaper.value === 'none') return 'Mặc định'
+  if (!threadWallpaper.value || threadWallpaper.value === 'none') return locale.value === 'vi' ? 'Mặc định' : 'Default'
   const preset = CHAT_WALLPAPER_PRESETS.find((p) => p.id === threadWallpaper.value)
-  if (preset) return preset.name
-  return 'Ảnh tùy chỉnh'
+  if (preset) return preset.names[locale.value]
+  return locale.value === 'vi' ? 'Ảnh tùy chỉnh' : 'Custom image'
 })
 
 const activePreviewStyle = computed(() => {
@@ -497,25 +500,29 @@ async function setConversationWallpaper(conversationId: string, wallpaperVal: st
 function selectWallpaperPreset(presetId: string) {
   if (!selectedConversation.value) return
   setConversationWallpaper(selectedConversation.value.id, presetId === 'none' ? '' : presetId)
-  ui.showToast(presetId === 'none' ? (t.value.wallpaperRemoved || 'Đã đặt lại hình nền') : (t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat'))
+  ui.showToast(presetId === 'none' ? t.value.wallpaperRemoved : t.value.wallpaperUpdated)
 }
 
 function removeConversationWallpaper() {
   if (!selectedConversation.value) return
   setConversationWallpaper(selectedConversation.value.id, '')
-  ui.showToast(t.value.wallpaperRemoved || 'Đã xóa hình nền đoạn chat')
+  ui.showToast(t.value.wallpaperRemoved)
 }
 
 const wallpaperCategoryFilter = ref<'all' | 'light' | 'dark'>('all')
 
 const filteredWallpaperPresets = computed(() => {
+  const localized = CHAT_WALLPAPER_PRESETS.map((preset) => ({
+    ...preset,
+    name: preset.names[locale.value],
+  }))
   if (wallpaperCategoryFilter.value === 'light') {
-    return CHAT_WALLPAPER_PRESETS.filter((p) => !p.isDark)
+    return localized.filter((p) => !p.isDark)
   }
   if (wallpaperCategoryFilter.value === 'dark') {
-    return CHAT_WALLPAPER_PRESETS.filter((p) => p.isDark || p.id === 'none')
+    return localized.filter((p) => p.isDark || p.id === 'none')
   }
-  return CHAT_WALLPAPER_PRESETS
+  return localized
 })
 
 function openWallpaperSubPage() {
@@ -569,7 +576,7 @@ async function handleWallpaperUpload(event: Event) {
   if (!file || !selectedConversation.value) return
 
   if (!file.type.startsWith('image/')) {
-    ui.showToast('Vui lòng chọn tệp hình ảnh')
+    ui.showToast(t.value.wallpaperInvalidImage)
     return
   }
 
@@ -579,13 +586,13 @@ async function handleWallpaperUpload(event: Event) {
     const customItem: ChatCustomWallpaper = {
       id: generateUUID(),
       url: dataUrl,
-      name: file.name || 'Ảnh tải lên',
+      name: file.name || t.value.uploadedImageFallbackName,
       source: 'uploaded',
       createdAt: new Date().toISOString(),
     }
     addCustomWallpaperToConversation(convId, customItem)
     setConversationWallpaper(convId, dataUrl)
-    ui.showToast(t.value.wallpaperUpdated || 'Đã đổi hình nền đoạn chat')
+    ui.showToast(t.value.wallpaperUpdated)
 
     // Asynchronously backup original image to user's Filvault personal storage
     void (async () => {
@@ -607,7 +614,7 @@ async function handleWallpaperUpload(event: Event) {
       }
     })()
   } catch {
-    ui.showToast('Không thể xử lý hình ảnh')
+    ui.showToast(t.value.wallpaperProcessError)
   } finally {
     target.value = ''
   }
@@ -652,6 +659,10 @@ const infoSearching = ref(false)
 const infoSearchDone = ref(false)
 const infoSearchInputRef = ref<HTMLInputElement | null>(null)
 
+function formatInfoSearchResults(count: number): string {
+  return t.value.searchResultsCount.replace('{count}', String(count))
+}
+
 interface SharedLinkItem {
   url: string
   domain: string
@@ -680,11 +691,11 @@ const sharedFiles = computed(() =>
 const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`]+)/gi
 
 function messageSenderName(msg: ChatMessage): string {
-  if (msg.senderId === auth.user?.id) return 'Bạn'
+  if (msg.senderId === auth.user?.id) return t.value.chatSenderYou
   const c = conversations.value.find((item) => item.id === msg.conversationId)
   if (c?.peer?.name) return c.peer.name
   if (c?.peer?.email) return c.peer.email
-  return 'Người gửi'
+  return t.value.chatSenderFallback
 }
 
 const sharedLinks = computed<SharedLinkItem[]>(() => {
@@ -744,7 +755,7 @@ async function performInfoSearch() {
     infoSearchResults.value = out.messages
     infoSearchDone.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'Search failed')
+    error.value = formatApiError(e, t.value.chatSearchFailed)
   } finally {
     infoSearching.value = false
   }
@@ -793,10 +804,10 @@ function formatSearchSnippet(body: string, query: string): string {
 }
 
 const chatInfoTitle = computed(() => {
-  if (chatInfoCurrentView.value === 'search') return 'Tìm kiếm'
-  if (chatInfoCurrentView.value === 'media') return 'File phương tiện và file'
-  if (chatInfoCurrentView.value === 'wallpaper') return t.value.chatWallpaper || 'Hình nền đoạn chat'
-  return t.value.chatInfo || 'Thông tin đoạn chat'
+  if (chatInfoCurrentView.value === 'search') return t.value.search
+  if (chatInfoCurrentView.value === 'media') return t.value.sharedMedia
+  if (chatInfoCurrentView.value === 'wallpaper') return t.value.chatWallpaper
+  return t.value.chatInfo
 })
 
 function openInfoSearchView() {
@@ -1183,7 +1194,7 @@ function conversationTitle(conversation: ChatConversation | null): string {
   if (!conversation) return ''
   const nick = nicknames.value[conversation.id]
   if (nick) return nick
-  return conversation.peer?.name || conversation.peer?.email || conversation.title || 'Untitled chat'
+  return conversation.peer?.name || conversation.peer?.email || conversation.title || t.value.untitledChat
 }
 
 function avatarClass(title: string): string {
@@ -1200,7 +1211,7 @@ function formatRelativeDay(iso: string): string {
   yesterday.setDate(today.getDate() - 1)
   if (date.toDateString() === today.toDateString()) return formatTime(iso)
   if (date.toDateString() === yesterday.toDateString()) return t.value.yesterday
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' })
+  return date.toLocaleDateString(locale.value === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'numeric' })
 }
 const inThread = computed({
   get: () => Boolean(selectedId.value),
@@ -1262,7 +1273,7 @@ async function selectReaction(emoji: string, targetMessage?: ChatMessage) {
       local.reactions = updated
     }
   } catch (err) {
-    ui.showToast(formatApiError(err, 'Không thể thả cảm xúc'), 'error')
+    ui.showToast(formatApiError(err, t.value.reactionFailed), 'error')
   }
 }
 
@@ -1295,7 +1306,7 @@ function triggerReplyMessage() {
   const msg = activeMessage.value
   messageMenuOpen.value = false
   if (!msg) return
-  const preview = msg.body ? (msg.body.length > 50 ? msg.body.slice(0, 50) + '…' : msg.body) : 'Tệp đính kèm'
+  const preview = msg.body ? (msg.body.length > 50 ? msg.body.slice(0, 50) + '…' : msg.body) : t.value.chatReplyAttachmentFallback
   draft.value = `> ${preview}\n`
   focusComposer(true)
 }
@@ -1375,7 +1386,7 @@ async function copyMessageText() {
     await navigator.clipboard.writeText(activeMessage.value.body)
     ui.showToast(t.value.copiedMessage)
   } catch {
-    ui.showToast('Không thể sao chép', 'error')
+    ui.showToast(t.value.copyFailed, 'error')
   } finally {
     messageMenuOpen.value = false
   }
@@ -1430,7 +1441,7 @@ async function deleteConversation(convId?: string) {
   if (!id) return
   const confirmed = await ui.confirm({
     title: t.value.deleteChat,
-    message: 'Toàn bộ tin nhắn trong cuộc trò chuyện này sẽ bị xóa khỏi danh sách của bạn.',
+    message: t.value.deleteChatMessage,
     confirmLabel: t.value.remove,
     danger: true,
   })
@@ -1451,7 +1462,7 @@ async function deleteConversation(convId?: string) {
     chatWallpapers.value = next
     saveWallpapersToStorage(next)
   }
-  ui.showToast('Đã xóa đoạn chat')
+  ui.showToast(t.value.deleteChatSuccess)
 }
 
 async function changeNickname() {
@@ -1460,13 +1471,13 @@ async function changeNickname() {
   const currentNick = nicknames.value[selectedConversation.value.id] || conversationTitle(selectedConversation.value)
   const nick = await ui.prompt({
     title: t.value.changeNickname,
-    label: 'Biệt danh mới',
+    label: t.value.newNicknameLabel,
     initialValue: currentNick,
-    confirmLabel: 'Lưu',
+    confirmLabel: t.value.nicknameSave,
   })
   if (nick !== null) {
     nicknames.value[selectedConversation.value.id] = nick.trim()
-    ui.showToast('Đã cập nhật biệt danh')
+    ui.showToast(t.value.nicknameUpdated)
   }
 }
 
@@ -1490,7 +1501,7 @@ async function openPeekPreview(conv: ChatConversation) {
     const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${conv.id}/messages?limit=6`)
     peekMessages.value = out.messages
   } catch {
-    ui.showToast('Không thể tải tin nhắn xem trước', 'error')
+    ui.showToast(t.value.peekLoadError, 'error')
   } finally {
     peekLoading.value = false
   }
@@ -1617,9 +1628,6 @@ function backToVault() {
 
 const appMenuOpen = ref(false)
 
-function toggleDarkMode() {
-  toggleResolvedAppearance()
-}
 
 function toggleLanguage() {
   const next = locale.value === 'vi' ? 'en' : 'vi'
@@ -1631,10 +1639,10 @@ async function toggleActiveStatus() {
   const next = !current
   try {
     await auth.updateActiveStatus(next)
-    ui.showToast(next ? 'Đã bật trạng thái hoạt động' : 'Đã tắt trạng thái hoạt động')
+    ui.showToast(next ? t.value.activeStatusEnabled : t.value.activeStatusDisabled)
     await loadConversations()
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Không thể cập nhật trạng thái'), 'error')
+    ui.showToast(formatApiError(e, t.value.activeStatusUpdateError), 'error')
   }
 }
 
@@ -1665,7 +1673,7 @@ async function loadConversations() {
       void router.replace(`/chat/${out.conversations[0].id}`)
     }
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load chats')
+    error.value = formatApiError(e, t.value.chatLoadFailed)
   } finally {
     loading.value = false
   }
@@ -1679,7 +1687,7 @@ async function createDirectConversation(email: string) {
     await selectConversation(conversation.id)
     void router.push(`/chat/${conversation.id}`)
   } catch (e) {
-    error.value = formatApiError(e, 'Could not open direct chat')
+    error.value = formatApiError(e, t.value.chatOpenDirectFailed)
   }
 }
 
@@ -1735,7 +1743,7 @@ async function loadMessages(id = selectedId.value) {
       void chatStore.markAsRead(id, out.messages[out.messages.length - 1]?.id)
     }
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load messages')
+    error.value = formatApiError(e, t.value.chatMessagesLoadFailed)
   } finally {
     loadingThread.value = false
   }
@@ -1763,7 +1771,7 @@ async function loadOlder() {
       container.scrollTop = container.scrollHeight - heightBefore + offsetBefore
     }
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load older messages')
+    error.value = formatApiError(e, t.value.chatOlderMessagesLoadFailed)
   } finally {
     loadingOlder.value = false
   }
@@ -1810,20 +1818,20 @@ function formatDayLabel(iso: string): string {
   const today = new Date()
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
-  if (date.toDateString() === today.toDateString()) return 'Today'
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  if (date.toDateString() === today.toDateString()) return t.value.today
+  if (date.toDateString() === yesterday.toDateString()) return t.value.yesterday
+  return date.toLocaleDateString(locale.value === 'vi' ? 'vi-VN' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString(locale.value === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 function conversationPreview(conv: ChatConversation): string {
   if (conv.preview?.body) {
     if (isStickerMessage(conv.preview.body)) {
       const sym = parseStickerSymbol(conv.preview.body)
-      return sym ? `[Sticker ${sym}]` : '[Sticker]'
+      return sym ? `[${t.value.sticker} ${sym}]` : `[${t.value.sticker}]`
     }
     return conv.preview.body
   }
@@ -1878,7 +1886,7 @@ async function searchMessages() {
     const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${selectedId.value}/messages/search?q=${q}`)
     searchResults.value = out.messages
   } catch (e) {
-    error.value = formatApiError(e, 'Search failed')
+    error.value = formatApiError(e, t.value.chatSearchFailed)
   }
 }
 
@@ -1918,7 +1926,7 @@ async function loadMedia(id = selectedId.value) {
     media.value = out.media
     void resolveMediaThumbs(out.media)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load media')
+    error.value = formatApiError(e, t.value.chatMediaLoadFailed)
   }
 }
 
@@ -1932,10 +1940,10 @@ function canMutateMessage(message: ChatMessage): boolean {
 
 async function editMessage(message: ChatMessage) {
   const body = await ui.prompt({
-    title: 'Edit message',
-    label: 'Message',
+    title: t.value.chatEditMessageTitle,
+    label: t.value.messageLabel,
     initialValue: message.body,
-    confirmLabel: 'Save',
+    confirmLabel: t.value.save,
   })
   if (!body?.trim() || body.trim() === message.body || !selectedId.value) return
   try {
@@ -1945,16 +1953,16 @@ async function editMessage(message: ChatMessage) {
     )
     messages.value = messages.value.map((item) => item.id === updated.id ? updated : item)
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to edit message')
+    error.value = formatApiError(e, t.value.chatMessageEditFailed)
   }
 }
 
 async function removeMessage(message: ChatMessage) {
   if (!selectedId.value) return
   const confirmed = await ui.confirm({
-    title: 'Remove message?',
-    message: 'This message will be replaced with a removal notice for everyone.',
-    confirmLabel: 'Remove',
+    title: t.value.chatRemoveMessageTitle,
+    message: t.value.chatRemoveMessageDescription,
+    confirmLabel: t.value.remove,
     danger: true,
   })
   if (!confirmed) return
@@ -1964,13 +1972,13 @@ async function removeMessage(message: ChatMessage) {
       item.id === message.id ? { ...item, body: '', removedAt: new Date().toISOString() } : item,
     )
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to remove message')
+    error.value = formatApiError(e, t.value.chatMessageRemoveFailed)
   }
 }
 
 function attachmentLabel(attachment: ChatAttachment): string {
-  if (attachment.availability === 'trashed') return 'File moved to Trash'
-  if (attachment.availability === 'purged') return 'File permanently deleted'
+  if (attachment.availability === 'trashed') return t.value.fileMovedToTrash
+  if (attachment.availability === 'purged') return t.value.filePermanentlyDeleted
   return ''
 }
 
@@ -2010,8 +2018,8 @@ async function sendText() {
     selectedId.value = message.conversationId
   } catch (e) {
     draft.value = draft.value ? draft.value : body
-    pendingMessageError.value = formatApiError(e, 'Failed to send message')
-    error.value = formatApiError(e, 'Failed to send message')
+    pendingMessageError.value = formatApiError(e, t.value.chatMessageSendFailed)
+    error.value = formatApiError(e, t.value.chatMessageSendFailed)
   } finally {
     sendingText.value = false
   }
@@ -2118,11 +2126,11 @@ async function processAttachment(id: string) {
     }
     attachmentQueue.value = attachmentQueue.value.filter((entry) => entry.id !== id)
     scrollToLatest({ smooth: true })
-    ui.showToast('Attachment sent')
+    ui.showToast(t.value.chatAttachmentSent)
   } catch (e) {
     if (item.status !== 'uploading') return
     item.status = 'failed'
-    item.error = formatApiError(e, 'Failed to send attachment')
+    item.error = formatApiError(e, t.value.chatAttachmentSendFailed)
   } finally {
     processNextInAttachmentQueue()
   }
@@ -2158,7 +2166,7 @@ async function openAttachment(attachmentId: string) {
     const targetUrl = normalizePresignedUrl(out.downloadUrl)
     window.open(targetUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, 'Download failed')
+    error.value = formatApiError(e, t.value.chatDownloadFailed)
   }
 }
 
@@ -2175,7 +2183,7 @@ async function openInlineImage(attachment: ChatAttachment) {
     lightboxUrl.value = normalizePresignedUrl(out.downloadUrl)
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'View failed')
+    error.value = formatApiError(e, t.value.chatViewFailed)
   }
 }
 
@@ -2274,7 +2282,7 @@ function initiateCall(isVideo: boolean) {
   if (!selectedConversation.value) return
   if (selectedConversation.value.type !== 'direct') return
   if (callStore.state !== 'idle') {
-    ui.showToast('Bạn đang trong cuộc gọi khác', 'info')
+    ui.showToast(t.value.callAlreadyActive, 'info')
     return
   }
   callStore.startCall(selectedConversation.value.id, {
@@ -2350,7 +2358,7 @@ watch(
 
 <template>
   <div class="chat-app" :class="{ 'in-thread': inThread, 'resizing-col': isResizingRail || isResizingInfo }" :style="{ '--rail-w': `${railWidth}px`, '--info-w': `${infoWidth}px` }">
-    <aside class="chat-rail" aria-label="Conversations">
+    <aside class="chat-rail" :aria-label="t.chats">
       <!-- Left resizer splitter (Desktop only) -->
       <div
         v-if="isDesktop"
@@ -2362,8 +2370,8 @@ watch(
         :aria-valuenow="railWidth"
         :aria-valuemin="MIN_RAIL_WIDTH"
         :aria-valuemax="MAX_RAIL_WIDTH"
-        aria-label="Resize conversation list"
-        title="Kéo để chỉnh độ rộng danh sách chat (Nhấp đúp để đặt lại)"
+        :aria-label="t.resizeConversationListAria"
+        :title="t.resizeConversationListTitle"
         @pointerdown.stop.prevent="startRailResize"
         @dblclick="resetRailWidth"
         @keydown="onRailResizerKeydown"
@@ -2381,7 +2389,7 @@ watch(
           <span class="chat-mark" aria-hidden="true">F</span>
         </button>
         <h1>{{ t.chats }}</h1>
-        <button type="button" class="icon-btn" aria-label="Back to Filvault" @click="backToVault">
+        <button type="button" class="icon-btn" :aria-label="t.backToFilvault" @click="backToVault">
           <Icon name="folder" :size="20" />
         </button>
         <button type="button" class="compose-btn" :aria-label="t.newChat" @click="promptNewConversation">
@@ -2470,9 +2478,11 @@ watch(
             class="thread-peer-info clickable"
             role="button"
             tabindex="0"
+            :aria-label="t.chatInfo"
             :title="t.chatInfo"
             @click="openChatInfo"
             @keydown.enter="openChatInfo"
+            @keydown.space.prevent="openChatInfo"
           >
             <img
               v-if="selectedConversation?.peer?.avatarUrl"
@@ -2502,8 +2512,8 @@ watch(
               <button
                 class="icon-btn"
                 type="button"
-                aria-label="Gọi thoại"
-                title="Gọi thoại"
+                :aria-label="t.callVoice"
+                :title="t.callVoice"
                 @click="initiateCall(false)"
               >
                 <Icon name="phone" :size="18" />
@@ -2511,8 +2521,8 @@ watch(
               <button
                 class="icon-btn"
                 type="button"
-                aria-label="Gọi video"
-                title="Gọi video"
+                :aria-label="t.callVideo"
+                :title="t.callVideo"
                 @click="initiateCall(true)"
               >
                 <Icon name="camera" :size="18" />
@@ -2549,7 +2559,7 @@ watch(
             v-if="chatStore.connectionState !== 'connected'"
             class="connection-status"
             role="status"
-            :title="t.retry || 'Thử lại'"
+            :title="t.retry"
             @click="chatStore.connectEvents()"
           >
             {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
@@ -2571,7 +2581,7 @@ watch(
           @scroll.passive="onThreadScroll"
         >
           <LoadingSkeletonThread v-if="loadingThread" />
-          <p v-else-if="loadingOlder" class="loading-older">{{ t.loadingOlder || 'Đang tải tin nhắn cũ hơn…' }}</p>
+          <p v-else-if="loadingOlder" class="loading-older">{{ t.loadingOlder }}</p>
           <div v-else-if="visibleMessages.length" class="message-list">
             <TransitionGroup name="msg">
               <template v-for="(message, index) in visibleMessages" :key="message.id">
@@ -2800,7 +2810,7 @@ watch(
                       v-if="item.previewUrl"
                       :src="item.previewUrl"
                       class="pending-image-thumb"
-                      alt="Đang gửi ảnh..."
+                      :alt="t.sendingImageAlt"
                     />
                     <div v-else class="pending-image-placeholder">
                       <div class="pending-skeleton-pulse" />
@@ -2828,13 +2838,13 @@ watch(
 
                       <div v-else-if="item.status === 'failed'" class="pending-failed-content">
                         <span class="failed-badge-icon">⚠️</span>
-                        <span class="failed-msg">{{ item.error || 'Lỗi tải ảnh' }}</span>
+                        <span class="failed-msg">{{ item.error || t.uploadImageFailed }}</span>
                         <div class="failed-actions">
                           <button type="button" class="bubble-action-btn retry" @click="retryUpload(item.id)">
-                            {{ t.retry || 'Thử lại' }}
+                            {{ t.retry }}
                           </button>
                           <button type="button" class="bubble-action-btn cancel" @click="cancelUpload(item.id)">
-                            Cancel upload
+                            {{ t.cancelUpload }}
                           </button>
                         </div>
                       </div>
@@ -2845,8 +2855,8 @@ watch(
                       v-if="item.status === 'uploading' || item.status === 'queued'"
                       type="button"
                       class="pending-bubble-cancel"
-                      title="Cancel upload"
-                      aria-label="Cancel upload"
+                      :title="t.cancelUpload"
+                      :aria-label="t.cancelUpload"
                       @click="cancelUpload(item.id)"
                     >
                       <Icon name="x" :size="13" />
@@ -2864,16 +2874,16 @@ watch(
                     </div>
                     <div v-if="item.status === 'uploading' || item.status === 'queued'" class="pending-file-actions">
                       <span class="pending-file-pct">{{ Math.round((item.progress || 0) * 100) }}%</span>
-                      <button type="button" class="pending-file-cancel-btn" title="Cancel upload" @click="cancelUpload(item.id)">
+                      <button type="button" class="pending-file-cancel-btn" :title="t.cancelUpload" :aria-label="t.cancelUpload" @click="cancelUpload(item.id)">
                         <Icon name="x" :size="14" />
                       </button>
                     </div>
                     <div v-else-if="item.status === 'failed'" class="pending-file-actions">
                       <button type="button" class="message-action" @click="retryUpload(item.id)">
-                        {{ t.retry || 'Thử lại' }}
+                        {{ t.retry }}
                       </button>
                       <button type="button" class="message-action" @click="cancelUpload(item.id)">
-                        Cancel upload
+                        {{ t.cancelUpload }}
                       </button>
                     </div>
                   </div>
@@ -2901,7 +2911,7 @@ watch(
           <Transition name="msg">
             <button v-if="showJump && !searchResults" type="button" class="jump-latest" @click="scrollToLatest({ smooth: true })">
               <Icon name="download" :size="16" />
-              <span>{{ t.latest || 'Mới nhất' }}</span>
+              <span>{{ t.latest }}</span>
             </button>
           </Transition>
         </div>
@@ -2927,7 +2937,7 @@ watch(
           />
         </div>
         <form class="chat-composer" @submit.prevent="sendText">
-          <button type="button" class="icon-btn attach-btn" aria-label="Attach file" @click="triggerAttachment">
+          <button type="button" class="icon-btn attach-btn" :aria-label="t.attachFile" @click="triggerAttachment">
             <Icon name="plus" :size="18" />
           </button>
           <button
@@ -2940,7 +2950,7 @@ watch(
           >
             <Icon name="sticker" :size="20" />
           </button>
-          <label class="sr-only" for="chat-message">Message</label>
+          <label class="sr-only" for="chat-message">{{ t.messageLabel }}</label>
           <textarea
             id="chat-message"
             ref="composerRef"
@@ -2966,14 +2976,14 @@ watch(
             v-show="Boolean(draft.trim())"
             class="send-btn"
             type="submit"
-            aria-label="Send"
+            :aria-label="t.send"
             :class="{ active: Boolean(draft.trim()) }"
             :disabled="!draft.trim() || sendingText"
             @click.prevent="sendText"
           >
             <Icon name="send" :size="18" />
           </button>
-          <label class="sr-only" for="chat-attachment">Attachment</label>
+          <label class="sr-only" for="chat-attachment">{{ t.attachment }}</label>
           <input id="chat-attachment" ref="fileInputRef" type="file" class="sr-only" @change="onAttachmentChange" />
         </form>
       </template>
@@ -2982,20 +2992,20 @@ watch(
           v-if="chatStore.connectionState !== 'connected'"
           class="connection-status"
           role="status"
-          :title="t.retry || 'Thử lại'"
+          :title="t.retry"
           @click="chatStore.connectEvents()"
         >
           {{ chatStore.connectionState === 'offline' ? t.offlineStatus : t.reconnecting }}
         </p>
         <EmptyState
-          :title="t.selectChat || 'Chọn một đoạn chat'"
-          :description="t.selectChatDesc || 'Chọn một cuộc trò chuyện từ danh sách hoặc bắt đầu cuộc trò chuyện mới.'"
+          :title="t.selectChat"
+          :description="t.selectChatDesc"
           icon="chat"
         />
       </template>
     </section>
 
-    <aside class="media-panel" aria-label="Shared media">
+    <aside class="media-panel" :aria-label="t.sharedMedia">
       <div class="media-panel-header">
         <h2>{{ t.sharedMedia }}</h2>
       </div>
@@ -3071,7 +3081,7 @@ watch(
             />
             <Icon v-else :name="item.mimeType.startsWith('video/') ? 'video' : 'image'" :size="18" />
             <span class="media-name">{{ item.name }}</span>
-            <small>{{ new Date(item.createdAt).toLocaleDateString() }}</small>
+            <small>{{ new Date(item.createdAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') }}</small>
           </button>
         </div>
         <p v-else class="muted-hint">{{ t.noSharedMedia }}</p>
@@ -3097,7 +3107,7 @@ watch(
             <span class="file-row-icon"><Icon name="file" :size="18" /></span>
             <span class="file-row-info">
               <span class="file-row-name" :title="item.name">{{ item.name }}</span>
-              <span class="file-row-meta">{{ formatBytes(item.sizeBytes) }} · {{ new Date(item.createdAt).toLocaleDateString() }}</span>
+              <span class="file-row-meta">{{ formatBytes(item.sizeBytes) }} · {{ new Date(item.createdAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US') }}</span>
             </span>
             <Icon name="download" :size="16" class="file-row-dl" />
           </button>
@@ -3144,7 +3154,7 @@ watch(
     <aside
       v-if="selectedConversation && isDesktop && desktopInfoOpen"
       class="chat-info-sidebar"
-      aria-label="Chat details"
+      :aria-label="t.chatInfo"
     >
       <!-- Right resizer splitter (Desktop only) -->
       <div
@@ -3156,8 +3166,8 @@ watch(
         :aria-valuenow="infoWidth"
         :aria-valuemin="MIN_INFO_WIDTH"
         :aria-valuemax="MAX_INFO_WIDTH"
-        aria-label="Resize chat details panel"
-        title="Kéo để chỉnh độ rộng thông tin đoạn chat (Nhấp đúp để đặt lại)"
+        :aria-label="t.resizeChatDetailsAria"
+        :title="t.resizeChatDetailsTitle"
         @pointerdown.stop.prevent="startInfoResize"
         @dblclick="resetInfoWidth"
         @keydown="onInfoResizerKeydown"
@@ -3220,7 +3230,7 @@ watch(
                 @click="initiateCall(false)"
               >
                 <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-                <span>Gọi thoại</span>
+                <span>{{ t.callVoice }}</span>
               </button>
               <button
                 type="button"
@@ -3228,7 +3238,7 @@ watch(
                 @click="initiateCall(true)"
               >
                 <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-                <span>Gọi video</span>
+                <span>{{ t.callVideo }}</span>
               </button>
             </template>
             <button
@@ -3248,7 +3258,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('customization')"
             >
-              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <span class="menu-section-label">{{ t.thisChatAppearance }}</span>
               <Icon
                 :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3263,7 +3273,7 @@ watch(
                 </div>
                 <div class="theme-dots">
                   <button
-                    v-for="th in chatThemes"
+                    v-for="th in localizedChatThemes"
                     :key="th.id"
                     type="button"
                     class="theme-dot"
@@ -3278,14 +3288,14 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openWallpaperSubPage">
                 <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
+                <span class="menu-item-text">{{ t.chatWallpaper }}</span>
                 <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
               <button type="button" class="menu-row-item" @click="bubblePickerOpen = true">
                 <span class="menu-item-icon badge-theme"><Icon name="chat" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatBubbleStyle || 'Kiểu bong bóng' }}</span>
+                <span class="menu-item-text">{{ t.chatBubbleStyle }}</span>
                 <span class="menu-badge">{{ currentBubbleStyle.name }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -3298,7 +3308,7 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openInfoSearchView">
                 <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
-                <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
+                <span class="menu-item-text">{{ t.searchInChat }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
             </div>
@@ -3311,7 +3321,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('media')"
             >
-              <span class="menu-section-label">{{ t.sharedMedia || 'File phương tiện và file' }}</span>
+              <span class="menu-section-label">{{ t.sharedMedia }}</span>
               <Icon
                 :name="infoSectionsOpen.media ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3321,19 +3331,19 @@ watch(
             <div v-show="infoSectionsOpen.media" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
                 <span class="menu-item-icon badge-theme"><Icon name="photos" :size="18" /></span>
-                <span class="menu-item-text">{{ t.photosAndVideos || 'File phương tiện' }}</span>
+                <span class="menu-item-text">{{ t.photosAndVideos }}</span>
                 <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
                 <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
-                <span class="menu-item-text">{{ t.files || 'File' }}</span>
+                <span class="menu-item-text">{{ t.files }}</span>
                 <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
                 <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
-                <span class="menu-item-text">{{ t.links || 'Liên kết' }}</span>
+                <span class="menu-item-text">{{ t.links }}</span>
                 <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -3347,7 +3357,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('privacy')"
             >
-              <span class="menu-section-label">Quyền riêng tư và hỗ trợ</span>
+              <span class="menu-section-label">{{ t.privacyAndSupport }}</span>
               <Icon
                 :name="infoSectionsOpen.privacy ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -3357,7 +3367,7 @@ watch(
             <div v-show="infoSectionsOpen.privacy" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
-                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : (t.muteChat || 'Tắt thông báo') }}</span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
               </button>
               <button type="button" class="menu-row-item danger-item" @click="deleteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
@@ -3376,7 +3386,7 @@ watch(
               v-model="infoSearchQuery"
               type="search"
               class="info-search-input"
-              :placeholder="t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện...'"
+              :placeholder="t.searchInChat"
               @input="onInfoSearchInput"
               @keydown.enter.prevent="performInfoSearch"
             />
@@ -3384,13 +3394,13 @@ watch(
               v-if="infoSearchDone && infoSearchResults.length"
               class="info-search-results-tag"
             >
-              {{ infoSearchResults.length }} kết quả
+              {{ formatInfoSearchResults(infoSearchResults.length) }}
             </span>
             <button
               v-if="infoSearchQuery"
               type="button"
               class="info-search-clear"
-              aria-label="Clear search"
+              :aria-label="t.clearSearch"
               @click="clearInfoSearch"
             >
               <Icon name="close" :size="14" />
@@ -3398,13 +3408,13 @@ watch(
           </div>
 
           <div v-if="infoSearching" class="subpage-status">
-            Đang tìm kiếm...
+            {{ t.searchingMessages }}
           </div>
           <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
-            <p class="search-enter-hint">Nhấn "Enter" để tìm kiếm.</p>
+            <p class="search-enter-hint">{{ t.pressEnterToSearch }}</p>
           </div>
           <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
-            <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
+            <p>{{ t.noMessagesFound }}</p>
           </div>
           <div v-else-if="infoSearchResults.length" class="subpage-results-container">
             <div class="info-search-list">
@@ -3588,13 +3598,13 @@ watch(
             <div class="wallpaper-preview-bubbles">
               <div class="preview-bubble incoming">
                 <span>{{ conversationTitle(selectedConversation) }}</span>
-                <p>Giao diện chat trông thế nào? ✨</p>
+                <p>{{ t.wallpaperPreviewIncoming }}</p>
               </div>
               <div
                 class="preview-bubble outgoing"
                 :style="{ background: activeWallpaperTheme ? activeWallpaperTheme.gradient : currentTheme.gradient }"
               >
-                <p>Rất đẹp và dễ nhìn! 👍</p>
+                <p>{{ t.wallpaperPreviewOutgoing }}</p>
               </div>
             </div>
           </div>
@@ -3603,11 +3613,11 @@ watch(
           <div class="wallpaper-actions-row">
             <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
               <Icon name="upload" :size="16" />
-              <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+              <span>{{ t.uploadCustomWallpaper }}</span>
             </button>
             <button type="button" class="wallpaper-action-btn storage" @click="openMediaStoragePicker">
               <Icon name="folder" :size="16" />
-              <span>{{ t.chooseFromStorage || 'Chọn từ kho lưu trữ' }}</span>
+              <span>{{ t.chooseFromStorage }}</span>
             </button>
             <button
               v-if="threadWallpaper"
@@ -3616,7 +3626,7 @@ watch(
               @click="removeConversationWallpaper"
             >
               <Icon name="trash" :size="16" />
-              <span>{{ t.resetWallpaper || 'Đặt lại mặc định' }}</span>
+              <span>{{ t.resetWallpaper }}</span>
             </button>
           </div>
           <input
@@ -3630,7 +3640,7 @@ watch(
           <!-- Custom Wallpapers of this Conversation -->
           <div v-if="currentConversationCustomWallpapers.length" class="wallpaper-presets-section wallpaper-custom-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.customWallpapers || 'Hình nền tùy chỉnh' }}</span>
+              <span class="wallpaper-section-title">{{ t.customWallpapers }}</span>
               <span class="custom-wallpaper-count">({{ currentConversationCustomWallpapers.length }})</span>
             </div>
             <div class="wallpaper-presets-grid">
@@ -3643,7 +3653,8 @@ watch(
                 tabindex="0"
                 :title="wp.name"
                 @click="setConversationWallpaper(selectedConversation.id, wp.url)"
-                @keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.enter.self="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.space.self.prevent="setConversationWallpaper(selectedConversation.id, wp.url)"
               >
                 <div class="wallpaper-preset-thumb custom-thumb" :style="{ backgroundImage: `url('${wp.url}')` }">
                   <span v-if="threadWallpaper === wp.url" class="preset-check-badge">
@@ -3652,8 +3663,8 @@ watch(
                   <button
                     type="button"
                     class="delete-custom-wp-btn"
-                    :title="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
-                    :aria-label="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    :title="t.removeWallpaperFromChat"
+                    :aria-label="t.removeWallpaperFromChat"
                     @click.stop="removeCustomWallpaperItem(selectedConversation.id, wp.id)"
                   >
                     <Icon name="trash" :size="12" />
@@ -3667,7 +3678,7 @@ watch(
           <!-- Presets Grid -->
           <div class="wallpaper-presets-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.chooseWallpaper || 'Hình nền có sẵn' }}</span>
+              <span class="wallpaper-section-title">{{ t.chooseWallpaper }}</span>
             </div>
 
             <!-- Mode Filter Tabs -->
@@ -3678,7 +3689,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'all' }"
                 @click="wallpaperCategoryFilter = 'all'"
               >
-                {{ t.allWallpapers || 'Tất cả' }}
+                {{ t.allWallpapers }}
               </button>
               <button
                 type="button"
@@ -3686,7 +3697,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'light' }"
                 @click="wallpaperCategoryFilter = 'light'"
               >
-                {{ t.lightModeWallpapers || 'Chế độ Sáng ☀️' }}
+                {{ t.lightModeWallpapers }}
               </button>
               <button
                 type="button"
@@ -3694,7 +3705,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'dark' }"
                 @click="wallpaperCategoryFilter = 'dark'"
               >
-                {{ t.darkModeWallpapers || 'Chế độ Tối 🌙' }}
+                {{ t.darkModeWallpapers }}
               </button>
             </div>
 
@@ -3732,7 +3743,7 @@ watch(
     <!-- Media & Personal Storage Picker BottomSheet for Wallpaper -->
     <BottomSheet
       :open="storagePickerOpen"
-      :title="t.pickWallpaperFromStorage || 'Chọn ảnh làm hình nền'"
+      :title="t.pickWallpaperFromStorage"
       @close="storagePickerOpen = false"
     >
       <div class="storage-picker-content">
@@ -3746,7 +3757,7 @@ watch(
             @click="switchStoragePickerTab('chat')"
           >
             <Icon name="chat" :size="15" />
-            <span>{{ t.fromThisChat || 'Trong đoạn chat' }} ({{ sharedPhotos.length }})</span>
+            <span>{{ t.fromThisChat }} ({{ sharedPhotos.length }})</span>
           </button>
           <button
             type="button"
@@ -3757,7 +3768,7 @@ watch(
             @click="switchStoragePickerTab('personal')"
           >
             <Icon name="folder" :size="15" />
-            <span>{{ t.fromPersonalStorage || 'Kho ảnh cá nhân' }}</span>
+            <span>{{ t.fromPersonalStorage }}</span>
           </button>
         </div>
 
@@ -3786,7 +3797,7 @@ watch(
           </div>
           <div v-else class="storage-picker-empty">
             <Icon name="image" :size="36" />
-            <p>{{ t.noChatPhotos || 'Chưa có ảnh nào trong đoạn chat' }}</p>
+            <p>{{ t.noChatPhotos }}</p>
           </div>
         </div>
 
@@ -3794,7 +3805,7 @@ watch(
         <div v-else-if="storagePickerTab === 'personal'" class="storage-picker-body">
           <div v-if="loadingPersonalPhotos" class="storage-picker-loading">
             <span class="spinner" />
-            <p>{{ t.loadingPhotos || 'Đang tải ảnh...' }}</p>
+            <p>{{ t.loadingPhotos }}</p>
           </div>
           <p v-else-if="personalPhotosError" class="alert">{{ personalPhotosError }}</p>
           <div v-else-if="personalPhotos.length" class="storage-picker-grid">
@@ -3820,7 +3831,7 @@ watch(
           </div>
           <div v-else class="storage-picker-empty">
             <Icon name="folder" :size="36" />
-            <p>{{ t.noPersonalPhotos || 'Chưa có ảnh nào trong kho cá nhân' }}</p>
+            <p>{{ t.noPersonalPhotos }}</p>
           </div>
         </div>
       </div>
@@ -3866,12 +3877,13 @@ watch(
         <div class="menu-section">
           <span class="menu-section-label">{{ t.appearance }} &amp; {{ t.navSettings }}</span>
           <div class="menu-items-group">
-            <button type="button" class="menu-row-item" @click="toggleDarkMode">
+            <button type="button" class="menu-row-item" @click="navigateTo('/settings#appearance')">
               <span class="menu-item-icon badge-theme">
-                <Icon :name="resolvedIsDark ? 'sun' : 'moon'" :size="18" />
+                <Icon :name="resolvedIsDark ? 'moon' : 'sun'" :size="18" />
               </span>
-              <span class="menu-item-text">{{ t.darkMode }}</span>
-              <span class="menu-toggle-state">{{ resolvedIsDark ? 'Bật' : 'Tắt' }}</span>
+              <span class="menu-item-text">{{ t.appAppearance }}</span>
+              <span class="menu-toggle-state">{{ resolvedIsDark ? t.appearanceModeDark : t.appearanceModeLight }}</span>
+              <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
             </button>
             <button type="button" class="menu-row-item" @click="toggleLanguage">
               <span class="menu-item-icon badge-lang"><Icon name="chat" :size="18" /></span>
@@ -3948,8 +3960,8 @@ watch(
             <button
               type="button"
               class="rx-btn rx-plus-btn"
-              title="Thêm biểu tượng khác"
-              aria-label="Thêm biểu tượng khác"
+              :title="t.addReaction"
+              :aria-label="t.addReaction"
               @click="openReactionPicker"
             >
               <Icon name="plus" :size="18" />
@@ -3988,13 +4000,13 @@ watch(
             <div class="action-icon-circle">
               <Icon name="reply" :size="20" />
             </div>
-            <span>{{ t.reply || 'Trả lời' }}</span>
+            <span>{{ t.reply }}</span>
           </button>
           <button type="button" class="bottom-action-btn" @click="copyMessageText">
             <div class="action-icon-circle">
               <Icon name="copy" :size="20" />
             </div>
-            <span>{{ t.copyMessage || 'Sao chép' }}</span>
+            <span>{{ t.copyMessage }}</span>
           </button>
           <button
             v-if="canMutateMessage(activeMessage)"
@@ -4005,7 +4017,7 @@ watch(
             <div class="action-icon-circle">
               <Icon name="pencil" :size="20" />
             </div>
-            <span>{{ t.edit || 'Sửa' }}</span>
+            <span>{{ t.edit }}</span>
           </button>
           <button
             v-if="canMutateMessage(activeMessage)"
@@ -4016,20 +4028,20 @@ watch(
             <div class="action-icon-circle danger-circle">
               <Icon name="trash" :size="20" />
             </div>
-            <span>{{ t.remove || 'Xóa' }}</span>
+            <span>{{ t.remove }}</span>
           </button>
           <button type="button" class="bottom-action-btn" @click="messageMenuOpen = false">
             <div class="action-icon-circle">
               <Icon name="close" :size="20" />
             </div>
-            <span>{{ t.close || 'Đóng' }}</span>
+            <span>{{ t.close }}</span>
           </button>
         </div>
       </div>
     </Teleport>
 
     <!-- Custom Emoji Reaction Picker BottomSheet -->
-    <BottomSheet :open="reactionPickerOpen" title="Chọn biểu tượng cảm xúc" @close="reactionPickerOpen = false">
+    <BottomSheet :open="reactionPickerOpen" :title="t.chooseReaction" @close="reactionPickerOpen = false">
       <EmojiPicker
         :active-reactions="targetMessageReactionList"
         @select-emoji="handlePickReactionEmoji"
@@ -4077,12 +4089,12 @@ watch(
           </span>
           <div class="peek-meta">
             <h4>{{ conversationTitle(peekConv) }}</h4>
-            <span class="peek-badge">Chế độ xem trước • Chưa dính đã xem</span>
+            <span class="peek-badge">{{ t.peekUnreadBadge }}</span>
           </div>
         </div>
 
         <div v-if="peekLoading" class="peek-loading">
-          <p>Đang tải tin nhắn…</p>
+          <p>{{ t.peekLoading }}</p>
         </div>
         <div v-else-if="!peekMessages.length" class="peek-empty">
           <p>{{ t.noMessagesYet }}</p>
@@ -4163,7 +4175,7 @@ watch(
                 @click="initiateCall(false); threadInfoOpen = false"
               >
                 <span class="action-icon-circle"><Icon name="phone" :size="18" /></span>
-                <span>Gọi thoại</span>
+                <span>{{ t.callVoice }}</span>
               </button>
               <button
                 type="button"
@@ -4171,7 +4183,7 @@ watch(
                 @click="initiateCall(true); threadInfoOpen = false"
               >
                 <span class="action-icon-circle"><Icon name="camera" :size="18" /></span>
-                <span>Gọi video</span>
+                <span>{{ t.callVideo }}</span>
               </button>
             </template>
             <button
@@ -4191,7 +4203,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('customization')"
             >
-              <span class="menu-section-label">{{ t.chatOptions || 'Tùy chỉnh đoạn chat' }}</span>
+              <span class="menu-section-label">{{ t.thisChatAppearance }}</span>
               <Icon
                 :name="infoSectionsOpen.customization ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -4206,7 +4218,7 @@ watch(
                 </div>
                 <div class="theme-dots">
                   <button
-                    v-for="th in chatThemes"
+                    v-for="th in localizedChatThemes"
                     :key="th.id"
                     type="button"
                     class="theme-dot"
@@ -4221,14 +4233,14 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openWallpaperSubPage">
                 <span class="menu-item-icon badge-theme"><Icon name="image" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatWallpaper || 'Hình nền đoạn chat' }}</span>
+                <span class="menu-item-text">{{ t.chatWallpaper }}</span>
                 <span class="menu-badge">{{ currentWallpaperPresetName }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
 
               <button type="button" class="menu-row-item" @click="bubblePickerOpen = true">
                 <span class="menu-item-icon badge-theme"><Icon name="chat" :size="18" /></span>
-                <span class="menu-item-text">{{ t.chatBubbleStyle || 'Kiểu bong bóng' }}</span>
+                <span class="menu-item-text">{{ t.chatBubbleStyle }}</span>
                 <span class="menu-badge">{{ currentBubbleStyle.name }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -4241,7 +4253,7 @@ watch(
 
               <button type="button" class="menu-row-item" @click="openInfoSearchView">
                 <span class="menu-item-icon badge-folder"><Icon name="search" :size="18" /></span>
-                <span class="menu-item-text">{{ t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện' }}</span>
+                <span class="menu-item-text">{{ t.searchInChat }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
             </div>
@@ -4254,7 +4266,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('media')"
             >
-              <span class="menu-section-label">{{ t.sharedMedia || 'File phương tiện và file' }}</span>
+              <span class="menu-section-label">{{ t.sharedMedia }}</span>
               <Icon
                 :name="infoSectionsOpen.media ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -4264,19 +4276,19 @@ watch(
             <div v-show="infoSectionsOpen.media" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="openMediaSubPage('media')">
                 <span class="menu-item-icon badge-theme"><Icon name="photos" :size="18" /></span>
-                <span class="menu-item-text">{{ t.photosAndVideos || 'File phương tiện' }}</span>
+                <span class="menu-item-text">{{ t.photosAndVideos }}</span>
                 <span v-if="sharedPhotos.length" class="menu-badge">{{ sharedPhotos.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('file')">
                 <span class="menu-item-icon badge-folder"><Icon name="file" :size="18" /></span>
-                <span class="menu-item-text">{{ t.files || 'File' }}</span>
+                <span class="menu-item-text">{{ t.files }}</span>
                 <span v-if="sharedFiles.length" class="menu-badge">{{ sharedFiles.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
               <button type="button" class="menu-row-item" @click="openMediaSubPage('link')">
                 <span class="menu-item-icon badge-theme"><Icon name="link" :size="18" /></span>
-                <span class="menu-item-text">{{ t.links || 'Liên kết' }}</span>
+                <span class="menu-item-text">{{ t.links }}</span>
                 <span v-if="sharedLinks.length" class="menu-badge">{{ sharedLinks.length }}</span>
                 <Icon name="chevron-right" :size="16" class="menu-item-arrow" />
               </button>
@@ -4290,7 +4302,7 @@ watch(
               class="menu-section-header-btn"
               @click="toggleInfoSection('privacy')"
             >
-              <span class="menu-section-label">Quyền riêng tư và hỗ trợ</span>
+              <span class="menu-section-label">{{ t.privacyAndSupport }}</span>
               <Icon
                 :name="infoSectionsOpen.privacy ? 'chevron-up' : 'chevron-down'"
                 :size="16"
@@ -4300,7 +4312,7 @@ watch(
             <div v-show="infoSectionsOpen.privacy" class="menu-items-group">
               <button type="button" class="menu-row-item" @click="toggleMuteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon :name="mutedConversations[selectedConversation.id] ? 'bell' : 'bell-off'" :size="18" /></span>
-                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : (t.muteChat || 'Tắt thông báo') }}</span>
+                <span class="menu-item-text">{{ mutedConversations[selectedConversation.id] ? t.unmuteChat : t.muteChat }}</span>
               </button>
               <button type="button" class="menu-row-item danger-item" @click="deleteConversation(selectedConversation.id)">
                 <span class="menu-item-icon badge-trash"><Icon name="trash" :size="18" /></span>
@@ -4319,7 +4331,7 @@ watch(
               v-model="infoSearchQuery"
               type="search"
               class="info-search-input"
-              :placeholder="t.searchInChat || 'Tìm kiếm trong cuộc trò chuyện...'"
+              :placeholder="t.searchInChat"
               @input="onInfoSearchInput"
               @keydown.enter.prevent="performInfoSearch"
             />
@@ -4327,13 +4339,13 @@ watch(
               v-if="infoSearchDone && infoSearchResults.length"
               class="info-search-results-tag"
             >
-              {{ infoSearchResults.length }} kết quả
+              {{ formatInfoSearchResults(infoSearchResults.length) }}
             </span>
             <button
               v-if="infoSearchQuery"
               type="button"
               class="info-search-clear"
-              aria-label="Clear search"
+              :aria-label="t.clearSearch"
               @click="clearInfoSearch"
             >
               <Icon name="close" :size="14" />
@@ -4341,13 +4353,13 @@ watch(
           </div>
 
           <div v-if="infoSearching" class="subpage-status">
-            Đang tìm kiếm...
+            {{ t.searchingMessages }}
           </div>
           <div v-else-if="!infoSearchQuery.trim()" class="subpage-empty-hint">
-            <p class="search-enter-hint">Nhấn "Enter" để tìm kiếm.</p>
+            <p class="search-enter-hint">{{ t.pressEnterToSearch }}</p>
           </div>
           <div v-else-if="infoSearchDone && !infoSearchResults.length" class="subpage-empty-hint">
-            <p>{{ t.noMessagesFound || 'Không tìm thấy tin nhắn nào khớp với từ khóa.' }}</p>
+            <p>{{ t.noMessagesFound }}</p>
           </div>
           <div v-else-if="infoSearchResults.length" class="subpage-results-container">
             <div class="info-search-list">
@@ -4531,13 +4543,13 @@ watch(
             <div class="wallpaper-preview-bubbles">
               <div class="preview-bubble incoming">
                 <span>{{ conversationTitle(selectedConversation) }}</span>
-                <p>Giao diện chat trông thế nào? ✨</p>
+                <p>{{ t.wallpaperPreviewIncoming }}</p>
               </div>
               <div
                 class="preview-bubble outgoing"
                 :style="{ background: activeWallpaperTheme ? activeWallpaperTheme.gradient : currentTheme.gradient }"
               >
-                <p>Rất đẹp và dễ nhìn! 👍</p>
+                <p>{{ t.wallpaperPreviewOutgoing }}</p>
               </div>
             </div>
           </div>
@@ -4546,11 +4558,11 @@ watch(
           <div class="wallpaper-actions-row">
             <button type="button" class="wallpaper-action-btn primary" @click="triggerWallpaperFileInput">
               <Icon name="upload" :size="16" />
-              <span>{{ t.uploadCustomWallpaper || 'Tải ảnh từ máy' }}</span>
+              <span>{{ t.uploadCustomWallpaper }}</span>
             </button>
             <button type="button" class="wallpaper-action-btn storage" @click="openMediaStoragePicker">
               <Icon name="folder" :size="16" />
-              <span>{{ t.chooseFromStorage || 'Chọn từ kho lưu trữ' }}</span>
+              <span>{{ t.chooseFromStorage }}</span>
             </button>
             <button
               v-if="threadWallpaper"
@@ -4559,7 +4571,7 @@ watch(
               @click="removeConversationWallpaper"
             >
               <Icon name="trash" :size="16" />
-              <span>{{ t.resetWallpaper || 'Đặt lại mặc định' }}</span>
+              <span>{{ t.resetWallpaper }}</span>
             </button>
           </div>
           <input
@@ -4573,7 +4585,7 @@ watch(
           <!-- Custom Wallpapers of this Conversation -->
           <div v-if="currentConversationCustomWallpapers.length" class="wallpaper-presets-section wallpaper-custom-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.customWallpapers || 'Hình nền tùy chỉnh' }}</span>
+              <span class="wallpaper-section-title">{{ t.customWallpapers }}</span>
               <span class="custom-wallpaper-count">({{ currentConversationCustomWallpapers.length }})</span>
             </div>
             <div class="wallpaper-presets-grid">
@@ -4586,7 +4598,8 @@ watch(
                 tabindex="0"
                 :title="wp.name"
                 @click="setConversationWallpaper(selectedConversation.id, wp.url)"
-                @keydown.enter="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.enter.self="setConversationWallpaper(selectedConversation.id, wp.url)"
+                @keydown.space.self.prevent="setConversationWallpaper(selectedConversation.id, wp.url)"
               >
                 <div class="wallpaper-preset-thumb custom-thumb" :style="{ backgroundImage: `url('${wp.url}')` }">
                   <span v-if="threadWallpaper === wp.url" class="preset-check-badge">
@@ -4595,8 +4608,8 @@ watch(
                   <button
                     type="button"
                     class="delete-custom-wp-btn"
-                    :title="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
-                    :aria-label="t.removeWallpaperFromChat || 'Gỡ khỏi đoạn chat'"
+                    :title="t.removeWallpaperFromChat"
+                    :aria-label="t.removeWallpaperFromChat"
                     @click.stop="removeCustomWallpaperItem(selectedConversation.id, wp.id)"
                   >
                     <Icon name="trash" :size="12" />
@@ -4610,7 +4623,7 @@ watch(
           <!-- Presets Grid -->
           <div class="wallpaper-presets-section">
             <div class="wallpaper-section-header">
-              <span class="wallpaper-section-title">{{ t.chooseWallpaper || 'Hình nền có sẵn' }}</span>
+              <span class="wallpaper-section-title">{{ t.chooseWallpaper }}</span>
             </div>
 
             <!-- Mode Filter Tabs -->
@@ -4621,7 +4634,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'all' }"
                 @click="wallpaperCategoryFilter = 'all'"
               >
-                {{ t.allWallpapers || 'Tất cả' }}
+                {{ t.allWallpapers }}
               </button>
               <button
                 type="button"
@@ -4629,7 +4642,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'light' }"
                 @click="wallpaperCategoryFilter = 'light'"
               >
-                {{ t.lightModeWallpapers || 'Chế độ Sáng ☀️' }}
+                {{ t.lightModeWallpapers }}
               </button>
               <button
                 type="button"
@@ -4637,7 +4650,7 @@ watch(
                 :class="{ active: wallpaperCategoryFilter === 'dark' }"
                 @click="wallpaperCategoryFilter = 'dark'"
               >
-                {{ t.darkModeWallpapers || 'Chế độ Tối 🌙' }}
+                {{ t.darkModeWallpapers }}
               </button>
             </div>
 
@@ -4686,6 +4699,9 @@ watch(
 }
 
 .chat-app {
+  --chat-accent: var(--accent);
+  --chat-accent-secondary: var(--accent);
+  --chat-bubble-outgoing: linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-secondary) 100%);
   display: grid;
   height: 100vh;
   height: 100dvh;
@@ -4741,7 +4757,7 @@ watch(
 
 .rail-filter input {
   width: 100%;
-  min-height: 40px;
+  min-height: var(--touch-min);
   padding: 8px 14px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
@@ -4849,7 +4865,7 @@ watch(
   width: 48px;
   height: 48px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #0084ff 0%, #0099ff 100%);
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
   font-size: 18px;
   font-weight: 700;
@@ -5494,7 +5510,7 @@ watch(
   min-height: 36px;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
-  color: var(--chat-accent, #0084ff);
+  color: var(--chat-accent);
   transition: background var(--duration-short) var(--ease-standard), transform var(--duration-short) var(--ease-standard);
 }
 
@@ -5525,7 +5541,7 @@ watch(
 .chat-search input {
   min-width: 0;
   flex: 1;
-  min-height: 40px;
+  min-height: var(--touch-min);
   padding: 8px 12px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
@@ -6023,7 +6039,7 @@ watch(
 }
 
 .message-bubble.outgoing {
-  background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
 }
 
@@ -6340,7 +6356,7 @@ watch(
 }
 
 .attach-btn:focus-visible {
-  outline: 2px solid var(--chat-accent, #0084ff);
+  outline: 2px solid var(--chat-accent);
   outline-offset: 2px;
 }
 
@@ -6371,8 +6387,8 @@ watch(
 }
 
 .sticker-toggle-btn.active {
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 18%, transparent);
-  color: var(--chat-accent, #0084ff);
+  background: color-mix(in srgb, var(--chat-accent) 18%, transparent);
+  color: var(--chat-accent);
 }
 
 .sticker-picker-drawer {
@@ -6436,7 +6452,7 @@ img.avatar-img {
 }
 
 .chat-composer textarea:focus-visible {
-  outline: 2px solid var(--chat-accent, #0084ff);
+  outline: 2px solid var(--chat-accent);
   outline-offset: -1px;
 }
 
@@ -6451,7 +6467,7 @@ img.avatar-img {
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--chat-accent, #0084ff);
+  color: var(--chat-accent);
   cursor: pointer;
   flex-shrink: 0;
   margin-bottom: 2px;
@@ -6462,7 +6478,7 @@ img.avatar-img {
 
 .like-btn:hover {
   transform: scale(1.15);
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 10%, transparent);
+  background: color-mix(in srgb, var(--chat-accent) 10%, transparent);
 }
 
 .like-btn:active {
@@ -6470,7 +6486,7 @@ img.avatar-img {
 }
 
 .like-btn:focus-visible {
-  outline: 2px solid var(--chat-accent, #0084ff);
+  outline: 2px solid var(--chat-accent);
   outline-offset: 2px;
 }
 
@@ -6484,7 +6500,7 @@ img.avatar-img {
   min-height: 36px;
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--chat-bubble-outgoing, linear-gradient(135deg, var(--chat-accent, #0084ff) 0%, #0099ff 100%));
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
   opacity: 0.4;
   cursor: pointer;
@@ -6688,8 +6704,8 @@ img.avatar-img {
 
   .thread-header {
     padding: calc(6px + env(safe-area-inset-top)) 10px 6px;
-    gap: 6px;
-    min-height: 52px;
+    gap: 4px;
+    min-height: 56px;
   }
 
   .thread-peer-info {
@@ -6711,12 +6727,19 @@ img.avatar-img {
   }
 
   .thread-actions {
-    gap: 2px;
+    gap: 0;
   }
 
-  .thread-actions .icon-btn {
-    width: 34px;
-    height: 34px;
+  .back-btn,
+  .thread-actions .icon-btn,
+  .attach-btn,
+  .sticker-toggle-btn,
+  .like-btn,
+  .send-btn {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
   }
 
   .sticker-picker-drawer {
@@ -7046,9 +7069,9 @@ img.avatar-img {
 
 /* Adaptive Seen Indicator when wallpaper is active */
 .message-thread.has-wallpaper .seen-indicator {
-  background: color-mix(in srgb, var(--chat-accent, #0084ff) 8%, rgba(255, 255, 255, 0.92));
-  border: 1px solid color-mix(in srgb, var(--chat-accent, #0084ff) 20%, rgba(0, 0, 0, 0.08));
-  color: color-mix(in srgb, var(--chat-accent, #0084ff) 85%, #000000);
+  background: color-mix(in srgb, var(--chat-accent) 8%, rgba(255, 255, 255, 0.92));
+  border: 1px solid color-mix(in srgb, var(--chat-accent) 20%, rgba(0, 0, 0, 0.08));
+  color: color-mix(in srgb, var(--chat-accent) 85%, #000000);
   font-weight: 600;
   padding: 2px 8px 2px 5px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -7280,7 +7303,7 @@ img.avatar-img {
 .reaction-badge-group.reacted-by-me {
   background: var(--surface);
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(0, 132, 255, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .rx-emoji {
@@ -7370,8 +7393,8 @@ img.avatar-img {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--touch-min);
+  height: var(--touch-min);
   border-radius: 50%;
   border: none;
   background: transparent;
@@ -7392,7 +7415,7 @@ img.avatar-img {
 }
 
 .rx-btn.rx-active {
-  background: rgba(0, 132, 255, 0.18);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   transform: scale(1.18);
 }
 
@@ -7403,8 +7426,6 @@ img.avatar-img {
 }
 
 .rx-plus-btn {
-  width: 36px;
-  height: 36px;
   background: rgba(255, 255, 255, 0.1);
   color: #e4e6eb;
 }
@@ -7461,7 +7482,7 @@ img.avatar-img {
 
 .message-bubble.active-elevated.outgoing {
   border-radius: 18px 18px 4px 18px;
-  background: var(--chat-bubble-outgoing, linear-gradient(135deg, #0084ff 0%, #0099ff 100%));
+  background: var(--chat-bubble-outgoing);
   color: #ffffff;
 }
 
@@ -7601,10 +7622,10 @@ img.avatar-img {
 
 @keyframes pulse-highlight {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 132, 255, 0);
+    box-shadow: 0 0 0 0 transparent;
   }
   20%, 50% {
-    box-shadow: 0 0 0 4px rgba(0, 132, 255, 0.4), 0 4px 16px rgba(0, 132, 255, 0.25);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent), 0 4px 16px color-mix(in srgb, var(--accent) 25%, transparent);
     transform: scale(1.02);
   }
 }
@@ -7625,7 +7646,7 @@ img.avatar-img {
   gap: 4px;
   border: none;
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -7637,7 +7658,7 @@ img.avatar-img {
 }
 
 .subpage-back-btn:hover {
-  background: rgba(0, 132, 255, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .subpage-title {
@@ -7656,10 +7677,10 @@ img.avatar-img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border: none;
   border-radius: var(--radius-pill);
   background: var(--surface-soft);
@@ -7859,7 +7880,7 @@ img.avatar-img {
 }
 
 .wallpaper-action-btn.primary {
-  background: var(--accent, #0084ff);
+  background: var(--accent);
   color: #ffffff;
   border: none;
 }
@@ -7963,8 +7984,8 @@ img.avatar-img {
 }
 
 .wallpaper-preset-item.active .wallpaper-preset-thumb {
-  border-color: var(--accent, #0084ff);
-  box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.3);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .preset-check-badge {
@@ -7974,7 +7995,7 @@ img.avatar-img {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--accent, #0084ff);
+  background: var(--accent);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -8027,25 +8048,46 @@ img.avatar-img {
 
 .delete-custom-wp-btn {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
+  top: -7px;
+  right: -7px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.65);
+  background: transparent;
   color: #ffffff;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
   z-index: 2;
 }
 
-.delete-custom-wp-btn:hover {
+.delete-custom-wp-btn::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  transition: background var(--duration-short) var(--ease-standard), transform var(--duration-short) var(--ease-standard);
+}
+
+.delete-custom-wp-btn svg {
+  position: relative;
+  z-index: 1;
+}
+
+.delete-custom-wp-btn:hover::before {
   background: var(--danger, #ef4444);
   transform: scale(1.15);
+}
+
+.delete-custom-wp-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -8px;
 }
 
 /* Storage & Media Picker BottomSheet */
@@ -8410,9 +8452,9 @@ img.avatar-img {
 
 .info-tab-btn.active {
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--accent, #0084ff);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .tab-badge {
@@ -8526,7 +8568,7 @@ img.avatar-img {
 }
 
 .shared-link-main:hover {
-  background: rgba(0, 132, 255, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .link-icon-wrap {
@@ -8537,7 +8579,7 @@ img.avatar-img {
   height: 32px;
   border-radius: var(--radius-sm);
   background: var(--surface-card);
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -8584,7 +8626,7 @@ img.avatar-img {
 .link-jump-btn {
   border: none;
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -8628,7 +8670,7 @@ img.avatar-img {
 
 .panel-tab-btn.active {
   background: var(--surface-soft);
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -8677,7 +8719,7 @@ img.avatar-img {
 }
 
 .file-row-icon {
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -8734,7 +8776,7 @@ img.avatar-img {
 }
 
 .panel-link-icon {
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -8780,7 +8822,7 @@ img.avatar-img {
 .panel-link-jump {
   border: none;
   background: transparent;
-  color: var(--accent, #0084ff);
+  color: var(--accent);
   font-size: 10px;
   cursor: pointer;
   padding: 0;
@@ -8792,8 +8834,8 @@ img.avatar-img {
 
 /* Active state for info icon button on thread header */
 .thread-actions .icon-btn.active {
-  background: var(--accent-soft, rgba(0, 132, 255, 0.12));
-  color: var(--chat-accent, #0084ff);
+  background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, transparent));
+  color: var(--chat-accent);
 }
 
 /* Desktop Chat Info Sidebar */
@@ -8837,10 +8879,10 @@ img.avatar-img {
 }
 
 .desktop-info-close-btn {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);

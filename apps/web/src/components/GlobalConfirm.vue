@@ -1,10 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useI18n } from '@/lib/i18n'
+import { sharedDialogCopy } from '@/lib/sharedDialogCopy'
 import { useUiStore } from '@/stores/ui'
 
 const ui = useUiStore()
 const { confirmState } = storeToRefs(ui)
+const { locale } = useI18n()
+const copy = computed(() => sharedDialogCopy(locale.value))
+const confirmLabel = computed(() => confirmState.value.confirmLabel ?? copy.value.confirm)
+const cancelLabel = computed(() => confirmState.value.cancelLabel ?? copy.value.cancel)
 
 function onConfirm() {
   ui.resolveConfirm(true)
@@ -25,10 +32,10 @@ function onCancel() {
         :class="confirmState.danger ? 'danger' : 'ink'"
         @click="onConfirm"
       >
-        {{ confirmState.confirmLabel }}
+        {{ confirmLabel }}
       </button>
       <button type="button" class="btn block ghost" @click="onCancel">
-        {{ confirmState.cancelLabel }}
+        {{ cancelLabel }}
       </button>
     </div>
   </BottomSheet>

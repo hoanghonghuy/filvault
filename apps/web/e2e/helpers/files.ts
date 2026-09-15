@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type Response } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +15,50 @@ const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../
 
 const textFixtureBuffer = readFileSync(path.join(fixturesDir, 'sample.txt'))
 const imageFixtureBuffer = readFileSync(path.join(fixturesDir, 'sample.png'))
+
+const trashMutationPath = {
+  files: /^\/api\/v1\/files\/[^/]+$/,
+  folders: /^\/api\/v1\/folders\/[^/]+$/,
+} as const
+
+function waitForTrashMutation(page: Page, resource: 'files' | 'folders'): Promise<Response> {
+  return page.waitForResponse((response) => {
+    if (response.request().method() !== 'DELETE') return false
+    const pathname = new URL(response.url()).pathname
+    return trashMutationPath[resource].test(pathname)
+  })
+}
+
+async function expectSuccessfulTrashMutation(mutation: Promise<Response>): Promise<void> {
+  const response = await mutation
+  expect(
+    response.ok(),
+    `Move-to-trash request failed: ${response.status()} ${response.request().method()} ${new URL(response.url()).pathname}`,
+  ).toBeTruthy()
+}
+
+async function confirmTrashMutation(page: Page, resource: 'files' | 'folders'): Promise<void> {
+  const label = /^Move to trash$/
+  const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: label }) })
+  const confirmButton = dialog.getByRole('button', { name: label })
+
+  await expect(dialog).toBeVisible()
+  const mutation = waitForTrashMutation(page, resource)
+
+  await confirmButton.click()
+  try {
+    await expect(dialog).toBeHidden({ timeout: 2_000 })
+  } catch {
+    // The trace in #171 showed an actionable click occasionally being lost while
+    // the transitioning confirmation stayed open. Retry only while the same
+    // dialog is still visible; a committed confirmation closes synchronously.
+    await expect(dialog).toBeVisible()
+    await confirmButton.click()
+    await expect(dialog).toBeHidden({ timeout: 5_000 })
+  }
+
+  await expectSuccessfulTrashMutation(mutation)
+}
 
 export async function navigateToFiles(page: Page): Promise<void> {
   await page.getByRole('link', { name: /^Files$/ }).click()
@@ -60,7 +104,7 @@ export async function uploadFile(page: Page, kind: 'text' | 'image', targetName:
 export async function openFileActions(page: Page, fileName: string): Promise<void> {
   const fileCard = page.getByRole('button', { name: fileName, exact: true })
   await expect(fileCard).toBeVisible()
-  await fileCard.getByRole('button', { name: /^File actions$/ }).click()
+  await fileCard.getByRole('button', { name: /^File actions:/ }).click()
   await expect(topDialog(page)).toBeVisible()
 }
 
@@ -84,15 +128,17 @@ export async function downloadFile(page: Page, fileName: string): Promise<void> 
 export async function moveFileToTrash(page: Page, fileName: string): Promise<void> {
   await openFileActions(page, fileName)
   await clickActionSheetItem(page, /^Move to trash$/)
-  await confirmDialog(page, /^Move to trash$/)
+
+  await confirmTrashMutation(page, 'files')
   await expect(page.getByRole('button', { name: fileName, exact: true })).toHaveCount(0)
 }
 
 export async function moveFolderToTrash(page: Page, folderName: string): Promise<void> {
   const folderCard = page.getByRole('button', { name: folderName, exact: true })
-  await folderCard.getByRole('button', { name: /^Folder actions$/ }).click()
+  await folderCard.getByRole('button', { name: /^Folder actions:/ }).click()
   await clickActionSheetItem(page, /^Move to trash$/)
-  await confirmDialog(page, /^Move to trash$/)
+
+  await confirmTrashMutation(page, 'folders')
   await expect(folderCard).toHaveCount(0)
 }
 

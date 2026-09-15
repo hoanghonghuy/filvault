@@ -12,12 +12,14 @@ import EmptyState from '@/components/EmptyState.vue'
 import LoadingSkeletonAlbum from '@/components/LoadingSkeletonAlbum.vue'
 import { cellDelay } from '@/lib/motion'
 import { useI18n } from '@/lib/i18n'
+import { albumRuntimeCopy } from '@/lib/albumCopy'
 import type { AlbumDetail, DownloadURL, TimelineItem } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const copy = computed(() => albumRuntimeCopy(locale.value))
 
 const album = ref<AlbumDetail | null>(null)
 const error = ref('')
@@ -26,28 +28,35 @@ const pickerOpen = ref(false)
 const mediaItem = ref<TimelineItem | null>(null)
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
+let loadSequence = 0
+let previewSequence = 0
 
 const albumId = computed(() => (Array.isArray(route.params.id) ? route.params.id[0] : (route.params.id ?? '')))
 const itemIds = computed(() => album.value?.items.map((i) => i.id) ?? [])
 
 async function load() {
+  const requestSequence = ++loadSequence
+  const requestAlbumId = albumId.value
   loading.value = true
   error.value = ''
   try {
-    album.value = await api<AlbumDetail>(`/photos/albums/${albumId.value}`)
+    const nextAlbum = await api<AlbumDetail>(`/photos/albums/${requestAlbumId}`)
+    if (requestSequence !== loadSequence || requestAlbumId !== albumId.value) return
+    album.value = nextAlbum
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load album')
+    if (requestSequence !== loadSequence || requestAlbumId !== albumId.value) return
+    error.value = formatApiError(e, copy.value.loadFailed, copy.value.apiError)
   } finally {
-    loading.value = false
+    if (requestSequence === loadSequence && requestAlbumId === albumId.value) loading.value = false
   }
 }
 
 async function openAlbumMenu() {
   if (!album.value) return
   const action = await ui.openActionSheet(album.value.name, [
-    { id: 'add', label: 'Add photos', icon: 'plus' },
-    { id: 'rename', label: 'Rename album', icon: 'pencil' },
-    { id: 'delete', label: 'Delete album', icon: 'trash', danger: true },
+    { id: 'add', label: copy.value.addPhotos, icon: 'plus' },
+    { id: 'rename', label: copy.value.renameAlbum, icon: 'pencil' },
+    { id: 'delete', label: copy.value.deleteAlbum, icon: 'trash', danger: true },
   ])
   if (!action) return
   if (action === 'add') pickerOpen.value = true
@@ -57,77 +66,47 @@ async function openAlbumMenu() {
 
 async function renameAlbum() {
   if (!album.value) return
-  const name = await ui.prompt({
-    title: t.value.renameAlbum,
-    label: t.value.displayName,
-    initialValue: album.value.name,
-  })
+  const name = await ui.prompt({ title: t.value.renameAlbum, label: t.value.displayName, initialValue: album.value.name })
   if (!name || name === album.value.name) return
   error.value = ''
   try {
-    await api(`/photos/albums/${albumId.value}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name }),
-    })
+    await api(`/photos/albums/${albumId.value}`, { method: 'PATCH', body: JSON.stringify({ name }) })
     ui.showToast(t.value.renameAlbum)
     await load()
-  } catch (e) {
-    error.value = formatApiError(e, 'Rename failed')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.renameFailed, copy.value.apiError) }
 }
 
 async function deleteAlbum() {
   if (!album.value) return
-  const ok = await ui.confirm({
-    title: `${t.value.deleteAlbum}?`,
-    message: `"${album.value.name}" ${t.value.deleteAlbumConfirm}`,
-    confirmLabel: t.value.deleteAlbum,
-    danger: true,
-  })
+  const ok = await ui.confirm({ title: `${t.value.deleteAlbum}?`, message: `"${album.value.name}" ${t.value.deleteAlbumConfirm}`, confirmLabel: t.value.deleteAlbum, danger: true })
   if (!ok) return
   error.value = ''
   try {
     await api(`/photos/albums/${albumId.value}`, { method: 'DELETE' })
     ui.showToast(t.value.deleteAlbum)
     await router.push('/photos')
-  } catch (e) {
-    error.value = formatApiError(e, 'Delete failed')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.deleteFailed, copy.value.apiError) }
 }
 
 async function addItem(fileId: string) {
   pickerOpen.value = false
   error.value = ''
   try {
-    await api(`/photos/albums/${albumId.value}/items`, {
-      method: 'POST',
-      body: JSON.stringify({ fileIds: [fileId] }),
-    })
+    await api(`/photos/albums/${albumId.value}/items`, { method: 'POST', body: JSON.stringify({ fileIds: [fileId] }) })
     ui.showToast(t.value.addPhotos)
     await load()
-  } catch (e) {
-    error.value = formatApiError(e, 'Failed to add item')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.addItemFailed, copy.value.apiError) }
 }
 
 async function openItemActions(item: TimelineItem) {
   const isCover = album.value?.coverFileId === item.id
   const action = await ui.openActionSheet(item.name, [
-    { id: 'view', label: 'View', icon: 'eye' },
-    { id: 'download', label: 'Download', icon: 'download' },
-    isCover
-      ? { id: 'unset-cover', label: 'Remove cover', icon: 'restore' }
-      : { id: 'set-cover', label: 'Set cover', icon: 'image' },
-    { id: 'remove', label: 'Remove from this album', icon: 'trash', danger: true },
+    { id: 'download', label: copy.value.download, icon: 'download' },
+    isCover ? { id: 'unset-cover', label: copy.value.removeCover, icon: 'restore' } : { id: 'set-cover', label: copy.value.setCover, icon: 'image' },
+    { id: 'remove', label: copy.value.removeFromAlbum, icon: 'trash', danger: true },
   ])
   if (!action) return
-  if (action === 'view') {
-    await openLightbox(item)
-  }
-  if (action === 'download') {
-    mediaItem.value = item
-    await downloadMedia()
-  }
+  if (action === 'download') { mediaItem.value = item; await downloadMedia() }
   if (action === 'set-cover') await setCover(item)
   if (action === 'unset-cover') await removeCover()
   if (action === 'remove') await removeItem(item.id, item.name)
@@ -136,78 +115,54 @@ async function openItemActions(item: TimelineItem) {
 async function setCover(item: TimelineItem) {
   error.value = ''
   try {
-    await api(`/photos/albums/${albumId.value}/cover`, {
-      method: 'POST',
-      body: JSON.stringify({ fileId: item.id }),
-    })
-    ui.showToast('Cover updated')
+    await api(`/photos/albums/${albumId.value}/cover`, { method: 'POST', body: JSON.stringify({ fileId: item.id }) })
+    ui.showToast(copy.value.coverUpdated)
     await load()
-  } catch (e) {
-    error.value = formatApiError(e, 'Failed to set cover')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.setCoverFailed, copy.value.apiError) }
 }
 
 async function removeCover() {
   error.value = ''
   try {
     await api(`/photos/albums/${albumId.value}/cover`, { method: 'DELETE' })
-    ui.showToast('Cover reset to automatic')
+    ui.showToast(copy.value.coverReset)
     await load()
-  } catch (e) {
-    error.value = formatApiError(e, 'Failed to remove cover')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.removeCoverFailed, copy.value.apiError) }
 }
 
 async function removeItem(fileId: string, name: string) {
-  const ok = await ui.confirm({
-    title: `${t.value.removeFromAlbum}?`,
-    message: `"${name}" will be removed from this album only.`,
-    confirmLabel: t.value.remove,
-    danger: true,
-  })
+  const ok = await ui.confirm({ title: `${t.value.removeFromAlbum}?`, message: copy.value.removeConfirmation(name), confirmLabel: t.value.remove, danger: true })
   if (!ok) return
   error.value = ''
   try {
     await api(`/photos/albums/${albumId.value}/items/${fileId}`, { method: 'DELETE' })
     ui.showToast(t.value.removeFromAlbum)
     await load()
-  } catch (e) {
-    error.value = formatApiError(e, 'Remove failed')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.removeFailed, copy.value.apiError) }
 }
 
 async function openLightbox(item: TimelineItem) {
+  const requestSequence = ++previewSequence
   error.value = ''
-  mediaItem.value = item
   try {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
+    if (requestSequence !== previewSequence) return
+    mediaItem.value = item
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, 'View failed')
+    if (requestSequence !== previewSequence) return
+    error.value = formatApiError(e, copy.value.viewFailed, copy.value.apiError)
   }
 }
 
+function closeLightbox() { previewSequence += 1; lightboxOpen.value = false; lightboxUrl.value = ''; mediaItem.value = null }
 const allAlbumItems = computed(() => album.value?.items ?? [])
-const currentLightboxIndex = computed(() =>
-  mediaItem.value ? allAlbumItems.value.findIndex((i) => i.id === mediaItem.value?.id) : -1,
-)
-const hasNextMedia = computed(
-  () => currentLightboxIndex.value !== -1 && currentLightboxIndex.value < allAlbumItems.value.length - 1,
-)
+const currentLightboxIndex = computed(() => mediaItem.value ? allAlbumItems.value.findIndex((i) => i.id === mediaItem.value?.id) : -1)
+const hasNextMedia = computed(() => currentLightboxIndex.value !== -1 && currentLightboxIndex.value < allAlbumItems.value.length - 1)
 const hasPrevMedia = computed(() => currentLightboxIndex.value > 0)
-
-async function nextMedia() {
-  if (!hasNextMedia.value) return
-  const nextItem = allAlbumItems.value[currentLightboxIndex.value + 1]
-  if (nextItem) await openLightbox(nextItem)
-}
-
-async function prevMedia() {
-  if (!hasPrevMedia.value) return
-  const prevItem = allAlbumItems.value[currentLightboxIndex.value - 1]
-  if (prevItem) await openLightbox(prevItem)
-}
+async function nextMedia() { if (!hasNextMedia.value) return; const item = allAlbumItems.value[currentLightboxIndex.value + 1]; if (item) await openLightbox(item) }
+async function prevMedia() { if (!hasPrevMedia.value) return; const item = allAlbumItems.value[currentLightboxIndex.value - 1]; if (item) await openLightbox(item) }
 
 async function downloadMedia() {
   if (!mediaItem.value) return
@@ -215,114 +170,60 @@ async function downloadMedia() {
   try {
     const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
-  } catch (e) {
-    error.value = formatApiError(e, 'Download failed')
-  }
+  } catch (e) { error.value = formatApiError(e, copy.value.downloadFailed, copy.value.apiError) }
 }
 
-watch(() => route.params.id, load, { immediate: true })
-
-onBeforeUnmount(() => {
+watch(() => route.params.id, () => {
+  previewSequence += 1
+  album.value = null
   pickerOpen.value = false
-})
+  lightboxOpen.value = false
+  lightboxUrl.value = ''
+  mediaItem.value = null
+  void load()
+}, { immediate: true })
+
+onBeforeUnmount(() => { loadSequence += 1; previewSequence += 1; pickerOpen.value = false })
 </script>
 
 <template>
   <div>
     <div class="album-header">
-      <button type="button" class="btn ghost mobile-back" @click="router.push('/photos')">
-        ← {{ t.photosTitle }}
-      </button>
+      <RouterLink to="/photos" class="btn ghost album-back" :aria-label="`${t.back}: ${t.photosTitle}`"><span aria-hidden="true">←</span><span>{{ t.photosTitle }}</span></RouterLink>
       <h1 class="album-title">{{ album?.name ?? t.album }}</h1>
-      <button type="button" class="btn icon-only" :aria-label="t.albumMenu" @click="openAlbumMenu">
-        <Icon name="more" :size="18" />
-      </button>
+      <button type="button" class="btn icon-only album-menu-btn" :aria-label="t.albumMenu" :disabled="!album || loading" @click="openAlbumMenu"><Icon name="more" :size="18" /></button>
     </div>
-
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="error && album" class="error" role="alert">{{ error }}</p>
     <LoadingSkeletonAlbum v-if="loading" />
+    <div v-else-if="error && !album" class="album-error-state" role="alert"><p class="error">{{ error }}</p><button type="button" class="btn album-retry" :disabled="loading" @click="load">{{ t.retry }}</button></div>
     <div v-else>
       <div v-if="album?.items.length" class="grid photos">
-        <PhotoThumb
-          v-for="(item, index) in album.items"
-          :key="item.id"
-          :mime-type="item.mimeType"
-          :name="item.name"
-          :thumbnail-url="item.thumbnailUrl"
-          class="appear"
-          :style="{ animationDelay: cellDelay(index) }"
-          :aria-label="`Actions for ${item.name}`"
-          @click="openItemActions(item)"
-          @contextmenu.prevent="openItemActions(item)"
-        />
+        <div v-for="(item, index) in album.items" :key="item.id" class="album-media-cell appear" :style="{ animationDelay: cellDelay(index) }">
+          <PhotoThumb :mime-type="item.mimeType" :name="item.name" :thumbnail-url="item.thumbnailUrl" @click="openLightbox(item)" @contextmenu.prevent="openItemActions(item)" />
+          <button type="button" class="album-media-more" :aria-label="`${t.moreActions}: ${item.name}`" @click="openItemActions(item)"><Icon name="more" :size="18" /></button>
+        </div>
       </div>
-
-      <EmptyState
-        v-else
-        :title="t.albumEmpty"
-        :description="t.albumEmptyDesc"
-        :action-label="t.addPhotos"
-        icon="photos"
-        @action="pickerOpen = true"
-      />
+      <EmptyState v-else :title="t.albumEmpty" :description="t.albumEmptyDesc" :action-label="t.addPhotos" icon="photos" @action="pickerOpen = true" />
     </div>
-
-    <MediaLightbox
-      :open="lightboxOpen"
-      :name="mediaItem?.name ?? ''"
-      :mime-type="mediaItem?.mimeType ?? ''"
-      :url="lightboxUrl"
-      :has-next="hasNextMedia"
-      :has-prev="hasPrevMedia"
-      @next="nextMedia"
-      @prev="prevMedia"
-      @download="downloadMedia"
-      @close="lightboxOpen = false"
-    />
-
-    <MediaPickerSheet
-      :open="pickerOpen"
-      :exclude-ids="itemIds"
-      @select="addItem"
-      @close="pickerOpen = false"
-    />
+    <MediaLightbox :open="lightboxOpen" :name="mediaItem?.name ?? ''" :mime-type="mediaItem?.mimeType ?? ''" :url="lightboxUrl" :has-next="hasNextMedia" :has-prev="hasPrevMedia" @next="nextMedia" @prev="prevMedia" @download="downloadMedia" @close="closeLightbox" />
+    <MediaPickerSheet :open="pickerOpen" :exclude-ids="itemIds" @select="addItem" @close="pickerOpen = false" />
   </div>
 </template>
 
 <style scoped>
-.album-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-}
-
-.album-title {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-back {
-  min-height: var(--touch-min);
-  padding: 0 var(--space-sm);
-}
-
-@media (min-width: 768px) {
-  .mobile-back {
-    display: none;
-  }
-
-  .album-title {
-    font-size: 1.5rem;
-    letter-spacing: -0.02em;
-  }
-}
+.album-header { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-md); min-width: 0; }
+.album-title { flex: 1; min-width: 0; margin: 0; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.album-back { min-height: var(--touch-min); min-width: var(--touch-min); padding: 0 var(--space-sm); text-decoration: none; flex-shrink: 0; }
+.album-menu-btn { min-width: var(--touch-min); min-height: var(--touch-min); flex-shrink: 0; }
+.album-error-state { display: grid; justify-items: start; gap: var(--space-sm); }
+.album-error-state .error { margin: 0; }
+.album-retry { min-height: var(--touch-min); }
+.album-retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.album-media-cell { position: relative; min-width: 0; }
+.album-media-more { position: absolute; right: 6px; top: 6px; width: 44px; height: 44px; border: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(17, 24, 39, 0.72); color: #fff; cursor: pointer; opacity: 0; transition: opacity var(--duration-short) var(--ease-standard); }
+.album-media-cell:hover .album-media-more, .album-media-more:focus-visible { opacity: 1; }
+.album-media-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: none), (pointer: coarse) { .album-media-more { opacity: 1; } }
+@media (min-width: 768px) { .album-title { font-size: 1.5rem; letter-spacing: -0.02em; } }
+@media (prefers-reduced-motion: reduce) { .album-media-more { transition: none; } }
 </style>

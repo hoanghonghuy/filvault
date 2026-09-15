@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useAttrs, watch } from 'vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import Icon from '@/components/AppIcon.vue'
 import type { ShareLinkTTL } from '@/api/types'
+import { useI18n } from '@/lib/i18n'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   open: boolean
@@ -15,77 +18,209 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  create: [ttl: ShareLinkTTL | null]
-  copy: [url: string]
-  revoke: []
   close: []
 }>()
 
-const TTL_OPTIONS: Array<{ value: ShareLinkTTL | null; label: string }> = [
-  { value: null, label: 'Forever' },
-  { value: '1h', label: '1 hour' },
-  { value: '24h', label: '24 hours' },
-  { value: '7d', label: '7 days' },
-]
+const attrs = useAttrs()
+const { locale } = useI18n()
+
+const copy = computed(() =>
+  locale.value === 'en'
+    ? {
+        anyone: 'Anyone with this link can view and download',
+        copying: 'Copying link…',
+        copyLink: 'Copy link',
+        expires: 'Expires',
+        neverExpires: 'Never expires',
+        revoking: 'Revoking…',
+        revoke: 'Revoke link',
+        close: 'Close',
+        expiresAfter: 'Link expires after',
+        expiryGroup: 'Link expiry',
+        forever: 'Forever',
+        oneHour: '1 hour',
+        oneDay: '24 hours',
+        sevenDays: '7 days',
+        creating: 'Creating…',
+        create: 'Create link',
+      }
+    : {
+        anyone: 'Bất kỳ ai có liên kết này đều có thể xem và tải xuống',
+        copying: 'Đang sao chép liên kết…',
+        copyLink: 'Sao chép liên kết',
+        expires: 'Hết hạn',
+        neverExpires: 'Không hết hạn',
+        revoking: 'Đang thu hồi…',
+        revoke: 'Thu hồi liên kết',
+        close: 'Đóng',
+        expiresAfter: 'Liên kết hết hạn sau',
+        expiryGroup: 'Thời hạn liên kết',
+        forever: 'Vĩnh viễn',
+        oneHour: '1 giờ',
+        oneDay: '24 giờ',
+        sevenDays: '7 ngày',
+        creating: 'Đang tạo…',
+        create: 'Tạo liên kết',
+      },
+)
+
+type Listener = (...args: unknown[]) => unknown
+
+function getListener(name: 'onCreate' | 'onCopy' | 'onRevoke'): Listener | null {
+  const listener = attrs[name]
+  return typeof listener === 'function' ? (listener as Listener) : null
+}
+
+async function invokeListener(name: 'onCreate' | 'onCopy' | 'onRevoke', ...args: unknown[]) {
+  const listener = getListener(name)
+  if (!listener) return
+  try {
+    await listener(...args)
+  } catch {
+    // FilesView owns user-facing operation errors. The sheet still guarantees
+    // that its pending state settles even if a future listener throws.
+  }
+}
+
+const ttlOptions = computed<Array<{ value: ShareLinkTTL | null; label: string }>>(() => [
+  { value: null, label: copy.value.forever },
+  { value: '1h', label: copy.value.oneHour },
+  { value: '24h', label: copy.value.oneDay },
+  { value: '7d', label: copy.value.sevenDays },
+])
 
 const selectedTTL = ref<ShareLinkTTL | null>(null)
 const creating = ref(false)
+const copying = ref(false)
+const revoking = ref(false)
+const busy = computed(() => creating.value || copying.value || revoking.value)
 
 const fullUrl = computed(() => (props.existing ? window.location.origin + props.existing.url : ''))
+const expiryLabel = computed(() => {
+  if (!props.existing?.expiresAt) return copy.value.neverExpires
+  const formatted = new Date(props.existing.expiresAt).toLocaleString(locale.value === 'vi' ? 'vi-VN' : 'en-US')
+  return `${copy.value.expires} ${formatted}`
+})
 
 watch(
   () => props.open,
   (open) => {
-    if (open) {
-      selectedTTL.value = null
-      creating.value = false
-    }
+    if (open) selectedTTL.value = null
   },
 )
 
+function selectTtlByKeyboard(event: KeyboardEvent, index: number) {
+  let nextIndex: number | null = null
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    nextIndex = (index + 1) % ttlOptions.value.length
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    nextIndex = (index - 1 + ttlOptions.value.length) % ttlOptions.value.length
+  } else if (event.key === 'Home') {
+    nextIndex = 0
+  } else if (event.key === 'End') {
+    nextIndex = ttlOptions.value.length - 1
+  }
+
+  if (nextIndex === null) return
+
+  event.preventDefault()
+  selectedTTL.value = ttlOptions.value[nextIndex]?.value ?? null
+
+  const group = (event.currentTarget as HTMLElement | null)?.closest('.ttl-options')
+  group?.querySelectorAll<HTMLButtonElement>('[role="radio"]').item(nextIndex).focus()
+}
+
 async function onCreate() {
+  if (creating.value || !getListener('onCreate')) return
   creating.value = true
-  emit('create', selectedTTL.value)
+  try {
+    await invokeListener('onCreate', selectedTTL.value)
+  } finally {
+    creating.value = false
+  }
+}
+
+async function onCopy(url: string) {
+  if (copying.value || !getListener('onCopy')) return
+  copying.value = true
+  try {
+    await invokeListener('onCopy', url)
+  } finally {
+    copying.value = false
+  }
+}
+
+async function onRevoke() {
+  if (revoking.value || !getListener('onRevoke')) return
+  revoking.value = true
+  try {
+    await invokeListener('onRevoke')
+  } finally {
+    revoking.value = false
+  }
 }
 </script>
 
 <template>
   <BottomSheet :open="open" :title="name" @close="emit('close')">
     <div v-if="existing" class="existing">
-      <p class="field-label">Anyone with this link can view and download</p>
+      <p class="field-label">{{ copy.anyone }}</p>
       <div class="link-box">
         <span class="link-url">{{ fullUrl }}</span>
-        <button type="button" class="btn icon-only" aria-label="Copy link" @click="emit('copy', existing.url)">
-          <Icon name="file" :size="18" />
+        <button
+          type="button"
+          class="btn icon-only"
+          :aria-label="copying ? copy.copying : copy.copyLink"
+          :aria-busy="copying ? 'true' : undefined"
+          :disabled="busy"
+          @click="onCopy(existing.url)"
+        >
+          <Icon name="copy" :size="18" />
         </button>
       </div>
-      <p class="expiry muted">
-        {{ existing.expiresAt ? `Expires ${new Date(existing.expiresAt).toLocaleString()}` : 'Never expires' }}
-      </p>
-      <button type="button" class="btn block danger" @click="emit('revoke')">Revoke link</button>
-      <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
+      <p class="expiry muted">{{ expiryLabel }}</p>
+      <button
+        type="button"
+        class="btn block danger"
+        :disabled="busy"
+        :aria-busy="revoking ? 'true' : undefined"
+        @click="onRevoke"
+      >
+        {{ revoking ? copy.revoking : copy.revoke }}
+      </button>
+      <button type="button" class="btn block ghost" @click="emit('close')">{{ copy.close }}</button>
     </div>
 
     <div v-else class="create">
-      <p class="field-label">Link expires after</p>
-      <div class="ttl-options" role="radiogroup" aria-label="Link expiry">
+      <p class="field-label">{{ copy.expiresAfter }}</p>
+      <div class="ttl-options" role="radiogroup" :aria-label="copy.expiryGroup">
         <button
-          v-for="option in TTL_OPTIONS"
-          :key="option.label"
+          v-for="(option, index) in ttlOptions"
+          :key="option.value ?? 'forever'"
           type="button"
           role="radio"
           class="ttl-option"
           :class="{ active: selectedTTL === option.value }"
           :aria-checked="selectedTTL === option.value"
+          :tabindex="selectedTTL === option.value ? 0 : -1"
+          :disabled="creating"
           @click="selectedTTL = option.value"
+          @keydown="selectTtlByKeyboard($event, index)"
         >
           {{ option.label }}
         </button>
       </div>
-      <button type="button" class="btn block ink" :disabled="creating" @click="onCreate">
-        {{ creating ? 'Creating…' : 'Create link' }}
+      <button
+        type="button"
+        class="btn block ink"
+        :disabled="creating"
+        :aria-busy="creating ? 'true' : undefined"
+        @click="onCreate"
+      >
+        {{ creating ? copy.creating : copy.create }}
       </button>
-      <button type="button" class="btn block ghost" @click="emit('close')">Close</button>
+      <button type="button" class="btn block ghost" @click="emit('close')">{{ copy.close }}</button>
     </div>
   </BottomSheet>
 </template>

@@ -4,9 +4,12 @@ import { useRouter } from 'vue-router'
 import { useVaultStore } from '@/stores/vault'
 import { useUiStore } from '@/stores/ui'
 import { useI18n } from '@/lib/i18n'
+import { getVaultStatusCopy } from '@/lib/vaultStatusCopy'
+import { formatVaultFileCount } from '@/lib/vaultFileCount'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { formatVaultDate } from '@/lib/vaultDate'
 import Icon from '@/components/AppIcon.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -15,7 +18,13 @@ import type { VaultFile } from '@/api/types'
 const router = useRouter()
 const vault = useVaultStore()
 const ui = useUiStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const vaultStatusCopy = computed(() => getVaultStatusCopy(locale.value))
+const vaultFileCountLabel = computed(() => formatVaultFileCount(vault.files.length, locale.value))
+
+// Initial Vault status state
+const statusLoading = ref(true)
+const statusError = ref(false)
 
 // Setup state
 const setupPin = ref('')
@@ -51,6 +60,7 @@ const fileActionOpen = ref(false)
 // In-app preview
 const previewOpen = ref(false)
 const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
+const loadError = ref(false)
 
 const totalVaultSize = computed(() => {
   return vault.files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0)
@@ -76,16 +86,33 @@ function onVisibilityChange() {
   }
 }
 
-onMounted(async () => {
-  document.addEventListener('visibilitychange', onVisibilityChange)
+async function loadVaultFiles() {
   try {
-    await vault.fetchStatus()
-    if (vault.isUnlocked) {
-      await vault.loadFiles()
+    await vault.loadFiles()
+    loadError.value = false
+  } catch {
+    loadError.value = true
+  }
+}
+
+async function loadVaultStatus() {
+  statusLoading.value = true
+  try {
+    const status = await vault.fetchStatus()
+    statusError.value = false
+    if (status.unlocked) {
+      await loadVaultFiles()
     }
   } catch {
-    // ignore
+    statusError.value = true
+  } finally {
+    statusLoading.value = false
   }
+}
+
+onMounted(async () => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  await loadVaultStatus()
 })
 
 onUnmounted(() => {
@@ -109,6 +136,7 @@ async function handleSetup() {
 
   try {
     await vault.setup(setupPin.value.trim())
+    await loadVaultFiles()
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     setupPin.value = ''
     confirmSetupPin.value = ''
@@ -123,6 +151,7 @@ async function handleUnlock() {
 
   try {
     await vault.unlock(unlockPin.value.trim())
+    await loadVaultFiles()
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     unlockPin.value = ''
   } catch (e) {
@@ -179,6 +208,7 @@ async function handleResetPin() {
   resettingPin.value = true
   try {
     await vault.resetPin(accountPassword.value, resetNewPin.value.trim())
+    await loadVaultFiles()
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     resetPinOpen.value = false
     accountPassword.value = ''
@@ -201,7 +231,7 @@ async function downloadFile(id: string) {
     const out = await api<{ downloadUrl: string }>(`/files/${id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    ui.showToast(formatApiError(e, 'Download failed'), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultDownloadFailed), 'error')
   }
 }
 
@@ -213,6 +243,13 @@ async function previewMediaFile(file: VaultFile) {
   } catch (e) {
     ui.showToast(formatApiError(e, t.value.vaultPreviewFailed), 'error')
   }
+}
+
+function onVaultFileKeydown(event: KeyboardEvent, file: VaultFile) {
+  if (event.target !== event.currentTarget) return
+  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
+  event.preventDefault()
+  void previewMediaFile(file)
 }
 
 async function removeSelectedFileFromVault() {
@@ -248,11 +285,6 @@ async function deleteSelectedFile() {
   }
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
 </script>
 
 <template>
@@ -264,11 +296,11 @@ function formatDate(iso: string): string {
       </button>
       <div class="header-titles">
         <h1 class="page-title">{{ t.vaultTitle }}</h1>
-        <span v-if="vault.isUnlocked" class="status-badge unlocked">
+        <span v-if="!statusLoading && !statusError && vault.isUnlocked" class="status-badge unlocked">
           <Icon name="unlock" :size="13" />
           {{ t.vaultUnlockedNotice }}
         </span>
-        <span v-else class="status-badge locked">
+        <span v-else-if="!statusLoading && !statusError" class="status-badge locked">
           <Icon name="lock" :size="13" />
           {{ t.vaultLockedTitle }}
         </span>
@@ -276,7 +308,7 @@ function formatDate(iso: string): string {
 
       <div class="header-actions">
         <button
-          v-if="vault.isUnlocked"
+          v-if="!statusLoading && !statusError && vault.isUnlocked"
           type="button"
           class="lock-btn"
           :title="t.vaultLockNow"
@@ -289,8 +321,27 @@ function formatDate(iso: string): string {
       </div>
     </header>
 
+    <!-- Initial status loading -->
+    <div v-if="statusLoading" class="vault-state-card" aria-live="polite" aria-busy="true">
+      <div class="shield-icon-box">
+        <Icon name="shield" :size="40" class="shield-icon" />
+      </div>
+      <h2 class="state-title">{{ vaultStatusCopy.loading }}</h2>
+    </div>
+
+    <!-- Initial status recovery -->
+    <div v-else-if="statusError" class="vault-state-card" role="alert">
+      <div class="lock-icon-box">
+        <Icon name="info" :size="44" class="lock-icon" />
+      </div>
+      <h2 class="state-title">{{ vaultStatusCopy.loadFailed }}</h2>
+      <button type="button" class="btn primary" :disabled="statusLoading" @click="loadVaultStatus">
+        {{ t.retry }}
+      </button>
+    </div>
+
     <!-- Main Content State 1: Setup PIN (First time) -->
-    <div v-if="!vault.isInitialized" class="vault-state-card setup-card">
+    <div v-else-if="!vault.isInitialized" class="vault-state-card setup-card">
       <div class="shield-icon-box">
         <Icon name="shield" :size="40" class="shield-icon" />
       </div>
@@ -392,7 +443,7 @@ function formatDate(iso: string): string {
       <!-- Toolbar -->
       <div class="vault-toolbar">
         <div class="vault-meta-info">
-          <span class="file-count">{{ vault.files.length }} {{ t.vaultFilesUnit }}</span>
+          <span class="file-count">{{ vaultFileCountLabel }}</span>
           <span class="dot-sep">•</span>
           <span class="total-size">{{ formatBytes(totalVaultSize) }}</span>
         </div>
@@ -405,8 +456,19 @@ function formatDate(iso: string): string {
         </div>
       </div>
 
+      <!-- Error State -->
+      <div v-if="loadError" class="vault-empty-box" role="alert">
+        <div class="empty-icon-wrap">
+          <Icon name="info" :size="48" />
+        </div>
+        <h3 class="empty-title">{{ t.filesLoadFailed }}</h3>
+        <button type="button" class="btn primary" :disabled="vault.loading" @click="loadVaultFiles">
+          <span>{{ t.retry }}</span>
+        </button>
+      </div>
+
       <!-- Empty State -->
-      <div v-if="vault.files.length === 0" class="vault-empty-box">
+      <div v-else-if="vault.files.length === 0" class="vault-empty-box">
         <div class="empty-icon-wrap">
           <Icon name="shield" :size="48" />
         </div>
@@ -424,7 +486,11 @@ function formatDate(iso: string): string {
           v-for="file in vault.files"
           :key="file.id"
           class="vault-file-row tappable"
+          role="button"
+          tabindex="0"
+          :aria-label="file.name"
           @click="previewMediaFile(file)"
+          @keydown="onVaultFileKeydown($event, file)"
         >
           <div class="file-icon-box" :class="mimeIcon(file.mimeType)">
             <Icon :name="mimeIcon(file.mimeType)" :size="24" />
@@ -434,15 +500,17 @@ function formatDate(iso: string): string {
             <h4 class="file-name" :title="file.name">{{ file.name }}</h4>
             <div class="file-subtext">
               <span>{{ formatBytes(file.sizeBytes) }}</span>
-              <span class="dot-sep">•</span>
-              <span>{{ formatDate(file.createdAt) }}</span>
+              <template v-if="formatVaultDate(file.createdAt, locale)">
+                <span class="dot-sep">•</span>
+                <span>{{ formatVaultDate(file.createdAt, locale) }}</span>
+              </template>
             </div>
           </div>
 
           <button
             type="button"
             class="more-btn"
-            :aria-label="t.vaultFileActions"
+            :aria-label="`${t.vaultFileActions}: ${file.name}`"
             @click.stop="openFileMenu(file)"
           >
             <Icon name="more" :size="20" />
@@ -922,6 +990,11 @@ function formatDate(iso: string): string {
 .vault-file-row:hover {
   background: var(--surface-soft);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.vault-file-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .file-icon-box {

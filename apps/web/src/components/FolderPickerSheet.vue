@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import BottomSheet from '@/components/BottomSheet.vue'
 import type { Browser } from '@/api/types'
+import { useI18n } from '@/lib/i18n'
+import { folderPickerCopy } from '@/lib/folderPickerCopy'
 
 const props = defineProps<{
   open: boolean
@@ -17,21 +19,31 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { t, locale } = useI18n()
+const copy = computed(() => folderPickerCopy(locale.value))
 const browseFolderId = ref<string | null>(null)
 const browser = ref<Browser | null>(null)
 const loading = ref(false)
 const error = ref('')
+let loadGeneration = 0
 
 async function loadBrowser() {
+  const generation = ++loadGeneration
   loading.value = true
   error.value = ''
+  browser.value = null
   try {
     const q = browseFolderId.value ? `?folderId=${browseFolderId.value}` : ''
-    browser.value = await api<Browser>(`/browser${q}`)
+    const nextBrowser = await api<Browser>(`/browser${q}`)
+    if (generation !== loadGeneration || !props.open) return
+    browser.value = nextBrowser
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load folders')
+    if (generation !== loadGeneration || !props.open) return
+    error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
-    loading.value = false
+    if (generation === loadGeneration && props.open) {
+      loading.value = false
+    }
   }
 }
 
@@ -51,6 +63,7 @@ function goUp() {
 }
 
 function confirmSelection() {
+  if (loading.value || error.value) return
   emit('select', browseFolderId.value)
 }
 
@@ -62,9 +75,16 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
-      resetBrowse()
-      void loadBrowser()
+      if (browseFolderId.value !== null) {
+        resetBrowse()
+      } else {
+        void loadBrowser()
+      }
+      return
     }
+
+    loadGeneration += 1
+    loading.value = false
   },
 )
 
@@ -77,8 +97,8 @@ watch(browseFolderId, () => {
 
 <template>
   <BottomSheet :open="open" :title="title" @close="onClose">
-    <nav v-if="browser" class="picker-breadcrumb" aria-label="Browse folders">
-      <button type="button" class="btn ghost crumb" @click="resetBrowse">Root</button>
+    <nav v-if="browser" class="picker-breadcrumb" :aria-label="copy.browseFolders">
+      <button type="button" class="btn ghost crumb" @click="resetBrowse">{{ copy.root }}</button>
       <template v-for="item in browser.breadcrumb" :key="item.id">
         <span aria-hidden="true">/</span>
         <button type="button" class="btn ghost crumb" @click="enterFolder(item.id)">
@@ -91,8 +111,13 @@ watch(browseFolderId, () => {
       </template>
     </nav>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+    <div v-if="error" class="picker-error" role="alert">
+      <p class="error">{{ error }}</p>
+      <button type="button" class="btn ghost picker-retry" :disabled="loading" @click="loadBrowser">
+        {{ t.retry }}
+      </button>
+    </div>
+    <p v-else-if="loading" class="muted" aria-live="polite">{{ t.loading }}</p>
 
     <div v-else class="picker-list">
       <button
@@ -101,7 +126,7 @@ watch(browseFolderId, () => {
         class="row tappable picker-row"
         @click="goUp"
       >
-        <span class="name">.. Parent folder</span>
+        <span class="name">{{ copy.parentFolder }}</span>
       </button>
       <button
         v-for="folder in browser?.folders ?? []"
@@ -113,18 +138,18 @@ watch(browseFolderId, () => {
       >
         <span class="name"><span class="icon-folder" />{{ folder.name }}</span>
       </button>
-      <p v-if="(browser?.folders.length ?? 0) === 0 && !loading" class="muted picker-empty">
-        No subfolders here.
+      <p v-if="(browser?.folders.length ?? 0) === 0" class="muted picker-empty">
+        {{ copy.empty }}
       </p>
     </div>
 
     <button
       type="button"
       class="btn block ink picker-confirm"
-      :disabled="browseFolderId === excludeFolderId"
+      :disabled="loading || Boolean(error) || browseFolderId === excludeFolderId"
       @click="confirmSelection"
     >
-      {{ confirmLabel ?? 'Move here' }}
+      {{ confirmLabel ?? t.moveHere }}
     </button>
   </BottomSheet>
 </template>
@@ -173,6 +198,14 @@ watch(browseFolderId, () => {
 .picker-empty {
   margin: var(--space-sm) 0;
   text-align: center;
+}
+
+.picker-error {
+  margin-bottom: var(--space-md);
+}
+
+.picker-error .error {
+  margin: 0 0 var(--space-sm);
 }
 
 .picker-confirm {

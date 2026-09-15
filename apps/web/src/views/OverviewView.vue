@@ -5,8 +5,11 @@ import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 import Icon from '@/components/AppIcon.vue'
+import OverviewStorageCard from '@/components/OverviewStorageCard.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import { mimeIcon } from '@/lib/mimeIcon'
+import { MIME_CATEGORY_COLORS } from '@/lib/mimeColors'
+import { overviewCopy } from '@/lib/overviewCopy'
 import {
   recentFilesFromBrowser,
   recentPhotosFromTimeline,
@@ -16,7 +19,8 @@ import type { Browser, BrowserFile, FavoriteFile, Timeline, TimelineGroup } from
 
 const auth = useAuthStore()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const copy = computed(() => overviewCopy(locale.value))
 
 const loading = ref(false)
 const filesError = ref('')
@@ -31,18 +35,10 @@ const activeTab = ref<'recent' | 'favorites' | 'photos'>('recent')
 const recentFiles = computed(() => recentFilesFromBrowser(files.value))
 const recentPhotos = computed(() => recentPhotosFromTimeline(groups.value))
 
-const storageUsedFormatted = computed(() => formatBytes(auth.user?.storageUsed ?? 0))
-const storageQuotaFormatted = computed(() => formatBytes(auth.user?.storageQuota ?? 0))
-const storagePercent = computed(() => {
-  const u = auth.user
-  if (!u || !u.storageQuota) return 0
-  return Math.min(100, Math.max(0, Math.round((u.storageUsed / u.storageQuota) * 100)))
-})
-
 const quickCategories = computed(() => [
-  { to: '/files', label: t.value.myFiles, icon: 'folder', color: '#f59e0b' },
-  { to: '/photos', label: t.value.navPhotos, icon: 'photos', color: '#10b981' },
-  { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos || 'Video', icon: 'video', color: '#8b5cf6' },
+  { to: '/files', label: t.value.myFiles, icon: 'folder', color: MIME_CATEGORY_COLORS.folder },
+  { to: '/photos', label: t.value.navPhotos, icon: 'photos', color: MIME_CATEGORY_COLORS.image },
+  { to: { path: '/photos', query: { type: 'video' } }, label: t.value.videos || 'Video', icon: 'video', color: MIME_CATEGORY_COLORS.video },
   { to: { path: '/files', query: { view: 'favorites' } }, label: t.value.tabFavorites, icon: 'star', color: '#eab308' },
   { to: '/shared', label: t.value.sharedWithMe, icon: 'users', color: '#06b6d4' },
   { to: '/vault', label: t.value.personalVault, icon: 'lock', color: '#6366f1' },
@@ -68,6 +64,7 @@ function onSearchSubmit() {
 const bothFailed = computed(() => Boolean(filesError.value && photosError.value))
 
 async function load() {
+  if (loading.value) return
   loading.value = true
   filesError.value = ''
   photosError.value = ''
@@ -81,13 +78,13 @@ async function load() {
       files.value = browserResult.value.files
     } else {
       files.value = []
-      filesError.value = formatApiError(browserResult.reason, 'Could not load files')
+      filesError.value = formatApiError(browserResult.reason, copy.value.loadFilesFailed)
     }
     if (timelineResult.status === 'fulfilled') {
       groups.value = timelineResult.value.groups
     } else {
       groups.value = []
-      photosError.value = formatApiError(timelineResult.reason, 'Could not load photos')
+      photosError.value = formatApiError(timelineResult.reason, copy.value.loadPhotosFailed)
     }
     if (favoritesResult.status === 'fulfilled') {
       favorites.value = favoritesResult.value.files
@@ -124,7 +121,7 @@ onMounted(load)
           v-if="searchQuery"
           type="button"
           class="clear-search-btn"
-          aria-label="Xóa tìm kiếm"
+          :aria-label="copy.clearSearchAria"
           @click="searchQuery = ''"
         >
           <Icon name="close" :size="16" />
@@ -132,40 +129,10 @@ onMounted(load)
       </form>
     </header>
 
-    <!-- TeraBox-style Cloud Storage Card -->
-    <section class="storage-card" aria-label="Thông tin dung lượng đám mây">
-      <div class="storage-head">
-        <div class="storage-title-wrap">
-          <span class="storage-cloud-badge">
-            <Icon name="cloud" :size="16" />
-          </span>
-          <span class="storage-card-title">{{ t.myCloud }}</span>
-        </div>
-        <RouterLink to="/settings" class="storage-manage-link">
-          {{ t.manageStorage }}
-          <Icon name="chevron-right" :size="14" />
-        </RouterLink>
-      </div>
-
-      <div class="storage-progress-track">
-        <div
-          class="storage-progress-fill"
-          :style="{ width: `${storagePercent}%` }"
-          role="progressbar"
-          :aria-valuenow="storagePercent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-        />
-      </div>
-
-      <div class="storage-meta">
-        <span class="storage-numbers">{{ storageUsedFormatted }} / {{ storageQuotaFormatted }}</span>
-        <span class="storage-percentage">{{ storagePercent }}%</span>
-      </div>
-    </section>
+    <OverviewStorageCard />
 
     <!-- TeraBox-style 8-icon 4-column Category Grid -->
-    <section class="categories-section" aria-label="Danh mục tính năng">
+    <section class="categories-section" :aria-label="copy.featureCategoriesAria">
       <div class="categories-grid">
         <RouterLink
           v-for="item in quickCategories"
@@ -181,8 +148,18 @@ onMounted(load)
       </div>
     </section>
 
-    <!-- Error alert if both failed -->
-    <p v-if="bothFailed" class="error" role="alert">Could not load overview. Try again later.</p>
+    <!-- Error recovery if both core sources failed -->
+    <div v-if="bothFailed" class="error overview-error" role="alert">
+      <span>{{ copy.loadOverviewFailed }}</span>
+      <button
+        type="button"
+        class="overview-retry"
+        :disabled="loading"
+        @click="load"
+      >
+        {{ t.retry }}
+      </button>
+    </div>
 
     <!-- Skeleton Loading -->
     <div v-if="loading" class="overview-loading" aria-busy="true" aria-live="polite">
@@ -246,7 +223,7 @@ onMounted(load)
             v-for="file in recentFiles"
             :key="file.id"
             class="row tappable"
-            to="/files"
+            :to="{ path: '/files', query: { q: file.name } }"
           >
             <span class="name">
               <Icon :name="mimeIcon(file.mimeType)" :size="18" class="row-icon" />
@@ -268,7 +245,7 @@ onMounted(load)
             v-for="file in favorites"
             :key="file.id"
             class="row tappable"
-            to="/files"
+            :to="{ path: '/files', query: { view: 'favorites', q: file.name } }"
           >
             <span class="name">
               <Icon name="star-filled" :size="18" class="row-icon star-icon" />
@@ -293,7 +270,7 @@ onMounted(load)
             :mime-type="item.mimeType"
             :name="item.name"
             :thumbnail-url="item.thumbnailUrl"
-            @click="router.push('/photos')"
+            @click="router.push(`/photos/preview/${item.id}`)"
           />
         </div>
         <p v-else class="empty-inline">
@@ -302,11 +279,6 @@ onMounted(load)
         </p>
       </div>
     </section>
-
-    <!-- Floating Action Button (FAB) -->
-    <RouterLink to="/files" class="overview-fab" title="Mở Tệp" aria-label="Mở Tệp">
-      <Icon name="plus" :size="24" />
-    </RouterLink>
   </div>
 </template>
 
@@ -377,86 +349,6 @@ onMounted(load)
   justify-content: center;
 }
 
-/* TeraBox Cloud Storage Card */
-.storage-card {
-  background: var(--surface-soft, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg, 16px);
-  padding: 14px 16px;
-  margin-bottom: var(--space-lg);
-}
-
-.storage-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.storage-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.storage-cloud-badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent-soft, rgba(0, 132, 255, 0.12));
-  color: var(--accent, #0084ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.storage-manage-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.storage-progress-track {
-  width: 100%;
-  height: 6px;
-  background: var(--hairline, rgba(255, 255, 255, 0.1));
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.storage-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent, #0084ff) 0%, #06b6d4 100%);
-  border-radius: 9999px;
-  transition: width 0.4s ease;
-}
-
-.storage-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.storage-numbers {
-  font-variant-numeric: tabular-nums;
-}
-
-.storage-percentage {
-  font-weight: 600;
-  color: var(--ink);
-}
-
 /* TeraBox 8-Icon 4-Column Category Grid */
 .categories-section {
   margin-bottom: var(--space-xl);
@@ -507,6 +399,38 @@ onMounted(load)
   overflow: hidden;
 }
 
+.overview-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+}
+
+.overview-retry {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.overview-retry:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.overview-retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* TeraBox Content Tabs */
 .content-tabs-section {
   margin-bottom: var(--space-xl);
@@ -530,6 +454,7 @@ onMounted(load)
 .tab-pill {
   background: transparent;
   border: none;
+  min-height: var(--touch-min);
   padding: 6px 0;
   font-size: 15px;
   font-weight: 600;
@@ -655,30 +580,6 @@ onMounted(load)
   color: var(--danger);
 }
 
-/* TeraBox Floating Action Button */
-.overview-fab {
-  position: fixed;
-  right: 20px;
-  bottom: 84px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--accent, #0084ff);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 132, 255, 0.4);
-  z-index: 50;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  touch-action: manipulation;
-}
-
-.overview-fab:active {
-  transform: scale(0.92);
-}
-
 /* Skeletons */
 .overview-loading {
   display: flex;
@@ -728,11 +629,6 @@ onMounted(load)
   .grid.photos {
     grid-template-columns: repeat(6, 1fr);
     gap: 8px;
-  }
-
-  .overview-fab {
-    bottom: 32px;
-    right: 32px;
   }
 }
 </style>

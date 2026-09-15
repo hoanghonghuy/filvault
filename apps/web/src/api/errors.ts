@@ -23,12 +23,21 @@ function isNetworkError(e: unknown): boolean {
   return e instanceof TypeError
 }
 
-export function formatApiError(e: unknown, fallback: string): string {
+export interface ApiErrorCopy {
+  network?: string
+  codes?: Partial<Record<string, string>>
+}
+
+export function formatApiError(e: unknown, fallback: string, copy: ApiErrorCopy = {}): string {
   if (isNetworkError(e)) {
-    return NETWORK_UNAVAILABLE
+    return copy.network ?? NETWORK_UNAVAILABLE
   }
   if (!(e instanceof ApiError)) {
     return fallback
+  }
+  const localized = copy.codes?.[e.code]
+  if (localized) {
+    return localized
   }
   if (e.code === 'CONFLICT') {
     if (e.message && e.message.toLowerCase() !== 'conflict') {
@@ -39,9 +48,63 @@ export function formatApiError(e: unknown, fallback: string): string {
   return friendly[e.code] ?? e.message ?? fallback
 }
 
-export function formatAuthError(e: unknown, fallback: string): string {
+const shareUserFriendly: Record<string, string> = {
+  CONFLICT: 'This item is already shared with that user.',
+  NOT_FOUND: 'Item not found.',
+  VALIDATION_ERROR: 'Enter a valid email address.',
+}
+
+export interface ShareUserErrorCopy {
+  conflict?: string
+  notFound?: string
+  validation?: string
+  network?: string
+}
+
+export function formatShareUserError(
+  e: unknown,
+  fallback: string,
+  copy: ShareUserErrorCopy = {},
+): string {
+  if (isNetworkError(e)) {
+    return copy.network ?? NETWORK_UNAVAILABLE
+  }
   if (!(e instanceof ApiError)) {
     return fallback
   }
-  return authFriendly[e.code] ?? fallback
+  if (e.code === 'CONFLICT') {
+    return copy.conflict ?? shareUserFriendly.CONFLICT ?? fallback
+  }
+  if (e.code === 'NOT_FOUND') {
+    return copy.notFound ?? shareUserFriendly.NOT_FOUND ?? fallback
+  }
+  if (e.code === 'VALIDATION_ERROR') {
+    return copy.validation ?? shareUserFriendly.VALIDATION_ERROR ?? fallback
+  }
+  return fallback
+}
+
+export interface AuthErrorCopy {
+  conflict?: string
+  forbidden?: string
+  registerDisabled?: string
+  unauthorized?: string
+}
+
+export function formatAuthError(
+  e: unknown,
+  fallback: string,
+  copy: AuthErrorCopy = {},
+): string {
+  if (!(e instanceof ApiError)) {
+    return fallback
+  }
+
+  const localized: Record<string, string | undefined> = {
+    CONFLICT: copy.conflict,
+    FORBIDDEN: copy.forbidden,
+    REGISTER_DISABLED: copy.registerDisabled,
+    UNAUTHORIZED: copy.unauthorized,
+  }
+  return localized[e.code] ?? authFriendly[e.code] ?? fallback
 }

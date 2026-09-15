@@ -3,6 +3,7 @@ import { api, uploadToPresigned } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { resolveContentType } from '@/lib/mimeIcon'
 import { useI18n } from '@/lib/i18n'
+import { uploadErrorCopy } from '@/lib/uploadErrorCopy'
 import type { UploadSession } from '@/api/types'
 import {
   FileUploadQueue,
@@ -20,7 +21,7 @@ export function useFileUploadQueue(options: {
   onBatchSettled: () => Promise<void>
   showToast: (message: string, tone?: 'success' | 'info') => void
 }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const queueRevision = ref(0)
   const showPanel = ref(false)
 
@@ -70,7 +71,10 @@ export function useFileUploadQueue(options: {
       return parentId
     },
     resolveContentType: (file) => resolveContentType(file),
-    formatError: (error) => formatApiError(error, 'Upload failed'),
+    formatError: (error) => {
+      const copy = uploadErrorCopy(locale.value)
+      return formatApiError(error, copy.fallback, copy.api)
+    },
   })
 
   const items = computed<UploadQueueItem[]>(() => {

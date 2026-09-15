@@ -13,11 +13,21 @@ export const useVaultStore = defineStore('vault', () => {
   const files = ref<VaultFile[]>([])
   const loading = ref(false)
   const error = ref('')
+  let fileHydrationSequence = 0
+  let statusRequestSequence = 0
+  let sessionMutationSequence = 0
 
   const isInitialized = computed(() => status.value?.initialized ?? false)
   const isUnlocked = computed(() => Boolean(vaultToken.value && status.value?.unlocked))
 
+  function invalidateSessionRequests() {
+    fileHydrationSequence += 1
+    statusRequestSequence += 1
+    sessionMutationSequence += 1
+  }
+
   function setToken(token: string) {
+    invalidateSessionRequests()
     vaultToken.value = token
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(VAULT_TOKEN_KEY, token)
@@ -25,7 +35,10 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   function clearToken() {
+    invalidateSessionRequests()
     vaultToken.value = null
+    loading.value = false
+    error.value = ''
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(VAULT_TOKEN_KEY)
     }
@@ -40,22 +53,30 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function fetchStatus(): Promise<VaultStatus> {
+    const requestToken = vaultToken.value
+    const requestSequence = ++statusRequestSequence
     try {
       const res = await api<VaultStatus>('/vault/status', {
         headers: getHeaders(),
       })
+      if (requestSequence !== statusRequestSequence || requestToken !== vaultToken.value) {
+        return status.value ?? res
+      }
       status.value = res
       if (!res.unlocked && vaultToken.value) {
         clearToken()
       }
       return res
     } catch (e) {
-      status.value = { initialized: false, unlocked: false }
+      if (requestSequence === statusRequestSequence && requestToken === vaultToken.value) {
+        status.value = { initialized: false, unlocked: false }
+      }
       throw e
     }
   }
 
   async function setup(pin: string): Promise<VaultSession> {
+    const requestSequence = ++sessionMutationSequence
     loading.value = true
     error.value = ''
     try {
@@ -63,16 +84,18 @@ export const useVaultStore = defineStore('vault', () => {
         method: 'POST',
         body: JSON.stringify({ pin }),
       })
+      if (requestSequence !== sessionMutationSequence) return session
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
-      await loadFiles()
+      loading.value = false
       return session
     } finally {
-      loading.value = false
+      if (requestSequence === sessionMutationSequence) loading.value = false
     }
   }
 
   async function unlock(pin: string): Promise<VaultSession> {
+    const requestSequence = ++sessionMutationSequence
     loading.value = true
     error.value = ''
     try {
@@ -80,12 +103,13 @@ export const useVaultStore = defineStore('vault', () => {
         method: 'POST',
         body: JSON.stringify({ pin }),
       })
+      if (requestSequence !== sessionMutationSequence) return session
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
-      await loadFiles()
+      loading.value = false
       return session
     } finally {
-      loading.value = false
+      if (requestSequence === sessionMutationSequence) loading.value = false
     }
   }
 
@@ -112,6 +136,7 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function resetPin(accountPassword: string, newPin: string): Promise<VaultSession> {
+    const requestSequence = ++sessionMutationSequence
     loading.value = true
     error.value = ''
     try {
@@ -119,33 +144,44 @@ export const useVaultStore = defineStore('vault', () => {
         method: 'POST',
         body: JSON.stringify({ accountPassword, newPin }),
       })
+      if (requestSequence !== sessionMutationSequence) return session
       setToken(session.token)
       status.value = { initialized: true, unlocked: true }
-      await loadFiles()
+      loading.value = false
       return session
     } finally {
-      loading.value = false
+      if (requestSequence === sessionMutationSequence) loading.value = false
     }
   }
 
   async function loadFiles(): Promise<VaultFile[]> {
-    if (!vaultToken.value) {
+    const requestToken = vaultToken.value
+    if (!requestToken) {
       files.value = []
       return []
     }
+    const requestSequence = ++fileHydrationSequence
     loading.value = true
     error.value = ''
     try {
       const res = await api<{ files: VaultFile[] }>('/vault/files', {
         headers: getHeaders(),
       })
+      if (requestSequence !== fileHydrationSequence || requestToken !== vaultToken.value || !isUnlocked.value) {
+        return files.value
+      }
       files.value = res.files ?? []
       return files.value
     } catch (e) {
+      if (requestSequence !== fileHydrationSequence || requestToken !== vaultToken.value || !isUnlocked.value) {
+        return files.value
+      }
       error.value = 'Failed to load vault files'
       throw e
     } finally {
-      loading.value = false
+      if (requestSequence === fileHydrationSequence && requestToken === vaultToken.value) {
+        loading.value = false
+      }
     }
   }
 

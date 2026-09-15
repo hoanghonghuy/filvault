@@ -100,12 +100,11 @@ describe('action sheet row contract', () => {
   it('provides an icon for every action sheet call site', () => {
     for (const view of ['FilesView.vue', 'TrashView.vue', 'PhotosView.vue', 'AlbumView.vue']) {
       const source = readSrc(`../views/${view}`)
-      const items = source.match(/\{ id: '[^']+', label: '[^']+'[^}]*\}/g) ?? []
+      const items = source.match(/\{ id: '[^']+', label: [^,}]+,[^}]*\}/g) ?? []
       expect(items.length, `${view} has action items`).toBeGreaterThan(0)
       for (const item of items) {
         expect(item, `${view}: ${item}`).toMatch(/icon: '/)
       }
-      expect(source).not.toMatch(/\{ id: '[^']+', label: '[^']+' \}/)
     }
   })
 })

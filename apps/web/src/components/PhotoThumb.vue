@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Icon from '@/components/AppIcon.vue'
 import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
 
@@ -14,9 +14,10 @@ const emit = defineEmits<{
 }>()
 
 const failed = ref(false)
-const isVideo = props.mimeType.startsWith('video/')
+const isVideo = computed(() => props.mimeType.startsWith('video/'))
 const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
 const heicThumbUrl = ref<string>('')
+let loadSequence = 0
 
 const displaySrc = computed(() => {
   if (isHeicMedia.value && heicThumbUrl.value) {
@@ -25,19 +26,29 @@ const displaySrc = computed(() => {
   return props.thumbnailUrl
 })
 
-async function loadHeicThumb() {
-  if (isHeicMedia.value && props.thumbnailUrl && !failed.value) {
-    try {
-      const url = await getHeicDisplayUrl(props.thumbnailUrl, 0.5)
+async function loadMedia() {
+  const requestSequence = ++loadSequence
+  failed.value = false
+  heicThumbUrl.value = ''
+
+  if (!isHeicMedia.value || !props.thumbnailUrl) return
+
+  try {
+    const url = await getHeicDisplayUrl(props.thumbnailUrl, 0.5)
+    if (requestSequence === loadSequence) {
       heicThumbUrl.value = url
-    } catch {
-      // If conversion fails, let standard <img> try or fallback
     }
+  } catch {
+    // If conversion fails, let standard <img> try or fallback.
+    // A stale conversion failure must not affect the current media identity.
   }
 }
 
-watch(() => props.thumbnailUrl, loadHeicThumb)
-onMounted(loadHeicThumb)
+watch(
+  () => [props.thumbnailUrl, props.name, props.mimeType] as const,
+  loadMedia,
+  { immediate: true },
+)
 
 function handleError() {
   failed.value = true

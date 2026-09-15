@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import BottomSheet from '@/components/BottomSheet.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import type { Timeline, TimelineItem } from '@/api/types'
+import { useI18n } from '@/lib/i18n'
+import { mediaPickerCopy } from '@/lib/mediaPickerCopy'
 
 const props = defineProps<{
   open: boolean
@@ -17,11 +19,14 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { t, locale } = useI18n()
+const copy = computed(() => mediaPickerCopy(locale.value))
 const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
+let loadGeneration = 0
 
 function flattenItems(): TimelineItem[] {
   const ids = new Set(props.excludeIds ?? [])
@@ -43,33 +48,45 @@ async function fetchTimeline(before?: string) {
 }
 
 async function loadInitial() {
+  const generation = ++loadGeneration
   loading.value = true
+  loadingMore.value = false
   error.value = ''
   groups.value = []
   nextBefore.value = undefined
   try {
     const data = await fetchTimeline()
+    if (generation !== loadGeneration || !props.open) return
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load photos')
+    if (generation !== loadGeneration || !props.open) return
+    error.value = formatApiError(e, copy.value.loadFailed)
   } finally {
-    loading.value = false
+    if (generation === loadGeneration && props.open) {
+      loading.value = false
+    }
   }
 }
 
 async function loadMore() {
   if (!nextBefore.value || loadingMore.value) return
+  const generation = ++loadGeneration
+  const before = nextBefore.value
   loadingMore.value = true
   error.value = ''
   try {
-    const data = await fetchTimeline(nextBefore.value)
+    const data = await fetchTimeline(before)
+    if (generation !== loadGeneration || !props.open) return
     groups.value = [...groups.value, ...data.groups]
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, 'Failed to load more')
+    if (generation !== loadGeneration || !props.open) return
+    error.value = formatApiError(e, copy.value.loadMoreFailed)
   } finally {
-    loadingMore.value = false
+    if (generation === loadGeneration && props.open) {
+      loadingMore.value = false
+    }
   }
 }
 
@@ -82,16 +99,28 @@ watch(
   (open) => {
     if (open) {
       void loadInitial()
+      return
     }
+
+    loadGeneration += 1
+    loading.value = false
+    loadingMore.value = false
   },
 )
 </script>
 
 <template>
-  <BottomSheet :open="open" title="Add to album" @close="emit('close')">
-    <p class="muted hint">Tap a photo or video to add it.</p>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="loading" class="muted">Loading…</p>
+  <BottomSheet :open="open" :title="copy.title" @close="emit('close')">
+    <p class="muted hint">{{ copy.hint }}</p>
+    <p v-if="error && groups.length > 0" class="error" role="alert">{{ error }}</p>
+    <p v-if="loading" class="muted">{{ t.loading }}</p>
+
+    <div v-else-if="error && groups.length === 0" class="picker-error" role="alert">
+      <p class="error">{{ error }}</p>
+      <button type="button" class="btn block" @click="loadInitial">
+        {{ t.retry }}
+      </button>
+    </div>
 
     <div v-else class="grid photos picker-grid">
       <PhotoThumb
@@ -105,9 +134,9 @@ watch(
     </div>
 
     <EmptyState
-      v-if="!loading && flattenItems().length === 0"
-      title="No media available"
-      description="Upload photos or videos in My Files first."
+      v-if="!loading && !error && flattenItems().length === 0"
+      :title="copy.emptyTitle"
+      :description="copy.emptyDescription"
     />
 
     <button
@@ -117,7 +146,7 @@ watch(
       :disabled="loadingMore"
       @click="loadMore"
     >
-      {{ loadingMore ? 'Loading…' : 'Load more' }}
+      {{ loadingMore ? t.loading : t.loadMore }}
     </button>
   </BottomSheet>
 </template>
@@ -125,6 +154,15 @@ watch(
 <style scoped>
 .hint {
   margin: 0 0 var(--space-sm);
+}
+
+.picker-error {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.picker-error .error {
+  margin: 0;
 }
 
 .picker-grid {
