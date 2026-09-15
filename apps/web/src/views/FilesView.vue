@@ -47,6 +47,10 @@ import {
   routeQueriesEqual,
   type FilesSearchChipKey,
 } from '@/lib/filesSearchState'
+import {
+  createFilesMediaPreviewSession,
+  runFilesMediaPreviewDownload,
+} from '@/lib/filesMediaPreview'
 
 const route = useRoute()
 const router = useRouter()
@@ -354,15 +358,29 @@ async function onFabClick() {
 // In-app preview
 const previewOpen = ref(false)
 const previewFile = ref<{ id: string; name: string; mimeType: string; url: string } | null>(null)
+const mediaPreviewSession = createFilesMediaPreviewSession()
 
 async function previewMediaFile(file: { id: string; name: string; mimeType: string }) {
-  try {
-    const out = await api<DownloadURL>(`/files/${file.id}/download`)
-    previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
-    previewOpen.value = true
-  } catch (e) {
-    error.value = formatApiError(e, t.value.filesPreviewFailed)
+  const requestSequence = mediaPreviewSession.beginPreview()
+  const result = await runFilesMediaPreviewDownload({
+    file,
+    requestSequence,
+    isCurrentPreview: mediaPreviewSession.isCurrentPreview.bind(mediaPreviewSession),
+    fetchDownload: (fileId) => api<DownloadURL>(`/files/${fileId}/download`),
+  })
+  if (result.status === 'stale') return
+  if (result.status === 'error') {
+    error.value = formatApiError(result.error, t.value.filesPreviewFailed)
+    return
   }
+  previewFile.value = result.preview
+  previewOpen.value = true
+}
+
+function closeMediaPreview() {
+  mediaPreviewSession.invalidatePreview()
+  previewOpen.value = false
+  previewFile.value = null
 }
 
 onMounted(() => {
@@ -530,6 +548,7 @@ watch(searchQuery, () => {
 
 onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer)
+  mediaPreviewSession.invalidatePreview()
 })
 
 watch(filters, () => {
@@ -1591,7 +1610,7 @@ watch(() => route.query.folderId, loadBrowser, { immediate: true })
       :mime-type="previewFile?.mimeType ?? ''"
       :url="previewFile?.url ?? ''"
       @download="previewFile ? downloadFile(previewFile.id) : undefined"
-      @close="previewOpen = false"
+      @close="closeMediaPreview"
     />
   </div>
 </template>
