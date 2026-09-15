@@ -41,7 +41,7 @@ const heicDisplayUrl = ref('')
 let heicRequestSequence = 0
 
 const displayImageUrl = computed(() => {
-  if (isHeicMedia.value && heicDisplayUrl.value) {
+  if (isHeicMedia.value) {
     return heicDisplayUrl.value
   }
   return props.url
@@ -84,6 +84,10 @@ async function onDownloadJpeg() {
   if (props.url) {
     await downloadHeicAsJpeg(props.url, props.name)
   }
+}
+
+function onRetryHeicConversion() {
+  resolveHeicImage()
 }
 
 const dialogRef = ref<HTMLDialogElement | null>(null)
@@ -448,9 +452,23 @@ onUnmounted(() => {
                 <div class="heic-spinner" />
                 <p>{{ t.heicConverting }}</p>
               </div>
+              <div
+                v-else-if="isHeicMedia && heicError"
+                class="heic-error-state"
+                role="alert"
+              >
+                <Icon name="image" :size="36" />
+                <p>{{ t.heicConversionFailed }}</p>
+                <button
+                  type="button"
+                  class="btn ghost heic-retry-btn"
+                  @click="onRetryHeicConversion"
+                >
+                  {{ t.retry }}
+                </button>
+              </div>
               <img
-                v-if="isImage"
-                v-show="!isHeicMedia || !heicLoading"
+                v-if="isImage && (!isHeicMedia || (!heicLoading && !heicError && heicDisplayUrl))"
                 :src="displayImageUrl"
                 :alt="name"
                 draggable="false"
@@ -692,7 +710,8 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.heic-loading-state {
+.heic-loading-state,
+.heic-error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -700,6 +719,21 @@ onUnmounted(() => {
   gap: var(--space-sm);
   color: var(--fg-soft, #fff);
   font-size: 14px;
+}
+
+.heic-error-state {
+  padding: var(--space-lg);
+  color: var(--muted);
+  text-align: center;
+}
+
+.heic-retry-btn {
+  min-height: var(--touch-min, 44px);
+}
+
+.heic-retry-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .heic-spinner {
