@@ -31,6 +31,7 @@ import type {
 } from '@/api/types'
 import SearchFilterSheet from '@/components/SearchFilterSheet.vue'
 import { useI18n } from '@/lib/i18n'
+import { filesRuntimeCopy } from '@/lib/filesCopy'
 import { vaultMoveCopy } from '@/lib/vaultMoveCopy'
 import { filesOperationsCopy } from '@/lib/filesOperationsCopy'
 import { formatSearchResultCount } from '@/lib/searchResultCount'
@@ -52,6 +53,7 @@ const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
 const { locale, t } = useI18n()
+const copy = computed(() => filesRuntimeCopy(locale.value))
 const vaultCopy = computed(() => vaultMoveCopy(locale.value))
 const operationsCopy = computed(() => filesOperationsCopy(locale.value))
 const reloadStorage = inject<() => Promise<void>>('reloadStorage')
@@ -361,7 +363,7 @@ async function previewMediaFile(file: { id: string; name: string; mimeType: stri
     previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
     previewOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, t.value.filesPreviewFailed)
+    error.value = formatApiError(e, t.value.filesPreviewFailed, copy.value.apiError)
   }
 }
 
@@ -424,7 +426,7 @@ async function loadBrowser() {
     const q = folderId.value ? `?folderId=${folderId.value}` : ''
     browser.value = await api<Browser>(`/browser${q}`)
   } catch (e) {
-    error.value = formatApiError(e, t.value.filesLoadFailed)
+    error.value = formatApiError(e, t.value.filesLoadFailed, copy.value.apiError)
   } finally {
     loading.value = false
   }
@@ -512,7 +514,7 @@ async function runSearch() {
   try {
     searchResults.value = await api<SearchResult>(`/search?${buildSearchApiQueryString(searchQuery.value, filters.value)}`)
   } catch (e) {
-    error.value = formatApiError(e, t.value.filesSearchFailed)
+    error.value = formatApiError(e, t.value.filesSearchFailed, copy.value.apiError)
   } finally {
     searchLoading.value = false
   }
@@ -594,7 +596,7 @@ async function createFolder() {
     ui.showToast(t.value.folderCreated)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, t.value.folderCreateFailed)
+    error.value = formatApiError(e, t.value.folderCreateFailed, copy.value.apiError)
   }
 }
 
@@ -633,7 +635,7 @@ async function downloadFile(id: string) {
     const out = await api<DownloadURL>(`/files/${id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, t.value.fileDownloadFailed)
+    error.value = formatApiError(e, t.value.fileDownloadFailed, copy.value.apiError)
   }
 }
 
@@ -646,7 +648,7 @@ async function renameFile(id: string, current: string) {
     ui.showToast(operationsCopy.value.fileRenamed)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, operationsCopy.value.renameFailed)
+    error.value = formatApiError(e, operationsCopy.value.renameFailed, copy.value.apiError)
   }
 }
 
@@ -659,7 +661,7 @@ async function renameFolder(id: string, current: string) {
     ui.showToast(operationsCopy.value.folderRenamed)
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, operationsCopy.value.renameFailed)
+    error.value = formatApiError(e, operationsCopy.value.renameFailed, copy.value.apiError)
   }
 }
 
@@ -719,7 +721,7 @@ async function onPickerSelect(targetFolderId: string | null) {
     }
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, operationsCopy.value.moveFailed)
+    error.value = formatApiError(e, operationsCopy.value.moveFailed, copy.value.apiError)
   }
 }
 
@@ -748,7 +750,7 @@ async function batchDelete() {
     await loadBrowser()
     await reloadStorage?.()
   } catch (e) {
-    error.value = formatApiError(e, operationsCopy.value.trashFailed)
+    error.value = formatApiError(e, operationsCopy.value.trashFailed, copy.value.apiError)
     await loadBrowser()
   }
 }
@@ -768,7 +770,7 @@ async function batchFavorite() {
     clearSelection()
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, t.value.favoriteBatchFailed)
+    error.value = formatApiError(e, t.value.favoriteBatchFailed, copy.value.apiError)
   }
 }
 
@@ -817,7 +819,7 @@ async function deleteFile(id: string) {
     ui.showToast(operationsCopy.value.movedToTrash)
     await reloadStorage?.()
   } catch (e) {
-    error.value = formatApiError(e, operationsCopy.value.trashFailed)
+    error.value = formatApiError(e, operationsCopy.value.trashFailed, copy.value.apiError)
     await loadBrowser()
   }
 }
@@ -836,7 +838,7 @@ async function deleteFolder(id: string) {
     await api(`/folders/${id}`, { method: 'DELETE' })
     ui.showToast(operationsCopy.value.movedToTrash)
   } catch (e) {
-    error.value = formatApiError(e, operationsCopy.value.trashFailed)
+    error.value = formatApiError(e, operationsCopy.value.trashFailed, copy.value.apiError)
     await loadBrowser()
   }
 }
@@ -861,7 +863,7 @@ async function loadFavorites() {
     const out = await api<{ files: FavoriteFile[] }>('/files/favorites')
     favorites.value = out.files
   } catch (e) {
-    error.value = formatApiError(e, t.value.favoritesLoadFailed)
+    error.value = formatApiError(e, t.value.favoritesLoadFailed, copy.value.apiError)
   } finally {
     favoritesLoading.value = false
   }
@@ -894,7 +896,7 @@ async function toggleFavorite(fileId: string, name: string) {
     }
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, t.value.favoriteUpdateFailed)
+    error.value = formatApiError(e, t.value.favoriteUpdateFailed, copy.value.apiError)
   }
 }
 
@@ -957,7 +959,7 @@ async function moveFileToVault(id: string, name: string) {
     ui.showToast(vaultCopy.value.moveInSuccess, 'success')
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, vaultCopy.value.moveInFailed)
+    error.value = formatApiError(e, vaultCopy.value.moveInFailed, copy.value.apiError)
     await loadBrowser()
   }
 }
@@ -984,7 +986,7 @@ async function batchMoveToVault() {
     clearSelection()
     await loadBrowser()
   } catch (e) {
-    error.value = formatApiError(e, vaultCopy.value.moveInFailed)
+    error.value = formatApiError(e, vaultCopy.value.moveInFailed, copy.value.apiError)
     await loadBrowser()
   }
 }
@@ -1038,7 +1040,7 @@ async function createShareLink(ttl: ShareLinkTTL | null) {
     existingLink.value = entry
     ui.showToast(t.value.shareLinkCreated)
   } catch (e) {
-    error.value = formatApiError(e, t.value.shareLinkCreateFailed)
+    error.value = formatApiError(e, t.value.shareLinkCreateFailed, copy.value.apiError)
   }
 }
 
@@ -1068,7 +1070,7 @@ async function revokeShareLink() {
     existingLink.value = null
     ui.showToast(t.value.shareLinkRevoked)
   } catch (e) {
-    error.value = formatApiError(e, t.value.shareLinkRevokeFailed)
+    error.value = formatApiError(e, t.value.shareLinkRevokeFailed, copy.value.apiError)
   }
 }
 
