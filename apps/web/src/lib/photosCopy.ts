@@ -1,6 +1,8 @@
+import type { ApiErrorCopy } from '@/api/errors'
 import type { Locale } from '@/lib/i18n'
 
 export type PhotosRuntimeCopy = {
+  apiError: ApiErrorCopy
   loadPhotosFailed: string
   loadMoreFailed: string
   albumCreated: string
@@ -22,6 +24,21 @@ export type PhotosRuntimeCopy = {
 
 const copy: Record<Locale, PhotosRuntimeCopy> = {
   vi: {
+    apiError: {
+      network: 'Không thể kết nối đến máy chủ. Hãy kiểm tra kết nối mạng và thử lại.',
+      codes: {
+        UNAUTHORIZED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+        NOT_FOUND: 'Không tìm thấy mục này hoặc mục đã bị thay đổi.',
+        CONFLICT: 'Tên đã tồn tại ở vị trí này.',
+        RATE_LIMITED: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.',
+        QUOTA_EXCEEDED: 'Dung lượng lưu trữ đã đầy. Hãy giải phóng dung lượng rồi thử lại.',
+        FILE_TOO_LARGE: 'Tệp vượt quá giới hạn 100 MiB.',
+        VALIDATION_ERROR: 'Dữ liệu không hợp lệ. Hãy kiểm tra loại tệp rồi thử lại.',
+        INVALID_STATE: 'Không thể thực hiện thao tác này lúc này.',
+        UPLOAD_EXPIRED: 'Phiên tải lên đã hết hạn. Hãy tải lại tệp.',
+      },
+    },
     loadPhotosFailed: 'Không thể tải ảnh',
     loadMoreFailed: 'Không thể tải thêm',
     albumCreated: 'Đã tạo album',
@@ -41,6 +58,7 @@ const copy: Record<Locale, PhotosRuntimeCopy> = {
     photosViewsAria: 'Các chế độ xem ảnh',
   },
   en: {
+    apiError: {},
     loadPhotosFailed: 'Failed to load photos',
     loadMoreFailed: 'Failed to load more',
     albumCreated: 'Album created',
