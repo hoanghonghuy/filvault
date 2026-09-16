@@ -8,6 +8,7 @@ import { getVaultStatusCopy } from '@/lib/vaultStatusCopy'
 import { formatVaultFileCount } from '@/lib/vaultFileCount'
 import { api, formatBytes } from '@/api/client'
 import { formatApiError } from '@/api/errors'
+import { vaultRuntimeCopy } from '@/lib/vaultRuntimeCopy'
 import { mimeIcon } from '@/lib/mimeIcon'
 import { formatVaultDate } from '@/lib/vaultDate'
 import Icon from '@/components/AppIcon.vue'
@@ -19,6 +20,7 @@ const router = useRouter()
 const vault = useVaultStore()
 const ui = useUiStore()
 const { t, locale } = useI18n()
+const copy = computed(() => vaultRuntimeCopy(locale.value))
 const vaultStatusCopy = computed(() => getVaultStatusCopy(locale.value))
 const vaultFileCountLabel = computed(() => formatVaultFileCount(vault.files.length, locale.value))
 
@@ -141,7 +143,7 @@ async function handleSetup() {
     setupPin.value = ''
     confirmSetupPin.value = ''
   } catch (e) {
-    setupError.value = formatApiError(e, t.value.vaultSetupFailed)
+    setupError.value = formatApiError(e, t.value.vaultSetupFailed, copy.value.apiError)
   }
 }
 
@@ -155,7 +157,7 @@ async function handleUnlock() {
     ui.showToast(t.value.vaultUnlockedNotice, 'success')
     unlockPin.value = ''
   } catch (e) {
-    unlockError.value = formatApiError(e, t.value.vaultUnlockFailed)
+    unlockError.value = formatApiError(e, t.value.vaultUnlockFailed, copy.value.apiError)
   }
 }
 
@@ -184,7 +186,7 @@ async function handleChangePin() {
     newPin.value = ''
     confirmNewPin.value = ''
   } catch (e) {
-    changePinError.value = formatApiError(e, t.value.vaultChangePinFailed)
+    changePinError.value = formatApiError(e, t.value.vaultChangePinFailed, copy.value.apiError)
   } finally {
     changingPin.value = false
   }
@@ -215,7 +217,7 @@ async function handleResetPin() {
     resetNewPin.value = ''
     confirmResetNewPin.value = ''
   } catch (e) {
-    resetPinError.value = formatApiError(e, t.value.vaultResetFailed)
+    resetPinError.value = formatApiError(e, t.value.vaultResetFailed, copy.value.apiError)
   } finally {
     resettingPin.value = false
   }
@@ -231,7 +233,7 @@ async function downloadFile(id: string) {
     const out = await api<{ downloadUrl: string }>(`/files/${id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    ui.showToast(formatApiError(e, t.value.vaultDownloadFailed), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultDownloadFailed, copy.value.apiError), 'error')
   }
 }
 
@@ -241,7 +243,7 @@ async function previewMediaFile(file: VaultFile) {
     previewFile.value = { id: file.id, name: file.name, mimeType: file.mimeType, url: out.downloadUrl }
     previewOpen.value = true
   } catch (e) {
-    ui.showToast(formatApiError(e, t.value.vaultPreviewFailed), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultPreviewFailed, copy.value.apiError), 'error')
   }
 }
 
@@ -260,7 +262,7 @@ async function removeSelectedFileFromVault() {
     await vault.removeFromVault([f.id])
     ui.showToast(t.value.vaultMoveOutSuccess, 'success')
   } catch (e) {
-    ui.showToast(formatApiError(e, t.value.vaultMoveOutFailed), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultMoveOutFailed, copy.value.apiError), 'error')
   }
 }
 
@@ -281,7 +283,7 @@ async function deleteSelectedFile() {
     await vault.loadFiles()
     ui.showToast(t.value.vaultFileDeleted, 'success')
   } catch (e) {
-    ui.showToast(formatApiError(e, t.value.vaultDeleteFailed), 'error')
+    ui.showToast(formatApiError(e, t.value.vaultDeleteFailed, copy.value.apiError), 'error')
   }
 }
 
