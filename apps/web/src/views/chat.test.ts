@@ -212,8 +212,11 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/names: \{ vi: 'Rừng nhiệt đới', en: 'Rainforest' \}/)
     expect(chat).toMatch(/preset\.names\[locale\.value\]/)
     expect(chat).toMatch(/name: preset\.names\[locale\.value\]/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'Mặc định' : 'Default'/)
-    expect(chat).toMatch(/locale\.value === 'vi' \? 'Ảnh tùy chỉnh' : 'Custom image'/)
+    expect(chat).toMatch(/const wallpaperLabelCopy = computed\(\(\) => chatWallpaperLabelCopy\(locale\.value\)\)/)
+    expect(chat).toMatch(/wallpaperLabelCopy\.value\.default/)
+    expect(chat).toMatch(/wallpaperLabelCopy\.value\.customImage/)
+    expect(chat).not.toMatch(/locale\.value === 'vi' \? 'Mặc định' : 'Default'/)
+    expect(chat).not.toMatch(/locale\.value === 'vi' \? 'Ảnh tùy chỉnh' : 'Custom image'/)
 
     expect(chat).not.toMatch(/v-for="th in chatThemes"/)
     expect(chat).not.toMatch(/if \(preset\) return preset\.name\b/)

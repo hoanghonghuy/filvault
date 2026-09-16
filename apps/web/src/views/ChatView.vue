@@ -29,6 +29,7 @@ import {
 } from '@/lib/stickers'
 import { useI18n } from '@/lib/i18n'
 import { chatRuntimeCopy } from '@/lib/chatCopy'
+import { chatWallpaperLabelCopy } from '@/lib/chatWallpaperLabelCopy'
 import { useTheme } from '@/lib/theme'
 import { generateUUID } from '@/lib/uuid'
 import type { UploadItemStatus } from '@/lib/uploadQueue'
@@ -44,6 +45,7 @@ const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
 const copy = computed(() => chatRuntimeCopy(locale.value))
+const wallpaperLabelCopy = computed(() => chatWallpaperLabelCopy(locale.value))
 const { resolvedIsDark } = useTheme()
 
 const conversations = ref<ChatConversation[]>([])
@@ -457,10 +459,10 @@ const threadWallpaperBackground = computed(() => {
 })
 
 const currentWallpaperPresetName = computed(() => {
-  if (!threadWallpaper.value || threadWallpaper.value === 'none') return locale.value === 'vi' ? 'Mặc định' : 'Default'
+  if (!threadWallpaper.value || threadWallpaper.value === 'none') return wallpaperLabelCopy.value.default
   const preset = CHAT_WALLPAPER_PRESETS.find((p) => p.id === threadWallpaper.value)
   if (preset) return preset.names[locale.value]
-  return locale.value === 'vi' ? 'Ảnh tùy chỉnh' : 'Custom image'
+  return wallpaperLabelCopy.value.customImage
 })
 
 const activePreviewStyle = computed(() => {
