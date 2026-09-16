@@ -9,6 +9,7 @@ let previousBodyOverflow = ''
 
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
+import { bottomSheetCopy } from '@/lib/bottomSheetCopy'
 import { useI18n } from '@/lib/i18n'
 
 const props = defineProps<{
@@ -22,7 +23,7 @@ const emit = defineEmits<{
 }>()
 
 const { locale } = useI18n()
-const fallbackDialogLabel = computed(() => (locale.value === 'vi' ? 'Hộp thoại' : 'Dialog'))
+const copy = computed(() => bottomSheetCopy(locale.value))
 const titleId = useId()
 const panelRef = ref<HTMLElement | null>(null)
 const sheetId = sheetCounter++
@@ -193,7 +194,7 @@ onUnmounted(unlockPage)
           aria-modal="true"
           tabindex="-1"
           :aria-labelledby="title ? titleId : undefined"
-          :aria-label="title ? undefined : fallbackDialogLabel"
+          :aria-label="title ? undefined : copy.untitledDialogAria"
           @touchstart="onTouchStart"
           @touchmove="onTouchMove"
           @touchend="onTouchEnd"
