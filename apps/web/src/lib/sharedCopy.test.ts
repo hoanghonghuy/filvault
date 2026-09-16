@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { ApiError } from '@/api/client'
+import { formatApiError } from '@/api/errors'
 import { formatShareExpiry, formatSharedDate, sharedCopy } from './sharedCopy'
 
 describe('sharedCopy', () => {
@@ -47,5 +49,54 @@ describe('sharedCopy', () => {
   it('returns an empty label for invalid expiry dates instead of leaking invalid text', () => {
     expect(formatShareExpiry('not-a-date', 'vi')).toBe('')
     expect(formatShareExpiry('not-a-date', 'en')).toBe('')
+  })
+
+  it('provides Vietnamese shared API error copy while preserving English defaults', () => {
+    const english = sharedCopy('en').apiError
+    const vietnamese = sharedCopy('vi').apiError
+
+    expect(english).toEqual({})
+    expect(vietnamese.network).toContain('kết nối')
+    expect(vietnamese.codes?.UNAUTHORIZED).toContain('đăng nhập')
+    expect(vietnamese.codes?.FORBIDDEN).toContain('quyền')
+    expect(vietnamese.codes?.NOT_FOUND).toContain('Không tìm thấy')
+    expect(vietnamese.codes?.CONFLICT).toContain('Tên đã tồn tại')
+    expect(vietnamese.codes?.RATE_LIMITED).toContain('thử lại')
+    expect(vietnamese.codes?.QUOTA_EXCEEDED).toContain('Dung lượng')
+  })
+
+  it('localizes network failures for Vietnamese Shared sessions', () => {
+    const copy = sharedCopy('vi')
+
+    expect(
+      formatApiError(new TypeError('Failed to fetch'), copy.loadIncomingFailed, copy.apiError),
+    ).toBe('Không thể kết nối đến máy chủ. Hãy kiểm tra kết nối mạng và thử lại.')
+  })
+
+  it('localizes common mapped API codes for Vietnamese Shared sessions', () => {
+    const copy = sharedCopy('vi')
+    const error = new ApiError('NOT_FOUND', 'not found', 404)
+
+    expect(formatApiError(error, copy.loadIncomingFailed, copy.apiError)).toBe(
+      'Không tìm thấy mục này hoặc mục đã bị thay đổi.',
+    )
+  })
+
+  it('keeps localized per-action fallback for unmapped errors', () => {
+    const copy = sharedCopy('vi')
+    const fallback = 'Không thể tải các mục được chia sẻ'
+
+    expect(formatApiError(new Error('unexpected json'), fallback, copy.apiError)).toBe(fallback)
+  })
+
+  it('keeps English shared formatter defaults when Shared copy omits overrides', () => {
+    const copy = sharedCopy('en')
+
+    expect(formatApiError(new TypeError('Failed to fetch'), copy.loadIncomingFailed, copy.apiError)).toBe(
+      "Can't reach the server. Try again in a moment.",
+    )
+    expect(formatApiError(new ApiError('NOT_FOUND', 'not found', 404), copy.loadIncomingFailed, copy.apiError)).toBe(
+      'Item not found.',
+    )
   })
 })
