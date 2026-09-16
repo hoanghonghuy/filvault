@@ -9,6 +9,7 @@ import { mimeIcon } from '@/lib/mimeIcon'
 import { mimeCategoryColor } from '@/lib/mimeColors'
 import { useI18n } from '@/lib/i18n'
 import { formatShareExpiry, formatSharedDate, sharedCopy } from '@/lib/sharedCopy'
+import { createSharedFolderNavigationGuard } from '@/lib/sharedFolderNavigationGuard'
 import type { DownloadURL, IncomingShare, SharedBrowser } from '@/api/types'
 
 interface ShareLinkInfo {
@@ -43,19 +44,30 @@ const folderLoading = ref(false)
 const folderError = ref('')
 const retryFolderTarget = ref<RetryFolderTarget | null>(null)
 const viewMode = ref<'list' | 'grid'>('list')
+const folderNavigation = createSharedFolderNavigationGuard()
+
+function isCurrentFolderNavigation(token: number): boolean {
+  return folderNavigation.isCurrentNavigation(token) && shareTab.value === 'with-me'
+}
+
+function invalidateFolderNavigation() {
+  folderNavigation.invalidateNavigation()
+  folderLoading.value = false
+}
 
 function toggleViewMode() {
   viewMode.value = viewMode.value === 'list' ? 'grid' : 'list'
 }
 
 function selectShareTab(next: ShareTab) {
-  shareTab.value = next
-  if (next === 'my-shares' && browsing.value) {
+  if (next === 'my-shares') {
+    invalidateFolderNavigation()
     browseStack.value = []
     browsing.value = null
     folderError.value = ''
     retryFolderTarget.value = null
   }
+  shareTab.value = next
 }
 
 async function loadIncomingShares() {
@@ -98,12 +110,14 @@ function formatExpiry(expiresAt: string | null): string {
 async function openSharedFolder(folderId: string, mode: BrowseMode) {
   if (folderLoading.value) return
 
+  const generation = folderNavigation.beginNavigation()
   folderLoading.value = true
   folderError.value = ''
   if (mode === 'root') error.value = ''
 
   try {
     const next = await api<SharedBrowser>(`/shared/folders/${folderId}`)
+    if (!isCurrentFolderNavigation(generation)) return
     if (mode === 'root') {
       browseStack.value = [next]
     } else {
@@ -112,12 +126,15 @@ async function openSharedFolder(folderId: string, mode: BrowseMode) {
     browsing.value = next
     retryFolderTarget.value = null
   } catch (e) {
+    if (!isCurrentFolderNavigation(generation)) return
     const message = formatApiError(e, copy.value.openFolderFailed, copy.value.apiError)
     retryFolderTarget.value = { id: folderId, mode }
     if (mode === 'root') error.value = message
     else folderError.value = message
   } finally {
-    folderLoading.value = false
+    if (isCurrentFolderNavigation(generation)) {
+      folderLoading.value = false
+    }
   }
 }
 
@@ -141,6 +158,7 @@ function goBackFromFolder() {
   retryFolderTarget.value = null
 
   if (browseStack.value.length <= 1) {
+    invalidateFolderNavigation()
     browseStack.value = []
     browsing.value = null
     return
@@ -152,6 +170,7 @@ function goBackFromFolder() {
 
 function goToBrowseIndex(index: number) {
   if (folderLoading.value || index < 0 || index >= browseStack.value.length - 1) return
+  invalidateFolderNavigation()
   folderError.value = ''
   retryFolderTarget.value = null
   browseStack.value = browseStack.value.slice(0, index + 1)
