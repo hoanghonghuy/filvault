@@ -4,6 +4,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import Icon from '@/components/AppIcon.vue'
 import type { ShareLinkTTL } from '@/api/types'
 import { useI18n } from '@/lib/i18n'
+import { shareSheetCopy } from '@/lib/shareSheetCopy'
 
 defineOptions({ inheritAttrs: false })
 
@@ -24,45 +25,7 @@ const emit = defineEmits<{
 const attrs = useAttrs()
 const { locale } = useI18n()
 
-const copy = computed(() =>
-  locale.value === 'en'
-    ? {
-        anyone: 'Anyone with this link can view and download',
-        copying: 'Copying link…',
-        copyLink: 'Copy link',
-        expires: 'Expires',
-        neverExpires: 'Never expires',
-        revoking: 'Revoking…',
-        revoke: 'Revoke link',
-        close: 'Close',
-        expiresAfter: 'Link expires after',
-        expiryGroup: 'Link expiry',
-        forever: 'Forever',
-        oneHour: '1 hour',
-        oneDay: '24 hours',
-        sevenDays: '7 days',
-        creating: 'Creating…',
-        create: 'Create link',
-      }
-    : {
-        anyone: 'Bất kỳ ai có liên kết này đều có thể xem và tải xuống',
-        copying: 'Đang sao chép liên kết…',
-        copyLink: 'Sao chép liên kết',
-        expires: 'Hết hạn',
-        neverExpires: 'Không hết hạn',
-        revoking: 'Đang thu hồi…',
-        revoke: 'Thu hồi liên kết',
-        close: 'Đóng',
-        expiresAfter: 'Liên kết hết hạn sau',
-        expiryGroup: 'Thời hạn liên kết',
-        forever: 'Vĩnh viễn',
-        oneHour: '1 giờ',
-        oneDay: '24 giờ',
-        sevenDays: '7 ngày',
-        creating: 'Đang tạo…',
-        create: 'Tạo liên kết',
-      },
-)
+const copy = computed(() => shareSheetCopy(locale.value))
 
 type Listener = (...args: unknown[]) => unknown
 
