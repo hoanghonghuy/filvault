@@ -104,8 +104,8 @@ describe('chat surface contract', () => {
     expect(chat).toMatch(/message: t\.value\.deleteChatMessage/)
     expect(chat).toMatch(/label: t\.value\.newNicknameLabel/)
     expect(chat).toMatch(/confirmLabel: t\.value\.nicknameSave/)
-    expect(chat).toMatch(/formatApiError\(err, t\.value\.reactionFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.activeStatusUpdateError\)/)
+    expect(chat).toMatch(/formatApiError\(err, t\.value\.reactionFailed, copy\.value\.apiError\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.activeStatusUpdateError, copy\.value\.apiError\)/)
     expect(chat).toMatch(/item\.error \|\| t\.uploadImageFailed/)
   })
 
@@ -124,14 +124,14 @@ describe('chat surface contract', () => {
       expect(i18n.match(new RegExp(`${key}:`, 'g'))).toHaveLength(2)
     }
 
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMediaLoadFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageEditFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageRemoveFailed\)/)
-    expect(chat.match(/formatApiError\(e, t\.value\.chatMessageSendFailed\)/g)).toHaveLength(2)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMediaLoadFailed, copy\.value\.apiError\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageEditFailed, copy\.value\.apiError\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatMessageRemoveFailed, copy\.value\.apiError\)/)
+    expect(chat.match(/formatApiError\(e, t\.value\.chatMessageSendFailed, copy\.value\.apiError\)/g)).toHaveLength(2)
     expect(chat).toMatch(/ui\.showToast\(t\.value\.chatAttachmentSent\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatAttachmentSendFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatDownloadFailed\)/)
-    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatViewFailed\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatAttachmentSendFailed, copy\.value\.apiError\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatDownloadFailed, copy\.value\.apiError\)/)
+    expect(chat).toMatch(/formatApiError\(e, t\.value\.chatViewFailed, copy\.value\.apiError\)/)
 
     for (const stale of [
       'Failed to load media',
