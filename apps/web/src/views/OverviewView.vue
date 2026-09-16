@@ -78,13 +78,13 @@ async function load() {
       files.value = browserResult.value.files
     } else {
       files.value = []
-      filesError.value = formatApiError(browserResult.reason, copy.value.loadFilesFailed)
+      filesError.value = formatApiError(browserResult.reason, copy.value.loadFilesFailed, copy.value.apiError)
     }
     if (timelineResult.status === 'fulfilled') {
       groups.value = timelineResult.value.groups
     } else {
       groups.value = []
-      photosError.value = formatApiError(timelineResult.reason, copy.value.loadPhotosFailed)
+      photosError.value = formatApiError(timelineResult.reason, copy.value.loadPhotosFailed, copy.value.apiError)
     }
     if (favoritesResult.status === 'fulfilled') {
       favorites.value = favoritesResult.value.files
