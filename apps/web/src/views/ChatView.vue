@@ -28,6 +28,7 @@ import {
   type Sticker,
 } from '@/lib/stickers'
 import { useI18n } from '@/lib/i18n'
+import { chatRuntimeCopy } from '@/lib/chatCopy'
 import { useTheme } from '@/lib/theme'
 import { generateUUID } from '@/lib/uuid'
 import type { UploadItemStatus } from '@/lib/uploadQueue'
@@ -42,6 +43,7 @@ const chatStore = useChatStore()
 const callStore = useCallStore()
 const auth = useAuthStore()
 const { t, locale, setLocale } = useI18n()
+const copy = computed(() => chatRuntimeCopy(locale.value))
 const { resolvedIsDark } = useTheme()
 
 const conversations = ref<ChatConversation[]>([])
@@ -364,7 +366,7 @@ async function loadPersonalPhotos() {
     personalPhotos.value = allItems
     personalPhotosLoaded.value = true
   } catch (e) {
-    personalPhotosError.value = formatApiError(e, t.value.personalPhotosLoadError)
+    personalPhotosError.value = formatApiError(e, t.value.personalPhotosLoadError, copy.value.apiError)
   } finally {
     loadingPersonalPhotos.value = false
   }
@@ -755,7 +757,7 @@ async function performInfoSearch() {
     infoSearchResults.value = out.messages
     infoSearchDone.value = true
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatSearchFailed)
+    error.value = formatApiError(e, t.value.chatSearchFailed, copy.value.apiError)
   } finally {
     infoSearching.value = false
   }
@@ -1273,7 +1275,7 @@ async function selectReaction(emoji: string, targetMessage?: ChatMessage) {
       local.reactions = updated
     }
   } catch (err) {
-    ui.showToast(formatApiError(err, t.value.reactionFailed), 'error')
+    ui.showToast(formatApiError(err, t.value.reactionFailed, copy.value.apiError), 'error')
   }
 }
 
@@ -1642,7 +1644,7 @@ async function toggleActiveStatus() {
     ui.showToast(next ? t.value.activeStatusEnabled : t.value.activeStatusDisabled)
     await loadConversations()
   } catch (e) {
-    ui.showToast(formatApiError(e, t.value.activeStatusUpdateError), 'error')
+    ui.showToast(formatApiError(e, t.value.activeStatusUpdateError, copy.value.apiError), 'error')
   }
 }
 
@@ -1673,7 +1675,7 @@ async function loadConversations() {
       void router.replace(`/chat/${out.conversations[0].id}`)
     }
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatLoadFailed)
+    error.value = formatApiError(e, t.value.chatLoadFailed, copy.value.apiError)
   } finally {
     loading.value = false
   }
@@ -1687,7 +1689,7 @@ async function createDirectConversation(email: string) {
     await selectConversation(conversation.id)
     void router.push(`/chat/${conversation.id}`)
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatOpenDirectFailed)
+    error.value = formatApiError(e, t.value.chatOpenDirectFailed, copy.value.apiError)
   }
 }
 
@@ -1743,7 +1745,7 @@ async function loadMessages(id = selectedId.value) {
       void chatStore.markAsRead(id, out.messages[out.messages.length - 1]?.id)
     }
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatMessagesLoadFailed)
+    error.value = formatApiError(e, t.value.chatMessagesLoadFailed, copy.value.apiError)
   } finally {
     loadingThread.value = false
   }
@@ -1771,7 +1773,7 @@ async function loadOlder() {
       container.scrollTop = container.scrollHeight - heightBefore + offsetBefore
     }
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatOlderMessagesLoadFailed)
+    error.value = formatApiError(e, t.value.chatOlderMessagesLoadFailed, copy.value.apiError)
   } finally {
     loadingOlder.value = false
   }
@@ -1886,7 +1888,7 @@ async function searchMessages() {
     const out = await api<{ messages: ChatMessage[] }>(`/chat/conversations/${selectedId.value}/messages/search?q=${q}`)
     searchResults.value = out.messages
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatSearchFailed)
+    error.value = formatApiError(e, t.value.chatSearchFailed, copy.value.apiError)
   }
 }
 
@@ -1926,7 +1928,7 @@ async function loadMedia(id = selectedId.value) {
     media.value = out.media
     void resolveMediaThumbs(out.media)
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatMediaLoadFailed)
+    error.value = formatApiError(e, t.value.chatMediaLoadFailed, copy.value.apiError)
   }
 }
 
@@ -1953,7 +1955,7 @@ async function editMessage(message: ChatMessage) {
     )
     messages.value = messages.value.map((item) => item.id === updated.id ? updated : item)
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatMessageEditFailed)
+    error.value = formatApiError(e, t.value.chatMessageEditFailed, copy.value.apiError)
   }
 }
 
@@ -1972,7 +1974,7 @@ async function removeMessage(message: ChatMessage) {
       item.id === message.id ? { ...item, body: '', removedAt: new Date().toISOString() } : item,
     )
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatMessageRemoveFailed)
+    error.value = formatApiError(e, t.value.chatMessageRemoveFailed, copy.value.apiError)
   }
 }
 
@@ -2018,8 +2020,8 @@ async function sendText() {
     selectedId.value = message.conversationId
   } catch (e) {
     draft.value = draft.value ? draft.value : body
-    pendingMessageError.value = formatApiError(e, t.value.chatMessageSendFailed)
-    error.value = formatApiError(e, t.value.chatMessageSendFailed)
+    pendingMessageError.value = formatApiError(e, t.value.chatMessageSendFailed, copy.value.apiError)
+    error.value = formatApiError(e, t.value.chatMessageSendFailed, copy.value.apiError)
   } finally {
     sendingText.value = false
   }
@@ -2130,7 +2132,7 @@ async function processAttachment(id: string) {
   } catch (e) {
     if (item.status !== 'uploading') return
     item.status = 'failed'
-    item.error = formatApiError(e, t.value.chatAttachmentSendFailed)
+    item.error = formatApiError(e, t.value.chatAttachmentSendFailed, copy.value.apiError)
   } finally {
     processNextInAttachmentQueue()
   }
@@ -2166,7 +2168,7 @@ async function openAttachment(attachmentId: string) {
     const targetUrl = normalizePresignedUrl(out.downloadUrl)
     window.open(targetUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatDownloadFailed)
+    error.value = formatApiError(e, t.value.chatDownloadFailed, copy.value.apiError)
   }
 }
 
@@ -2183,7 +2185,7 @@ async function openInlineImage(attachment: ChatAttachment) {
     lightboxUrl.value = normalizePresignedUrl(out.downloadUrl)
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, t.value.chatViewFailed)
+    error.value = formatApiError(e, t.value.chatViewFailed, copy.value.apiError)
   }
 }
 
