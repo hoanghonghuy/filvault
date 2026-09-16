@@ -38,11 +38,11 @@ describe('video-focused Photos route contract', () => {
     expect(videoSource).toContain("view: 'View failed'")
     expect(videoSource).toContain("download: 'Download failed'")
     expect(videoSource).toContain("favorite: 'Failed to update favorite'")
-    expect(videoSource).toContain('formatApiError(e, errorCopy.value.load)')
-    expect(videoSource).toContain('formatApiError(e, errorCopy.value.loadMore)')
-    expect(videoSource).toContain('formatApiError(e, errorCopy.value.view)')
-    expect(videoSource).toContain('formatApiError(e, errorCopy.value.download)')
-    expect(videoSource).toContain('formatApiError(e, errorCopy.value.favorite)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.load, photosCopy.value.apiError)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.loadMore, photosCopy.value.apiError)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.view, photosCopy.value.apiError)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.download, photosCopy.value.apiError)')
+    expect(videoSource).toContain('formatApiError(e, errorCopy.value.favorite, photosCopy.value.apiError)')
   })
 
   it('keeps initial load failure separate from a true-empty success and exposes retry', () => {
