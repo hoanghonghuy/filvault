@@ -6,6 +6,7 @@ import type { PublicShareMeta } from '@/api/types'
 import Icon from '@/components/AppIcon.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
 import { useI18n } from '@/lib/i18n'
+import { publicShareCopy } from '@/lib/publicShareCopy'
 
 const route = useRoute()
 const { locale } = useI18n()
@@ -25,37 +26,7 @@ let metadataSequence = 0
 let objectOperationSequence = 0
 let objectUrlRequest: { token: string; promise: Promise<string> } | null = null
 
-const copy = computed(() =>
-  locale.value === 'vi'
-    ? {
-        loading: 'Đang tải liên kết…',
-        unavailable: 'Liên kết này không còn khả dụng',
-        temporary: 'Tạm thời không thể tải liên kết này.',
-        retry: 'Thử lại',
-        expires: 'Hết hạn',
-        preview: 'Xem trước',
-        previewing: 'Đang chuẩn bị xem trước…',
-        previewFailed: 'Không thể chuẩn bị bản xem trước. Liên kết vẫn còn hiệu lực; hãy thử lại.',
-        download: 'Tải xuống',
-        downloading: 'Đang chuẩn bị tải xuống…',
-        downloadFailed: 'Không thể chuẩn bị tệp tải xuống. Liên kết vẫn còn hiệu lực; hãy thử lại.',
-        sharedVia: 'Được chia sẻ qua Filvault',
-      }
-    : {
-        loading: 'Loading link…',
-        unavailable: 'This link is not available',
-        temporary: 'This link could not be loaded right now.',
-        retry: 'Retry',
-        expires: 'Expires',
-        preview: 'Preview',
-        previewing: 'Preparing preview…',
-        previewFailed: 'Could not prepare the preview. The link is still available; try again.',
-        download: 'Download',
-        downloading: 'Preparing download…',
-        downloadFailed: 'Could not prepare the download. The link is still available; try again.',
-        sharedVia: 'Shared via Filvault',
-      },
-)
+const copy = computed(() => publicShareCopy(locale.value))
 
 const expiresLabel = computed(() => {
   if (!meta.value?.expiresAt) return ''
