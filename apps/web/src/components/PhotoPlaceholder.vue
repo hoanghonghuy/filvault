@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '@/lib/i18n'
+import { photoPlaceholderCopy } from '@/lib/photoPlaceholderCopy'
 
 defineProps<{ mimeType: string; name: string }>()
 
 const emit = defineEmits<{ click: [] }>()
 const { locale } = useI18n()
-const photoLabel = computed(() => (locale.value === 'vi' ? 'Ảnh' : 'Photo'))
+const photoLabel = computed(() => photoPlaceholderCopy(locale.value).photo)
 
 const isVideo = (mime: string) => mime.startsWith('video/')
 </script>
