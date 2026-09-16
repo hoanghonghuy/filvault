@@ -8,11 +8,11 @@ describe('FilesView favorites feedback localization wiring', () => {
   it('uses locale-reactive copy for batch, load and single-file favorite feedback', () => {
     expect(source).toContain("ui.showToast(t.value.favoriteNoneSelected, 'info')")
     expect(source).toContain("t.value.favoriteBatchAdded.replace('{n}', String(fileIds.length))")
-    expect(source).toContain('formatApiError(e, t.value.favoriteBatchFailed)')
-    expect(source).toContain('formatApiError(e, t.value.favoritesLoadFailed)')
+    expect(source).toContain('formatApiError(e, t.value.favoriteBatchFailed, copy.value.apiError)')
+    expect(source).toContain('formatApiError(e, t.value.favoritesLoadFailed, copy.value.apiError)')
     expect(source).toContain("t.value.favoriteRemoved.replace('{name}', () => name)")
     expect(source).toContain("t.value.favoriteAdded.replace('{name}', () => name)")
-    expect(source).toContain('formatApiError(e, t.value.favoriteUpdateFailed)')
+    expect(source).toContain('formatApiError(e, t.value.favoriteUpdateFailed, copy.value.apiError)')
   })
 
   it('uses callback replacement so dollar sequences in filenames stay literal', () => {

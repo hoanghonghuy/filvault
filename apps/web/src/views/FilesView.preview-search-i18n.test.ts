@@ -7,8 +7,8 @@ const i18nSource = readFileSync(fileURLToPath(new URL('../lib/i18n.ts', import.m
 
 describe('FilesView preview and search fallback localization', () => {
   it('uses locale-reactive copy for preview and search failures', () => {
-    expect(source).toContain('formatApiError(e, t.value.filesPreviewFailed)')
-    expect(source).toContain('formatApiError(e, t.value.filesSearchFailed)')
+    expect(source).toContain('formatApiError(e, t.value.filesPreviewFailed, copy.value.apiError)')
+    expect(source).toContain('formatApiError(e, t.value.filesSearchFailed, copy.value.apiError)')
   })
 
   it('keeps bounded VI/EN fallback copy in the shared dictionary', () => {
