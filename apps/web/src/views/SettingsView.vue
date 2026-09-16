@@ -150,7 +150,7 @@ async function saveTrashSettings() {
     trashSavedFeedback.value = true
     ui.showToast(t.value.trashSettingsSaved, 'success')
   } catch (e) {
-    trashError.value = formatApiError(e, t.value.trashSaveFailed)
+    trashError.value = formatApiError(e, t.value.trashSaveFailed, settingsText.value.apiError)
   } finally {
     savingTrashSettings.value = false
   }
@@ -175,7 +175,7 @@ async function savePreviewSettings() {
     previewSavedFeedback.value = true
     ui.showToast(t.value.previewSettingsSaved, 'success')
   } catch (e) {
-    previewError.value = formatApiError(e, t.value.previewSaveFailed)
+    previewError.value = formatApiError(e, t.value.previewSaveFailed, settingsText.value.apiError)
   } finally {
     savingPreviewSettings.value = false
   }
@@ -244,7 +244,7 @@ async function revokeFromSettings(link: ShareLinkInfo) {
     ui.showToast(settingsText.value.linkRevoked)
     await loadShareLinks()
   } catch (e) {
-    error.value = formatApiError(e, settingsText.value.revokeFailed)
+    error.value = formatApiError(e, settingsText.value.revokeFailed, settingsText.value.apiError)
   }
 }
 
