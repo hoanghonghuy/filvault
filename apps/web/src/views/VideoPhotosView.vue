@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useUiStore } from '@/stores/ui'
 import { useI18n } from '@/lib/i18n'
+import { photosRuntimeCopy } from '@/lib/photosCopy'
 import type { DownloadURL, Timeline, TimelineItem } from '@/api/types'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import MediaLightbox from '@/components/MediaLightbox.vue'
@@ -14,6 +15,7 @@ import LoadingSkeletonPhotos from '@/components/LoadingSkeletonPhotos.vue'
 
 const ui = useUiStore()
 const { t, locale } = useI18n()
+const photosCopy = computed(() => photosRuntimeCopy(locale.value))
 const groups = ref<Timeline['groups']>([])
 const nextBefore = ref<string | undefined>()
 const loading = ref(false)
@@ -55,7 +57,7 @@ async function load() {
     groups.value = data.groups
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, errorCopy.value.load)
+    error.value = formatApiError(e, errorCopy.value.load, photosCopy.value.apiError)
   } finally {
     loading.value = false
   }
@@ -76,7 +78,7 @@ async function loadMore() {
     groups.value = merged
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, errorCopy.value.loadMore)
+    error.value = formatApiError(e, errorCopy.value.loadMore, photosCopy.value.apiError)
   } finally {
     loadingMore.value = false
   }
@@ -90,7 +92,7 @@ async function openLightbox(item: TimelineItem) {
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, errorCopy.value.view)
+    error.value = formatApiError(e, errorCopy.value.view, photosCopy.value.apiError)
   }
 }
 
@@ -100,7 +102,7 @@ async function download(item: TimelineItem) {
     const out = await api<DownloadURL>(`/files/${item.id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, errorCopy.value.download)
+    error.value = formatApiError(e, errorCopy.value.download, photosCopy.value.apiError)
   }
 }
 
@@ -111,7 +113,7 @@ async function toggleFavorite(item: TimelineItem) {
     await api(`/files/${item.id}/favorite`, { method: wasFavorited ? 'DELETE' : 'PUT' })
     item.isFavorite = !wasFavorited
   } catch (e) {
-    error.value = formatApiError(e, errorCopy.value.favorite)
+    error.value = formatApiError(e, errorCopy.value.favorite, photosCopy.value.apiError)
   }
 }
 
