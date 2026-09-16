@@ -15,7 +15,7 @@ describe('FilesView Personal Vault localization wiring', () => {
     expect(source).toContain('message: vaultCopy.value.confirmBatchMessage(fileIds.length)')
     expect(source).toContain("ui.showToast(vaultCopy.value.moveInSuccess, 'success')")
     expect(source).toContain('ui.showToast(vaultCopy.value.moveInBatchSuccess(fileIds.length)')
-    expect(source.match(/formatApiError\(e, vaultCopy\.value\.moveInFailed\)/g)).toHaveLength(2)
+    expect(source.match(/formatApiError\(e, vaultCopy\.value\.moveInFailed, copy\.value\.apiError\)/g)).toHaveLength(2)
   })
 
   it('does not leave Vietnamese-only move fallbacks in FilesView', () => {
