@@ -7,14 +7,14 @@ const source = readFileSync(fileURLToPath(new URL('./FilesView.vue', import.meta
 describe('FilesView sharing feedback localization wiring', () => {
   it('uses locale-reactive copy for public-link lifecycle and direct sharing', () => {
     expect(source).toContain('ui.showToast(t.value.shareLinkCreated)')
-    expect(source).toContain('formatApiError(e, t.value.shareLinkCreateFailed)')
+    expect(source).toContain('formatApiError(e, t.value.shareLinkCreateFailed, copy.value.apiError)')
     expect(source).toContain('ui.showToast(t.value.shareLinkCopied)')
     expect(source).toContain("ui.showToast(t.value.shareLinkCopyFailed, 'info')")
     expect(source).toContain('title: t.value.shareLinkRevokeTitle')
     expect(source).toContain('message: t.value.shareLinkRevokeMessage')
     expect(source).toContain('confirmLabel: t.value.shareLinkRevokeConfirm')
     expect(source).toContain('ui.showToast(t.value.shareLinkRevoked)')
-    expect(source).toContain('formatApiError(e, t.value.shareLinkRevokeFailed)')
+    expect(source).toContain('formatApiError(e, t.value.shareLinkRevokeFailed, copy.value.apiError)')
     expect(source).toContain("t.value.shareInvitationSent.replace('{email}', () => result.email)")
     expect(source).toContain(".replace('{name}', () => name)")
     expect(source).toContain(".replace('{email}', () => result.email)")

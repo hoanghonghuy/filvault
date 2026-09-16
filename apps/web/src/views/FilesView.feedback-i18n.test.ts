@@ -6,10 +6,10 @@ const source = readFileSync(fileURLToPath(new URL('./FilesView.vue', import.meta
 
 describe('FilesView core feedback localization wiring', () => {
   it('uses locale-reactive copy for browse, create-folder and download feedback', () => {
-    expect(source).toContain('formatApiError(e, t.value.filesLoadFailed)')
+    expect(source).toContain('formatApiError(e, t.value.filesLoadFailed, copy.value.apiError)')
     expect(source).toContain('ui.showToast(t.value.folderCreated)')
-    expect(source).toContain('formatApiError(e, t.value.folderCreateFailed)')
-    expect(source).toContain('formatApiError(e, t.value.fileDownloadFailed)')
+    expect(source).toContain('formatApiError(e, t.value.folderCreateFailed, copy.value.apiError)')
+    expect(source).toContain('formatApiError(e, t.value.fileDownloadFailed, copy.value.apiError)')
   })
 
   it('does not retain the replaced English-only fallback literals', () => {
