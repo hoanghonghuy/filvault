@@ -63,7 +63,7 @@ async function loadIncomingShares() {
     const out = await api<{ shares: IncomingShare[] }>('/shares/with-me')
     shares.value = out.shares
   } catch (e) {
-    error.value = formatApiError(e, copy.value.loadIncomingFailed)
+    error.value = formatApiError(e, copy.value.loadIncomingFailed, copy.value.apiError)
   }
 }
 
@@ -72,7 +72,7 @@ async function loadMyShareLinks() {
     const out = await api<{ links: ShareLinkInfo[] }>('/share-links')
     shareLinks.value = out.links
   } catch (e) {
-    error.value = formatApiError(e, copy.value.loadLinksFailed)
+    error.value = formatApiError(e, copy.value.loadLinksFailed, copy.value.apiError)
   }
 }
 
@@ -112,7 +112,7 @@ async function openSharedFolder(folderId: string, mode: BrowseMode) {
     browsing.value = next
     retryFolderTarget.value = null
   } catch (e) {
-    const message = formatApiError(e, copy.value.openFolderFailed)
+    const message = formatApiError(e, copy.value.openFolderFailed, copy.value.apiError)
     retryFolderTarget.value = { id: folderId, mode }
     if (mode === 'root') error.value = message
     else folderError.value = message
@@ -165,7 +165,7 @@ async function downloadFile(fileId: string, name: string) {
     window.open(out.downloadUrl, '_blank', 'noopener')
     ui.showToast(copy.value.downloading(name), 'success')
   } catch (e) {
-    error.value = formatApiError(e, copy.value.downloadFailed)
+    error.value = formatApiError(e, copy.value.downloadFailed, copy.value.apiError)
   }
 }
 
@@ -199,7 +199,7 @@ async function revokeLink(link: ShareLinkInfo) {
     ui.showToast(copy.value.revokeSuccess)
     await loadMyShareLinks()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.revokeFailed)
+    error.value = formatApiError(e, copy.value.revokeFailed, copy.value.apiError)
   }
 }
 
