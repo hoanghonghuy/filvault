@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Icon from '@/components/AppIcon.vue'
 import { useI18n } from '@/lib/i18n'
+import { networkStatusCopy } from '@/lib/networkStatusCopy'
 
 const RECOVERY_VISIBLE_MS = 3000
 
@@ -10,17 +11,8 @@ const online = ref(true)
 const recovered = ref(false)
 let recoveryTimer: ReturnType<typeof setTimeout> | null = null
 
-const copy = computed(() => {
-  if (locale.value === 'en') {
-    return online.value
-      ? { title: 'Back online', detail: 'Your device connection has been restored.' }
-      : { title: 'You’re offline', detail: 'Network actions will be available again when your device reconnects.' }
-  }
-
-  return online.value
-    ? { title: 'Đã kết nối lại', detail: 'Kết nối mạng của thiết bị đã được khôi phục.' }
-    : { title: 'Bạn đang ngoại tuyến', detail: 'Các thao tác cần mạng sẽ khả dụng lại khi thiết bị kết nối.' }
-})
+const labels = computed(() => networkStatusCopy(locale.value))
+const copy = computed(() => (online.value ? labels.value.recovered : labels.value.offline))
 
 function clearRecoveryTimer() {
   if (recoveryTimer) {
