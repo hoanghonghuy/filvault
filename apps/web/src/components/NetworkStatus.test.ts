@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
+import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import NetworkStatus from './NetworkStatus.vue'
@@ -60,6 +61,45 @@ describe('NetworkStatus', () => {
     vi.advanceTimersByTime(3000)
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('updates offline labels reactively when locale changes without remount', async () => {
+    setLocale('vi')
+    setOnline(false)
+    const wrapper = mount(NetworkStatus)
+    await wrapper.vm.$nextTick()
+
+    const status = wrapper.get('[role="status"]')
+    expect(status.text()).toContain('Bạn đang ngoại tuyến')
+    expect(status.text()).toContain('Các thao tác cần mạng')
+
+    setLocale('en')
+    await nextTick()
+
+    expect(status.text()).toContain('You’re offline')
+    expect(status.text()).toContain('Network actions will be available again')
+    wrapper.unmount()
+  })
+
+  it('updates recovered labels reactively when locale changes without remount', async () => {
+    setLocale('en')
+    const wrapper = mount(NetworkStatus)
+
+    window.dispatchEvent(new Event('offline'))
+    await wrapper.vm.$nextTick()
+    window.dispatchEvent(new Event('online'))
+    await wrapper.vm.$nextTick()
+
+    const status = wrapper.get('[role="status"]')
+    expect(status.text()).toContain('Back online')
+    expect(status.text()).toContain('Your device connection has been restored.')
+
+    setLocale('vi')
+    await nextTick()
+
+    expect(status.text()).toContain('Đã kết nối lại')
+    expect(status.text()).toContain('Kết nối mạng của thiết bị đã được khôi phục.')
     wrapper.unmount()
   })
 
