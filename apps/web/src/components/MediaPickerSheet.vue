@@ -61,7 +61,7 @@ async function loadInitial() {
     nextBefore.value = data.nextBefore
   } catch (e) {
     if (generation !== loadGeneration || !props.open) return
-    error.value = formatApiError(e, copy.value.loadFailed)
+    error.value = formatApiError(e, copy.value.loadFailed, copy.value.apiError)
   } finally {
     if (generation === loadGeneration && props.open) {
       loading.value = false
@@ -82,7 +82,7 @@ async function loadMore() {
     nextBefore.value = data.nextBefore
   } catch (e) {
     if (generation !== loadGeneration || !props.open) return
-    error.value = formatApiError(e, copy.value.loadMoreFailed)
+    error.value = formatApiError(e, copy.value.loadMoreFailed, copy.value.apiError)
   } finally {
     if (generation === loadGeneration && props.open) {
       loadingMore.value = false
