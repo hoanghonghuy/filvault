@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '@/lib/i18n'
+import { photoPlaceholderCopy } from '@/lib/photoPlaceholderCopy'
 
 defineProps<{ mimeType: string; name: string }>()
 
 const emit = defineEmits<{ click: [] }>()
 const { locale } = useI18n()
-const photoLabel = computed(() => (locale.value === 'vi' ? 'Ảnh' : 'Photo'))
+const copy = computed(() => photoPlaceholderCopy(locale.value))
 
 const isVideo = (mime: string) => mime.startsWith('video/')
 </script>
@@ -14,7 +15,7 @@ const isVideo = (mime: string) => mime.startsWith('video/')
 <template>
   <button type="button" class="placeholder" :aria-label="name" :title="name" @click="emit('click')">
     <span class="badge" :class="{ video: isVideo(mimeType) }">
-      {{ isVideo(mimeType) ? 'Video' : photoLabel }}
+      {{ isVideo(mimeType) ? 'Video' : copy.photo }}
     </span>
     <span class="name">{{ name }}</span>
   </button>
