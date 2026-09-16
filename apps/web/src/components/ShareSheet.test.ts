@@ -48,22 +48,39 @@ describe('ShareSheet', () => {
     wrapper.unmount()
   })
 
-  it('reacts to Vietnamese locale in create and existing-link states', async () => {
+  it('reacts to locale changes without remounting in create and existing-link states', async () => {
     const createWrapper = mountSheet()
     expect(createWrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Link expiry')
     expect(createWrapper.text()).toContain('Forever')
+    expect(createWrapper.text()).toContain('Create link')
 
     setLocale('vi')
     await createWrapper.vm.$nextTick()
     expect(createWrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Thời hạn liên kết')
     expect(createWrapper.text()).toContain('Vĩnh viễn')
     expect(createWrapper.text()).toContain('Tạo liên kết')
+
+    setLocale('en')
+    await createWrapper.vm.$nextTick()
+    expect(createWrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Link expiry')
+    expect(createWrapper.text()).toContain('Create link')
     createWrapper.unmount()
 
     const existingWrapper = mountSheet({ url: '/s/token', expiresAt: null, createdAt: new Date().toISOString() })
-    expect(existingWrapper.text()).toContain('Bất kỳ ai có liên kết này đều có thể xem và tải xuống')
-    expect(existingWrapper.text()).toContain('Không hết hạn')
+    expect(existingWrapper.get('button[aria-label="Copy link"]').exists()).toBe(true)
+    expect(existingWrapper.text()).toContain('Revoke link')
+    expect(existingWrapper.text()).toContain('Never expires')
+
+    setLocale('vi')
+    await existingWrapper.vm.$nextTick()
     expect(existingWrapper.get('button[aria-label="Sao chép liên kết"]').exists()).toBe(true)
+    expect(existingWrapper.text()).toContain('Thu hồi liên kết')
+    expect(existingWrapper.text()).toContain('Không hết hạn')
+
+    setLocale('en')
+    await existingWrapper.vm.$nextTick()
+    expect(existingWrapper.get('button[aria-label="Copy link"]').exists()).toBe(true)
+    expect(existingWrapper.text()).toContain('Revoke link')
     existingWrapper.unmount()
   })
 
