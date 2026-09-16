@@ -1,6 +1,8 @@
+import type { ApiErrorCopy } from '@/api/errors'
 import type { Locale } from '@/lib/i18n'
 
 export interface SharedCopy {
+  apiError: ApiErrorCopy
   loadIncomingFailed: string
   loadLinksFailed: string
   openFolderFailed: string
@@ -30,6 +32,21 @@ export interface SharedCopy {
 export function sharedCopy(locale: Locale): SharedCopy {
   if (locale === 'vi') {
     return {
+      apiError: {
+        network: 'Không thể kết nối đến máy chủ. Hãy kiểm tra kết nối mạng và thử lại.',
+        codes: {
+          UNAUTHORIZED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
+          NOT_FOUND: 'Không tìm thấy mục này hoặc mục đã bị thay đổi.',
+          CONFLICT: 'Tên đã tồn tại ở vị trí này.',
+          RATE_LIMITED: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.',
+          QUOTA_EXCEEDED: 'Dung lượng lưu trữ đã đầy. Hãy giải phóng dung lượng rồi thử lại.',
+          FILE_TOO_LARGE: 'Tệp vượt quá giới hạn 100 MiB.',
+          VALIDATION_ERROR: 'Dữ liệu không hợp lệ. Hãy kiểm tra loại tệp rồi thử lại.',
+          INVALID_STATE: 'Không thể thực hiện thao tác này lúc này.',
+          UPLOAD_EXPIRED: 'Phiên tải lên đã hết hạn. Hãy tải lại tệp.',
+        },
+      },
       loadIncomingFailed: 'Không thể tải các mục được chia sẻ',
       loadLinksFailed: 'Không thể tải các liên kết chia sẻ của bạn',
       openFolderFailed: 'Không thể mở thư mục',
@@ -58,6 +75,7 @@ export function sharedCopy(locale: Locale): SharedCopy {
   }
 
   return {
+    apiError: {},
     loadIncomingFailed: 'Could not load shared items',
     loadLinksFailed: 'Could not load your share links',
     openFolderFailed: 'Could not open folder',
