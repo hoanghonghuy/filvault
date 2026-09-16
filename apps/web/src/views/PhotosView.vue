@@ -72,7 +72,7 @@ async function load() {
     albums.value = list.albums
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.loadPhotosFailed)
+    error.value = formatApiError(e, copy.value.loadPhotosFailed, copy.value.apiError)
   } finally {
     loading.value = false
   }
@@ -93,7 +93,7 @@ async function loadMore() {
     groups.value = merged
     nextBefore.value = data.nextBefore
   } catch (e) {
-    error.value = formatApiError(e, copy.value.loadMoreFailed)
+    error.value = formatApiError(e, copy.value.loadMoreFailed, copy.value.apiError)
   } finally {
     loadingMore.value = false
   }
@@ -111,7 +111,7 @@ async function createAlbum() {
     ui.showToast(copy.value.albumCreated)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.createAlbumFailed)
+    error.value = formatApiError(e, copy.value.createAlbumFailed, copy.value.apiError)
   }
 }
 
@@ -136,7 +136,7 @@ async function renameAlbum(album: Album) {
     ui.showToast(t.value.renameAlbum)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.renameFailed)
+    error.value = formatApiError(e, copy.value.renameFailed, copy.value.apiError)
   }
 }
 
@@ -154,7 +154,7 @@ async function deleteAlbum(id: string, name: string) {
     ui.showToast(copy.value.albumDeleted)
     await load()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.deleteFailed)
+    error.value = formatApiError(e, copy.value.deleteFailed, copy.value.apiError)
   }
 }
 
@@ -178,7 +178,7 @@ async function toggleFavorite(item: TimelineItem) {
     }
     await loadFavorites()
   } catch (e) {
-    error.value = formatApiError(e, copy.value.favoriteFailed)
+    error.value = formatApiError(e, copy.value.favoriteFailed, copy.value.apiError)
   }
 }
 
@@ -205,7 +205,7 @@ async function openLightbox(item: TimelineItem) {
     lightboxUrl.value = out.downloadUrl
     lightboxOpen.value = true
   } catch (e) {
-    error.value = formatApiError(e, copy.value.viewFailed)
+    error.value = formatApiError(e, copy.value.viewFailed, copy.value.apiError)
   }
 }
 
@@ -250,7 +250,7 @@ async function downloadMedia() {
     const out = await api<DownloadURL>(`/files/${mediaItem.value.id}/download`)
     window.open(out.downloadUrl, '_blank', 'noopener')
   } catch (e) {
-    error.value = formatApiError(e, copy.value.downloadFailed)
+    error.value = formatApiError(e, copy.value.downloadFailed, copy.value.apiError)
   }
 }
 
