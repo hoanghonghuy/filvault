@@ -9,7 +9,7 @@ describe('FilesView runtime API error localization wiring', () => {
     expect(source).toContain('const copy = computed(() => filesRuntimeCopy(locale.value))')
     expect(source).toContain('formatApiError(e, t.value.filesLoadFailed, copy.value.apiError)')
     expect(source).toContain('formatApiError(e, t.value.filesSearchFailed, copy.value.apiError)')
-    expect(source).toContain('formatApiError(e, t.value.filesPreviewFailed, copy.value.apiError)')
+    expect(source).toContain('formatApiError(result.error, t.value.filesPreviewFailed, copy.value.apiError)')
     expect(source).toContain('formatApiError(e, t.value.folderCreateFailed, copy.value.apiError)')
     expect(source).toContain('formatApiError(e, t.value.fileDownloadFailed, copy.value.apiError)')
     expect(source).toContain('formatApiError(e, operationsCopy.value.renameFailed, copy.value.apiError)')
