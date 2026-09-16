@@ -39,7 +39,7 @@ async function loadBrowser() {
     browser.value = nextBrowser
   } catch (e) {
     if (generation !== loadGeneration || !props.open) return
-    error.value = formatApiError(e, copy.value.loadFailed)
+    error.value = formatApiError(e, copy.value.loadFailed, copy.value.apiError)
   } finally {
     if (generation === loadGeneration && props.open) {
       loading.value = false
