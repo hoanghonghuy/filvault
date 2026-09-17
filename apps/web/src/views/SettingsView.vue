@@ -208,14 +208,16 @@ async function logout() {
 
 const shareLinks = ref<ShareLinkInfo[]>([])
 const linksLoading = ref(false)
+const linksLoadError = ref(false)
 
 async function loadShareLinks() {
   linksLoading.value = true
+  linksLoadError.value = false
   try {
     const out = await api<{ links: ShareLinkInfo[] }>('/share-links')
     shareLinks.value = out.links
   } catch {
-    shareLinks.value = []
+    linksLoadError.value = true
   } finally {
     linksLoading.value = false
   }
@@ -604,6 +606,12 @@ onMounted(() => {
     <section class="card section">
       <h2 class="section-title">{{ settingsText.sharedLinks }}</h2>
       <p v-if="linksLoading" class="muted">{{ t.loading }}</p>
+      <p v-else-if="linksLoadError" class="muted" role="alert">
+        {{ settingsText.sharedLinksLoadFailed }}
+        <button type="button" class="btn retry-btn" @click="loadShareLinks">
+          {{ settingsText.retrySharedLinks }}
+        </button>
+      </p>
       <p v-else-if="shareLinks.length === 0" class="muted">{{ settingsText.noActiveShareLinks }}</p>
       <ul v-else class="link-list">
         <li v-for="link in shareLinks" :key="link.id" class="link-row">
