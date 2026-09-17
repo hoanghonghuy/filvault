@@ -19,12 +19,8 @@ describe('ChatView runtime loading localization wiring', () => {
   })
 
   it('does not retain two-arg formatApiError calls that can hit English defaults', () => {
-    expect(source).not.toMatch(/formatApiError\(\s*e,\s*t\.value\.[^,)]+\)/)
-    expect(source).not.toMatch(/formatApiError\(\s*err,\s*t\.value\.[^,)]+\)/)
-    expect(source).not.toContain("formatApiError(e, 'Failed to load chats')")
-    expect(source).not.toContain("formatApiError(e, 'Could not open direct chat')")
-    expect(source).not.toContain("formatApiError(e, 'Failed to load messages')")
-    expect(source).not.toContain("formatApiError(e, 'Failed to load older messages')")
-    expect(source).not.toContain("formatApiError(e, 'Search failed')")
+    // Guard the contract rather than today's catch-variable names. A future refactor to
+    // `catch (error)` must not be able to bypass the locale-aware third argument.
+    expect(source).not.toMatch(/formatApiError\(\s*[^,\n]+,\s*[^,\n)]+\)/)
   })
 })
