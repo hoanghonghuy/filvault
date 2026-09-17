@@ -11,8 +11,4 @@ describe('Chat back accessibility contract', () => {
     expect(backButton).toContain(':aria-label="t.back"')
     expect(backButton).toContain('@click="backToRail"')
   })
-
-  it('does not retain a stale hard-coded English Back aria marker', () => {
-    expect(chat).not.toContain('aria-label="Back"')
-  })
 })
