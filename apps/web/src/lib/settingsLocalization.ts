@@ -10,6 +10,8 @@ export type SettingsLocaleText = {
   quickThemesGroup: string
   sharedLinks: string
   noActiveShareLinks: string
+  sharedLinksLoadFailed: string
+  retrySharedLinks: string
   copyLink: string
   revokeLink: string
   linkCopied: string
@@ -49,6 +51,8 @@ const COPY: Record<Locale, SettingsLocaleText> = {
     quickThemesGroup: 'Chủ đề nhanh',
     sharedLinks: 'Liên kết đã chia sẻ',
     noActiveShareLinks: 'Không có liên kết chia sẻ đang hoạt động.',
+    sharedLinksLoadFailed: 'Không thể tải các liên kết đã chia sẻ.',
+    retrySharedLinks: 'Thử lại',
     copyLink: 'Sao chép liên kết',
     revokeLink: 'Thu hồi liên kết',
     linkCopied: 'Đã sao chép liên kết',
@@ -75,6 +79,8 @@ const COPY: Record<Locale, SettingsLocaleText> = {
     quickThemesGroup: 'Quick themes',
     sharedLinks: 'Shared links',
     noActiveShareLinks: 'No active share links.',
+    sharedLinksLoadFailed: 'Could not load shared links.',
+    retrySharedLinks: 'Retry',
     copyLink: 'Copy link',
     revokeLink: 'Revoke link',
     linkCopied: 'Link copied',
