@@ -1,0 +1,43 @@
+name: Task 471 runtime patch
+
+on:
+  push:
+    branches:
+      - task/471-shared-links-load-error
+    paths:
+      - .github/workflows/task-471-runtime-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: task/471-shared-links-load-error
+      - name: Patch Settings shared-links states
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('apps/web/src/views/SettingsView.vue')
+          text = path.read_text()
+          old_state = """const shareLinks = ref<ShareLinkInfo[]>([])\nconst linksLoading = ref(false)\n\nasync function loadShareLinks() {\n  linksLoading.value = true\n  try {\n    const out = await api<{ links: ShareLinkInfo[] }>('/share-links')\n    shareLinks.value = out.links\n  } catch {\n    shareLinks.value = []\n  } finally {\n    linksLoading.value = false\n  }\n}\n"""
+          new_state = """const shareLinks = ref<ShareLinkInfo[]>([])\nconst linksLoading = ref(false)\nconst linksLoadError = ref(false)\n\nasync function loadShareLinks() {\n  linksLoading.value = true\n  linksLoadError.value = false\n  try {\n    const out = await api<{ links: ShareLinkInfo[] }>('/share-links')\n    shareLinks.value = out.links\n  } catch {\n    linksLoadError.value = true\n  } finally {\n    linksLoading.value = false\n  }\n}\n"""
+          old_ui = """      <p v-if=\"linksLoading\" class=\"muted\">{{ t.loading }}</p>\n      <p v-else-if=\"shareLinks.length === 0\" class=\"muted\">{{ settingsText.noActiveShareLinks }}</p>\n"""
+          new_ui = """      <p v-if=\"linksLoading\" class=\"muted\">{{ t.loading }}</p>\n      <p v-else-if=\"linksLoadError\" class=\"muted\" role=\"alert\">\n        {{ settingsText.sharedLinksLoadFailed }}\n        <button type=\"button\" class=\"btn retry-btn\" @click=\"loadShareLinks\">\n          {{ settingsText.retrySharedLinks }}\n        </button>\n      </p>\n      <p v-else-if=\"shareLinks.length === 0\" class=\"muted\">{{ settingsText.noActiveShareLinks }}</p>\n"""
+          if old_state not in text:
+              raise SystemExit('Expected shared-links state block not found')
+          if old_ui not in text:
+              raise SystemExit('Expected shared-links UI block not found')
+          text = text.replace(old_state, new_state, 1).replace(old_ui, new_ui, 1)
+          path.write_text(text)
+      - name: Remove one-shot workflow and commit patch
+        run: |
+          rm .github/workflows/task-471-runtime-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/views/SettingsView.vue .github/workflows/task-471-runtime-patch.yml
+          git commit -m "fix(settings): distinguish shared-links load failures (#471)"
+          git push origin HEAD:task/471-shared-links-load-error
