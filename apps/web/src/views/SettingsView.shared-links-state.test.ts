@@ -12,6 +12,12 @@ describe('Settings shared-links load state contract', () => {
     expect(view).not.toMatch(/catch\s*\{[\s\S]*?shareLinks\.value\s*=\s*\[\][\s\S]*?\}/)
   })
 
+  it('preserves the last successful links when a refresh fails', () => {
+    const catchBlock = view.match(/async function loadShareLinks\(\)[\s\S]*?catch\s*\{([\s\S]*?)\}\s*finally/)?.[1] ?? ''
+    expect(catchBlock).toContain('linksLoadError.value = true')
+    expect(catchBlock).not.toContain('shareLinks.value = []')
+  })
+
   it('renders an accessible localized error and retry before empty state', () => {
     expect(view).toContain('v-else-if="linksLoadError"')
     expect(view).toContain('role="alert"')
