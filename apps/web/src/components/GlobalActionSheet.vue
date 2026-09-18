@@ -111,6 +111,12 @@ function onClose() {
   transform: scale(0.98);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .sheet-row:active {
+    transform: none;
+  }
+}
+
 .sheet-row-icon {
   flex-shrink: 0;
   color: var(--muted);
