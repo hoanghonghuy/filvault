@@ -8,7 +8,12 @@
   color: var(--danger);
 }
 
-.trash-action-btn:focus-visible {
+.trash-action-btn:focus-visible,
+.empty-trash-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.empty-trash-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
 }
