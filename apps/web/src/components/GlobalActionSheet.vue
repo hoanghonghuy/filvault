@@ -102,6 +102,11 @@ function onClose() {
   background: var(--surface-soft);
 }
 
+.sheet-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .sheet-row:active {
   transform: scale(0.98);
 }
