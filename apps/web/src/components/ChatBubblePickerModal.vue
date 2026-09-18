@@ -217,6 +217,12 @@ function handleCancel() {
   transition: opacity 0.15s ease, color 0.15s ease;
 }
 
+.action-btn:focus-visible,
+.style-card:focus-visible {
+  outline: 2px solid var(--chat-accent, var(--accent));
+  outline-offset: 2px;
+}
+
 .cancel-btn {
   color: #ffffff;
 }
