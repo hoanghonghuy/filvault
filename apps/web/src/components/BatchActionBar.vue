@@ -283,7 +283,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   transition: background var(--duration-short) var(--ease-standard);
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   background: var(--surface-soft);
 }
 
