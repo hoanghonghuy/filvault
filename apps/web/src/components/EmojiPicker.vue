@@ -239,6 +239,14 @@ function handleStickerClick(sticker: Sticker) {
   color: var(--ink, #ffffff);
 }
 
+.type-switch-btn:focus-visible,
+.picker-close-btn:focus-visible,
+.picker-cat-btn:focus-visible,
+.picker-item-btn:focus-visible {
+  outline: 2px solid var(--chat-accent, var(--accent));
+  outline-offset: 2px;
+}
+
 .picker-categories {
   display: flex;
   align-items: center;
