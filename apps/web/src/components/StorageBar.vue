@@ -128,6 +128,10 @@ defineExpose({ reload: storage.reload })
   font-weight: 600;
 }
 
+.retry-btn:hover {
+  background: var(--surface-card);
+}
+
 .retry-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -226,6 +230,11 @@ defineExpose({ reload: storage.reload })
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.action-link:hover {
+  background: var(--danger-soft);
+  text-decoration: underline;
 }
 
 .action-link:focus-visible {
