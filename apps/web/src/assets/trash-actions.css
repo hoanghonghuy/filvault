@@ -17,3 +17,7 @@
 .empty-trash-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 20%, transparent);
 }
+
+.trash-retry-btn:hover:not(:disabled) {
+  background: var(--surface-card);
+}
