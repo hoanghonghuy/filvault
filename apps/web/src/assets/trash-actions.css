@@ -1,0 +1,14 @@
+.trash-action-btn:hover:not(:disabled) {
+  background: var(--surface-card);
+  color: var(--ink);
+}
+
+.trash-action-btn.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.trash-action-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
