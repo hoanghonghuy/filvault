@@ -176,7 +176,6 @@ export const useVaultStore = defineStore('vault', () => {
       if (requestSequence !== fileHydrationSequence || requestToken !== vaultToken.value || !isUnlocked.value) {
         return files.value
       }
-      error.value = 'Failed to load vault files'
       throw e
     } finally {
       if (requestSequence === fileHydrationSequence && requestToken === vaultToken.value) {
