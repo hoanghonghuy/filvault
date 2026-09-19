@@ -7,4 +7,12 @@
   .overview .category-btn:active .category-icon-box {
     transform: none !important;
   }
+
+  .settings-page .quick-swatch {
+    transition: none !important;
+  }
+
+  .settings-page .quick-swatch:active {
+    transform: none !important;
+  }
 }
