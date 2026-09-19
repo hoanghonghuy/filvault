@@ -1,5 +1,6 @@
 import './assets/main.css'
 import './assets/trash-actions.css'
+import './assets/reduced-motion.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
