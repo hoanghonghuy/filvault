@@ -198,7 +198,7 @@ function handleStickerClick(sticker: Sticker) {
   font-weight: 500;
   color: var(--muted, #8a8d91);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
 }
 
@@ -276,7 +276,7 @@ function handleStickerClick(sticker: Sticker) {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
   touch-action: manipulation;
 }
@@ -368,5 +368,19 @@ function handleStickerClick(sticker: Sticker) {
 .picker-item-btn.item-reacted {
   background: color-mix(in srgb, var(--chat-accent, var(--accent)) 20%, transparent);
   box-shadow: inset 0 0 0 1.5px var(--chat-accent, var(--accent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .type-switch-btn,
+  .picker-close-btn,
+  .picker-cat-btn,
+  .picker-item-btn {
+    transition: none;
+  }
+
+  .picker-item-btn:hover,
+  .picker-item-btn:active {
+    transform: none;
+  }
 }
 </style>
