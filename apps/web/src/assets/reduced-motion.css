@@ -1,0 +1,10 @@
+/* Cross-surface reduced-motion overrides that must reach scoped component styles. */
+@media (prefers-reduced-motion: reduce) {
+  .overview .category-icon-box {
+    transition: none !important;
+  }
+
+  .overview .category-btn:active .category-icon-box {
+    transform: none !important;
+  }
+}
