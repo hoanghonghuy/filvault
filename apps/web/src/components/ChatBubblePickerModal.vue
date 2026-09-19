@@ -414,7 +414,7 @@ function handleCancel() {
   border: 1.5px solid transparent;
   border-radius: 16px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -490,6 +490,23 @@ function handleCancel() {
   .bubble-modal-enter-from .bubble-picker-window,
   .bubble-modal-leave-to .bubble-picker-window {
     transform: scale(0.95) translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-btn,
+  .preview-bubble,
+  .style-card,
+  .bubble-modal-enter-active,
+  .bubble-modal-leave-active,
+  .bubble-modal-enter-active .bubble-picker-window,
+  .bubble-modal-leave-active .bubble-picker-window {
+    transition: none;
+  }
+
+  .bubble-modal-enter-from .bubble-picker-window,
+  .bubble-modal-leave-to .bubble-picker-window {
+    transform: none;
   }
 }
 </style>
