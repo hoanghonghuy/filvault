@@ -31,6 +31,13 @@ make prod-like-up
 
 Chi tiết operator: [`deploy/production/README.md`](deploy/production/README.md). Health/readiness: [`docs/ops/health-readiness-migration.md`](docs/ops/health-readiness-migration.md).
 
+Release smoke + rollback runbook (#43):
+
+```bash
+make prod-like-release-smoke      # core path + app restart persistence
+make prod-like-rollback-verify    # post-rollback health gates
+```
+
 ## Tài khoản dev (test xuyên suốt)
 
 `make up` (Docker) và `make dev-api` (API trên host) **tự tạo** tài khoản dev sau migrate — không cần chạy `make seed` riêng.
