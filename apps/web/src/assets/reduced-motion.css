@@ -15,4 +15,16 @@
   .settings-page .quick-swatch:active {
     transform: none !important;
   }
+
+  .page-enter-active,
+  .page-leave-active,
+  .nav-indicator,
+  .header-chat-btn {
+    transition: none !important;
+  }
+
+  .page-enter-from,
+  .header-chat-btn:hover {
+    transform: none !important;
+  }
 }
