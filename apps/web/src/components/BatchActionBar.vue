@@ -375,4 +375,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     transform: translate(-50%, 20px);
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-icon:active:not(:disabled),
+  .btn-text:active {
+    transform: none;
+  }
+
+  .action-bar-enter-active,
+  .action-bar-leave-active {
+    transition: none;
+  }
+}
 </style>
