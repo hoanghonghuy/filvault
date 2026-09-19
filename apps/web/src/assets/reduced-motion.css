@@ -19,12 +19,17 @@
   .page-enter-active,
   .page-leave-active,
   .nav-indicator,
-  .header-chat-btn {
+  .header-chat-btn,
+  .row-enter-active,
+  .row-leave-active,
+  .row-move {
     transition: none !important;
   }
 
   .page-enter-from,
-  .header-chat-btn:hover {
+  .header-chat-btn:hover,
+  .row-enter-from,
+  .row-leave-to {
     transform: none !important;
   }
 }
