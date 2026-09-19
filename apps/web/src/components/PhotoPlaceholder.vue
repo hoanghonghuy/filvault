@@ -7,7 +7,7 @@ defineProps<{ mimeType: string; name: string }>()
 
 const emit = defineEmits<{ click: [] }>()
 const { locale } = useI18n()
-const photoLabel = computed(() => photoPlaceholderCopy(locale.value).photo)
+const copy = computed(() => photoPlaceholderCopy(locale.value))
 
 const isVideo = (mime: string) => mime.startsWith('video/')
 </script>
@@ -15,7 +15,7 @@ const isVideo = (mime: string) => mime.startsWith('video/')
 <template>
   <button type="button" class="placeholder" :aria-label="name" :title="name" @click="emit('click')">
     <span class="badge" :class="{ video: isVideo(mimeType) }">
-      {{ isVideo(mimeType) ? 'Video' : photoLabel }}
+      {{ isVideo(mimeType) ? copy.video : copy.photo }}
     </span>
     <span class="name">{{ name }}</span>
   </button>
