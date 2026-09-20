@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Icon from '@/components/AppIcon.vue'
 import { isHeic, getHeicDisplayUrl } from '@/lib/heic'
+import { useI18n } from '@/lib/i18n'
 
 const props = defineProps<{
   mimeType: string
@@ -13,9 +14,11 @@ const emit = defineEmits<{
   click: []
 }>()
 
+const { t } = useI18n()
 const failed = ref(false)
 const isVideo = computed(() => props.mimeType.startsWith('video/'))
 const isHeicMedia = computed(() => isHeic(props.name, props.mimeType))
+const accessibleName = computed(() => `${isVideo.value ? t.value.filterTypeVideo : t.value.filterTypeImage}: ${props.name}`)
 const heicThumbUrl = ref<string>('')
 let loadSequence = 0
 
@@ -56,12 +59,12 @@ function handleError() {
 </script>
 
 <template>
-  <button type="button" class="photo-thumb" :title="name" @click="emit('click')">
+  <button type="button" class="photo-thumb" :aria-label="accessibleName" :title="name" @click="emit('click')">
     <template v-if="(displaySrc || (thumbnailUrl && !isHeicMedia)) && !failed">
       <img
         v-if="!isVideo"
         :src="displaySrc || thumbnailUrl"
-        :alt="name"
+        alt=""
         loading="lazy"
         decoding="async"
         @error="handleError"
@@ -69,7 +72,7 @@ function handleError() {
       <video
         v-else
         :src="thumbnailUrl"
-        :aria-label="name"
+        aria-hidden="true"
         muted
         playsinline
         preload="metadata"
