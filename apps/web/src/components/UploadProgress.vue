@@ -107,13 +107,31 @@ function conflictNote(item: UploadProgressItem): string | null {
   return formatTemplate(t.value.uploadConflictRenamed, { name: item.resolvedName })
 }
 
-const liveAnnouncement = ref('')
+type LiveEvent = {
+  status: Extract<UploadItemStatus, 'completed' | 'failed' | 'cancelled'>
+  name: string
+}
+
+const liveEvents = ref<LiveEvent[]>([])
+const liveAnnouncement = computed(() =>
+  liveEvents.value
+    .map((event) => {
+      if (event.status === 'completed') {
+        return formatTemplate(t.value.uploadLiveCompleted, { name: event.name })
+      }
+      if (event.status === 'failed') {
+        return formatTemplate(t.value.uploadLiveFailed, { name: event.name })
+      }
+      return formatTemplate(t.value.uploadLiveCancelled, { name: event.name })
+    })
+    .join('. '),
+)
 const trackedStatuses = new Map<string, UploadItemStatus>()
 
 watch(
   () => props.items.map((item) => ({ id: item.id, status: item.status, name: displayName(item) })),
   (snapshots) => {
-    const messages: string[] = []
+    const events: LiveEvent[] = []
     const seen = new Set<string>()
 
     for (const snapshot of snapshots) {
@@ -124,12 +142,12 @@ watch(
       trackedStatuses.set(snapshot.id, snapshot.status)
       if (previous === undefined) continue
 
-      if (snapshot.status === 'completed') {
-        messages.push(formatTemplate(t.value.uploadLiveCompleted, { name: snapshot.name }))
-      } else if (snapshot.status === 'failed') {
-        messages.push(formatTemplate(t.value.uploadLiveFailed, { name: snapshot.name }))
-      } else if (snapshot.status === 'cancelled') {
-        messages.push(formatTemplate(t.value.uploadLiveCancelled, { name: snapshot.name }))
+      if (
+        snapshot.status === 'completed' ||
+        snapshot.status === 'failed' ||
+        snapshot.status === 'cancelled'
+      ) {
+        events.push({ status: snapshot.status, name: snapshot.name })
       }
     }
 
@@ -137,8 +155,8 @@ watch(
       if (!seen.has(id)) trackedStatuses.delete(id)
     }
 
-    if (messages.length > 0) {
-      liveAnnouncement.value = messages.join('. ')
+    if (events.length > 0) {
+      liveEvents.value = events
     }
   },
 )
