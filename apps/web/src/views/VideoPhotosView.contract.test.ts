@@ -45,6 +45,18 @@ describe('video-focused Photos route contract', () => {
     expect(videoSource).toContain('formatApiError(e, errorCopy.value.favorite, photosCopy.value.apiError)')
   })
 
+  it('formats timeline dates with the active locale and keeps invalid values safe', () => {
+    expect(videoSource).toContain("locale.value === 'vi' ? 'vi-VN' : 'en-US'")
+    expect(videoSource).toContain("timeZone: 'UTC'")
+    expect(videoSource).toContain('if (!match) return value')
+    expect(videoSource).toContain('return value\n  }')
+    expect(videoSource).toContain(':aria-label="formatGroupDate(group.date)"')
+    expect(videoSource).toContain('{{ formatGroupDate(group.date) }}')
+    expect(videoSource).toContain(':key="group.date"')
+    expect(videoSource).not.toContain(':aria-label="group.date"')
+    expect(videoSource).not.toContain('<h3 class="timeline-date-title">{{ group.date }}</h3>')
+  })
+
   it('keeps initial load failure separate from a true-empty success and exposes retry', () => {
     expect(videoSource).toContain('v-if="error && groups.length > 0"')
     expect(videoSource).toContain('v-else-if="error && groups.length === 0"')
