@@ -10,7 +10,7 @@ const titleId = useId()
 </script>
 
 <template>
-  <div class="auth-page">
+  <main class="auth-page">
     <div class="auth-shell">
       <p class="auth-brand">
         <span class="auth-brand-mark" aria-hidden="true">F</span>
@@ -32,5 +32,5 @@ const titleId = useId()
         </footer>
       </div>
     </div>
-  </div>
+  </main>
 </template>
