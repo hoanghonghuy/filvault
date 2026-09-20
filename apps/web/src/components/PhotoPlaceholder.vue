@@ -13,7 +13,13 @@ const isVideo = (mime: string) => mime.startsWith('video/')
 </script>
 
 <template>
-  <button type="button" class="placeholder" :aria-label="name" :title="name" @click="emit('click')">
+  <button
+    type="button"
+    class="placeholder"
+    :aria-label="`${isVideo(mimeType) ? copy.video : copy.photo}: ${name}`"
+    :title="name"
+    @click="emit('click')"
+  >
     <span class="badge" :class="{ video: isVideo(mimeType) }">
       {{ isVideo(mimeType) ? copy.video : copy.photo }}
     </span>

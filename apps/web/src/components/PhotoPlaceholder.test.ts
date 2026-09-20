@@ -30,11 +30,17 @@ describe('PhotoPlaceholder', () => {
     video.unmount()
   })
 
-  it('preserves filename accessibility identity and click behavior', async () => {
+  it('includes the localized media type in the accessible name while preserving filename identity and click behavior', async () => {
+    setLocale('vi')
     const wrapper = mount(PhotoPlaceholder, { props: { mimeType: 'image/png', name: 'cover.png' } })
 
-    expect(wrapper.attributes('aria-label')).toBe('cover.png')
+    expect(wrapper.attributes('aria-label')).toBe('Ảnh: cover.png')
     expect(wrapper.attributes('title')).toBe('cover.png')
+
+    setLocale('en')
+    await nextTick()
+    expect(wrapper.attributes('aria-label')).toBe('Photo: cover.png')
+
     await wrapper.trigger('click')
     expect(wrapper.emitted('click')).toHaveLength(1)
 
