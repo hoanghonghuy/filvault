@@ -40,6 +40,31 @@ const favoriteIds = ref<Set<string>>(new Set())
 const lightboxOpen = ref(false)
 const lightboxUrl = ref('')
 
+function formatGroupDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return value
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(locale.value === 'vi' ? 'vi-VN' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)
+}
+
 function selectPhotoTab(tab: 'timeline' | 'albums', focus = false) {
   activePhotoTab.value = tab
   if (focus) {
@@ -325,9 +350,9 @@ onBeforeUnmount(() => {
       aria-labelledby="photos-tab-timeline"
       tabindex="0"
     >
-      <section v-for="group in groups" :key="group.date" class="timeline-date-group" :aria-label="group.date">
+      <section v-for="group in groups" :key="group.date" class="timeline-date-group" :aria-label="formatGroupDate(group.date)">
         <div class="timeline-sticky-header">
-          <h2 class="timeline-date-title">{{ group.date }}</h2>
+          <h2 class="timeline-date-title">{{ formatGroupDate(group.date) }}</h2>
           <span class="timeline-count-badge">{{ group.items.length }}</span>
         </div>
         <div class="grid photos">
