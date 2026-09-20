@@ -43,6 +43,31 @@ const errorCopy = computed(() =>
       },
 )
 
+function formatGroupDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return value
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(locale.value === 'vi' ? 'vi-VN' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)
+}
+
 async function loadVideoTimeline(before?: string) {
   const params = new URLSearchParams({ type: 'video' })
   if (before) params.set('before', before)
@@ -171,9 +196,9 @@ onMounted(() => void load())
 
     <main v-else aria-labelledby="video-timeline-heading">
       <h2 id="video-timeline-heading" class="sr-only">{{ t.filterTypeVideo }}</h2>
-      <section v-for="group in groups" :key="group.date" class="timeline-date-group" :aria-label="group.date">
+      <section v-for="group in groups" :key="group.date" class="timeline-date-group" :aria-label="formatGroupDate(group.date)">
         <div class="timeline-sticky-header">
-          <h3 class="timeline-date-title">{{ group.date }}</h3>
+          <h3 class="timeline-date-title">{{ formatGroupDate(group.date) }}</h3>
           <span class="timeline-count-badge">{{ group.items.length }}</span>
         </div>
         <div class="video-grid">
