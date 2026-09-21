@@ -199,7 +199,7 @@ watch(
       aria-valuemax="100"
       :aria-label="label ?? t.uploadProgressAggregateAria"
     >
-      <div class="fill" :style="{ transform: `scaleX(${effectiveProgress ?? 0})` }" />
+      <div class="fill" :style="{ transform: `scaleX(${percent / 100})` }" />
     </div>
 
     <ul v-if="queueMode" class="upload-item-list" :aria-label="t.uploadProgressListAria">
