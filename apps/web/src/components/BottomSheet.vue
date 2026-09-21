@@ -87,6 +87,21 @@ function isTopSheet() {
   return openSheets[openSheets.length - 1] === sheetId
 }
 
+function getFocusables(panel: HTMLElement) {
+  return panel.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )
+}
+
+function onFocusIn(event: FocusEvent) {
+  if (!isTopSheet()) return
+  const panel = panelRef.value
+  if (!panel) return
+  const target = event.target
+  if (target instanceof Node && panel.contains(target)) return
+  ;(getFocusables(panel)[0] ?? panel).focus()
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (!isTopSheet()) return
   if (event.key === 'Escape') {
@@ -100,9 +115,7 @@ function onKeydown(event: KeyboardEvent) {
 function trapFocus(event: KeyboardEvent) {
   const panel = panelRef.value
   if (!panel) return
-  const focusables = panel.querySelectorAll<HTMLElement>(
-    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-  )
+  const focusables = getFocusables(panel)
   const first = focusables[0]
   const last = focusables[focusables.length - 1]
   if (!first || !last) {
@@ -140,6 +153,7 @@ function lockPage() {
   lockedCount++
   previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('focusin', onFocusIn)
 }
 
 function unlockPage() {
@@ -154,6 +168,7 @@ function unlockPage() {
     previousBodyOverflow = ''
   }
   document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('focusin', onFocusIn)
   previousFocus?.focus()
   previousFocus = null
 }
