@@ -19,7 +19,7 @@ const percent = computed(() => {
 </script>
 
 <template>
-  <div class="linear-progress" role="status" aria-live="polite">
+  <div class="linear-progress">
     <div class="linear-progress__meta">
       <span class="linear-progress__label">{{ resolvedLabel }}</span>
       <span class="linear-progress__percent">{{ percent }}%</span>
