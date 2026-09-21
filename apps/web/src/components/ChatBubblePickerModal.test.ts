@@ -6,24 +6,6 @@ import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChatBubblePickerModal from './ChatBubblePickerModal.vue'
 
-const activeBubbleStyleId = ref('classic')
-
-vi.mock('@/lib/chatBubbles', () => ({
-  activeBubbleStyleId,
-  CHAT_BUBBLE_STYLES: [
-    { id: 'classic', name: 'Classic', thumbUrl: '/classic.png', bg: '#fff', color: '#000', decorations: [] },
-  ],
-  getBubbleStyle: () => ({
-    id: 'classic',
-    name: 'Classic',
-    thumbUrl: '/classic.png',
-    bg: '#fff',
-    color: '#000',
-    decorations: [],
-  }),
-  setBubbleStyle: vi.fn(),
-}))
-
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({ locale: ref('en') }),
 }))
