@@ -38,4 +38,12 @@ describe('ThemeView product contract', () => {
     expect(source).toContain('env(safe-area-inset-top)')
     expect(source).toContain('@media (prefers-reduced-motion:reduce)')
   })
+
+  it('contains programmatic focus drift while the preview is open and cleans up the guard', () => {
+    expect(source).toContain("document.addEventListener('focusin', handlePreviewFocusIn)")
+    expect(source).toContain("document.removeEventListener('focusin', handlePreviewFocusIn)")
+    expect(source).toContain('previewDialog.value.contains(target)')
+    expect(source).toContain('previewCloseButton.value?.focus()')
+    expect(source).toContain('previewDialog.value.focus()')
+  })
 })
