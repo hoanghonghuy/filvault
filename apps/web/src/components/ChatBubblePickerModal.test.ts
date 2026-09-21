@@ -24,7 +24,7 @@ vi.mock('@/lib/chatBubblePickerCopy', () => ({
 }))
 
 vi.mock('@/stores/ui', () => ({
-  useUiStore: () => ({ showToast: vi.fn() }),
+  useUiStore: () => ({ showToast: vi.fn<() => void>() }),
 }))
 
 const flush = async () => {
