@@ -111,6 +111,11 @@ function trapFocus(event: KeyboardEvent) {
     return
   }
   const active = document.activeElement
+  if (!(active instanceof Node) || !panel.contains(active)) {
+    event.preventDefault()
+    ;(event.shiftKey ? last : first).focus()
+    return
+  }
   if (event.shiftKey && (active === first || active === panel)) {
     event.preventDefault()
     last.focus()
