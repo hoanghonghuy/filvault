@@ -69,6 +69,23 @@ describe('installCallModalFocusGuard', () => {
     expect(document.activeElement).toBe(last)
   })
 
+  it('returns programmatic focus drift to a safe control inside the modal', async () => {
+    const overlay = document.createElement('div')
+    overlay.className = 'call-overlay'
+    overlay.setAttribute('aria-modal', 'true')
+    overlay.innerHTML = `
+      <button class="call-btn btn-decline">Decline</button>
+      <button class="call-btn btn-accept">Accept</button>
+    `
+    document.body.append(overlay)
+    await flush()
+
+    const trigger = document.querySelector<HTMLButtonElement>('#trigger')!
+    trigger.focus()
+
+    expect(document.activeElement).toBe(overlay.querySelector('.btn-accept'))
+  })
+
   it('suppresses Escape and avoids initially focusing a destructive-only outgoing action', async () => {
     const overlay = document.createElement('div')
     overlay.className = 'call-overlay'
