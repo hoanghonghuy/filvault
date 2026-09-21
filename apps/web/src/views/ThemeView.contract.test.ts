@@ -40,10 +40,9 @@ describe('ThemeView product contract', () => {
   })
 
   it('contains programmatic focus drift while the preview is open and cleans up the guard', () => {
-    expect(source).toContain("document.addEventListener('focusin', handlePreviewFocusIn)")
-    expect(source).toContain("document.removeEventListener('focusin', handlePreviewFocusIn)")
-    expect(source).toContain('previewDialog.value.contains(target)')
-    expect(source).toContain('previewCloseButton.value?.focus()')
-    expect(source).toContain('previewDialog.value.focus()')
+    expect(source).toContain("document.addEventListener('focusin', handlePreviewFocusin)")
+    expect(source).toContain("document.removeEventListener('focusin', handlePreviewFocusin)")
+    expect(source).toContain('previewDialog.value.contains(event.target)')
+    expect(source).toContain('(previewCloseButton.value ?? previewDialog.value).focus()')
   })
 })
