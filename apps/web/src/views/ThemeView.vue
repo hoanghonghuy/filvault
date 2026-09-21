@@ -31,16 +31,24 @@ function themeName(theme: ThemeDef): string {
   return (t.value[key] as string) || theme.nameDefault
 }
 
+function handlePreviewFocusin(event: FocusEvent) {
+  if (!previewOpen.value || !previewDialog.value) return
+  if (event.target instanceof Node && previewDialog.value.contains(event.target)) return
+  ;(previewCloseButton.value ?? previewDialog.value).focus()
+}
+
 async function openPreview(theme: ThemeDef) {
   previewOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null
   previewTheme.value = theme
   previewOpen.value = true
+  document.addEventListener('focusin', handlePreviewFocusin)
   await nextTick()
   previewCloseButton.value?.focus()
 }
 
 async function closePreview() {
   if (!previewOpen.value) return
+  document.removeEventListener('focusin', handlePreviewFocusin)
   previewOpen.value = false
   await nextTick()
   previewOpener?.focus()
@@ -89,6 +97,7 @@ function handlePreviewKeydown(event: KeyboardEvent) {
 }
 
 onBeforeUnmount(() => {
+  document.removeEventListener('focusin', handlePreviewFocusin)
   previewOpener = null
 })
 </script>
