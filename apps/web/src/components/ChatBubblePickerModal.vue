@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import {
   CHAT_BUBBLE_STYLES,
   activeBubbleStyleId,
@@ -26,15 +26,96 @@ const copy = computed(() => chatBubblePickerCopy(locale.value))
 
 const previewId = ref<string>(activeBubbleStyleId.value)
 const isChanged = computed(() => previewId.value !== activeBubbleStyleId.value)
+const dialogRef = ref<HTMLElement | null>(null)
+const cancelRef = ref<HTMLButtonElement | null>(null)
+let opener: HTMLElement | null = null
+
+const focusableSelector = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function focusInitialControl() {
+  ;(cancelRef.value ?? dialogRef.value)?.focus()
+}
+
+function restoreOpenerFocus() {
+  if (opener?.isConnected) opener.focus()
+  opener = null
+}
+
+function handleDocumentFocus(event: FocusEvent) {
+  if (!props.open || !dialogRef.value) return
+  if (event.target instanceof Node && dialogRef.value.contains(event.target)) return
+  focusInitialControl()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (!props.open || !dialogRef.value) return
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    handleCancel()
+    return
+  }
+
+  if (event.key !== 'Tab') return
+
+  const focusables = Array.from(dialogRef.value.querySelectorAll<HTMLElement>(focusableSelector))
+  if (focusables.length === 0) {
+    event.preventDefault()
+    dialogRef.value.focus()
+    return
+  }
+
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !dialogRef.value.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (active === last || !dialogRef.value.contains(active))) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function addModalListeners() {
+  document.addEventListener('keydown', handleDocumentKeydown)
+  document.addEventListener('focusin', handleDocumentFocus)
+}
+
+function removeModalListeners() {
+  document.removeEventListener('keydown', handleDocumentKeydown)
+  document.removeEventListener('focusin', handleDocumentFocus)
+}
 
 watch(
   () => props.open,
-  (val) => {
+  async (val, wasOpen) => {
     if (val) {
       previewId.value = activeBubbleStyleId.value
+      opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      addModalListeners()
+      await nextTick()
+      focusInitialControl()
+    } else if (wasOpen) {
+      removeModalListeners()
+      await nextTick()
+      restoreOpenerFocus()
     }
   },
+  { immediate: true },
 )
+
+onBeforeUnmount(() => {
+  removeModalListeners()
+  restoreOpenerFocus()
+})
 
 const activeStyle = computed<ChatBubbleStyle>(() => getBubbleStyle(previewId.value))
 
@@ -59,10 +140,17 @@ function handleCancel() {
   <Teleport to="body">
     <Transition name="bubble-modal">
       <div v-if="open" class="bubble-picker-backdrop" @click.self="handleCancel">
-        <div class="bubble-picker-window" role="dialog" aria-modal="true" aria-labelledby="bubble-modal-title">
+        <div
+          ref="dialogRef"
+          class="bubble-picker-window"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bubble-modal-title"
+          tabindex="-1"
+        >
           <!-- Top Bar -->
           <header class="bubble-modal-header">
-            <button type="button" class="action-btn cancel-btn" @click="handleCancel">
+            <button ref="cancelRef" type="button" class="action-btn cancel-btn" @click="handleCancel">
               {{ copy.cancel }}
             </button>
             <h2 id="bubble-modal-title" class="modal-title">{{ copy.title }}</h2>
