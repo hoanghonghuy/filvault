@@ -108,14 +108,23 @@ export function installCallModalFocusGuard(): () => void {
     }
   }
 
+  const onFocusin = (event: FocusEvent) => {
+    const overlay = activeOverlay
+    if (!overlay || !overlay.isConnected) return
+    if (event.target instanceof Node && overlay.contains(event.target)) return
+    focusInitialControl(overlay)
+  }
+
   const observer = new MutationObserver(syncOverlay)
   observer.observe(document.body, { childList: true, subtree: true })
   document.addEventListener('keydown', onKeydown, true)
+  document.addEventListener('focusin', onFocusin, true)
   syncOverlay()
 
   return () => {
     observer.disconnect()
     document.removeEventListener('keydown', onKeydown, true)
+    document.removeEventListener('focusin', onFocusin, true)
     if (activeOverlay) deactivate()
   }
 }
