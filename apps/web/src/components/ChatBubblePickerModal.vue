@@ -72,8 +72,8 @@ function handleDocumentKeydown(event: KeyboardEvent) {
     return
   }
 
-  const first = focusables[0]
-  const last = focusables[focusables.length - 1]
+  const first = focusables[0]!
+  const last = focusables[focusables.length - 1]!
   const active = document.activeElement
   if (event.shiftKey && (active === first || !dialogRef.value.contains(active))) {
     event.preventDefault()
