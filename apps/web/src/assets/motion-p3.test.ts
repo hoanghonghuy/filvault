@@ -53,8 +53,10 @@ describe('bottom sheet focus trap contract', () => {
 
   it('keeps Tab cycling inside the panel while open', () => {
     const script = sheet.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1] ?? ''
-    expect(script).toMatch(/focusablesInPanel|querySelectorAll/)
+    expect(script).toMatch(/focusables|querySelectorAll/)
     expect(script).toMatch(/Tab/)
+    expect(script).toContain('panel.contains(active)')
+    expect(script).toMatch(/event\.shiftKey \? last : first/)
   })
 })
 
