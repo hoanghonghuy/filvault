@@ -74,6 +74,10 @@ watch(
       <div class="heic-spinner" />
       <span>HEIC</span>
     </div>
+    <div v-else-if="failed" class="preview-failed">
+      <strong>{{ copy.previewUnavailable }}</strong>
+      <span>{{ copy.openAttachment }}</span>
+    </div>
     <img
       v-else
       :src="displaySrc"
@@ -82,7 +86,7 @@ watch(
       decoding="async"
       @error="failed = true"
     />
-    <span v-if="isHeicImage && !loading" class="heic-badge">HEIC</span>
+    <span v-if="isHeicImage && !loading && !failed" class="heic-badge">HEIC</span>
   </button>
 </template>
 
@@ -113,7 +117,8 @@ watch(
   outline-offset: 2px;
 }
 
-.heic-loading-box {
+.heic-loading-box,
+.preview-failed {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -126,6 +131,16 @@ watch(
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: var(--radius-lg);
+}
+
+.preview-failed {
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.preview-failed strong {
+  color: var(--text);
+  font-size: 0.85rem;
 }
 
 .heic-spinner {
