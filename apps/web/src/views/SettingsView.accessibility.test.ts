@@ -44,4 +44,12 @@ describe('SettingsView accessibility contract', () => {
     expect(rule).not.toContain('width: 36px;')
     expect(rule).not.toContain('height: 36px;')
   })
+
+  it('falls back from a broken avatar and retries when the avatar URL changes', () => {
+    expect(source).toContain("const avatarError = ref(false)")
+    expect(source).toContain("() => auth.user?.avatarUrl")
+    expect(source).toContain("avatarError.value = false")
+    expect(source).toContain('auth.user?.avatarUrl && !avatarError')
+    expect(source).toContain('@error="avatarError = true"')
+  })
 })
