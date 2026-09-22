@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api, setTokens, ApiError } from '@/api/client'
 import { formatApiError } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
@@ -27,6 +27,14 @@ const savingProfile = ref(false)
 const changingPassword = ref(false)
 const updatingAvatar = ref(false)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
+const avatarFailed = ref(false)
+
+watch(
+  () => auth.user?.avatarUrl,
+  () => {
+    avatarFailed.value = false
+  },
+)
 
 const passwordCopy = computed(() =>
   locale.value === 'vi'
@@ -253,7 +261,7 @@ async function logout() {
     <section class="card section identity" aria-labelledby="profile-identity-heading">
       <div class="identity-row">
         <div class="avatar-uploader">
-          <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" :alt="auth.user.displayName || avatarCopy.avatarAlt" class="avatar-image" />
+          <img v-if="auth.user?.avatarUrl && !avatarFailed" :src="auth.user.avatarUrl" :alt="auth.user.displayName || avatarCopy.avatarAlt" class="avatar-image" @error="avatarFailed = true" />
           <span v-else class="avatar" aria-hidden="true">{{ initials }}</span>
           <button type="button" class="avatar-action-btn" :title="avatarCopy.changeAvatar" :aria-label="avatarCopy.changeAvatar" :disabled="updatingAvatar" @click="triggerAvatarPick"><Icon name="camera" :size="18" /></button>
           <input ref="avatarInputRef" type="file" accept="image/png,image/jpeg,image/webp,image/*,.heic,.heif,.HEIC,.HEIF" class="sr-only" @change="handleAvatarSelected" />
